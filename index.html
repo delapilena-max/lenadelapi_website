@@ -1,2 +1,59 @@
 ﻿<!doctype html>
-...paste the full index.html content above here...
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LenaDelApi — Demo</title>
+  <meta name="description" content="LenaDelApi demo site. API demo and documentation links, Terms of Service, and Privacy Policy." />
+  <link rel="canonical" href="https://delapilena-max.github.io/lenadelapi_website/" />
+  <style>
+    :root{--bg:#f7f8fb;--card:#fff;--accent:#0b5fff;--muted:#6b7280}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#0f172a;margin:0;padding:0}
+    header{background:linear-gradient(90deg,#ffffff 0%,#f1f5f9 100%);border-bottom:1px solid #e6eef8}
+    .wrap{max-width:900px;margin:28px auto;padding:24px}
+    h1{margin:0 0 8px;font-size:28px}
+    p.lead{color:var(--muted);margin:0 0 18px}
+    .card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(12,24,48,0.06)}
+    nav a{color:var(--accent);text-decoration:none;margin-right:16px}
+    footer{max-width:900px;margin:28px auto;padding:12px;color:var(--muted);font-size:13px}
+    .meta{font-size:13px;color:var(--muted);margin-top:12px}
+    .btn{display:inline-block;padding:10px 14px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none}
+    pre{background:#0b1220;color:#e6eef8;padding:12px;border-radius:8px;overflow:auto}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>LenaDelApi</h1>
+      <p class="lead">Demo site for the LenaDelApi ContentBot. Use the API for content generation and integrations.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Quick Links</h2>
+      <p class="meta">Documentation and legal pages for app review and public use.</p>
+      <ul>
+        <li><a href="tos.html">Terms of Service</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+      </ul>
+
+      <h3>Demo</h3>
+      <p class="meta">A minimal example of how to call the API (replace <code>API_KEY</code> and endpoint as needed).</p>
+      <pre>curl -X POST "https://api.example.com/v1/generate" \
+  -H "Authorization: Bearer API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"Write a short product description","max_tokens":120}</pre>
+
+      <p class="meta">Questions or issues? Contact <strong>support@lenadelapi.example</strong>.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div>© <strong>LenaDelApi</strong> — All rights reserved.</div>
+      <div class="meta">Effective date for legal pages: <strong>2026-05-11</strong></div>
+    </div>
+  </footer>
+</body>
+</html>
