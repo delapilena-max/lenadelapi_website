@@ -1,0 +1,33 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>lenadelapi_uploader - Privacy Policy</title></head>
+<body>
+<h1>lenadelapi_uploader Privacy Policy</h1>
+<p><strong>Effective date:</strong> 2026-05-11</p>
+<h2>1. Summary</h2>
+<p>We collect minimal data necessary to authenticate users and post content on their behalf. We prioritize secure storage, limited retention, and user control.</p>
+<h2>2. Data We Collect</h2>
+<ul>
+<li>OAuth access and refresh tokens required to post to connected accounts.</li>
+<li>Basic profile metadata (display name, user id).</li>
+<li>Content you create (drafts, captions, media) when you use the Service.</li>
+<li>Usage logs for debugging and abuse prevention.</li>
+</ul>
+<h2>3. How We Use Data</h2>
+<p>To authenticate and post content, provide draft previews and scheduling, refresh tokens, detect abuse, and troubleshoot errors.</p>
+<h2>4. Data Sharing</h2>
+<p>We do not sell personal data. We share data with third‑party platforms (e.g., TikTok) as required to post content and with service providers under contract.</p>
+<h2>5. Storage and Security</h2>
+<p>Tokens and sensitive data are encrypted at rest. Access to production secrets is limited to authorized systems and personnel.</p>
+<h2>6. Retention and Deletion</h2>
+<p>Tokens are retained only as needed. You may request deletion via <a href="mailto:privacy@lenadelapi.example">privacy@lenadelapi.example</a>.</p>
+<h2>7. User Controls</h2>
+<p>Revoke access via the connected platform or our settings page. Request data export or deletion by contacting us.</p>
+<h2>8. Children</h2>
+<p>The Service is not intended for children under 13.</p>
+<h2>9. Changes to Policy</h2>
+<p>We may update this policy; we will post the revised policy with an updated effective date.</p>
+<h2>10. Contact</h2>
+<p>Privacy inquiries: <a href="mailto:privacy@lenadelapi.example">privacy@lenadelapi.example</a></p>
+</body>
+</html>

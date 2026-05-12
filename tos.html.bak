@@ -1,0 +1,28 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>lenadelapi_uploader - Terms of Service</title></head>
+<body>
+<h1>lenadelapi_uploader Terms of Service</h1>
+<p><strong>Effective date:</strong> 2026-05-11</p>
+<h2>1. Acceptance of Terms</h2>
+<p>By using lenadelapi_uploader (the “Service”), you agree to these Terms of Service. If you do not agree, do not use the Service.</p>
+<h2>2. Service Description</h2>
+<p>lenadelapi_uploader provides tools to create, preview, and publish social media content on behalf of authenticated users via third‑party APIs (including TikTok).</p>
+<h2>3. User Accounts and Authorization</h2>
+<p>Authentication is performed via OAuth; you grant the Service permission to act on your behalf only for the scopes you approve. You may revoke access at any time.</p>
+<h2>4. User Content</h2>
+<p>You retain ownership of content you create. By publishing through the Service you grant lenadelapi_uploader a non‑exclusive license to store and transmit that content for the purpose of providing the Service.</p>
+<h2>5. Prohibited Uses</h2>
+<p>Do not use the Service to post illegal, infringing, abusive, or otherwise prohibited content. We may suspend or remove content or accounts that violate these Terms.</p>
+<h2>6. Tokens and Credentials</h2>
+<p>OAuth tokens and credentials are stored securely. We do not store user passwords. If a token is compromised, revoke it immediately and notify us.</p>
+<h2>7. Liability and Disclaimers</h2>
+<p>The Service is provided “as is.” To the maximum extent permitted by law, lenadelapi_uploader disclaims warranties and limits liability for damages arising from use of the Service.</p>
+<h2>8. Termination</h2>
+<p>We may suspend or terminate accounts for violations. You may terminate your account at any time; termination does not remove content already posted to third‑party platforms.</p>
+<h2>9. Changes to Terms</h2>
+<p>We may update these Terms. Continued use after changes constitutes acceptance.</p>
+<h2>10. Contact</h2>
+<p>For questions: <a href="mailto:privacy@lenadelapi.example">privacy@lenadelapi.example</a></p>
+</body>
+</html>
