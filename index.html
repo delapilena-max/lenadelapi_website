@@ -3,59 +3,50 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LenaDelApi — Demo</title>
-  <meta name="description" content="LenaDelApi demo site. API demo and documentation links, Terms of Service, and Privacy Policy." />
-  <link rel="canonical" href="https://delapilena-max.github.io/lenadelapi_website/" />
+  <title>LenaDelApi — Official Site</title>
   <style>
-    :root{--bg:#f7f8fb;--card:#fff;--accent:#0b5fff;--muted:#6b7280}
-    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#0f172a;margin:0;padding:0}
-    header{background:linear-gradient(90deg,#ffffff 0%,#f1f5f9 100%);border-bottom:1px solid #e6eef8}
-    .wrap{max-width:900px;margin:28px auto;padding:24px}
-    h1{margin:0 0 8px;font-size:28px}
-    p.lead{color:var(--muted);margin:0 0 18px}
-    .card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(12,24,48,0.06)}
-    nav a{color:var(--accent);text-decoration:none;margin-right:16px}
-    footer{max-width:900px;margin:28px auto;padding:12px;color:var(--muted);font-size:13px}
-    .meta{font-size:13px;color:var(--muted);margin-top:12px}
-    .btn{display:inline-block;padding:10px 14px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none}
-    pre{background:#0b1220;color:#e6eef8;padding:12px;border-radius:8px;overflow:auto}
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 40px; line-height: 1.6; color: #222; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 2.4rem; margin-bottom: 0.5rem; }
+    h2 { margin-top: 2rem; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer { margin-top: 3rem; font-size: 0.9rem; color: #555; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <h1>LenaDelApi</h1>
-      <p class="lead">Demo site for the LenaDelApi ContentBot. Use the API for content generation and integrations.</p>
-    </div>
-  </header>
+  <div class="container">
+    <h1>LenaDelApi</h1>
+    <p>
+      LenaDelApi is a content automation service designed to support creators, apps, and digital tools
+      with reliable, high‑quality media generation workflows.  
+      This site provides official information, documentation links, and legal policies for the service.
+    </p>
 
-  <main class="wrap">
-    <section class="card">
-      <h2>Quick Links</h2>
-      <p class="meta">Documentation and legal pages for app review and public use.</p>
-      <ul>
-        <li><a href="tos.html">Terms of Service</a></li>
-        <li><a href="privacy.html">Privacy Policy</a></li>
-      </ul>
+    <h2>About the Service</h2>
+    <p>
+      LenaDelApi enables applications to integrate automated content generation into their workflows.
+      It is built for stability, safety, and compliance with platform policies, including TikTok’s
+      developer requirements.  
+      If you are integrating with LenaDelApi, please refer to your developer dashboard for API access.
+    </p>
 
-      <h3>Demo</h3>
-      <p class="meta">A minimal example of how to call the API (replace <code>API_KEY</code> and endpoint as needed).</p>
-      <pre>curl -X POST "https://api.example.com/v1/generate" \
-  -H "Authorization: Bearer API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"Write a short product description","max_tokens":120}</pre>
+    <h2>Support</h2>
+    <p>
+      For questions, integration support, or general inquiries, contact:  
+      <strong>delapliena@gmail.com</strong>
+    </p>
 
-      <p class="meta">Questions or issues? Contact <strong>delapilena@gmail.com</strong>.</p>
-    </section>
-  </main>
+    <h2>Legal</h2>
+    <ul>
+      <li><a href="privacy.html">Privacy Policy</a></li>
+      <li><a href="terms.html">Terms of Service</a></li>
+    </ul>
 
-  <footer>
-    <div class="wrap">
-      <div>© <strong>LenaDelApi</strong> — All rights reserved.</div>
-      <div class="meta">Effective date for legal pages: <strong>2026-05-11</strong></div>
-    </div>
-  </footer>
+    <footer>
+      © LenaDelApi — All rights reserved.<br>
+      Effective date for legal pages: 2026‑05‑11
+    </footer>
+  </div>
 </body>
 </html>
-
-
