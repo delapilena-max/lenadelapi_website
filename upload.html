@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LenaDelApi — Upload Video</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}
+    .box{max-width:720px;margin:0 auto}
+    label{display:block;margin:12px 0 6px}
+    progress{width:100%}
+    pre{background:#f6f6f6;padding:12px;border-radius:6px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Upload Video</h1>
+
+    <label for="apiUrl">API Endpoint</label>
+    <input id="apiUrl" type="text" value="https://api.example.com/v1/upload" style="width:100%"/>
+
+    <label for="token">Authorization Token (paste here)</label>
+    <input id="token" type="password" placeholder="Bearer token or classic token" style="width:100%"/>
+
+    <label for="file">Choose video</label>
+    <input id="file" type="file" accept="video/*" />
+
+    <label for="title">Title (optional)</label>
+    <input id="title" type="text" style="width:100%" placeholder="Video title"/>
+
+    <div style="margin-top:12px">
+      <button id="uploadBtn">Upload</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <progress id="progress" value="0" max="100" style="display:none"></progress>
+    </div>
+
+    <h3>Response</h3>
+    <pre id="output">No upload yet.</pre>
+  </div>
+
+  <script>
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('file');
+    const apiUrlInput = document.getElementById('apiUrl');
+    const tokenInput = document.getElementById('token');
+    const titleInput = document.getElementById('title');
+    const progress = document.getElementById('progress');
+    const output = document.getElementById('output');
+
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) { output.textContent = 'Pick a video file first.'; return; }
+
+      const apiUrl = apiUrlInput.value.trim();
+      const token = tokenInput.value.trim();
+      if (!apiUrl) { output.textContent = 'Set the API endpoint.'; return; }
+      if (!token) { output.textContent = 'Paste your token in the token field.'; return; }
+
+      const form = new FormData();
+      form.append('file', file);
+      form.append('title', titleInput.value || '');
+
+      progress.style.display = 'block';
+      progress.value = 0;
+      output.textContent = 'Uploading…';
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', apiUrl, true);
+        xhr.setRequestHeader('Authorization', token.startsWith('Bearer') ? token : 'Bearer ' + token);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progress.value = pct;
+          }
+        };
+
+        xhr.onload = () => {
+          progress.value = 100;
+          try {
+            const json = JSON.parse(xhr.responseText || '{}');
+            output.textContent = JSON.stringify(json, null, 2);
+          } catch (err) {
+            output.textContent = xhr.status + ' — ' + xhr.responseText;
+          }
+        };
+
+        xhr.onerror = () => {
+          output.textContent = 'Network error during upload.';
+        };
+
+        xhr.send(form);
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
