@@ -1,0 +1,1 @@
+C:\Program Files\Python311\python.exe: can't open file 'C:\\projects\\ai\\content_bot\\lenadelapi-website\\nodes\\ai_lady\\pipeline.py': [Errno 2] No such file or directory
