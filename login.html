@@ -1,0 +1,40 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LenaDelApi — Login</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 40px; line-height: 1.6; color: #222; }
+    .container { max-width: 600px; margin: 0 auto; text-align: center; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    a.button {
+      display: inline-block;
+      padding: 12px 20px;
+      background: #000;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 1.1rem;
+      margin-top: 20px;
+    }
+    a.button:hover { opacity: 0.85; }
+    footer { margin-top: 3rem; font-size: 0.9rem; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Log in to LenaDelApi</h1>
+    <p>Use TikTok Login to authenticate securely and access your content tools.</p>
+
+    <a class="button"
+       href="https://www.tiktok.com/auth/authorize?client_key=sbaw22warhcfv3ggeu&response_type=code&scope=user.info.basic&redirect_uri=https%3A%2F%2Fdelapilena-max.github.io%2Flenadelapi_website%2Fauth%2Ftiktok%2Fcallback.html&state=login">
+      Log in with TikTok
+    </a>
+
+    <footer>
+      © LenaDelApi — All rights reserved.
+    </footer>
+  </div>
+</body>
+</html>
