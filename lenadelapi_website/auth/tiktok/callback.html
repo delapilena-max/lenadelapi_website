@@ -1,0 +1,7 @@
+﻿<!doctype html><meta charset="utf-8"><title>TikTok OAuth Callback</title>
+<script>
+const p=new URLSearchParams(location.search),c=p.get('code'),e=p.get('error')||p.get('error_description');
+if(c) document.write('code='+c);
+else if(e) document.write('error='+e);
+else document.write('no_code_or_error:'+location.search);
+</script>

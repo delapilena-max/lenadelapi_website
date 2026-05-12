@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Login with TikTok</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>body{font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:720px;margin:auto}.btn{display:inline-block;padding:12px 18px;background:#00a0ff;color:#fff;border-radius:6px;text-decoration:none;font-weight:600}pre{background:#f6f6f6;padding:12px;border-radius:6px;overflow:auto}.note{color:#666;margin-top:12px}</style>
+</head>
+<body>
+  <h1>Login with TikTok</h1>
+  <p>Click the button below to start the OAuth flow.</p>
+  <a id="authBtn" class="btn" href="#" rel="noopener noreferrer">Authorize with TikTok</a>
+  <h2>Debug output</h2>
+  <pre id="debug">Ready</pre>
+  <p class="note">If redirected to the callback, copy the <strong>code</strong> query parameter and paste it here.</p>
+  <script>
+    const oauthUrl = "https://open.tiktokapis.com/platform/oauth/connect"
+      + "?client_key=sbaw22warhcfv3ggeu"
+      + "&response_type=code"
+      + "&scope=user.info.basic%20video.upload%20content.create%20content.publish"
+      + "&redirect_uri=" + encodeURIComponent("https://delapilena-max.github.io/lenadelapi_website/auth/tiktok/callback.html")
+      + "&state=demo";
+    document.getElementById('authBtn').href = oauthUrl;
+    document.getElementById('debug').textContent = oauthUrl;
+  </script>
+</body>
+</html>
