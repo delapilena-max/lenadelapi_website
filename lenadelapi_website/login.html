@@ -1,2 +1,35 @@
-﻿<!doctype html><html><head><meta http-equiv="refresh" content="0;url=/lenadelapi_website/login.html"><script>location.replace("/lenadelapi_website/login.html");</script><title>Redirecting…</title></head><body>Redirecting to login…</body></html>
-
+﻿<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Login Demo</title></head>
+<body>
+<h1>Login Demo</h1>
+<div id="status">Not logged in</div>
+<form id="loginForm">
+  <input id="user" placeholder="demo user" />
+  <button type="submit">Sign in</button>
+</form>
+<button id="logout" style="display:none">Sign out</button>
+<script>
+const status = document.getElementById('status');
+const loginForm = document.getElementById('loginForm');
+const logoutBtn = document.getElementById('logout');
+function setLoggedIn(user){
+  document.cookie = "demo_user="+encodeURIComponent(user)+";path=/";
+  status.textContent = "Signed in as " + user;
+  loginForm.style.display = "none";
+  logoutBtn.style.display = "inline";
+}
+function clearLogin(){
+  document.cookie = "demo_user=;path=/;max-age=0";
+  status.textContent = "Not logged in";
+  loginForm.style.display = "block";
+  logoutBtn.style.display = "none";
+}
+loginForm.addEventListener('submit', e => { e.preventDefault(); setLoggedIn(document.getElementById('user').value || 'demo'); });
+logoutBtn.addEventListener('click', clearLogin);
+(function init(){
+  if(document.cookie.match(/demo_user=/)){ setLoggedIn(decodeURIComponent(document.cookie.split('demo_user=')[1].split(';')[0])); }
+})();
+</script>
+</body>
+</html>
