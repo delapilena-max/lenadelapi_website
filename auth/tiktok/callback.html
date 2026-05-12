@@ -1,23 +1,24 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>TikTok OAuth Callback</title>
-  </head>
-  <body>
-    <h2>TikTok OAuth Callback</h2>
-    <p>You may now close this window.</p>
-
-    <script>
-      // Capture the full redirect URL (with code)
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-
-      // Send the code back to your local app (optional)
-      if (code) {
-        fetch("http://127.0.0.1:5000/oauth/callback?code=" + code)
-          .catch(() => {});
-      }
-    </script>
-  </body>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TikTok OAuth Callback</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="font-family:Arial,Helvetica,sans-serif;padding:24px;">
+  <h1>TikTok OAuth Callback</h1>
+  <p id="message">You may now close this window.</p>
+  <pre id="oauth-code" style="background:#f6f6f6;padding:12px;border-radius:6px;white-space:pre-wrap;"></pre>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      document.getElementById('message').innerText = 'OAuth code found — copy it now.';
+      document.getElementById('oauth-code').innerText = code;
+      fetch("http://127.0.0.1:5000/oauth/callback?code=" + encodeURIComponent(code)).catch(()=>{});
+    } else {
+      document.getElementById('oauth-code').innerText = 'NO_CODE_FOUND';
+    }
+  </script>
+</body>
 </html>
