@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -13,7 +13,7 @@
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code) {
-      document.getElementById('message').innerText = 'OAuth code found — copy it now.';
+      document.getElementById('message').innerText = 'OAuth code found â€” copy it now.';
       document.getElementById('oauth-code').innerText = code;
       fetch("http://127.0.0.1:5000/oauth/callback?code=" + encodeURIComponent(code)).catch(()=>{});
     } else {
@@ -22,3 +22,4 @@
   </script>
 </body>
 </html>
+
