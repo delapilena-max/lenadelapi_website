@@ -1,0 +1,13 @@
+{
+  "platform": "instagram_reels",
+  "api_body": {
+    "media_type": "REELS",
+    "caption": "pigeon_with_intent",
+    "share_to_feed": true,
+    "thumb_offset": 1000
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+  "note": "Video must be hosted at a public URL for Instagram API.",
+  "episode_id": "6484E41A5475",
+  "packaged_at": "2026-04-17T01:59:07.435246+00:00"
+}

@@ -1,0 +1,51 @@
+{
+  "metadata_template_version": "1.0",
+  "episode_type": "heroic_rescue",
+
+  "title_formats": [
+    "He really thought he was saving the pig",
+    "Another heroic rescue attempt",
+    "He takes his job way too seriously",
+    "Protecting the pig at all costs",
+    "This pig needs a new bodyguard"
+  ],
+
+  "description_formats": [
+    "He swore an oath to protect the pig… even from this.",
+    "Another day, another crisis averted. Kind of.",
+    "He’s doing his best. The pig is doing nothing.",
+    "The pig didn’t ask for this. He volunteered anyway.",
+    "Heroic rescue #{{threat_name}} edition."
+  ],
+
+  "hashtag_sets": [
+    ["#funny", "#shorts", "#comedy", "#animation", "#pig"],
+    ["#tiktok", "#viral", "#brainrot", "#meme", "#cartoon"],
+    ["#skit", "#lol", "#relatable", "#hero", "#parody"],
+    ["#dailyshorts", "#fyp", "#goofy", "#protectthepig", "#absurd"]
+  ],
+
+  "platform_overrides": {
+    "tiktok": {
+      "max_title_length": 150,
+      "max_description_length": 2200,
+      "preferred_hashtags": ["#fyp", "#tiktok", "#viral"]
+    },
+    "youtube_shorts": {
+      "max_title_length": 100,
+      "max_description_length": 5000,
+      "preferred_hashtags": ["#shorts"]
+    },
+    "instagram_reels": {
+      "max_title_length": 2200,
+      "max_description_length": 2200,
+      "preferred_hashtags": ["#reels", "#explore"]
+    }
+  },
+
+  "dynamic_fields": {
+    "insert_threat_name": true,
+    "insert_episode_number": true,
+    "insert_timestamp": true
+  }
+}

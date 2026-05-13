@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "rolling_pinecone #Shorts",
+      "description": "A pinecone rolling slowly across the ground with no urgency.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\649035BC506D_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "649035BC506D",
+  "packaged_at": "2026-04-17T01:59:07.467990+00:00"
+}

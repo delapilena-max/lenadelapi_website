@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "node platforms that can actually run today:
+
+### `nodes/ai_lady/posting_rules.json` — updated platforms
+```json
+{
+  "enabled": true,
+  "node_type": "persona",
+  "build_face_cache": true,
+  "face_cache_count": 1_type": "persona",
+  "build_face_cache": true,
+  "face,
+  "queue_min_threshold": 3,
+  "platforms": ["tiktok", "youtube"],
+  "frequency": {
+    "min_per_week": 5,
+    "max_per_week": 7
+  },
+  "post_commands": {
+    "tiktok":  ["upload_tiktok_personas.py"],
+    "youtube": ["uploaders/youtube_shorts.py"]
+  }
+}

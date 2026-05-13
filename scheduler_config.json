@@ -1,0 +1,10 @@
+{
+  "posts_per_day": 2,
+  "backlog_days_target": 30,
+  "platforms": ["tiktok", "shorts", "reels"],
+  "time_windows": {
+    "tiktok": ["11:00", "19:00"],
+    "shorts": ["12:00", "17:00"],
+    "reels": ["09:00", "18:00"]
+  }
+}

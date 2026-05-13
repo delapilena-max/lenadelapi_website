@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "rogue_shadow #Shorts",
+      "description": "A shadow that appears slightly too close for comfort.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\D28026B23C76_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "D28026B23C76",
+  "packaged_at": "2026-04-17T01:59:07.451616+00:00"
+}

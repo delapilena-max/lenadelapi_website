@@ -1,0 +1,89 @@
+{
+  "episode_type": "heroic_rescue",
+  "version": "1.0",
+
+  "characters": {
+    "main": "protagonist",
+    "companion": "pig"
+  },
+
+  "beats": {
+    "setup": {
+      "camera": "medium_side_profile",
+      "emotion": "overly_sincere",
+      "lines_pool": [
+        "I’ll keep you safe.",
+        "No one touches my pig.",
+        "I was born for this.",
+        "Stay behind me.",
+        "This is what training was for."
+      ]
+    },
+
+    "emotional_beat": {
+      "camera": "closeup",
+      "emotion": "tender",
+      "lines_pool": [
+        "You’re all I have.",
+        "I won’t let anything happen to you.",
+        "Trust me.",
+        "I’ve got you."
+      ]
+    },
+
+    "threat": {
+      "threat_name": "<VARIABLE>",
+      "threat_type": "<object|creature|environment>",
+      "behavior": "<approaches|falls|moves|exists>",
+      "description": "<short description of the threat>"
+    },
+
+    "escalation": {
+      "camera": "dynamic_close",
+      "emotion": "panic_overreaction",
+      "lines_pool": [
+        "GET BACK!",
+        "NOT AGAIN—",
+        "IT’S HAPPENING.",
+        "STAY BEHIND ME!",
+        "THIS IS HOW I DIE."
+      ],
+      "actions_pool": [
+        "shield_pig",
+        "dramatic_dive",
+        "spread_arms",
+        "internal_scream",
+        "charge_forward",
+        "collapse_theatrically"
+      ]
+    },
+
+    "punchline": {
+      "camera": "static",
+      "event": "<anticlimax_event>",
+      "lines_pool": [
+        "Tell my story…",
+        "Remember me…",
+        "Save yourself…",
+        "It’s too late…"
+      ]
+    },
+
+    "aftermath": {
+      "camera": "wide",
+      "resolution_pool": [
+        "Heroic rescue successful.",
+        "Crisis averted.",
+        "Another day saved.",
+        "Threat neutralized.",
+        "Training complete."
+      ]
+    }
+  },
+
+  "metadata": {
+    "threat_id": "<unique_id>",
+    "timestamp": "<generated_at>",
+    "tags": ["heroic_rescue", "parody", "brainrot", "absurdist"]
+  }
+}

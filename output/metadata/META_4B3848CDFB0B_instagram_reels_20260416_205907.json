@@ -1,0 +1,13 @@
+{
+  "platform": "instagram_reels",
+  "api_body": {
+    "media_type": "REELS",
+    "caption": "dramatic_dandelion_puff",
+    "share_to_feed": true,
+    "thumb_offset": 1000
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+  "note": "Video must be hosted at a public URL for Instagram API.",
+  "episode_id": "4B3848CDFB0B",
+  "packaged_at": "2026-04-17T01:59:07.468361+00:00"
+}

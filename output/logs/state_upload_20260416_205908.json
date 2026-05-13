@@ -1,0 +1,367 @@
+{
+  "step": "upload",
+  "timestamp": "20260416_205908",
+  "count": 60,
+  "data": [
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "962B429A6F0D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "962B429A6F0D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "962B429A6F0D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "6E466792EAA5",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "6E466792EAA5",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "6E466792EAA5",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "823BD5AF6B0F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "823BD5AF6B0F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "823BD5AF6B0F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "F0FAEABBFB25",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "F0FAEABBFB25",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "F0FAEABBFB25",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "1A8A2CC6DF16",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "1A8A2CC6DF16",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "1A8A2CC6DF16",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "D8970D6F8D04",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "D8970D6F8D04",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "D8970D6F8D04",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "2C4C2956D3BB",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "2C4C2956D3BB",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "2C4C2956D3BB",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "BF6785447CDA",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "BF6785447CDA",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "BF6785447CDA",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "453CD815BDFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "453CD815BDFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "453CD815BDFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "B995E3C6E207",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "B995E3C6E207",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "B995E3C6E207",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "6484E41A5475",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "6484E41A5475",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "6484E41A5475",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "15FFC21AC9EE",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "15FFC21AC9EE",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "15FFC21AC9EE",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "6455228C1A70",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "6455228C1A70",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "6455228C1A70",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "D28026B23C76",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "D28026B23C76",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "D28026B23C76",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "A04DE657906F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "A04DE657906F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "A04DE657906F",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "0613EBFDA4AF",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "0613EBFDA4AF",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "0613EBFDA4AF",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "B4144F4D711A",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "B4144F4D711A",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "B4144F4D711A",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "649035BC506D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "649035BC506D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "649035BC506D",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "4B3848CDFB0B",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "4B3848CDFB0B",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "4B3848CDFB0B",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    },
+    {
+      "platform": "youtube_shorts",
+      "episode_id": "428BC8AEDEFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\youtube_client_secret.json\nDownload from Google Cloud Console"
+    },
+    {
+      "platform": "tiktok",
+      "episode_id": "428BC8AEDEFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\tiktok_credentials.json\nCreate at developers.tiktok.com"
+    },
+    {
+      "platform": "instagram_reels",
+      "episode_id": "428BC8AEDEFD",
+      "status": "error",
+      "error": "Missing C:\\content_bot\\config\\credentials\\instagram_credentials.json\nCreate at developers.facebook.com"
+    }
+  ]
+}

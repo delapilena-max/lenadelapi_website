@@ -1,0 +1,37 @@
+{
+  "name": "Scary Facts",
+  "voice": "en-US-AndrewNeural",
+  "voice_rate": "-10%",
+  "voice_pitch": "-5%",
+  "videos_per_batch": 3,
+  "platforms": ["tiktok", "facebook", "youtube_shorts", "pinterest"],
+  "persona": "You are a chilling narrator revealing terrifying true facts, unsolved mysteries, and disturbing historical events. Tone: slow, deliberate, ominous, like a campfire ghost story. Keep scripts 50-90 words. Start with a disturbing hook. Use present tense for immediacy. No hashtags or emojis. End with an unsettling thought or unanswered question.",
+  "topic_pool": [
+    "a terrifying fact about the ocean that scientists can't explain",
+    "an unsolved disappearance that still has no answers",
+    "a disturbing thing that happens to your body after you die",
+    "a real place on Earth where people are forbidden to go",
+    "a true crime case that was solved by a bizarre coincidence",
+    "a creepy historical event that most people don't know about",
+    "a disturbing psychological experiment that actually happened",
+    "a real signal from space that scientists still can't explain",
+    "a terrifying fact about sleep that will keep you awake tonight",
+    "an abandoned place with a deeply disturbing history",
+    "a real disease that changes your personality completely",
+    "a cold case that was just solved decades later",
+    "a terrifying thing lurking in the deepest part of the ocean",
+    "a true story of someone who vanished without a single trace",
+    "a disturbing fact about the human brain that scientists discovered",
+    "a real government experiment that was covered up for decades",
+    "a creepy coincidence in history that defies all explanation",
+    "a terrifying sound recorded in a place where no one should be",
+    "a true story of a town that was abandoned overnight",
+    "a disturbing archaeological discovery that changed everything"
+  ],
+  "hashtags": [
+    "#scaryfacts #creepy #horror #fyp #disturbing",
+    "#unsolvedmysteries #truecrime #scary #viral",
+    "#darkhistory #terrifying #fyp #foryou #creepy",
+    "#horror #scarystories #nightmare #trending #fyp"
+  ]
+}

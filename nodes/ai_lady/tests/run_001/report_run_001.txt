@@ -1,0 +1,51 @@
+==============================================================
+  IDENTITY STABILITY TEST — run_001
+  Project: nodes/ai_lady     Timestamp: 2026-05-09 00:24:17
+==============================================================
+
+PREVIEW RESULTS
+----------------------------------------
+  preview1           ✓ PASS  100/100  — Primary — neutral tight crop
+  preview2           ✓ PASS  100/100  — Primary — brightness+sharpen
+  preview3           ✓ PASS   86/100  — Backup — baseline contrast
+              ↳ Under-exposed (brightness 72.7)
+              ↳ Shadow crushing: 9.77%
+  preview4           ✓ PASS   86/100  — Backup — contrast+sharpen boost
+              ↳ Under-exposed (brightness 72.4)
+              ↳ Shadow crushing: 14.27%
+  preview5           ✓ PASS   86/100  — Backup — warm grade
+              ↳ Under-exposed (brightness 77.8)
+              ↳ Shadow crushing: 3.17%
+
+BEST 3
+----------------------------------------
+  preview1  (100/100)  Primary — neutral tight crop
+  preview2  (100/100)  Primary — brightness+sharpen
+  preview3  (86/100)  Backup — baseline contrast
+
+WORST 2
+----------------------------------------
+  preview4  (86/100)  Backup — contrast+sharpen boost
+  preview5  (86/100)  Backup — warm grade
+
+COMMON FAILURE MODES
+----------------------------------------
+  [1x]  Under-exposed (brightness 72.7)
+  [1x]  Shadow crushing: 9.77%
+  [1x]  Under-exposed (brightness 72.4)
+  [1x]  Shadow crushing: 14.27%
+  [1x]  Under-exposed (brightness 77.8)
+  [1x]  Shadow crushing: 3.17%
+
+RECOMMENDED FIXES
+----------------------------------------
+  1. UNDEREXPOSED: Gamma +15% on ref, or CFG +0.5 + 'bright
+     lighting' prompt.
+  2. SHADOW CRUSH: Lift black point to 10 in Levels.
+
+NEXT STEP
+----------------------------------------
+  ✅ All 5 passed — references stable. Proceed to full-res
+  generation.
+
+==============================================================

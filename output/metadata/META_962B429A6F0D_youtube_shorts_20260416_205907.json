@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "rogue_balloon #Shorts",
+      "description": "A single red balloon drifting unpredictably toward them.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\962B429A6F0D_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "962B429A6F0D",
+  "packaged_at": "2026-04-17T01:59:07.392820+00:00"
+}

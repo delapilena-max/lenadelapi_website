@@ -1,0 +1,122 @@
+[
+  {
+    "threat_name": "wandering_leaf_cluster",
+    "threat_type": "environment",
+    "behavior": "drifts",
+    "description": "A tiny cluster of leaves drifting together like a confused squad."
+  },
+  {
+    "threat_name": "hesitant_bubble",
+    "threat_type": "object",
+    "behavior": "floats",
+    "description": "A bubble that rises, pauses, and continues like it forgot something."
+  },
+  {
+    "threat_name": "micro_tumbleweed",
+    "threat_type": "object",
+    "behavior": "rolls",
+    "description": "A tiny tumbleweed rolling with zero urgency."
+  },
+  {
+    "threat_name": "determined_ant",
+    "threat_type": "creature",
+    "behavior": "walks",
+    "description": "A single ant marching with suspicious confidence."
+  },
+  {
+    "threat_name": "rogue_postit",
+    "threat_type": "object",
+    "behavior": "flutters",
+    "description": "A sticky note drifting like it has a message from beyond."
+  },
+  {
+    "threat_name": "dramatic_petunia",
+    "threat_type": "object",
+    "behavior": "sways",
+    "description": "A lone petunia swaying dramatically in a nonexistent breeze."
+  },
+  {
+    "threat_name": "confused_paper_plane",
+    "threat_type": "object",
+    "behavior": "glides",
+    "description": "A paper airplane gliding in slow, chaotic arcs."
+  },
+  {
+    "threat_name": "slow_spinning_coin",
+    "threat_type": "object",
+    "behavior": "spins",
+    "description": "A coin spinning lazily on its edge before giving up."
+  },
+  {
+    "threat_name": "approaching_duckling",
+    "threat_type": "creature",
+    "behavior": "walks",
+    "description": "A duckling waddling closer with zero awareness of the drama."
+  },
+  {
+    "threat_name": "rogue_marshmallow",
+    "threat_type": "object",
+    "behavior": "bounces",
+    "description": "A marshmallow bouncing once, then stopping like it reconsidered."
+  },
+  {
+    "threat_name": "hovering_dust_particle",
+    "threat_type": "environment",
+    "behavior": "floats",
+    "description": "A single dust mote suspended in a sunbeam."
+  },
+  {
+    "threat_name": "rolling_grape",
+    "threat_type": "object",
+    "behavior": "rolls",
+    "description": "A grape rolling slowly across the ground with no destination."
+  },
+  {
+    "threat_name": "pigeon_head_tilt",
+    "threat_type": "creature",
+    "behavior": "stares",
+    "description": "A pigeon tilting its head in a way that feels judgmental."
+  },
+  {
+    "threat_name": "rogue_sippy_cup",
+    "threat_type": "object",
+    "behavior": "tips",
+    "description": "A sippy cup slowly tipping over like it’s had enough."
+  },
+  {
+    "threat_name": "dramatic_sunbeam",
+    "threat_type": "environment",
+    "behavior": "shifts",
+    "description": "A sunbeam shifting slightly, as if spotlighting the moment."
+  },
+  {
+    "threat_name": "micro_snowflake",
+    "threat_type": "environment",
+    "behavior": "falls",
+    "description": "A single snowflake drifting down despite it not being winter."
+  },
+  {
+    "threat_name": "wandering_pebble",
+    "threat_type": "object",
+    "behavior": "slides",
+    "description": "A pebble sliding a few millimeters for no clear reason."
+  },
+  {
+    "threat_name": "confused_ladybug",
+    "threat_type": "creature",
+    "behavior": "crawls",
+    "description": "A ladybug crawling in a perfect circle like it’s buffering."
+  },
+  {
+    "threat_name": "rogue_feather_cluster",
+    "threat_type": "object",
+    "behavior": "falls",
+    "description": "A small cluster of feathers drifting downward in slow motion."
+  },
+  {
+    "threat_name": "dramatic_dust_bunny",
+    "threat_type": "object",
+    "behavior": "drifts",
+    "description": "A dust bunny drifting across the floor like a tiny tumbleweed."
+  }
+]

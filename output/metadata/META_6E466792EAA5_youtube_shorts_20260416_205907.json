@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "staring_squirrel #Shorts",
+      "description": "A squirrel frozen in place, staring with unsettling intensity.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\6E466792EAA5_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "6E466792EAA5",
+  "packaged_at": "2026-04-17T01:59:07.392820+00:00"
+}

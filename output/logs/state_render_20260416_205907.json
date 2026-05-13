@@ -1,0 +1,127 @@
+{
+  "step": "render",
+  "timestamp": "20260416_205907",
+  "count": 20,
+  "data": [
+    {
+      "episode_id": "962B429A6F0D",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\962B429A6F0D_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "6E466792EAA5",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\6E466792EAA5_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "823BD5AF6B0F",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\823BD5AF6B0F_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "F0FAEABBFB25",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\F0FAEABBFB25_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "1A8A2CC6DF16",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\1A8A2CC6DF16_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "D8970D6F8D04",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\D8970D6F8D04_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "2C4C2956D3BB",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\2C4C2956D3BB_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "BF6785447CDA",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\BF6785447CDA_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "453CD815BDFD",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "B995E3C6E207",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\B995E3C6E207_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "6484E41A5475",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "15FFC21AC9EE",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\15FFC21AC9EE_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "6455228C1A70",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\6455228C1A70_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "D28026B23C76",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\D28026B23C76_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "A04DE657906F",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\A04DE657906F_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "0613EBFDA4AF",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\0613EBFDA4AF_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "B4144F4D711A",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\B4144F4D711A_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "649035BC506D",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\649035BC506D_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "4B3848CDFB0B",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+      "status": "dry_run"
+    },
+    {
+      "episode_id": "428BC8AEDEFD",
+      "command": "[dry-run: skipped]",
+      "output_path": "C:\\content_bot\\output\\renders\\428BC8AEDEFD_20260416_205907.mp4",
+      "status": "dry_run"
+    }
+  ]
+}

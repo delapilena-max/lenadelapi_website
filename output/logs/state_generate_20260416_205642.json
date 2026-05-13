@@ -1,0 +1,567 @@
+{
+  "step": "generate",
+  "timestamp": "20260416_205642",
+  "count": 20,
+  "data": [
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "962B429A6F0D",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 0,
+      "created_at": "2026-04-17T01:56:42.217749+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rogue_balloon",
+        "threat_type": "object",
+        "behavior": "floats",
+        "description": "A single red balloon drifting unpredictably toward them."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_962B429A6F0D_20260416_205642_000.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "6E466792EAA5",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 1,
+      "created_at": "2026-04-17T01:56:42.217749+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "staring_squirrel",
+        "threat_type": "creature",
+        "behavior": "stares",
+        "description": "A squirrel frozen in place, staring with unsettling intensity."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_6E466792EAA5_20260416_205642_001.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "823BD5AF6B0F",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 2,
+      "created_at": "2026-04-17T01:56:42.227008+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "approaching_roomba",
+        "threat_type": "object",
+        "behavior": "moves",
+        "description": "A Roomba slowly inching forward at a painfully slow speed."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_823BD5AF6B0F_20260416_205642_002.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "F0FAEABBFB25",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 3,
+      "created_at": "2026-04-17T01:56:42.227716+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rogue_receipt",
+        "threat_type": "object",
+        "behavior": "blows",
+        "description": "A shopping receipt fluttering in the wind like a warning."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_F0FAEABBFB25_20260416_205642_003.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "1A8A2CC6DF16",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 4,
+      "created_at": "2026-04-17T01:56:42.229735+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "dramatic_butterfly",
+        "threat_type": "creature",
+        "behavior": "flutters",
+        "description": "A butterfly flapping dramatically as if announcing doom."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_1A8A2CC6DF16_20260416_205642_004.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "D8970D6F8D04",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 5,
+      "created_at": "2026-04-17T01:56:42.233863+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rolling_toy_car",
+        "threat_type": "object",
+        "behavior": "rolls",
+        "description": "A tiny toy car rolling slowly toward them with no clear motive."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_D8970D6F8D04_20260416_205642_005.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "2C4C2956D3BB",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 6,
+      "created_at": "2026-04-17T01:56:42.233863+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "judgmental_cat",
+        "threat_type": "creature",
+        "behavior": "stares",
+        "description": "A cat sitting nearby, judging everything silently."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_2C4C2956D3BB_20260416_205642_006.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "BF6785447CDA",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 7,
+      "created_at": "2026-04-17T01:56:42.233863+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rogue_bubble",
+        "threat_type": "object",
+        "behavior": "floats",
+        "description": "A soap bubble drifting closer, wobbling ominously."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_BF6785447CDA_20260416_205642_007.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "453CD815BDFD",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 8,
+      "created_at": "2026-04-17T01:56:42.245605+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "plastic_bag_entity",
+        "threat_type": "object",
+        "behavior": "drifts",
+        "description": "A plastic bag drifting like a ghost with no purpose."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_453CD815BDFD_20260416_205642_008.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "B995E3C6E207",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 9,
+      "created_at": "2026-04-17T01:56:42.250769+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "slow_falling_acorn",
+        "threat_type": "environment",
+        "behavior": "falls",
+        "description": "An acorn descending slowly from above, threatening nothing."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_B995E3C6E207_20260416_205642_009.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "6484E41A5475",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 10,
+      "created_at": "2026-04-17T01:56:42.250769+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "pigeon_with_intent",
+        "threat_type": "creature",
+        "behavior": "walks",
+        "description": "A pigeon walking directly toward them with suspicious confidence."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_6484E41A5475_20260416_205642_010.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "15FFC21AC9EE",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 11,
+      "created_at": "2026-04-17T01:56:42.250769+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rogue_feather",
+        "threat_type": "object",
+        "behavior": "falls",
+        "description": "A feather drifting down like a soft omen."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_15FFC21AC9EE_20260416_205642_011.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "6455228C1A70",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 12,
+      "created_at": "2026-04-17T01:56:42.250769+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "toddler_with_juice_box",
+        "threat_type": "creature",
+        "behavior": "approaches",
+        "description": "A toddler approaching slowly, gripping a juice box with power."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_6455228C1A70_20260416_205642_012.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "D28026B23C76",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 13,
+      "created_at": "2026-04-17T01:56:42.259293+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rogue_shadow",
+        "threat_type": "environment",
+        "behavior": "exists",
+        "description": "A shadow that appears slightly too close for comfort."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_D28026B23C76_20260416_205642_013.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "A04DE657906F",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 14,
+      "created_at": "2026-04-17T01:56:42.259293+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "wandering_frisbee",
+        "threat_type": "object",
+        "behavior": "glides",
+        "description": "A frisbee gliding lazily through the air toward them."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_A04DE657906F_20260416_205642_014.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "0613EBFDA4AF",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 15,
+      "created_at": "2026-04-17T01:56:42.259293+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "micro_sprinkler_burst",
+        "threat_type": "environment",
+        "behavior": "sprays",
+        "description": "A sprinkler sputtering a single rogue water droplet."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_0613EBFDA4AF_20260416_205642_015.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "B4144F4D711A",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 16,
+      "created_at": "2026-04-17T01:56:42.265250+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "confused_drone",
+        "threat_type": "object",
+        "behavior": "hovers",
+        "description": "A drone hovering nearby, clearly lost and confused."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_B4144F4D711A_20260416_205642_016.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "649035BC506D",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 17,
+      "created_at": "2026-04-17T01:56:42.267447+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "rolling_pinecone",
+        "threat_type": "object",
+        "behavior": "rolls",
+        "description": "A pinecone rolling slowly across the ground with no urgency."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_649035BC506D_20260416_205642_017.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "4B3848CDFB0B",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 18,
+      "created_at": "2026-04-17T01:56:42.267447+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "dramatic_dandelion_puff",
+        "threat_type": "object",
+        "behavior": "floats",
+        "description": "A dandelion puff drifting like it has a tragic backstory."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_4B3848CDFB0B_20260416_205642_018.json"
+    },
+    {
+      "_stub": true,
+      "_note": "Replace with your actual episode_template.json",
+      "episode_id": "428BC8AEDEFD",
+      "batch_name": "threats_batch_01.json",
+      "batch_index": 19,
+      "created_at": "2026-04-17T01:56:42.267447+00:00",
+      "status": "generated",
+      "content": {
+        "threat_name": "mailbox_flag_movement",
+        "threat_type": "object",
+        "behavior": "moves",
+        "description": "A mailbox flag slowly rising for no apparent reason."
+      },
+      "storyboard": {
+        "_stub": true,
+        "_note": "Replace with your actual storyboard_template.json"
+      },
+      "subtitle_timing": {
+        "_stub": true,
+        "_note": "Replace with your actual subtitle_timing.json"
+      },
+      "pose_manifest": {
+        "_stub": true,
+        "_note": "Replace with your actual pose_list.json"
+      },
+      "_filepath": "C:\\content_bot\\output\\episodes\\EP_428BC8AEDEFD_20260416_205642_019.json"
+    }
+  ]
+}

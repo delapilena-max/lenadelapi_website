@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "plastic_bag_entity #Shorts",
+      "description": "A plastic bag drifting like a ghost with no purpose.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "453CD815BDFD",
+  "packaged_at": "2026-04-17T01:59:07.426501+00:00"
+}

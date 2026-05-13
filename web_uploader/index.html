@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>TikTok Demo Uploader</h2>
+
+  <button onclick="window.location='/oauth/start'">Login with TikTok</button>
+
+  <br><br>
+
+  <input type="file" id="fileInput" accept="video/mp4">
+  <br><br>
+
+  <video id="preview" width="300" controls></video>
+  <br><br>
+
+  <button onclick="upload()">Upload to TikTok</button>
+
+  <script>
+    document.getElementById('fileInput').onchange = e => {
+      const file = e.target.files[0];
+      document.getElementById('preview').src = URL.createObjectURL(file);
+    };
+
+    async function upload() {
+      const file = document.getElementById('fileInput').files[0];
+      const form = new FormData();
+      form.append('video', file);
+      await fetch('/upload', { method: 'POST', body: form });
+      alert('Uploaded + Published!');
+    }
+  </script>
+</body>
+</html>

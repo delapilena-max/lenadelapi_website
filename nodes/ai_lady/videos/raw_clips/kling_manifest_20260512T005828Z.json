@@ -1,0 +1,31 @@
+{
+  "storyboard_path": "C:\\projects\\ai\\content_bot\\nodes\\ai_lady\\storyboards\\20260512T004703Z_coffee_shop_window_20260512T004703Z.json",
+  "created_at": "2026-05-12T00:58:28.465701Z",
+  "model": "kling-v3",
+  "clips": [
+    {
+      "job_id": "coffee_shop_window_20260512T004703Z_clip",
+      "scene_id": "coffee_shop_window_20260512T004703Z",
+      "prompt": "Lena, sitting, thoughtful, sip_coffee, wearing casual. in a cafe with soft_indoor lighting. camera: medium_shot, static, movement: none. motion: body step, hair minimal, camera none",
+      "negative_prompt": "low quality, blurry, distorted, extra limbs, deformed, bad anatomy, text artifacts, watermark, logo, oversaturated, underexposed",
+      "duration_seconds": 5,
+      "fps": 24,
+      "width": 1080,
+      "height": 1920,
+      "seed": 123,
+      "ref_face_path": null,
+      "output_path": "C:\\projects\\ai\\content_bot\\nodes\\ai_lady\\videos\\raw_clips\\coffee_shop_window_20260512T004703Z_clip.mp4",
+      "extra": {
+        "audio_type": "lofi",
+        "audio_track_id": null,
+        "text_overlay": {
+          "enabled": true,
+          "content": "",
+          "style": "soft",
+          "placement": "bottom"
+        },
+        "tags": []
+      }
+    }
+  ]
+}

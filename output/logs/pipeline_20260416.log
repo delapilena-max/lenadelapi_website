@@ -1,0 +1,377 @@
+[2026-04-16 20:32:22] INFO     content_bot - Content Bot Pipeline v1.0.0
+[2026-04-16 20:32:22] INFO     content_bot - Root: C:\content_bot
+[2026-04-16 20:32:22] INFO     content_bot - Mode: DRY RUN
+[2026-04-16 20:32:22] INFO     content_bot - Running full pipeline: generate -> render -> package -> upload
+[2026-04-16 20:32:22] INFO     content_bot - ============================================================
+[2026-04-16 20:32:22] INFO     content_bot - STEP 1: GENERATE EPISODES
+[2026-04-16 20:32:22] INFO     content_bot - ============================================================
+[2026-04-16 20:32:23] INFO     content_bot - Generated 20 episodes
+[2026-04-16 20:32:23] INFO     content_bot -   [962B429A6F0D] -> C:\content_bot\output\episodes\EP_962B429A6F0D_20260416_203223_000.json
+[2026-04-16 20:32:23] INFO     content_bot -   [6E466792EAA5] -> C:\content_bot\output\episodes\EP_6E466792EAA5_20260416_203223_001.json
+[2026-04-16 20:32:23] INFO     content_bot -   [823BD5AF6B0F] -> C:\content_bot\output\episodes\EP_823BD5AF6B0F_20260416_203223_002.json
+[2026-04-16 20:32:23] INFO     content_bot -   [F0FAEABBFB25] -> C:\content_bot\output\episodes\EP_F0FAEABBFB25_20260416_203223_003.json
+[2026-04-16 20:32:23] INFO     content_bot -   [1A8A2CC6DF16] -> C:\content_bot\output\episodes\EP_1A8A2CC6DF16_20260416_203223_004.json
+[2026-04-16 20:32:23] INFO     content_bot -   [D8970D6F8D04] -> C:\content_bot\output\episodes\EP_D8970D6F8D04_20260416_203223_005.json
+[2026-04-16 20:32:23] INFO     content_bot -   [2C4C2956D3BB] -> C:\content_bot\output\episodes\EP_2C4C2956D3BB_20260416_203223_006.json
+[2026-04-16 20:32:23] INFO     content_bot -   [BF6785447CDA] -> C:\content_bot\output\episodes\EP_BF6785447CDA_20260416_203223_007.json
+[2026-04-16 20:32:23] INFO     content_bot -   [453CD815BDFD] -> C:\content_bot\output\episodes\EP_453CD815BDFD_20260416_203223_008.json
+[2026-04-16 20:32:23] INFO     content_bot -   [B995E3C6E207] -> C:\content_bot\output\episodes\EP_B995E3C6E207_20260416_203223_009.json
+[2026-04-16 20:32:23] INFO     content_bot -   [6484E41A5475] -> C:\content_bot\output\episodes\EP_6484E41A5475_20260416_203223_010.json
+[2026-04-16 20:32:23] INFO     content_bot -   [15FFC21AC9EE] -> C:\content_bot\output\episodes\EP_15FFC21AC9EE_20260416_203223_011.json
+[2026-04-16 20:32:23] INFO     content_bot -   [6455228C1A70] -> C:\content_bot\output\episodes\EP_6455228C1A70_20260416_203223_012.json
+[2026-04-16 20:32:23] INFO     content_bot -   [D28026B23C76] -> C:\content_bot\output\episodes\EP_D28026B23C76_20260416_203223_013.json
+[2026-04-16 20:32:23] INFO     content_bot -   [A04DE657906F] -> C:\content_bot\output\episodes\EP_A04DE657906F_20260416_203223_014.json
+[2026-04-16 20:32:23] INFO     content_bot -   [0613EBFDA4AF] -> C:\content_bot\output\episodes\EP_0613EBFDA4AF_20260416_203223_015.json
+[2026-04-16 20:32:23] INFO     content_bot -   [B4144F4D711A] -> C:\content_bot\output\episodes\EP_B4144F4D711A_20260416_203223_016.json
+[2026-04-16 20:32:23] INFO     content_bot -   [649035BC506D] -> C:\content_bot\output\episodes\EP_649035BC506D_20260416_203223_017.json
+[2026-04-16 20:32:23] INFO     content_bot -   [4B3848CDFB0B] -> C:\content_bot\output\episodes\EP_4B3848CDFB0B_20260416_203223_018.json
+[2026-04-16 20:32:23] INFO     content_bot -   [428BC8AEDEFD] -> C:\content_bot\output\episodes\EP_428BC8AEDEFD_20260416_203223_019.json
+[2026-04-16 20:32:23] INFO     content_bot - State saved: C:\content_bot\output\logs\state_generate_20260416_203223.json
+[2026-04-16 20:32:23] INFO     content_bot - ============================================================
+[2026-04-16 20:32:23] INFO     content_bot - STEP 2: RENDER VIDEOS
+[2026-04-16 20:32:23] INFO     content_bot - ============================================================
+[2026-04-16 20:56:42] INFO     content_bot - Content Bot Pipeline v1.0.0
+[2026-04-16 20:56:42] INFO     content_bot - Root: C:\content_bot
+[2026-04-16 20:56:42] INFO     content_bot - Mode: DRY RUN
+[2026-04-16 20:56:42] INFO     content_bot - Running full pipeline: generate -> render -> package -> upload
+[2026-04-16 20:56:42] INFO     content_bot - ============================================================
+[2026-04-16 20:56:42] INFO     content_bot - STEP 1: GENERATE EPISODES
+[2026-04-16 20:56:42] INFO     content_bot - ============================================================
+[2026-04-16 20:56:42] INFO     content_bot - Generated 20 episodes
+[2026-04-16 20:56:42] INFO     content_bot -   [962B429A6F0D] -> C:\content_bot\output\episodes\EP_962B429A6F0D_20260416_205642_000.json
+[2026-04-16 20:56:42] INFO     content_bot -   [6E466792EAA5] -> C:\content_bot\output\episodes\EP_6E466792EAA5_20260416_205642_001.json
+[2026-04-16 20:56:42] INFO     content_bot -   [823BD5AF6B0F] -> C:\content_bot\output\episodes\EP_823BD5AF6B0F_20260416_205642_002.json
+[2026-04-16 20:56:42] INFO     content_bot -   [F0FAEABBFB25] -> C:\content_bot\output\episodes\EP_F0FAEABBFB25_20260416_205642_003.json
+[2026-04-16 20:56:42] INFO     content_bot -   [1A8A2CC6DF16] -> C:\content_bot\output\episodes\EP_1A8A2CC6DF16_20260416_205642_004.json
+[2026-04-16 20:56:42] INFO     content_bot -   [D8970D6F8D04] -> C:\content_bot\output\episodes\EP_D8970D6F8D04_20260416_205642_005.json
+[2026-04-16 20:56:42] INFO     content_bot -   [2C4C2956D3BB] -> C:\content_bot\output\episodes\EP_2C4C2956D3BB_20260416_205642_006.json
+[2026-04-16 20:56:42] INFO     content_bot -   [BF6785447CDA] -> C:\content_bot\output\episodes\EP_BF6785447CDA_20260416_205642_007.json
+[2026-04-16 20:56:42] INFO     content_bot -   [453CD815BDFD] -> C:\content_bot\output\episodes\EP_453CD815BDFD_20260416_205642_008.json
+[2026-04-16 20:56:42] INFO     content_bot -   [B995E3C6E207] -> C:\content_bot\output\episodes\EP_B995E3C6E207_20260416_205642_009.json
+[2026-04-16 20:56:42] INFO     content_bot -   [6484E41A5475] -> C:\content_bot\output\episodes\EP_6484E41A5475_20260416_205642_010.json
+[2026-04-16 20:56:42] INFO     content_bot -   [15FFC21AC9EE] -> C:\content_bot\output\episodes\EP_15FFC21AC9EE_20260416_205642_011.json
+[2026-04-16 20:56:42] INFO     content_bot -   [6455228C1A70] -> C:\content_bot\output\episodes\EP_6455228C1A70_20260416_205642_012.json
+[2026-04-16 20:56:42] INFO     content_bot -   [D28026B23C76] -> C:\content_bot\output\episodes\EP_D28026B23C76_20260416_205642_013.json
+[2026-04-16 20:56:42] INFO     content_bot -   [A04DE657906F] -> C:\content_bot\output\episodes\EP_A04DE657906F_20260416_205642_014.json
+[2026-04-16 20:56:42] INFO     content_bot -   [0613EBFDA4AF] -> C:\content_bot\output\episodes\EP_0613EBFDA4AF_20260416_205642_015.json
+[2026-04-16 20:56:42] INFO     content_bot -   [B4144F4D711A] -> C:\content_bot\output\episodes\EP_B4144F4D711A_20260416_205642_016.json
+[2026-04-16 20:56:42] INFO     content_bot -   [649035BC506D] -> C:\content_bot\output\episodes\EP_649035BC506D_20260416_205642_017.json
+[2026-04-16 20:56:42] INFO     content_bot -   [4B3848CDFB0B] -> C:\content_bot\output\episodes\EP_4B3848CDFB0B_20260416_205642_018.json
+[2026-04-16 20:56:42] INFO     content_bot -   [428BC8AEDEFD] -> C:\content_bot\output\episodes\EP_428BC8AEDEFD_20260416_205642_019.json
+[2026-04-16 20:56:42] INFO     content_bot - State saved: C:\content_bot\output\logs\state_generate_20260416_205642.json
+[2026-04-16 20:56:42] INFO     content_bot - ============================================================
+[2026-04-16 20:56:42] INFO     content_bot - STEP 2: RENDER VIDEOS
+[2026-04-16 20:56:42] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - Content Bot Pipeline v1.0.0
+[2026-04-16 20:59:07] INFO     content_bot - Root: C:\content_bot
+[2026-04-16 20:59:07] INFO     content_bot - Mode: DRY RUN
+[2026-04-16 20:59:07] INFO     content_bot - Running full pipeline: generate -> render -> package -> upload
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - STEP 1: GENERATE EPISODES
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - Generated 20 episodes
+[2026-04-16 20:59:07] INFO     content_bot -   [962B429A6F0D] -> C:\content_bot\output\episodes\EP_962B429A6F0D_20260416_205907_000.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6E466792EAA5] -> C:\content_bot\output\episodes\EP_6E466792EAA5_20260416_205907_001.json
+[2026-04-16 20:59:07] INFO     content_bot -   [823BD5AF6B0F] -> C:\content_bot\output\episodes\EP_823BD5AF6B0F_20260416_205907_002.json
+[2026-04-16 20:59:07] INFO     content_bot -   [F0FAEABBFB25] -> C:\content_bot\output\episodes\EP_F0FAEABBFB25_20260416_205907_003.json
+[2026-04-16 20:59:07] INFO     content_bot -   [1A8A2CC6DF16] -> C:\content_bot\output\episodes\EP_1A8A2CC6DF16_20260416_205907_004.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D8970D6F8D04] -> C:\content_bot\output\episodes\EP_D8970D6F8D04_20260416_205907_005.json
+[2026-04-16 20:59:07] INFO     content_bot -   [2C4C2956D3BB] -> C:\content_bot\output\episodes\EP_2C4C2956D3BB_20260416_205907_006.json
+[2026-04-16 20:59:07] INFO     content_bot -   [BF6785447CDA] -> C:\content_bot\output\episodes\EP_BF6785447CDA_20260416_205907_007.json
+[2026-04-16 20:59:07] INFO     content_bot -   [453CD815BDFD] -> C:\content_bot\output\episodes\EP_453CD815BDFD_20260416_205907_008.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B995E3C6E207] -> C:\content_bot\output\episodes\EP_B995E3C6E207_20260416_205907_009.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6484E41A5475] -> C:\content_bot\output\episodes\EP_6484E41A5475_20260416_205907_010.json
+[2026-04-16 20:59:07] INFO     content_bot -   [15FFC21AC9EE] -> C:\content_bot\output\episodes\EP_15FFC21AC9EE_20260416_205907_011.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6455228C1A70] -> C:\content_bot\output\episodes\EP_6455228C1A70_20260416_205907_012.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D28026B23C76] -> C:\content_bot\output\episodes\EP_D28026B23C76_20260416_205907_013.json
+[2026-04-16 20:59:07] INFO     content_bot -   [A04DE657906F] -> C:\content_bot\output\episodes\EP_A04DE657906F_20260416_205907_014.json
+[2026-04-16 20:59:07] INFO     content_bot -   [0613EBFDA4AF] -> C:\content_bot\output\episodes\EP_0613EBFDA4AF_20260416_205907_015.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B4144F4D711A] -> C:\content_bot\output\episodes\EP_B4144F4D711A_20260416_205907_016.json
+[2026-04-16 20:59:07] INFO     content_bot -   [649035BC506D] -> C:\content_bot\output\episodes\EP_649035BC506D_20260416_205907_017.json
+[2026-04-16 20:59:07] INFO     content_bot -   [4B3848CDFB0B] -> C:\content_bot\output\episodes\EP_4B3848CDFB0B_20260416_205907_018.json
+[2026-04-16 20:59:07] INFO     content_bot -   [428BC8AEDEFD] -> C:\content_bot\output\episodes\EP_428BC8AEDEFD_20260416_205907_019.json
+[2026-04-16 20:59:07] INFO     content_bot - State saved: C:\content_bot\output\logs\state_generate_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - STEP 2: RENDER VIDEOS
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - Render complete: 20 success, 0 errors
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [962B429A6F0D] dry_run -> C:\content_bot\output\renders\962B429A6F0D_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [6E466792EAA5] dry_run -> C:\content_bot\output\renders\6E466792EAA5_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [823BD5AF6B0F] dry_run -> C:\content_bot\output\renders\823BD5AF6B0F_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [F0FAEABBFB25] dry_run -> C:\content_bot\output\renders\F0FAEABBFB25_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [1A8A2CC6DF16] dry_run -> C:\content_bot\output\renders\1A8A2CC6DF16_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [D8970D6F8D04] dry_run -> C:\content_bot\output\renders\D8970D6F8D04_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [2C4C2956D3BB] dry_run -> C:\content_bot\output\renders\2C4C2956D3BB_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [BF6785447CDA] dry_run -> C:\content_bot\output\renders\BF6785447CDA_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [453CD815BDFD] dry_run -> C:\content_bot\output\renders\453CD815BDFD_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [B995E3C6E207] dry_run -> C:\content_bot\output\renders\B995E3C6E207_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [6484E41A5475] dry_run -> C:\content_bot\output\renders\6484E41A5475_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [15FFC21AC9EE] dry_run -> C:\content_bot\output\renders\15FFC21AC9EE_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [6455228C1A70] dry_run -> C:\content_bot\output\renders\6455228C1A70_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [D28026B23C76] dry_run -> C:\content_bot\output\renders\D28026B23C76_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [A04DE657906F] dry_run -> C:\content_bot\output\renders\A04DE657906F_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [0613EBFDA4AF] dry_run -> C:\content_bot\output\renders\0613EBFDA4AF_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [B4144F4D711A] dry_run -> C:\content_bot\output\renders\B4144F4D711A_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [649035BC506D] dry_run -> C:\content_bot\output\renders\649035BC506D_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [4B3848CDFB0B] dry_run -> C:\content_bot\output\renders\4B3848CDFB0B_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot -   [+] [428BC8AEDEFD] dry_run -> C:\content_bot\output\renders\428BC8AEDEFD_20260416_205907.mp4
+[2026-04-16 20:59:07] INFO     content_bot - State saved: C:\content_bot\output\logs\state_render_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - STEP 3: PACKAGE METADATA
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - Packaged 60 metadata files
+[2026-04-16 20:59:07] INFO     content_bot -   [962B429A6F0D] youtube_shorts -> C:\content_bot\output\metadata\META_962B429A6F0D_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [962B429A6F0D] tiktok -> C:\content_bot\output\metadata\META_962B429A6F0D_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [962B429A6F0D] instagram_reels -> C:\content_bot\output\metadata\META_962B429A6F0D_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6E466792EAA5] youtube_shorts -> C:\content_bot\output\metadata\META_6E466792EAA5_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6E466792EAA5] tiktok -> C:\content_bot\output\metadata\META_6E466792EAA5_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6E466792EAA5] instagram_reels -> C:\content_bot\output\metadata\META_6E466792EAA5_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [823BD5AF6B0F] youtube_shorts -> C:\content_bot\output\metadata\META_823BD5AF6B0F_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [823BD5AF6B0F] tiktok -> C:\content_bot\output\metadata\META_823BD5AF6B0F_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [823BD5AF6B0F] instagram_reels -> C:\content_bot\output\metadata\META_823BD5AF6B0F_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [F0FAEABBFB25] youtube_shorts -> C:\content_bot\output\metadata\META_F0FAEABBFB25_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [F0FAEABBFB25] tiktok -> C:\content_bot\output\metadata\META_F0FAEABBFB25_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [F0FAEABBFB25] instagram_reels -> C:\content_bot\output\metadata\META_F0FAEABBFB25_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [1A8A2CC6DF16] youtube_shorts -> C:\content_bot\output\metadata\META_1A8A2CC6DF16_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [1A8A2CC6DF16] tiktok -> C:\content_bot\output\metadata\META_1A8A2CC6DF16_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [1A8A2CC6DF16] instagram_reels -> C:\content_bot\output\metadata\META_1A8A2CC6DF16_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D8970D6F8D04] youtube_shorts -> C:\content_bot\output\metadata\META_D8970D6F8D04_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D8970D6F8D04] tiktok -> C:\content_bot\output\metadata\META_D8970D6F8D04_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D8970D6F8D04] instagram_reels -> C:\content_bot\output\metadata\META_D8970D6F8D04_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [2C4C2956D3BB] youtube_shorts -> C:\content_bot\output\metadata\META_2C4C2956D3BB_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [2C4C2956D3BB] tiktok -> C:\content_bot\output\metadata\META_2C4C2956D3BB_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [2C4C2956D3BB] instagram_reels -> C:\content_bot\output\metadata\META_2C4C2956D3BB_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [BF6785447CDA] youtube_shorts -> C:\content_bot\output\metadata\META_BF6785447CDA_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [BF6785447CDA] tiktok -> C:\content_bot\output\metadata\META_BF6785447CDA_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [BF6785447CDA] instagram_reels -> C:\content_bot\output\metadata\META_BF6785447CDA_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [453CD815BDFD] youtube_shorts -> C:\content_bot\output\metadata\META_453CD815BDFD_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [453CD815BDFD] tiktok -> C:\content_bot\output\metadata\META_453CD815BDFD_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [453CD815BDFD] instagram_reels -> C:\content_bot\output\metadata\META_453CD815BDFD_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B995E3C6E207] youtube_shorts -> C:\content_bot\output\metadata\META_B995E3C6E207_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B995E3C6E207] tiktok -> C:\content_bot\output\metadata\META_B995E3C6E207_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B995E3C6E207] instagram_reels -> C:\content_bot\output\metadata\META_B995E3C6E207_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6484E41A5475] youtube_shorts -> C:\content_bot\output\metadata\META_6484E41A5475_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6484E41A5475] tiktok -> C:\content_bot\output\metadata\META_6484E41A5475_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6484E41A5475] instagram_reels -> C:\content_bot\output\metadata\META_6484E41A5475_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [15FFC21AC9EE] youtube_shorts -> C:\content_bot\output\metadata\META_15FFC21AC9EE_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [15FFC21AC9EE] tiktok -> C:\content_bot\output\metadata\META_15FFC21AC9EE_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [15FFC21AC9EE] instagram_reels -> C:\content_bot\output\metadata\META_15FFC21AC9EE_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6455228C1A70] youtube_shorts -> C:\content_bot\output\metadata\META_6455228C1A70_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6455228C1A70] tiktok -> C:\content_bot\output\metadata\META_6455228C1A70_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [6455228C1A70] instagram_reels -> C:\content_bot\output\metadata\META_6455228C1A70_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D28026B23C76] youtube_shorts -> C:\content_bot\output\metadata\META_D28026B23C76_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D28026B23C76] tiktok -> C:\content_bot\output\metadata\META_D28026B23C76_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [D28026B23C76] instagram_reels -> C:\content_bot\output\metadata\META_D28026B23C76_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [A04DE657906F] youtube_shorts -> C:\content_bot\output\metadata\META_A04DE657906F_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [A04DE657906F] tiktok -> C:\content_bot\output\metadata\META_A04DE657906F_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [A04DE657906F] instagram_reels -> C:\content_bot\output\metadata\META_A04DE657906F_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [0613EBFDA4AF] youtube_shorts -> C:\content_bot\output\metadata\META_0613EBFDA4AF_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [0613EBFDA4AF] tiktok -> C:\content_bot\output\metadata\META_0613EBFDA4AF_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [0613EBFDA4AF] instagram_reels -> C:\content_bot\output\metadata\META_0613EBFDA4AF_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B4144F4D711A] youtube_shorts -> C:\content_bot\output\metadata\META_B4144F4D711A_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B4144F4D711A] tiktok -> C:\content_bot\output\metadata\META_B4144F4D711A_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [B4144F4D711A] instagram_reels -> C:\content_bot\output\metadata\META_B4144F4D711A_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [649035BC506D] youtube_shorts -> C:\content_bot\output\metadata\META_649035BC506D_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [649035BC506D] tiktok -> C:\content_bot\output\metadata\META_649035BC506D_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [649035BC506D] instagram_reels -> C:\content_bot\output\metadata\META_649035BC506D_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [4B3848CDFB0B] youtube_shorts -> C:\content_bot\output\metadata\META_4B3848CDFB0B_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [4B3848CDFB0B] tiktok -> C:\content_bot\output\metadata\META_4B3848CDFB0B_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [4B3848CDFB0B] instagram_reels -> C:\content_bot\output\metadata\META_4B3848CDFB0B_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [428BC8AEDEFD] youtube_shorts -> C:\content_bot\output\metadata\META_428BC8AEDEFD_youtube_shorts_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [428BC8AEDEFD] tiktok -> C:\content_bot\output\metadata\META_428BC8AEDEFD_tiktok_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot -   [428BC8AEDEFD] instagram_reels -> C:\content_bot\output\metadata\META_428BC8AEDEFD_instagram_reels_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot - State saved: C:\content_bot\output\logs\state_package_20260416_205907.json
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - STEP 4: UPLOAD
+[2026-04-16 20:59:07] INFO     content_bot - ============================================================
+[2026-04-16 20:59:07] INFO     content_bot - DRY RUN — skipping actual uploads
+[2026-04-16 20:59:08] INFO     content_bot - Upload complete: 0/60 successful
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [962B429A6F0D] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [962B429A6F0D] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [962B429A6F0D] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6E466792EAA5] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6E466792EAA5] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6E466792EAA5] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [823BD5AF6B0F] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [823BD5AF6B0F] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [823BD5AF6B0F] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [F0FAEABBFB25] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [F0FAEABBFB25] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [F0FAEABBFB25] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [1A8A2CC6DF16] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [1A8A2CC6DF16] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [1A8A2CC6DF16] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D8970D6F8D04] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D8970D6F8D04] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D8970D6F8D04] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [2C4C2956D3BB] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [2C4C2956D3BB] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [2C4C2956D3BB] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [BF6785447CDA] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [BF6785447CDA] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [BF6785447CDA] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [453CD815BDFD] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [453CD815BDFD] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [453CD815BDFD] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B995E3C6E207] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B995E3C6E207] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B995E3C6E207] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6484E41A5475] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6484E41A5475] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6484E41A5475] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [15FFC21AC9EE] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [15FFC21AC9EE] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [15FFC21AC9EE] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6455228C1A70] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6455228C1A70] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [6455228C1A70] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D28026B23C76] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D28026B23C76] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [D28026B23C76] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [A04DE657906F] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [A04DE657906F] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [A04DE657906F] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [0613EBFDA4AF] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [0613EBFDA4AF] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [0613EBFDA4AF] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B4144F4D711A] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B4144F4D711A] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [B4144F4D711A] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [649035BC506D] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [649035BC506D] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [649035BC506D] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [4B3848CDFB0B] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [4B3848CDFB0B] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [4B3848CDFB0B] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [428BC8AEDEFD] youtube_shorts: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\youtube_client_secret.json
+Download from Google Cloud Console
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [428BC8AEDEFD] tiktok: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\tiktok_credentials.json
+Create at developers.tiktok.com
+[2026-04-16 20:59:08] INFO     content_bot -   [X] [428BC8AEDEFD] instagram_reels: error
+[2026-04-16 20:59:08] ERROR    content_bot -     Error: Missing C:\content_bot\config\credentials\instagram_credentials.json
+Create at developers.facebook.com
+[2026-04-16 20:59:08] INFO     content_bot - State saved: C:\content_bot\output\logs\state_upload_20260416_205908.json
+[2026-04-16 20:59:08] INFO     content_bot - ============================================================
+[2026-04-16 20:59:08] INFO     content_bot - PIPELINE COMPLETE
+[2026-04-16 20:59:08] INFO     content_bot -   Episodes generated: 20
+[2026-04-16 20:59:08] INFO     content_bot -   Videos rendered:    20
+[2026-04-16 20:59:08] INFO     content_bot -   Metadata packages:  60
+[2026-04-16 20:59:08] INFO     content_bot -   Uploads attempted:  60
+[2026-04-16 20:59:08] INFO     content_bot -   Total time:         1.1s
+[2026-04-16 20:59:08] INFO     content_bot - ============================================================

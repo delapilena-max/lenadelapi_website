@@ -1,0 +1,13 @@
+{
+  "platform": "instagram_reels",
+  "api_body": {
+    "media_type": "REELS",
+    "caption": "rogue_feather",
+    "share_to_feed": true,
+    "thumb_offset": 1000
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\15FFC21AC9EE_20260416_205907.mp4",
+  "note": "Video must be hosted at a public URL for Instagram API.",
+  "episode_id": "15FFC21AC9EE",
+  "packaged_at": "2026-04-17T01:59:07.443149+00:00"
+}

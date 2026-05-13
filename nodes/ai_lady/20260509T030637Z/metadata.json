@@ -1,0 +1,16 @@
+{
+  "status": "ok",
+  "generated_at": "2026-05-09T03:06:37.411661Z",
+  "run_id": "20260509T030637Z",
+  "output_dir": "C:\\projects\\ai\\content_bot\\nodes\\ai_lady\\20260509T030637Z",
+  "params": {
+    "seed": 4,
+    "strength": 0.3,
+    "face_restore": true,
+    "used_seed": 4
+  },
+  "files": [
+    "C:\\projects\\ai\\content_bot\\nodes\\ai_lady\\20260509T030637Z\\placeholder_seed4.png"
+  ],
+  "notes": "deterministic placeholder output with identity-preservation stubs"
+}

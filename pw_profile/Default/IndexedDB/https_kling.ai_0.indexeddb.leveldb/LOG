@@ -1,0 +1,26 @@
+2026/05/11-22:01:13.754 9714 Reusing MANIFEST C:\projects\ai\content_bot\pw_profile\Default\IndexedDB\https_kling.ai_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/11-22:01:13.754 9714 Recovering log #63
+2026/05/11-22:01:13.754 9714 Reusing old log C:\projects\ai\content_bot\pw_profile\Default\IndexedDB\https_kling.ai_0.indexeddb.leveldb/000063.log 
+2026/05/11-22:01:13.754 9714 Delete type=2 #62
+2026/05/11-22:01:13.990 7bc8 Level-0 table #68: started
+2026/05/11-22:01:13.991 7bc8 Level-0 table #68: 47069 bytes OK
+2026/05/11-22:01:13.992 7bc8 Delete type=0 #63
+2026/05/11-22:01:13.992 9714 Manual compaction at level-0 from '\x00\x17\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x18\x00\x00\x00' @ 0 : 0; will stop at '\x00\x17\x00\x00\x05' @ 782 : 1
+2026/05/11-22:01:13.992 9714 Compacting 1@0 + 1@1 files
+2026/05/11-22:01:13.993 9714 Generated table #69@0: 127 keys, 27257 bytes
+2026/05/11-22:01:13.993 9714 Compacted 1@0 + 1@1 files => 27257 bytes
+2026/05/11-22:01:13.993 9714 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/11-22:01:13.994 9714 Delete type=2 #68
+2026/05/11-22:01:13.994 9714 Manual compaction at level-0 from '\x00\x17\x00\x00\x05' @ 782 : 1 .. '\x00\x18\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/05/11-22:01:14.147 7bc8 Level-0 table #71: started
+2026/05/11-22:01:14.148 7bc8 Level-0 table #71: 490 bytes OK
+2026/05/11-22:01:14.149 7bc8 Delete type=2 #65
+2026/05/11-22:01:14.149 7bc8 Delete type=0 #67
+2026/05/11-22:01:14.149 9714 Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at '\x00\x18\x00\x00\x05' @ 801 : 1
+2026/05/11-22:01:14.149 9714 Compacting 1@0 + 1@1 files
+2026/05/11-22:01:14.150 9714 Generated table #72@0: 127 keys, 27257 bytes
+2026/05/11-22:01:14.150 9714 Compacted 1@0 + 1@1 files => 27257 bytes
+2026/05/11-22:01:14.150 9714 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/11-22:01:14.151 9714 Delete type=2 #71
+2026/05/11-22:01:14.151 9714 Manual compaction at level-0 from '\x00\x18\x00\x00\x05' @ 801 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/05/11-22:01:47.323 7bc8 Manual compaction at level-0 from '\x00\x19\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x1a\x00\x00\x00' @ 0 : 0; will stop at (end)

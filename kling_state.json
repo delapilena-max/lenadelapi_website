@@ -1,0 +1,845 @@
+{
+  "cookies": [
+    {
+      "name": "kGateway-identity",
+      "value": "kGateway-f15ced88-153345592",
+      "domain": "kling.ai",
+      "path": "/app/image",
+      "expires": 1794005572.09696,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "did",
+      "value": "web_8ljacdpb1gs0k1vgs26acfnjmht376pj8mgh",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1813013572.141785,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__risk_web_device_id",
+      "value": "f0a1aded1778453573123a11",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1813013573.123225,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "accept-language",
+      "value": "en-001",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1804472238.212606,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "history-locale",
+      "value": "en",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1804472238.212729,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_gcl_au",
+      "value": "1.1.1857715801.1778453574",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1786229574,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "IDE",
+      "value": "AHWqTUn5orj1Efcg9uVfnWsuXbETl55HoNk-B7n9lZpoNSl3itzEFTi47KxECFDc",
+      "domain": ".doubleclick.net",
+      "path": "/",
+      "expires": 1813013574.690397,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "MUID",
+      "value": "13CC2834E5B56AA605D33F61E4CB6BA0",
+      "domain": ".bing.com",
+      "path": "/",
+      "expires": 1812149574.718947,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "MR",
+      "value": "0",
+      "domain": ".bat.bing.com",
+      "path": "/",
+      "expires": 1779058374.719058,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "_ga",
+      "value": "GA1.1.1365198740.1778453575",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1813112238.531762,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OTZ",
+      "value": "8602493_76_80_104160_76_446820",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1781045583,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "kwpsecproductname",
+      "value": "kling-web-sgp",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1781144238,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "wid",
+      "value": "47415036725158771",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1810088240,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "ktrace-context",
+      "value": "1|MS44Nzg0NzI0NTc4Nzk2ODY5LjQ4MTM4NjU3LjE3Nzg1NTIyMjUwMjQuMTkwOTQ5MDgx|MS44Nzg0NzI0NTc4Nzk2ODY5LjgyMjk3NTgzLjE3Nzg1NTIyMjUwMjQuMTkwOTQ5MDgy|0|webservice-user-growth-node|webservice|true|src-Js",
+      "domain": "kling.ai",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "g_state",
+      "value": "{\"i_l\":0,\"i_ll\":1778552238404,\"i_b\":\"9j7WHPHdSV2vjcqMftQKfWdQI53AWoPtd6QjWd9di00\",\"i_e\":{\"enable_itp_optimization\":0},\"i_et\":1778453574274}",
+      "domain": "kling.ai",
+      "path": "/",
+      "expires": 1794104238,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_uetsid",
+      "value": "e77fc3a04da611f1b141615082cb8cbb|1umg9rs|2|g5z|0|2323",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1778638638,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ga_MWG30LDQKZ",
+      "value": "GS2.1.s1778551467$o2$g1$t1778552238$j39$l0$h1236376126",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1813112238.551083,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "kwfv1",
+      "value": "+/PIG9bS+90zD8/40D8eZA8nPIPn8Y+0cEGf8f+e8f8nPhG/LAG0clw/WFG0zYP0+f+/qhG9G7PAQY+fHU+0zD8Bbfwe8SGfQYGfH7P9Gh8BGI+BL9+BHFG0LE+9PE+BQj+AmS80SYG9QSPBPIG0WEG0ZF+AG7P/LFGAHIP/cFP0H=",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1781144238,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "kwssectoken",
+      "value": "39sEutipszAkSYiANchBE7gL6h1hla1XSRLwr3s/gQax3YoHAdrXdRVJbxDJbS2agQ8FYuwxd9INrlVlaKwqjA==",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1778552598,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "kwscode",
+      "value": "1dc1737b22e8c2004d63385ab54d1899dcef8852af36206501063e713e9d2d6c",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1778552598,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_uetvid",
+      "value": "fb3088d04cc211f19b087301c5f98018|8stc1o|1778552238931|8|1|bat.bing.com/p/conversions/c/l",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": 1812248238,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "NID",
+      "value": "531=aRilTBzBLIAMMqtXfstIpPEC_9CYBu0VQYnd9msBkY7EyyS347lEANx8J5vfVtjUb0Sq5svRO7GLCbEh9rmmroavXiQOr55jMbsGigTqfuW39sAgJWcb0r8BRvfstI4tGHAVS73DNq3B5WCiSEtpi_e40IeHHBd3N4HRTYEnASCOYr2tyDCPmmssJGXBUXGi7zjjuvgcY6KfdEpmOlShELLwC8KWTiXN673r8-vk1s-306I8sVqNlI1Ic9J9E3GUsHDcN71GKyxdVY4LbMvjLJha3qyA8EJSr3dopJlp80K6qFVyh4r_8-wbn59vRwJcJ3FTJKJID6EBZkZfSYyByV0j3k-qYLf82l2T8sYKlUoxoMy-Vdo41st1yNyIyh4_scrtbjNjmmysC_hF2cntx8_JLzX7uOhkKQRhm_IFIlpi1gfwIKEHN3DvhOIyxelxtzUpukwFNbOK0lQnU2FHGN-YUkUISVyW45o18JoFprmcwTnT40UpSAEcTKJP1EWnbxnA5RxuIfJmdv5oPWgFk-B98Rvdp0LCRUopeEyZFAYeItYEY9tvLC0HBF4BrYv9FLf29J03j6YDL7SeOXlQWmbiEBFaqzL7lArJnKX01Lqd7XxDg1zyT1QkdSTeziSXfIAqTM4flzxF5o1ed5KbEZaylwQL",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1794362666.317602,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "HSID",
+      "value": "Av_cUvGiBQasIhpCU",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317846,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SSID",
+      "value": "ACz27SdiI0PIKk5BD",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317867,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "APISID",
+      "value": "xuDSAXIIGO8vWTvY/AX1I9Nak3uY-XADnM",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317885,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317904,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317923,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112302.317941,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ACCOUNT_CHOOSER",
+      "value": "AFx_qI4lHqVmL41XcQK4RGpxEyJqR8wXo7fEv19sVlSzw-dHrlHGClEGW0eTcwaJiXotoVl3O6LCMhoTkoTiyNzVZJTNAuXGNWV9PwBNV-Tkb-i8gcaBrOi1aArEJ4lonEcPhMeT5AoG",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112302.317958,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "LSID",
+      "value": "s.youtube:g.a0009whDT1zG-kypUQ78Yd8sFAuJYWbuitWgKl5jg7E4nvq7_oYTYz3TtUBuYqhSaUWLmVWbBgACgYKAYYSARYSFQHGX2MiKwPhUnY6pNaCuEDf4-gobRoVAUF8yKrb4RfRW39ayKC_40X6ok7C0076",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112302.462478,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Host-1PLSID",
+      "value": "s.youtube:g.a0009whDT1zG-kypUQ78Yd8sFAuJYWbuitWgKl5jg7E4nvq7_oYTHtYE8jSvx2JlHyZ3L8GnzwACgYKAVkSARYSFQHGX2MitGAn4BIEakvlTY7uS5rTmBoVAUF8yKofG_KnWHSdU13KN5XS0O1B0076",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112302.462596,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Host-3PLSID",
+      "value": "s.youtube:g.a0009whDT1zG-kypUQ78Yd8sFAuJYWbuitWgKl5jg7E4nvq7_oYTOm5dcy5N9RfSXSXzSEdJMQACgYKAcISARYSFQHGX2MiSnKdEB_DKuxnGf4czBlmDhoVAUF8yKov4SSbEL367wfWSYY0JEkg0076",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112302.462634,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__Secure-1PSIDTS",
+      "value": "sidts-CjUBhkeRd71Cyc47CuXKQjlRuVXEmOIhLrrXvCyBaxzUAgREzb4McbO-2Wq9OEf6Bf9iv1AcBxAA",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1810088302.628965,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PSIDTS",
+      "value": "sidts-CjUBhkeRd71Cyc47CuXKQjlRuVXEmOIhLrrXvCyBaxzUAgREzb4McbO-2Wq9OEf6Bf9iv1AcBxAA",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1810088302.629076,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "HSID",
+      "value": "AWxsls2hftQ19KR1l",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629098,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SSID",
+      "value": "A035EzEHgC6TOvfci",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.62912,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "APISID",
+      "value": "xuDSAXIIGO8vWTvY/AX1I9Nak3uY-XADnM",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629135,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629153,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629171,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PAPISID",
+      "value": "SgvRf79oT1sAD1Jt/AVAbeRqzpyfmsUBLT",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629187,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "SID",
+      "value": "g.a0009whDT_Ei1z39Cp4GPBrFL-jPVH7pLc0kQUMv_8HWK52ZBFjL9-x2auzKDhG3n838K7aaWgACgYKAX0SARYSFQHGX2Miw0lB0oEjn9ByeWAm1pj-fRoVAUF8yKrfzBsrKGk3d4ayRbGSoOTH0076",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629201,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PSID",
+      "value": "g.a0009whDT_Ei1z39Cp4GPBrFL-jPVH7pLc0kQUMv_8HWK52ZBFjLsGgUPkCREdNr_1ob0prhKgACgYKAX0SARYSFQHGX2MipahcaUAo67X1W9uCk5tlIxoVAUF8yKo9pQp3xRaa462_UOCe-9He0076",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629221,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PSID",
+      "value": "g.a0009whDT_Ei1z39Cp4GPBrFL-jPVH7pLc0kQUMv_8HWK52ZBFjL76yM32pKaxrlrAHMCcNDlQACgYKAZwSARYSFQHGX2Mi25JonhtLGOzEw7Sk51SafRoVAUF8yKogKen4Ixg25g_d-O1kz6_Z0076",
+      "domain": ".youtube.com",
+      "path": "/",
+      "expires": 1813112302.629238,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "SID",
+      "value": "g.a0009whDT1hfDr0PaJCPWc3EhCMiYFXRPJDNrHfxhXAHtceGDyL7Id_TG94973TakUSlBQzn3wACgYKAbgSARYSFQHGX2MiD8DQN4SdILvQjWIIsfb99xoVAUF8yKp9hh2upqzL0yBEuHFRZq9t0076",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112303.207207,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PSID",
+      "value": "g.a0009whDT1hfDr0PaJCPWc3EhCMiYFXRPJDNrHfxhXAHtceGDyL7rLzRnK65gQmk9YWO5wDy4AACgYKAdkSARYSFQHGX2Mi5tWBU8BeQCZwe6ycc5qSFhoVAUF8yKrYCTWmpBU4NM5TL9KYK7hr0076",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112303.207246,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PSID",
+      "value": "g.a0009whDT1hfDr0PaJCPWc3EhCMiYFXRPJDNrHfxhXAHtceGDyL7fKfNjzA8w7uqpTlFIyGWOQACgYKAbISARYSFQHGX2Mi5B-mIK19_pzOrrksUwBw6xoVAUF8yKpgYXdGgbt5uOLHb3brmAIu0076",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1813112303.207279,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__Secure-1PSIDTS",
+      "value": "sidts-CjcBhkeRd2TR2XF7rVa9HD5gRJfLtpk8Dv8aHdnuw2sQLAea_dxvVIJ_R3DwI37q8EElGClxiFryEAA",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1810088303.743354,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PSIDRTS",
+      "value": "sidts-CjcBhkeRd2TR2XF7rVa9HD5gRJfLtpk8Dv8aHdnuw2sQLAea_dxvVIJ_R3DwI37q8EElGClxiFryEAA",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1778552903.743572,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PSIDTS",
+      "value": "sidts-CjcBhkeRd2TR2XF7rVa9HD5gRJfLtpk8Dv8aHdnuw2sQLAea_dxvVIJ_R3DwI37q8EElGClxiFryEAA",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1810088303.743676,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__Secure-3PSIDRTS",
+      "value": "sidts-CjcBhkeRd2TR2XF7rVa9HD5gRJfLtpk8Dv8aHdnuw2sQLAea_dxvVIJ_R3DwI37q8EElGClxiFryEAA",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1778552903.74378,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__Host-GAPS",
+      "value": "1:WyfGTuXbKdMU7QeQw8v3mXP2_JNO9Wm_oWT_tuomjozWarKgB4HC75CHkthGr9JbU9EMxKSZgm4bl_kHIPDo2v9KW5cPXGgbo5TTTjX59h4aP09o1PUYxbiA-ZEvdIQhYxm3TGenZk0y8Zjz7VmL1oVq2TBt-7H3epW2Ueg4yi9x2Yv5SozOTg:mCMS26TFRea304ZB",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112303.928017,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Host-GAPSTS",
+      "value": "gapsts-Ci0BZ4fKaATIn9JjxD8usb0YRPYFS8N88RjblW4TXSU2pAYnn66iKeR1KpMAPy4QAQ==",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1813112304.098359,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "SIDCC",
+      "value": "AKEyXzX-Rm94IYFbP6gdNZebzFG701C7B5hLtXOUzFkjiJUqR9RmWUZtuUddYF20egXAvYRC",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1810088306.370612,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-1PSIDCC",
+      "value": "AKEyXzX2t1Va-MIHJd5iVbquLsOuVwaJe78Icq8M1cpCJH4jl8eHWZ-7DJpd3ZzNT3BkxsOL",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1810088306.370691,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-3PSIDCC",
+      "value": "AKEyXzXxU4LvZqLLreFfa5fna2F3LSPnYwez59J_1mV3syI914YJrxAbKO2CY2PJ_IAAVlc",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1810088306.370759,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "userId",
+      "value": "78022253",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "userId",
+      "value": "78022253",
+      "domain": "id.kling.ai",
+      "path": "/",
+      "expires": 1780366707.649592,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "passToken",
+      "value": "ChNwYXNzcG9ydC5wYXNzLXRva2VuEsAB20xNkN6lvNJylRS3XYClQ0Ipgp41QueGKvVlrcc4RiecxmAASJeqOJSoDB4X4GRgCrEMVFEJhahaDbaHDxaSLVItODWeQKYJT673d6bAtkQGFLKv-i7H9v5_RChEVjwcnaqJOzX-0lGktPGqxU-BgzIZMBgvSWJqYABman3rrNHr_z5s2TrHlACd4M0qBPY9ezViVgSus3QrfN8Bp_wiPyFymO-p7pPd-5sGrAHfAgwQyhZLemQ5cOnl-1f5m3ArGhJfp14u8uMmBIHYbAB-G7lgNk8iIAEFyZtLTgfY4OubDAJ9onOqOE39SRd4CizSIP_mU6JjKAUwAQ",
+      "domain": "id.kling.ai",
+      "path": "/",
+      "expires": 1780366707.64961,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ksi18n.ai.portal_st",
+      "value": "ChNrc2kxOG4uYWkucG9ydGFsLnN0EqABY_jrmQPlMeTfyhClF1_7-fClnsMNUmVd9QGBgWEwNCzQVeSvqd0yWOVEGBU3pO1gvlvBHgWaUzd0GYsZjhvrd1qis2NpuQ1zDKovGaZ6ZmYc_mGnR2wCsYOMij3stnyFOTmSqguppmKnC1DM0jrdzVeWJDlabcnxOcnWEVUWyKET5wnZgATHwpVbQtmR0KxolbZbkKioCID93XoIUEDD8xoSEnc-F49shTZjU4ZJCJHDj9OJIiB4eJZ2i-TvtYm7_-NLHaZ6Ec3PQmg7ZocH5KmyerlhhigFMAE",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ksi18n.ai.portal_ph",
+      "value": "ec7d80ec7417998f2c3b46947c9ebcba0368",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "teamId",
+      "value": "",
+      "domain": ".kling.ai",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://kling.ai",
+      "localStorage": [
+        {
+          "name": "chatbot-position",
+          "value": "{}"
+        },
+        {
+          "name": "sw-server-push-status",
+          "value": "{\"isConnected\":true,\"connectedClientsCount\":0,\"error\":null,\"lastMessage\":null,\"lastUpdateTime\":1778552311505}"
+        },
+        {
+          "name": "_uetvid_exp",
+          "value": "Sun, 06 Jun 2027 02:17:18 GMT"
+        },
+        {
+          "name": "appDownDate",
+          "value": "{\"iosQRCodeUrl\":\"https://s15-kling.klingai.com/kimg/EMXN1y8qMgoGdXBsb2FkEg55bGFiLXN0dW50LXNncBoYa2xpbmcvYXBwX2FkL2lvc0NvZGUucG5n.origin?x-kcdn-pid=112372\",\"androidQRCodeUrl\":\"https://s15-kling.klingai.com/kimg/EMXN1y8qNgoGdXBsb2FkEg55bGFiLXN0dW50LXNncBoca2xpbmcvYXBwX2FkL2FuZHJvaWRDb2RlLnBuZw.origin?x-kcdn-pid=112372\",\"desktopWindows\":\"https://p4-kling.klingai.com/kcdn/cdn-kcdn112452/kling-local-app/windows-x64/1.3.11/KlingAI-setup-1.3.11.exe\",\"desktopIntel\":\"https://p4-kling.klingai.com/kcdn/cdn-kcdn112452/kling-local-app/macos-x64/1.3.11/KlingAI-v1.3.11-darwin-x64.dmg\",\"desktopM\":\"https://p2-kling.klingai.com/kcdn/cdn-kcdn112452/kling-local-app/macos-arm-x64/1.3.11/KlingAI-v1.3.11-darwin-arm64.dmg\"}"
+        },
+        {
+          "name": "overlay-frequency-moved|first-use-lora|guide|create-face-model",
+          "value": "true"
+        },
+        {
+          "name": "loglevel:lk-e2ee",
+          "value": "SILENT"
+        },
+        {
+          "name": "loglevel:livekit-track",
+          "value": "SILENT"
+        },
+        {
+          "name": "style-gallery-tip-shown",
+          "value": "true"
+        },
+        {
+          "name": "livexChatbotDataLayer",
+          "value": "{\"user\":{\"data\":{\"account\":{\"account_id\":0,\"name\":\"\",\"email\":\"\"}},\"expire\":1778554111149}}"
+        },
+        {
+          "name": "user",
+          "value": "{\"userName\":\"OLoVknYC\",\"userAvatars\":[\"https://s15-kling.klingai.com/kimg/EMXN1y8qSgoGdXBsb2FkEg55bGFiLXN0dW50LXNncBowa2xpbmcvcmVzb3VyY2VzL2tsX3BsYWNlaG9sZGVyX2F2YXRhcl9uZXdAM3gucG5n.origin?x-kcdn-pid=112372\"],\"introduction\":\"\",\"userId\":78022253,\"userEmail\":\"laterhands@gmail.com\",\"userAbConfigs\":{\"showUserGuide\":\"false\",\"designerPanelStyle\":\"simplified\",\"task_submit_rate_limit_time\":\"5000\",\"versionSelectCache\":\"true\",\"modelSelectPosition\":\"top\",\"offline_v10_v20master\":\"true\",\"livex_retention\":\"false\",\"use_kimg\":\"true\",\"kling_7day_membership_type\":\"\",\"oversea_web_agp_pay\":\"true\",\"kling_wxpay_type\":\"\",\"kimage_to_video_web_param\":\"default\",\"new_side_navigation\":\"true\",\"web_banner_featured\":\"true\",\"web_input_revision\":\"true\",\"kling_commerce_reach_type\":\"2\",\"motion_control_pass_display_oversea\":\"default\"},\"userFeatures\":{\"effect_hide_id_when_pending\":true,\"effect_publish_template_creative\":true,\"effect_clone_onekey_split\":true,\"effect_clone_profit_split\":true,\"effect_kling_desktop\":true,\"effect_m2v_img2video_tail_image_v21\":true,\"effect_show_canvas_entry\":true,\"effect_web_intelligence_switch\":true,\"effect_upload_mouse_and_wheel_event\":true,\"effect_mmu_multi_img2img_aiweb\":true,\"effect_multi_modal_video_edit\":true,\"effect_motion_control_imgs2video\":true,\"effect_motion_control_motion_process\":true,\"effect_mmu_img2img_aiweb_v15_outpainting\":true,\"effect_mmu_img2img_aiweb_v15_inpainting\":true,\"effect_m2v_img2video_tail_only_pro_v16\":true,\"effect_m2v_x2video_audio_hq\":true,\"effect_m2v_audio_voice\":true,\"effect_chat_tool\":true,\"effect_livex_switch\":true,\"effect_mmu_img2img_model\":true,\"effect_m2v_img2video_tail_only_v15\":true,\"effect_m2v_lora_train\":true,\"effect_community_publish\":true,\"effect_client_config_test\":true,\"effect_share_switch\":true,\"effect_kwave_txt2audio\":true,\"effect_kwave_video_add_audio\":true,\"effect_ki18n_ja_ko\":true,\"effect_effect_m2v_img2digital\":true,\"effect_m2v_img2digital_v2\":true,\"effect_damaged_image_detection\":true,\"argument_special_effect_m2v_img2video_se_hq\":true,\"argument_imageList_m2v_img2video\":true,\"argument_imageList_m2v_img2video_hq\":true,\"argument_motion_brush_json_all\":true,\"argument_kling_version_all\":true,\"argument_kling_3.0_4k_all\":true,\"argument_kling_3.0_audio_all\":true,\"argument_kling_3.0_extra_all\":true,\"argument_kling_3.0_motion_m2v_motion_control_animal_motion_direction_subject_v30_720p\":true,\"argument_kling_3.0_omni_all\":true,\"argument_kling_img_web_3.0_omni_all\":true,\"argument_kling_img_web_3.0_all\":true,\"argument_kling_omni_beta_all\":true,\"argument_kling_txt2video_v25_m2v_txt2video_hq\":true,\"argument_kling_txt2video_v25_m2v_txt2video\":true,\"argument_kling_img2video_v25_m2v_img2video_hq\":true,\"argument_kling_img2video_v25_m2v_img2video\":true,\"argument_kling_v25_all\":true,\"argument_kolors_txt2img_v21_mmu_txt2img_aiweb\":true,\"argument_kling_v21_master_t2v_m2v_txt2video\":true,\"argument_kling_v21_master_i2v_m2v_img2video\":true,\"argument_kling_v21_i2v_m2v_img2video\":true,\"argument_kolors_txt2img_2k_mmu_txt2img_aiweb\":true,\"argument_kolors_img2img_v20_mmu_img2img_aiweb\":true,\"argument_kolors_txt2img_v20_mmu_txt2img_aiweb\":true,\"argument_kling_txtimg2video_v20_m2v_txt2video_hq\":true,\"argument_special_effect_spring_blossoms_m2v_img2video_se_hq\":true,\"argument_m2v_extend_video_V15_v16_m2v_extend_video\":true,\"argument_m2v_extend_video_V15_v16_v2_m2v_extend_video\":true,\"argument_pe_switch_all\":true,\"argument_kolors_version_v15_mmu_txt2img_aiweb\":true,\"argument_kling_version_v16_all\":true,\"argument_kling_version_v15_m2v_txt2video\":true},\"totalBalance\":292100,\"pointCards\":[{\"orderId\":\"883000785515839500\",\"type\":\"reward\",\"amount\":1500,\"balance\":1500,\"startTime\":1778552311405,\"endTime\":1778630399000,\"trial\":false,\"name\":\"new_member_login_bonus_daily\",\"showGrantDialog\":false,\"source\":\"\"},{\"orderId\":\"881717038752862287\",\"type\":\"plan\",\"amount\":300000,\"balance\":290000,\"startTime\":1778246270185,\"endTime\":1780924670185,\"trial\":false,\"name\":\"svip-subscription-monthly\",\"showGrantDialog\":true,\"source\":\"\"},{\"orderId\":\"880700607823220777\",\"type\":\"recharge\",\"amount\":33000,\"balance\":600,\"startTime\":1778004064342,\"endTime\":1841076064342,\"trial\":false,\"name\":\"point-33000\",\"showGrantDialog\":false,\"source\":\"\"}],\"tickets\":[{\"orderId\":\"877798387897212971\",\"type\":\"extend\",\"packageType\":\"reward\",\"amount\":2,\"balance\":2,\"startTime\":1777311963160,\"endTime\":1779990363160},{\"orderId\":\"877798387897212971\",\"type\":\"priority\",\"packageType\":\"reward\",\"amount\":1,\"balance\":1,\"startTime\":1777311963160,\"endTime\":1779990363160},{\"orderId\":\"877798387897212971\",\"type\":\"hq_5s\",\"packageType\":\"reward\",\"amount\":3,\"balance\":3,\"startTime\":1777311963160,\"endTime\":1779990363160}],\"enableConsole\":false,\"userPreferences\":{\"hasVisitedKling3_0\":true,\"videoVersionSelect\":\"\"}}"
+        },
+        {
+          "name": "webp_check_result",
+          "value": "true"
+        },
+        {
+          "name": "_gcl_ls",
+          "value": "{\"schema\":\"gcl\",\"version\":1,\"gcl_ctr\":{\"value\":{\"value\":0,\"timeouts\":0,\"errors\":0,\"eopCount\":0,\"creationTimeMs\":1778453574335},\"expires\":1786229574335},\"last_convs\":{\"value\":[],\"expires\":1786327886193}}"
+        },
+        {
+          "name": "overlay-frequency-moved|ds-img-inference-i2v|guide|image-to-video-by-frame",
+          "value": "true"
+        },
+        {
+          "name": "overlay-frequency-moved|first-use-motion-brush|guide|motion-brush",
+          "value": "true"
+        },
+        {
+          "name": "overlay-manage__auto-dialog__weekly-trial",
+          "value": "1778551473022"
+        },
+        {
+          "name": "openChatBox",
+          "value": "false"
+        },
+        {
+          "name": "teamId",
+          "value": "{\"value\":\"private\",\"expire\":null}"
+        },
+        {
+          "name": "serverPushConnectId",
+          "value": "1778552311505"
+        },
+        {
+          "name": "REACT_QUERY_OFFLINE_CACHE",
+          "value": "{\"buster\":\"\",\"timestamp\":1778552311431,\"clientState\":{\"mutations\":[],\"queries\":[{\"dehydratedAt\":1778552311431,\"state\":{\"data\":\"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>\\n<svg width=\\\"320\\\" height=\\\"320\\\" viewBox=\\\"0 0 320 320\\\" fill=\\\"none\\\" xmlns=\\\"http://www.w3.org/2000/svg\\\">\\n  <path d=\\\"M90 133.61C90 114.088 97.375 95.3645 110.503 81.5605C123.63 67.7554 141.435 60 160 60C178.565 60 196.37 67.7554 209.497 81.5605C222.625 95.3645 230 114.088 230 133.61V144.494C246.96 147.05 260 162.392 260 180.931V183.56C260 202.226 244.69 218.588 226.68 217.715C219.28 240.009 200.46 255.036 180.15 258.843C175.45 260.651 169.89 259.8 165 259.8C161.022 259.8 157.206 258.138 154.393 255.18C151.58 252.222 150 248.209 150 244.026C150 239.843 151.58 235.83 154.393 232.872C157.206 229.914 161.022 228.252 165 228.252C172.93 228.252 181.71 227.043 187.07 234.656C200.03 228.168 210 214.466 210 196.705V133.61C210 119.665 204.732 106.291 195.355 96.4319C185.979 86.5713 173.261 81.0315 160 81.0315C146.739 81.0315 134.021 86.5713 124.645 96.4319C115.268 106.291 110 119.665 110 133.61V199.334C110 204.214 108.156 208.895 104.874 212.346C101.592 215.797 97.141 217.737 92.5 217.737C83.88 217.737 75.614 214.136 69.519 207.727C63.424 201.317 60 192.625 60 183.56V180.931C59.998 172.079 63.03 163.524 68.54 156.831C74.049 150.139 81.668 145.759 90 144.494V133.61Z\\\" fill=\\\"white\\\"></path>\\n</svg>\\n\",\"dataUpdateCount\":1,\"dataUpdatedAt\":1778552311288,\"error\":null,\"errorUpdateCount\":0,\"errorUpdatedAt\":0,\"fetchFailureCount\":0,\"fetchFailureReason\":null,\"fetchMeta\":null,\"isInvalidated\":false,\"status\":\"success\",\"fetchStatus\":\"idle\"},\"queryKey\":[\"useFetchSvg\",\"https://api.copilot.livex.ai/api/v1/users/static/6c3f397755a06f79d17ddee41de4a673/26f7c70ff7d852d182fb257fca1c6868.headset.svg\"],\"queryHash\":\"[\\\"useFetchSvg\\\",\\\"https://api.copilot.livex.ai/api/v1/users/static/6c3f397755a06f79d17ddee41de4a673/26f7c70ff7d852d182fb257fca1c6868.headset.svg\\\"]\"}]}}"
+        },
+        {
+          "name": "loglevel:livekit",
+          "value": "SILENT"
+        },
+        {
+          "name": "OTHER_DEVICE_INCREASE_ID",
+          "value": "{\"_ts\":1778552522028}"
+        },
+        {
+          "name": "overlay-frequency-moved|ds-img-inference-i2i|guide|text-to-image",
+          "value": "true"
+        },
+        {
+          "name": "overlay-frequency-moved|first-use-multimodal-video|guide|multimodal-to-video",
+          "value": "true"
+        },
+        {
+          "name": "kwai_player_device_id",
+          "value": "web_8ljacdpb1gs0k1vgs26acfnjmht376pj8mgh"
+        },
+        {
+          "name": "banner",
+          "value": "{}"
+        },
+        {
+          "name": "overlay-frequency-moved|first-use-motion-control|guide|image-to-video-by-frame",
+          "value": "true"
+        },
+        {
+          "name": "_uetvid",
+          "value": "fb3088d04cc211f19b087301c5f98018|8stc1o|1778552238931|8|1|bat.bing.com/p/conversions/c/l"
+        },
+        {
+          "name": "@radar:task-map",
+          "value": "{\"0\":[\"login_global\",{\"taskUuid\":\"c406c432-b94b-44ce-964e-5c212e1371b1\",\"steps\":[{\"projectId\":\"5a39174a1m\",\"bundleId\":\"\",\"stepName\":\"login_start\",\"stepTime\":1778552242602},{\"projectId\":\"5a39174a1m\",\"bundleId\":\"\",\"stepName\":\"email_first_step_enter\",\"stepTime\":1778552242604},{\"projectId\":\"5a39174a1m\",\"bundleId\":\"\",\"stepName\":\"google_first_step_enter\",\"stepTime\":1778552244245},{\"projectId\":\"5a39174a1m\",\"bundleId\":\"\",\"stepName\":\"google_first_step_success\",\"stepTime\":1778552308768},{\"projectId\":\"5a39174a1m\",\"bundleId\":\"\",\"stepName\":\"login_end\",\"stepTime\":1778552309366}],\"_ts\":1778552309366}],\"_ts\":1778552309367}"
+        },
+        {
+          "name": "LOAD_DEVICE_INCREASE_ID",
+          "value": "{\"_ts\":1778552240340}"
+        },
+        {
+          "name": "kwfcv1",
+          "value": "8"
+        },
+        {
+          "name": "alg",
+          "value": "test"
+        },
+        {
+          "name": "theme",
+          "value": "{}"
+        },
+        {
+          "name": "loglevel:livekit-participant",
+          "value": "SILENT"
+        },
+        {
+          "name": "loglevel:livekit-signal",
+          "value": "SILENT"
+        },
+        {
+          "name": "overlay-frequency-moved|release-notes-2025-07-24|auto-dialog|release-notes2025-07-24",
+          "value": "true"
+        },
+        {
+          "name": "commerce",
+          "value": "{\"invitationCode\":\"\",\"invitationCodeFrom\":\"\",\"timestamp\":1778552312560}"
+        },
+        {
+          "name": "klingai_user",
+          "value": "{\"id\":\"78022253\",\"email\":\"laterhands@gmail.com\",\"avatar\":\"https://s15-kling.klingai.com/kimg/EMXN1y8qSgoGdXBsb2FkEg55bGFiLXN0dW50LXNncBowa2xpbmcvcmVzb3VyY2VzL2tsX3BsYWNlaG9sZGVyX2F2YXRhcl9uZXdAM3gucG5n.origin?x-kcdn-pid=112372\",\"nickname\":\"OLoVknYC\",\"isNewUser\":false}"
+        },
+        {
+          "name": "KLING_RECENT_LOGIN",
+          "value": "{\"type\":\"google\",\"email\":\"laterhands@gmail.com\"}"
+        },
+        {
+          "name": "loglevel:livekit-track-publication",
+          "value": "SILENT"
+        },
+        {
+          "name": "WEBLOGGER_CUSTOM_INCREAMENT_ID_KEY",
+          "value": "257"
+        },
+        {
+          "name": "_uetsid",
+          "value": "e77fc3a04da611f1b141615082cb8cbb|1umg9rs|2|g5z|0|2323"
+        },
+        {
+          "name": "loglevel:livekit-engine",
+          "value": "SILENT"
+        },
+        {
+          "name": "kwrcv1",
+          "value": "4"
+        },
+        {
+          "name": "overlay-frequency-moved|multi-image-function-first|guide|motion-brush",
+          "value": "true"
+        },
+        {
+          "name": "streamDetailsMap",
+          "value": "{}"
+        },
+        {
+          "name": "overlay-frequency-moved|first-use-multi-reference-image|guide|multi-image-reference",
+          "value": "true"
+        },
+        {
+          "name": "_uetsid_exp",
+          "value": "Wed, 13 May 2026 02:17:18 GMT"
+        },
+        {
+          "name": "kwfv1",
+          "value": "+/PIG9bS+90zD8/40D8eZA8nPIPn8Y+0cEGf8f+e8f8nPhG/LAG0clw/WFG0zYP0+f+/qhG9G7PAQY+fHU+0zD8Bbfwe8SGfQYGfH7P9Gh8BGI+BL9+BHFG0LE+9PE+BQj+AmS80SYG9QSPBPIG0WEG0ZF+AG7P/LFGAHIP/cFP0H="
+        },
+        {
+          "name": "loglevel:livekit-pc-transport",
+          "value": "SILENT"
+        },
+        {
+          "name": "loglevel:livekit-pc-manager",
+          "value": "SILENT"
+        },
+        {
+          "name": "loglevel:livekit-room",
+          "value": "SILENT"
+        },
+        {
+          "name": "SEE",
+          "value": "12"
+        },
+        {
+          "name": "__risk_web_device_id",
+          "value": "f0a1aded1778453573123a11"
+        },
+        {
+          "name": "overlay-manage__guide__digital-human",
+          "value": "1778453573785"
+        },
+        {
+          "name": "WEBLOGGER_INCREAMENT_ID_KEY",
+          "value": "267"
+        },
+        {
+          "name": "lvxcplt-visitor-id",
+          "value": "019e1417f9141oNVyvRwxmfA"
+        }
+      ]
+    }
+  ]
+}

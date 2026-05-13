@@ -1,0 +1,74 @@
+{
+  "subtitle_template_version": "1.0",
+  "episode_type": "heroic_rescue",
+
+  "timing_model": {
+    "mode": "relative",
+    "units": "percent"
+  },
+
+  "subtitles": [
+    {
+      "id": "sub_01_setup",
+      "source": "beats.setup.line",
+      "start": 5,
+      "end": 20,
+      "style": "default"
+    },
+    {
+      "id": "sub_02_emotional",
+      "source": "beats.emotional_beat.line",
+      "start": 22,
+      "end": 38,
+      "style": "default"
+    },
+    {
+      "id": "sub_03_escalation",
+      "source": "beats.escalation.line",
+      "start": 45,
+      "end": 62,
+      "style": "impact"
+    },
+    {
+      "id": "sub_04_punchline",
+      "source": "beats.punchline.line",
+      "start": 65,
+      "end": 82,
+      "style": "whisper"
+    },
+    {
+      "id": "sub_05_aftermath",
+      "source": "beats.aftermath.resolution",
+      "start": 85,
+      "end": 98,
+      "style": "deadpan"
+    }
+  ],
+
+  "styles": {
+    "default": {
+      "font": "bold",
+      "size": "medium",
+      "color": "white",
+      "outline": "black"
+    },
+    "impact": {
+      "font": "bold",
+      "size": "large",
+      "color": "yellow",
+      "outline": "black"
+    },
+    "whisper": {
+      "font": "italic",
+      "size": "small",
+      "color": "white",
+      "opacity": 0.8
+    },
+    "deadpan": {
+      "font": "regular",
+      "size": "medium",
+      "color": "white",
+      "outline": "black"
+    }
+  }
+}

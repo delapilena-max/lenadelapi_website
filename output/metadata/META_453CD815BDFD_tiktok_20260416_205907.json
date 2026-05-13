@@ -1,0 +1,23 @@
+{
+  "platform": "tiktok",
+  "api_body": {
+    "post_info": {
+      "title": "plastic_bag_entity",
+      "privacy_level": "SELF_ONLY",
+      "disable_duet": false,
+      "disable_stitch": false,
+      "disable_comment": false,
+      "video_cover_timestamp_ms": 1000
+    },
+    "source_info": {
+      "source": "FILE_UPLOAD",
+      "video_size": 0,
+      "chunk_size": 0,
+      "total_chunk_count": 1
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+  "draft_mode": true,
+  "episode_id": "453CD815BDFD",
+  "packaged_at": "2026-04-17T01:59:07.426501+00:00"
+}

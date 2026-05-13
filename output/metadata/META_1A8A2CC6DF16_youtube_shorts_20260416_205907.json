@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "dramatic_butterfly #Shorts",
+      "description": "A butterfly flapping dramatically as if announcing doom.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\1A8A2CC6DF16_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "1A8A2CC6DF16",
+  "packaged_at": "2026-04-17T01:59:07.409395+00:00"
+}

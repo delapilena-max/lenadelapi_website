@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "approaching_roomba #Shorts",
+      "description": "A Roomba slowly inching forward at a painfully slow speed.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\823BD5AF6B0F_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "823BD5AF6B0F",
+  "packaged_at": "2026-04-17T01:59:07.401338+00:00"
+}

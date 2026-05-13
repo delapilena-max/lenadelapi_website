@@ -1,0 +1,27 @@
+{
+  "_stub": true,
+  "_note": "Replace with your actual episode_template.json",
+  "episode_id": "6484E41A5475",
+  "batch_name": "threats_batch_01.json",
+  "batch_index": 10,
+  "created_at": "2026-04-17T01:32:23.028994+00:00",
+  "status": "generated",
+  "content": {
+    "threat_name": "pigeon_with_intent",
+    "threat_type": "creature",
+    "behavior": "walks",
+    "description": "A pigeon walking directly toward them with suspicious confidence."
+  },
+  "storyboard": {
+    "_stub": true,
+    "_note": "Replace with your actual storyboard_template.json"
+  },
+  "subtitle_timing": {
+    "_stub": true,
+    "_note": "Replace with your actual subtitle_timing.json"
+  },
+  "pose_manifest": {
+    "_stub": true,
+    "_note": "Replace with your actual pose_list.json"
+  }
+}

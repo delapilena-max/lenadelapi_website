@@ -1,0 +1,214 @@
+to run and paste outputs:   
+Get-ChildItem "C:\projects\ai\content_bot\outbox\ai_lady\uploaded" -File | Select Name,Length,LastWriteTime
+Get-Content "C:\projects\ai\content_bot\logs\bot_current.log" -Tail 100
+
+Tail review worker log:
+powershell
+Get-Content ".\logs\review_worker.log" -Tail 40
+
+Show recent label entries
+powershell
+Get-Content ".\logs\review_labels.json" -Tail 40
+
+Tail monitor log
+powershell
+Get-Content ".\logs\monitor.log" -Tail 40
+
+Run rotation helper interactively
+powershell
+.\rotate_mastodon_token.ps1
+
+*If you want to open the review UI in your default browser so you can manually approve/flag items (this is the most useful next step), run this one PowerShell command from the project root:
+
+powershell
+Start-Process "http://127.0.0.1:5000"
+
+*Stop or inspect the AutoFlow job
+If you need to pause or stop the automation:
+
+powershell
+# Stop AutoFlow but keep job object (pause)
+Get-Job -Name AutoFlow | Stop-Job; Write-Host "AUTO_FLOW_STOPPED"
+
+# Remove the job entirely
+Get-Job -Name AutoFlow | Stop-Job; Get-Job -Name AutoFlow | Remove-Job; Write-Host "AUTO_FLOW_REMOVED"
+
+# Stream the job output (if it has produced output)
+Receive-Job -Name AutoFlow -Keep
+
+5) Monitor and stop the automation when needed
+Why: you’ll want to pause posting quickly if something goes wrong.
+
+powershell
+# stop AutoFlow (pause)
+Get-Job -Name AutoFlow | Stop-Job; Write-Host "AUTO_FLOW_STOPPED"
+
+# remove AutoFlow (cleanup)
+Get-Job -Name AutoFlow | Stop-Job; Get-Job -Name AutoFlow | Remove-Job; Write-Host "AUTO_FLOW_REMOVED"
+
+# stream job output (if any)
+Receive-Job -Name AutoFlow -Keep
+
+Automation script to run the pipeline and show results
+Run this single PowerShell script from anywhere. It uses the venv Python, runs the pipeline with a prompt/seed you can change, captures output, lists recent files, and prints a compact summary of the last storyboard.
+
+powershell
+# Save as run_pipeline.ps1 and run: .\run_pipeline.ps1
+$root = "C:\projects\ai\content_bot"
+$py = Join-Path $root ".venv\Scripts\python.exe"
+$script = Join-Path $root "nodes\ai_lady\pipeline.py"
+$out = Join-Path $root "pipeline_out.txt"
+$err = Join-Path $root "pipeline_err.txt"
+
+Set-Location $root
+
+# change prompt/seed here if desired
+$prompt = "soft girl morning"
+$seed = 123
+
+# run pipeline
+& $py $script --prompt $prompt --seed $seed --pretty > $out 2> $err
+
+# show errors if any
+if ((Get-Item $err).Length -gt 0) {
+  Write-Host "`n--- ERRORS ---`n" -ForegroundColor Yellow
+  Get-Content $err -Raw
+} else {
+  Write-Host "`nNo stderr output.`n" -ForegroundColor Green
+}
+
+# print a short snippet of stdout
+Write-Host "`n--- PIPELINE OUTPUT (snippet) ---`n"
+Get-Content $out -Raw | Select-Object -First 1 | ForEach-Object { $_.Substring(0,[Math]::Min(2000,$_.Length)) }
+
+# list recent storyboards and scenes
+Write-Host "`n--- Recent storyboards ---`n"
+Get-ChildItem .\nodes\ai_lady\storyboards -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,LastWriteTime | Format-Table -AutoSize
+
+Write-Host "`n--- Recent scenes ---`n"
+Get-ChildItem .\nodes\ai_lady\scenes -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,LastWriteTime | Format-Table -AutoSize
+
+# print compact summary of last storyboard JSON
+$last = Get-ChildItem .\nodes\ai_lady\storyboards -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($last) {
+  $json = Get-Content $last.FullName -Raw | ConvertFrom-Json
+  Write-Host "`n--- Storyboard summary ---`n"
+  Write-Host ("Scene ID: " + $json.scene_id)
+  Write-Host ("Duration: " + $json.duration_seconds + "s")
+  Write-Host ("Location: " + $json.environment.location)
+  Write-Host ("Character: " + $json.character.name + " — " + $json.character.action)
+  Write-Host ("Saved: " + $last.FullName)
+} else {
+  Write-Host "`nNo storyboard files found.`" -ForegroundColor Yellow
+}
+
+
+⭐ About the “state” problem
+You’re right — we need a way to keep context so you don’t have to repeat yourself.
+
+Here’s the cleanest way to do it:
+
+Every day, paste ONE block at the start of the session:
+Code
+PROJECT STATE:
+- Repo path: C:\projects\ai\content_bot\lenadelapi-website
+- GitHub repo: delapilena-max/lenadelapi_website
+- GitHub Pages: main / (root)
+- Current file tree: [paste tree /F]
+- Current URLs that must work: [list them]
+
+
+Quick ways to inspect the result
+Open the file in your default player
+
+powershell
+start output\episode_demo.mp4
+Reveal the file in Explorer
+
+powershell
+explorer.exe /select, "$(Resolve-Path output\episode_demo.mp4)"
+Check file info (duration, size)
+
+powershell
+Get-Item output\episode_demo.mp4 | Select-Object Name,Length
+Useful follow‑ups you can run now
+Re-run with verbose logging (if you want more debug output):
+
+powershell
+python run_episode.py --verbose
+Force a clean rebuild (remove temp files first):
+
+powershell
+Remove-Item temp_shot_* -ErrorAction SilentlyContinue
+Remove-Item output\episode_demo.mp4 -ErrorAction SilentlyContinue
+python run_episode.py
+Make ImageMagick setting permanent (if you set it only for the session):
+
+powershell
+setx IMAGEMAGICK_BINARY "C:\Program Files\ImageMagick-7.1.2-Q16-HDRI\magick.exe"
+If you want changes or fixes
+Change subtitle style or position — I can provide the exact edits for nodes/renderer.py (font, size, color, bottom margin).
+
+Adjust voiceover voice/locale — I can show the exact env vars or code changes to switch voice, speaking rate, or language in nodes/voiceover_engine.py.
+
+Swap the placeholder assets — I can give a short script to replace assets/bg_sample.png, assets/char_sample.png, and assets/music_sample.* with your real files and validate sizes/formats.
+
+Housekeeping suggestions
+Commit the generated assets and output (if you want reproducibility):
+
+powershell
+git add assets output/episode_demo.mp4
+git commit -m "Add sample assets and demo episode"
+Remove temporary voice files if you want to keep the repo clean:
+
+powershell
+Remove-Item assets\audio\voiceover.mp3 -ErrorAction SilentlyContinue
+
+Concrete steps to stay under 0.5M characters
+Measure characters per episode now.
+
+Quick rule of thumb: ~900 characters per minute of spoken audio (≈150 words/min × ~6 chars/word). Use this to estimate minutes from characters. (Estimate; use your real transcripts to be precise.)
+
+Example: a 5‑minute episode ≈ 
+5
+×
+900
+=
+4,500
+ characters. Ten such episodes = 45,000 characters.
+
+Run an automated character counter before each synth.
+
+python
+# count characters in a text file
+p = Path("scripts/episode1.txt")
+print(len(p.read_text(encoding="utf8")))
+
+
+Why requirements.txt matters
+requirements.txt lists the Python packages your project needs so anyone (or CI) can install the exact dependencies with one command. It ensures reproducible environments, avoids “works on my machine” problems, and documents runtime needs (Azure SDK, MoviePy, Pillow, local TTS libs, etc.).
+Short: it’s a single source of truth for what to pip install.	
+
+(.venv) PS C:\projects\ai\content_bot> pip show click typer
+Name: click
+Version: 8.3.3
+Summary: Composable command line interface toolkit
+Home-page:
+Author:
+Author-email:
+License-Expression: BSD-3-Clause
+Location: C:\projects\ai\content_bot\.venv\Lib\site-packages
+Requires: colorama
+Required-by: face-recognition, Flask, gTTS, typer
+---
+Name: typer
+Version: 0.25.1
+Summary: Typer, build great CLIs. Easy to code. Based on Python type hints.
+Home-page: https://github.com/fastapi/typer
+Author:
+Author-email: =?utf-8?q?Sebasti=C3=A1n_Ram=C3=ADrez?= <tiangolo@gmail.com>
+License-Expression: MIT
+Location: C:\projects\ai\content_bot\.venv\Lib\site-packages
+Requires: annotated-doc, click, rich, shellingham
+Required-by: huggingface_hub
+(.venv) PS C:\projects\ai\content_bot>

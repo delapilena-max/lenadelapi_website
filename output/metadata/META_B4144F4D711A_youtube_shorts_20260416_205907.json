@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "confused_drone #Shorts",
+      "description": "A drone hovering nearby, clearly lost and confused.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\B4144F4D711A_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "B4144F4D711A",
+  "packaged_at": "2026-04-17T01:59:07.459678+00:00"
+}

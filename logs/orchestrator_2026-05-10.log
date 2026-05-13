@@ -1,0 +1,53 @@
+2026-05-10 19:34:05,608 [INFO] === Orchestrator Sunday May 10 2026 19:34 CDT ===
+2026-05-10 19:34:05,623 [INFO] Node: ai_lady (persona)
+2026-05-10 19:34:05,623 [WARNING] nodes/dark_psych: no posting_rules.json — skipping
+2026-05-10 19:34:05,639 [INFO] Node: scary_facts (text_content)
+2026-05-10 19:34:05,639 [INFO] Active today: ['ai_lady', 'scary_facts']
+2026-05-10 19:34:05,639 [INFO] Refreshing Kling auth...
+2026-05-10 19:34:05,639 [INFO] [auth] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\save_state_cdp.py
+2026-05-10 19:34:06,620 [INFO] [auth] exit=1
+2026-05-10 19:34:11,160 [INFO] Queue: 30 episodes ready
+2026-05-10 19:34:11,160 [INFO] ai_lady: queue=30 episodes, no build needed
+2026-05-10 19:34:11,172 [INFO] Today's schedule (10 posts):
+2026-05-10 19:34:11,174 [INFO]   10:24  scary_facts → facebook  [ep_001]
+2026-05-10 19:34:11,174 [INFO]   11:05  ai_lady → facebook  [ep_001]
+2026-05-10 19:34:11,174 [INFO]   11:15  scary_facts → instagram  [ep_002]
+2026-05-10 19:34:11,174 [INFO]   13:13  scary_facts → facebook  [ep_003]
+2026-05-10 19:34:11,174 [INFO]   13:25  ai_lady → tiktok  [ep_002]
+2026-05-10 19:34:11,176 [INFO]   16:39  scary_facts → youtube  [ep_004]
+2026-05-10 19:34:11,176 [INFO]   16:46  scary_facts → tiktok  [ep_005]
+2026-05-10 19:34:11,176 [INFO]   17:34  ai_lady → pinterest  [ep_003]
+2026-05-10 19:34:11,176 [INFO]   19:17  ai_lady → instagram  [ep_004]
+2026-05-10 19:34:11,176 [INFO]   20:19  ai_lady → youtube  [ep_005]
+2026-05-10 19:34:11,176 [INFO] [scary_facts/facebook] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform facebook --video C:\projects\ai\content_bot\queue\ep_001\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_001\episode.json
+2026-05-10 19:34:11,284 [INFO] [scary_facts/facebook] exit=0
+2026-05-10 19:34:11,284 [INFO] ✓ Posted: scary_facts → facebook [ep_001]
+2026-05-10 19:34:19,290 [INFO] [ai_lady/facebook] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform facebook --video C:\projects\ai\content_bot\queue\ep_001\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_001\episode.json
+2026-05-10 19:34:19,391 [INFO] [ai_lady/facebook] exit=0
+2026-05-10 19:34:19,398 [INFO] ✓ Posted: ai_lady → facebook [ep_001]
+2026-05-10 19:34:27,414 [INFO] [scary_facts/instagram] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform instagram --video C:\projects\ai\content_bot\queue\ep_002\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_002\episode.json
+2026-05-10 19:34:27,525 [INFO] [scary_facts/instagram] exit=0
+2026-05-10 19:34:27,541 [INFO] ✓ Posted: scary_facts → instagram [ep_002]
+2026-05-10 19:34:35,544 [INFO] [scary_facts/facebook] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform facebook --video C:\projects\ai\content_bot\queue\ep_003\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_003\episode.json
+2026-05-10 19:34:35,653 [INFO] [scary_facts/facebook] exit=0
+2026-05-10 19:34:35,656 [INFO] ✓ Posted: scary_facts → facebook [ep_003]
+2026-05-10 19:34:43,659 [INFO] [ai_lady/tiktok] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\upload_tiktok_personas.py --video C:\projects\ai\content_bot\queue\ep_002\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_002\episode.json
+2026-05-10 19:34:45,011 [INFO] [ai_lady/tiktok] exit=0
+2026-05-10 19:34:45,027 [INFO] ✓ Posted: ai_lady → tiktok [ep_002]
+2026-05-10 19:34:53,031 [INFO] [scary_facts/youtube] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform youtube --video C:\projects\ai\content_bot\queue\ep_004\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_004\episode.json
+2026-05-10 19:34:53,186 [INFO] [scary_facts/youtube] exit=0
+2026-05-10 19:34:53,202 [INFO] ✓ Posted: scary_facts → youtube [ep_004]
+2026-05-10 19:35:01,205 [INFO] [scary_facts/tiktok] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform tiktok --video C:\projects\ai\content_bot\queue\ep_005\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_005\episode.json
+2026-05-10 19:35:01,337 [INFO] [scary_facts/tiktok] exit=0
+2026-05-10 19:35:01,354 [INFO] ✓ Posted: scary_facts → tiktok [ep_005]
+2026-05-10 19:35:09,356 [INFO] [ai_lady/pinterest] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\posting_agent.py --platform pinterest --video C:\projects\ai\content_bot\queue\ep_003\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_003\episode.json
+2026-05-10 19:35:09,483 [INFO] [ai_lady/pinterest] exit=0
+2026-05-10 19:35:09,506 [INFO] ✓ Posted: ai_lady → pinterest [ep_003]
+2026-05-10 19:35:17,517 [INFO] [ai_lady/instagram] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\uploaders\instagram_reels.py --video C:\projects\ai\content_bot\queue\ep_004\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_004\episode.json
+2026-05-10 19:35:17,703 [INFO] [ai_lady/instagram] exit=0
+2026-05-10 19:35:17,726 [INFO] ✓ Posted: ai_lady → instagram [ep_004]
+2026-05-10 19:35:25,731 [INFO] Sleeping 44.1 min → 20:19 [ai_lady/youtube]
+2026-05-10 20:19:31,971 [INFO] [ai_lady/youtube] C:\projects\ai\content_bot\.venv\Scripts\python.exe C:\projects\ai\content_bot\uploaders\youtube_shorts.py --video C:\projects\ai\content_bot\queue\ep_005\final_video.mp4 --meta C:\projects\ai\content_bot\queue\ep_005\episode.json
+2026-05-10 20:19:32,173 [INFO] [ai_lady/youtube] exit=0
+2026-05-10 20:19:32,207 [INFO] ✓ Posted: ai_lady → youtube [ep_005]
+2026-05-10 20:19:40,209 [INFO] === Orchestrator run complete ===
