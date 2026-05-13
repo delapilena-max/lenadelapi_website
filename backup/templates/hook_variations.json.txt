@@ -1,0 +1,67 @@
+{
+  "hook_template_version": "1.0",
+  "episode_type": "heroic_rescue",
+
+  "hooks": [
+    {
+      "id": "hook_01",
+      "camera": "closeup",
+      "text_overlay": "He takes this WAY too seriously",
+      "animation_note": "protagonist wide_eyed pose, pig neutral"
+    },
+    {
+      "id": "hook_02",
+      "camera": "medium_side_profile",
+      "text_overlay": "Another day, another crisis",
+      "animation_note": "protagonist sincere_stand, pig blink"
+    },
+    {
+      "id": "hook_03",
+      "camera": "closeup",
+      "text_overlay": "He swore to protect the pig",
+      "animation_note": "protagonist closeup_sincere, pig idle_shift"
+    },
+    {
+      "id": "hook_04",
+      "camera": "wide_static",
+      "text_overlay": "This shouldn’t be dramatic… but it is",
+      "animation_note": "protagonist neutral_stand, pig neutral"
+    },
+    {
+      "id": "hook_05",
+      "camera": "dynamic_close",
+      "text_overlay": "He sensed danger before it existed",
+      "animation_note": "protagonist alert_turn, pig side_glance"
+    },
+    {
+      "id": "hook_06",
+      "camera": "closeup",
+      "text_overlay": "He’s ready for anything",
+      "animation_note": "protagonist sincere_stand, pig blink"
+    },
+    {
+      "id": "hook_07",
+      "camera": "medium_side_profile",
+      "text_overlay": "The pig? Unbothered.",
+      "animation_note": "protagonist protective_stance, pig neutral"
+    },
+    {
+      "id": "hook_08",
+      "camera": "closeup",
+      "text_overlay": "He’s about to overreact again",
+      "animation_note": "protagonist wide_eyed, pig idle_shift"
+    },
+    {
+      "id": "hook_09",
+      "camera": "wide_static",
+      "text_overlay": "He thinks danger is near",
+      "animation_note": "protagonist alert_turn, pig neutral"
+    },
+    {
+      "id": "hook_10",
+      "camera": "closeup",
+      "text_overlay": "He’s the hero nobody asked for",
+      "animation_note": "protagonist sincere_stand, pig blink"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+2026/05/11-22:00:01.953 3730 Reusing MANIFEST C:\projects\ai\content_bot\pw_profile\Default\IndexedDB\https_kling.ai_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/11-22:00:01.953 3730 Recovering log #56
+2026/05/11-22:00:01.954 3730 Reusing old log C:\projects\ai\content_bot\pw_profile\Default\IndexedDB\https_kling.ai_0.indexeddb.leveldb/000056.log 
+2026/05/11-22:00:01.954 3730 Delete type=2 #55
+2026/05/11-22:00:02.202 8954 Level-0 table #61: started
+2026/05/11-22:00:02.204 8954 Level-0 table #61: 48491 bytes OK
+2026/05/11-22:00:02.204 8954 Delete type=0 #56
+2026/05/11-22:00:02.205 3730 Manual compaction at level-0 from '\x00\x15\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x16\x00\x00\x00' @ 0 : 0; will stop at '\x00\x15\x00\x00\x05' @ 720 : 1
+2026/05/11-22:00:02.205 3730 Compacting 1@0 + 1@1 files
+2026/05/11-22:00:02.206 3730 Generated table #62@0: 127 keys, 27253 bytes
+2026/05/11-22:00:02.206 3730 Compacted 1@0 + 1@1 files => 27253 bytes
+2026/05/11-22:00:02.206 3730 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/11-22:00:02.207 3730 Delete type=2 #61
+2026/05/11-22:00:02.207 3730 Manual compaction at level-0 from '\x00\x15\x00\x00\x05' @ 720 : 1 .. '\x00\x16\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/05/11-22:00:02.362 8954 Level-0 table #64: started
+2026/05/11-22:00:02.363 8954 Level-0 table #64: 494 bytes OK
+2026/05/11-22:00:02.364 8954 Delete type=2 #58
+2026/05/11-22:00:02.364 8954 Delete type=0 #60
+2026/05/11-22:00:02.364 3730 Manual compaction at level-0 from '\x00\x16\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x17\x00\x00\x00' @ 0 : 0; will stop at '\x00\x16\x00\x00\x05' @ 739 : 1
+2026/05/11-22:00:02.364 3730 Compacting 1@0 + 1@1 files
+2026/05/11-22:00:02.366 3730 Generated table #65@0: 127 keys, 27253 bytes
+2026/05/11-22:00:02.366 3730 Compacted 1@0 + 1@1 files => 27253 bytes
+2026/05/11-22:00:02.366 3730 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/11-22:00:02.367 3730 Delete type=2 #64
+2026/05/11-22:00:02.367 3730 Manual compaction at level-0 from '\x00\x16\x00\x00\x05' @ 739 : 1 .. '\x00\x17\x00\x00\x00' @ 0 : 0; will stop at (end)

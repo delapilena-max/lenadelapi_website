@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "pigeon_with_intent #Shorts",
+      "description": "A pigeon walking directly toward them with suspicious confidence.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "6484E41A5475",
+  "packaged_at": "2026-04-17T01:59:07.435246+00:00"
+}

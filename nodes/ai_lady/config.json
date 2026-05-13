@@ -1,0 +1,36 @@
+﻿{
+  "name": "AI Lady",
+  "voice": "en-US-AriaNeural",
+  "videos_per_batch": 5,
+  "platforms": ["tiktok", "youtube_shorts", "instagram"],
+  "persona": "You are a relatable, charismatic young woman sharing wild brainrot observations and unhinged life takes. Tone: chaotic, funny, self-aware. Keep scripts 40-80 words. Start with a hook that stops the scroll. No hashtags in script.",
+  "topic_pool": [
+    "a thing that only makes sense at 3am",
+    "a sign you are the main character",
+    "a reason girlhood is actually insane",
+    "a hot take no one asked for but everyone needed",
+    "a thing that lives rent free in your head",
+    "a vibe check that went sideways",
+    "a moment that changed your entire personality",
+    "a thing gen z does that no one can explain",
+    "a reason your situationship was actually a simulation",
+    "a sign the algorithm knows you too well"
+  ],
+  "hashtags": [
+    "#brainrot #fyp #foryou #viral",
+    "#girlboss #chaosera #trending #relatable",
+    "#maincharacter #unhinged #fypシ #viral",
+    "#aura #vibes #brainrotcore #fyp"
+  ],
+  "clip_gen": {
+    "character_desc": "beautiful young woman, 24 years old, natural makeup, candid iPhone 15 Pro photo, realistic skin, unposed, relatable",
+    "face_ref": "nodes/ai_lady/ref_face.png",
+    "kling_model": "kling-v3",
+    "kling_mode": "pro",
+    "clip_duration": 5,
+    "pulid_id_weight": 1.0,
+    "pulid_start_step": 0,
+    "num_steps": 20,
+    "guidance_scale": 4.0
+  }
+}

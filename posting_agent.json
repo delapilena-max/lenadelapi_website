@@ -1,0 +1,51 @@
+"""
+posting_agent.py — Platform dispatcher
+Routes --platform calls to the right uploader in uploaders/
+Called by orchestrator.py for any platform not explicitly overridden in posting_rules.json
+"""
+import argparse, subprocess, sys
+from pathlib import Path
+
+ROOT = Path(__file__).parent
+
+# Priority order per platform — first file found wins
+UPLOADER_PRIORITY = {
+    "instagram": ["uploaders/instagram_reels.py", "uploaders/instagram.py"],
+    "youtube":   ["uploaders/youtube_shorts.py",  "uploaders/youtube.py"],
+    "tiktok":    ["upload_tiktok_personas.py",     "uploaders/tiktok.py"],
+    "facebook":  ["uploaders/facebook.py"],
+    "pinterest": ["uploaders/pinterest.py"],
+}
+
+def find_uploader(platform: str) -> Path | None:
+    for rel in UPLOADER_PRIORITY.get(platform, []):
+        p = ROOT / rel
+        if p.exists():
+            return p
+    return None
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--platform", required=True)
+    parser.add_argument("--video",    default=None)
+    parser.add_argument("--meta",     default=None)
+    parser.add_argument("--node",     default=None)
+    args = parser.parse_args()
+
+    uploader = find_uploader(args.platform)
+    if uploader is None:
+        print(f"[posting_agent] No uploader found for platform: {args.platform}")
+        print(f"[posting_agent] Expected one of: {UPLOADER_PRIORITY.get(args.platform, [])}")
+        sys.exit(1)
+
+    cmd = [sys.executable, str(uploader)]
+    if args.video:    cmd += ["--video",    args.video]
+    if args.meta:     cmd += ["--meta",     args.meta]
+    if args.node:     cmd += ["--node",     args.node]
+
+    print(f"[posting_agent] {args.platform} → {uploader.name}")
+    result = subprocess.run(cmd, cwd=ROOT)
+    sys.exit(result.returncode)
+
+if __name__ == "__main__":
+    main()

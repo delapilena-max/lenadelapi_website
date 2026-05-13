@@ -1,0 +1,36 @@
+{
+  "scene_id": "coffee_shop_window_20260512T004439Z",
+  "duration_seconds": 5,
+  "camera": {
+    "type": "static",
+    "movement": "none",
+    "framing": "medium_shot"
+  },
+  "character": {
+    "name": "Lena",
+    "pose": "sitting",
+    "expression": "thoughtful",
+    "action": "sip_coffee",
+    "outfit": "casual"
+  },
+  "environment": {
+    "location": "cafe",
+    "lighting": "soft_indoor",
+    "props": []
+  },
+  "motion": {
+    "body": "step",
+    "hair": "minimal",
+    "camera": "none"
+  },
+  "text_overlay": {
+    "enabled": true,
+    "content": "",
+    "style": "soft",
+    "placement": "bottom"
+  },
+  "audio": {
+    "type": "lofi",
+    "track_id": null
+  }
+}

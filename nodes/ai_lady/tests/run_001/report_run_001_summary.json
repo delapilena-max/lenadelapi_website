@@ -1,0 +1,91 @@
+{
+  "run_id": "run_001",
+  "timestamp": "2026-05-09 00:24:17",
+  "pass_threshold": 60,
+  "total_previews": 5,
+  "pass_count": 5,
+  "avg_score": 91.6,
+  "rescue_triggered": false,
+  "previews": [
+    {
+      "file": "preview1.png",
+      "label": "Primary \u2014 neutral tight crop",
+      "passed": true,
+      "score": 100,
+      "issues": [],
+      "key_metrics": {
+        "num_eyes": 2,
+        "symmetry_score": 76.9000015258789,
+        "mean_brightness": 84.3,
+        "laplacian_var": 215.9,
+        "edge_flag": false
+      }
+    },
+    {
+      "file": "preview2.png",
+      "label": "Primary \u2014 brightness+sharpen",
+      "passed": true,
+      "score": 100,
+      "issues": [],
+      "key_metrics": {
+        "num_eyes": 3,
+        "symmetry_score": 75.9000015258789,
+        "mean_brightness": 88.7,
+        "laplacian_var": 329.3,
+        "edge_flag": false
+      }
+    },
+    {
+      "file": "preview3.png",
+      "label": "Backup \u2014 baseline contrast",
+      "passed": true,
+      "score": 86,
+      "issues": [
+        "Under-exposed (brightness 72.7)",
+        "Shadow crushing: 9.77%"
+      ],
+      "key_metrics": {
+        "num_eyes": 2,
+        "symmetry_score": 78.5,
+        "mean_brightness": 72.7,
+        "laplacian_var": 231.0,
+        "edge_flag": false
+      }
+    },
+    {
+      "file": "preview4.png",
+      "label": "Backup \u2014 contrast+sharpen boost",
+      "passed": true,
+      "score": 86,
+      "issues": [
+        "Under-exposed (brightness 72.4)",
+        "Shadow crushing: 14.27%"
+      ],
+      "key_metrics": {
+        "num_eyes": 2,
+        "symmetry_score": 77.0999984741211,
+        "mean_brightness": 72.4,
+        "laplacian_var": 283.9,
+        "edge_flag": false
+      }
+    },
+    {
+      "file": "preview5.png",
+      "label": "Backup \u2014 warm grade",
+      "passed": true,
+      "score": 86,
+      "issues": [
+        "Under-exposed (brightness 77.8)",
+        "Shadow crushing: 3.17%"
+      ],
+      "key_metrics": {
+        "num_eyes": 2,
+        "symmetry_score": 78.80000305175781,
+        "mean_brightness": 77.8,
+        "laplacian_var": 224.7,
+        "edge_flag": false
+      }
+    }
+  ],
+  "one_liner": "\u2705 All 5 passed \u2014 references stable. Proceed to full-res generation."
+}

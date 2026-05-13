@@ -1,0 +1,122 @@
+[
+  {
+    "threat_name": "rogue_balloon",
+    "threat_type": "object",
+    "behavior": "floats",
+    "description": "A single red balloon drifting unpredictably toward them."
+  },
+  {
+    "threat_name": "staring_squirrel",
+    "threat_type": "creature",
+    "behavior": "stares",
+    "description": "A squirrel frozen in place, staring with unsettling intensity."
+  },
+  {
+    "threat_name": "approaching_roomba",
+    "threat_type": "object",
+    "behavior": "moves",
+    "description": "A Roomba slowly inching forward at a painfully slow speed."
+  },
+  {
+    "threat_name": "rogue_receipt",
+    "threat_type": "object",
+    "behavior": "blows",
+    "description": "A shopping receipt fluttering in the wind like a warning."
+  },
+  {
+    "threat_name": "dramatic_butterfly",
+    "threat_type": "creature",
+    "behavior": "flutters",
+    "description": "A butterfly flapping dramatically as if announcing doom."
+  },
+  {
+    "threat_name": "rolling_toy_car",
+    "threat_type": "object",
+    "behavior": "rolls",
+    "description": "A tiny toy car rolling slowly toward them with no clear motive."
+  },
+  {
+    "threat_name": "judgmental_cat",
+    "threat_type": "creature",
+    "behavior": "stares",
+    "description": "A cat sitting nearby, judging everything silently."
+  },
+  {
+    "threat_name": "rogue_bubble",
+    "threat_type": "object",
+    "behavior": "floats",
+    "description": "A soap bubble drifting closer, wobbling ominously."
+  },
+  {
+    "threat_name": "plastic_bag_entity",
+    "threat_type": "object",
+    "behavior": "drifts",
+    "description": "A plastic bag drifting like a ghost with no purpose."
+  },
+  {
+    "threat_name": "slow_falling_acorn",
+    "threat_type": "environment",
+    "behavior": "falls",
+    "description": "An acorn descending slowly from above, threatening nothing."
+  },
+  {
+    "threat_name": "pigeon_with_intent",
+    "threat_type": "creature",
+    "behavior": "walks",
+    "description": "A pigeon walking directly toward them with suspicious confidence."
+  },
+  {
+    "threat_name": "rogue_feather",
+    "threat_type": "object",
+    "behavior": "falls",
+    "description": "A feather drifting down like a soft omen."
+  },
+  {
+    "threat_name": "toddler_with_juice_box",
+    "threat_type": "creature",
+    "behavior": "approaches",
+    "description": "A toddler approaching slowly, gripping a juice box with power."
+  },
+  {
+    "threat_name": "rogue_shadow",
+    "threat_type": "environment",
+    "behavior": "exists",
+    "description": "A shadow that appears slightly too close for comfort."
+  },
+  {
+    "threat_name": "wandering_frisbee",
+    "threat_type": "object",
+    "behavior": "glides",
+    "description": "A frisbee gliding lazily through the air toward them."
+  },
+  {
+    "threat_name": "micro_sprinkler_burst",
+    "threat_type": "environment",
+    "behavior": "sprays",
+    "description": "A sprinkler sputtering a single rogue water droplet."
+  },
+  {
+    "threat_name": "confused_drone",
+    "threat_type": "object",
+    "behavior": "hovers",
+    "description": "A drone hovering nearby, clearly lost and confused."
+  },
+  {
+    "threat_name": "rolling_pinecone",
+    "threat_type": "object",
+    "behavior": "rolls",
+    "description": "A pinecone rolling slowly across the ground with no urgency."
+  },
+  {
+    "threat_name": "dramatic_dandelion_puff",
+    "threat_type": "object",
+    "behavior": "floats",
+    "description": "A dandelion puff drifting like it has a tragic backstory."
+  },
+  {
+    "threat_name": "mailbox_flag_movement",
+    "threat_type": "object",
+    "behavior": "moves",
+    "description": "A mailbox flag slowly rising for no apparent reason."
+  }
+]

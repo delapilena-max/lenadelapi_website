@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "dramatic_dandelion_puff #Shorts",
+      "description": "A dandelion puff drifting like it has a tragic backstory.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "4B3848CDFB0B",
+  "packaged_at": "2026-04-17T01:59:07.468361+00:00"
+}

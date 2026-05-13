@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "mailbox_flag_movement #Shorts",
+      "description": "A mailbox flag slowly rising for no apparent reason.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\428BC8AEDEFD_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "428BC8AEDEFD",
+  "packaged_at": "2026-04-17T01:59:07.473920+00:00"
+}

@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "toddler_with_juice_box #Shorts",
+      "description": "A toddler approaching slowly, gripping a juice box with power.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\6455228C1A70_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "6455228C1A70",
+  "packaged_at": "2026-04-17T01:59:07.443149+00:00"
+}

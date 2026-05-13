@@ -1,0 +1,26 @@
+{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+
+    "background_image": "assets/background.png",
+    "vignette_image": "assets/vignette.png",
+    "vignette_opacity": 0.35,
+
+    "zoom": 1.05,
+
+    "output_file": "final_video.mp4",
+
+    "audio_bed": "C:/content_bot/assets/audio/bed.mp3",
+    "audio_volume": 0.28,
+
+
+    "subtitles": {
+    "font_size": 48,
+    "color": "white",
+    "font_path": "fonts/arial.ttf",
+    "position": "bottom",
+    "margin_bottom": 80
+}
+
+}

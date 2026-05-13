@@ -1,0 +1,15 @@
+		$AccessKey = "AbRptmpLgh9Y9ThtGFkFCRGnfyHeyEnH"
+$SecretKey = "9RPAKpFppGJCTfnKAB3rhaJPFRbtJCem"
+
+$JwtToken = New-KlingJwtToken -AccessKey $AccessKey -SecretKey $SecretKey
+
+$env:KLING_EMAIL = "laterhands@gmail.com"
+$env:KLING_PASSWORD = "Dnd4life!"
+# Confirm
+echo "KLING_EMAIL: $env:KLING_EMAIL"
+
+$env:KLING_COOKIE = "ChNrc2kxOG4uYWkucG9ydGFsLnN0EqABUfveNdW2LbQEeT-52_crhXyYajBbZEComSj3Nv44c7W5gmsLrD6ZgFIaUC5AJ4DQ9qdq1r6mY-PK1k3BqMt4XwdpgGjn_jqHt3DqxHLJdxb-iMzaMeYootDqYNkX0kKR2hm83MHkq7VEYln_VE0FQWCUg6xZDqWFlMPMA9V1Rlz2BywtpWZWwaFQ51lq22sEjRKMoqV1wY1en_nQY3vKixoSLmDppRkR9BEjgVHow85u0AwbIiCu5tEsPiDUEEEMMLWhM2WhDsE2rhaciwApBYtfecrmpCgFMAE"
+echo "KLING_COOKIE now: $env:KLING_COOKIE"
+
+
+GitHub token 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

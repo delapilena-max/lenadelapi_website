@@ -1,0 +1,1247 @@
+{
+  "step": "package",
+  "timestamp": "20260416_205907",
+  "count": 60,
+  "data": [
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rogue_balloon #Shorts",
+          "description": "A single red balloon drifting unpredictably toward them.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\962B429A6F0D_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "962B429A6F0D",
+      "packaged_at": "2026-04-17T01:59:07.392820+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_962B429A6F0D_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rogue_balloon",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\962B429A6F0D_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "962B429A6F0D",
+      "packaged_at": "2026-04-17T01:59:07.392820+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_962B429A6F0D_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rogue_balloon",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\962B429A6F0D_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "962B429A6F0D",
+      "packaged_at": "2026-04-17T01:59:07.392820+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_962B429A6F0D_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "staring_squirrel #Shorts",
+          "description": "A squirrel frozen in place, staring with unsettling intensity.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6E466792EAA5_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "6E466792EAA5",
+      "packaged_at": "2026-04-17T01:59:07.392820+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6E466792EAA5_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "staring_squirrel",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6E466792EAA5_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "6E466792EAA5",
+      "packaged_at": "2026-04-17T01:59:07.400875+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6E466792EAA5_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "staring_squirrel",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6E466792EAA5_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "6E466792EAA5",
+      "packaged_at": "2026-04-17T01:59:07.401338+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6E466792EAA5_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "approaching_roomba #Shorts",
+          "description": "A Roomba slowly inching forward at a painfully slow speed.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\823BD5AF6B0F_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "823BD5AF6B0F",
+      "packaged_at": "2026-04-17T01:59:07.401338+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_823BD5AF6B0F_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "approaching_roomba",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\823BD5AF6B0F_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "823BD5AF6B0F",
+      "packaged_at": "2026-04-17T01:59:07.401338+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_823BD5AF6B0F_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "approaching_roomba",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\823BD5AF6B0F_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "823BD5AF6B0F",
+      "packaged_at": "2026-04-17T01:59:07.401338+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_823BD5AF6B0F_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rogue_receipt #Shorts",
+          "description": "A shopping receipt fluttering in the wind like a warning.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\F0FAEABBFB25_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "F0FAEABBFB25",
+      "packaged_at": "2026-04-17T01:59:07.401338+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_F0FAEABBFB25_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rogue_receipt",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\F0FAEABBFB25_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "F0FAEABBFB25",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_F0FAEABBFB25_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rogue_receipt",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\F0FAEABBFB25_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "F0FAEABBFB25",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_F0FAEABBFB25_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "dramatic_butterfly #Shorts",
+          "description": "A butterfly flapping dramatically as if announcing doom.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\1A8A2CC6DF16_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "1A8A2CC6DF16",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_1A8A2CC6DF16_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "dramatic_butterfly",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\1A8A2CC6DF16_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "1A8A2CC6DF16",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_1A8A2CC6DF16_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "dramatic_butterfly",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\1A8A2CC6DF16_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "1A8A2CC6DF16",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_1A8A2CC6DF16_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rolling_toy_car #Shorts",
+          "description": "A tiny toy car rolling slowly toward them with no clear motive.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D8970D6F8D04_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "D8970D6F8D04",
+      "packaged_at": "2026-04-17T01:59:07.409395+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D8970D6F8D04_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rolling_toy_car",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D8970D6F8D04_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "D8970D6F8D04",
+      "packaged_at": "2026-04-17T01:59:07.417970+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D8970D6F8D04_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rolling_toy_car",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D8970D6F8D04_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "D8970D6F8D04",
+      "packaged_at": "2026-04-17T01:59:07.417970+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D8970D6F8D04_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "judgmental_cat #Shorts",
+          "description": "A cat sitting nearby, judging everything silently.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\2C4C2956D3BB_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "2C4C2956D3BB",
+      "packaged_at": "2026-04-17T01:59:07.417970+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_2C4C2956D3BB_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "judgmental_cat",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\2C4C2956D3BB_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "2C4C2956D3BB",
+      "packaged_at": "2026-04-17T01:59:07.423513+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_2C4C2956D3BB_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "judgmental_cat",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\2C4C2956D3BB_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "2C4C2956D3BB",
+      "packaged_at": "2026-04-17T01:59:07.423513+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_2C4C2956D3BB_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rogue_bubble #Shorts",
+          "description": "A soap bubble drifting closer, wobbling ominously.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\BF6785447CDA_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "BF6785447CDA",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_BF6785447CDA_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rogue_bubble",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\BF6785447CDA_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "BF6785447CDA",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_BF6785447CDA_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rogue_bubble",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\BF6785447CDA_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "BF6785447CDA",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_BF6785447CDA_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "plastic_bag_entity #Shorts",
+          "description": "A plastic bag drifting like a ghost with no purpose.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "453CD815BDFD",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_453CD815BDFD_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "plastic_bag_entity",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "453CD815BDFD",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_453CD815BDFD_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "plastic_bag_entity",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\453CD815BDFD_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "453CD815BDFD",
+      "packaged_at": "2026-04-17T01:59:07.426501+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_453CD815BDFD_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "slow_falling_acorn #Shorts",
+          "description": "An acorn descending slowly from above, threatening nothing.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B995E3C6E207_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "B995E3C6E207",
+      "packaged_at": "2026-04-17T01:59:07.434563+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B995E3C6E207_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "slow_falling_acorn",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B995E3C6E207_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "B995E3C6E207",
+      "packaged_at": "2026-04-17T01:59:07.435246+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B995E3C6E207_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "slow_falling_acorn",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B995E3C6E207_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "B995E3C6E207",
+      "packaged_at": "2026-04-17T01:59:07.435246+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B995E3C6E207_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "pigeon_with_intent #Shorts",
+          "description": "A pigeon walking directly toward them with suspicious confidence.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "6484E41A5475",
+      "packaged_at": "2026-04-17T01:59:07.435246+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6484E41A5475_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "pigeon_with_intent",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "6484E41A5475",
+      "packaged_at": "2026-04-17T01:59:07.435246+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6484E41A5475_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "pigeon_with_intent",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6484E41A5475_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "6484E41A5475",
+      "packaged_at": "2026-04-17T01:59:07.435246+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6484E41A5475_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rogue_feather #Shorts",
+          "description": "A feather drifting down like a soft omen.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\15FFC21AC9EE_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "15FFC21AC9EE",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_15FFC21AC9EE_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rogue_feather",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\15FFC21AC9EE_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "15FFC21AC9EE",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_15FFC21AC9EE_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rogue_feather",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\15FFC21AC9EE_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "15FFC21AC9EE",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_15FFC21AC9EE_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "toddler_with_juice_box #Shorts",
+          "description": "A toddler approaching slowly, gripping a juice box with power.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6455228C1A70_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "6455228C1A70",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6455228C1A70_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "toddler_with_juice_box",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6455228C1A70_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "6455228C1A70",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6455228C1A70_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "toddler_with_juice_box",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\6455228C1A70_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "6455228C1A70",
+      "packaged_at": "2026-04-17T01:59:07.443149+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_6455228C1A70_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rogue_shadow #Shorts",
+          "description": "A shadow that appears slightly too close for comfort.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D28026B23C76_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "D28026B23C76",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D28026B23C76_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rogue_shadow",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D28026B23C76_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "D28026B23C76",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D28026B23C76_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rogue_shadow",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\D28026B23C76_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "D28026B23C76",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_D28026B23C76_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "wandering_frisbee #Shorts",
+          "description": "A frisbee gliding lazily through the air toward them.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\A04DE657906F_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "A04DE657906F",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_A04DE657906F_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "wandering_frisbee",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\A04DE657906F_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "A04DE657906F",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_A04DE657906F_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "wandering_frisbee",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\A04DE657906F_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "A04DE657906F",
+      "packaged_at": "2026-04-17T01:59:07.451616+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_A04DE657906F_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "micro_sprinkler_burst #Shorts",
+          "description": "A sprinkler sputtering a single rogue water droplet.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\0613EBFDA4AF_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "0613EBFDA4AF",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_0613EBFDA4AF_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "micro_sprinkler_burst",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\0613EBFDA4AF_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "0613EBFDA4AF",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_0613EBFDA4AF_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "micro_sprinkler_burst",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\0613EBFDA4AF_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "0613EBFDA4AF",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_0613EBFDA4AF_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "confused_drone #Shorts",
+          "description": "A drone hovering nearby, clearly lost and confused.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B4144F4D711A_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "B4144F4D711A",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B4144F4D711A_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "confused_drone",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B4144F4D711A_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "B4144F4D711A",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B4144F4D711A_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "confused_drone",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\B4144F4D711A_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "B4144F4D711A",
+      "packaged_at": "2026-04-17T01:59:07.459678+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_B4144F4D711A_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "rolling_pinecone #Shorts",
+          "description": "A pinecone rolling slowly across the ground with no urgency.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\649035BC506D_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "649035BC506D",
+      "packaged_at": "2026-04-17T01:59:07.467990+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_649035BC506D_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "rolling_pinecone",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\649035BC506D_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "649035BC506D",
+      "packaged_at": "2026-04-17T01:59:07.468361+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_649035BC506D_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "rolling_pinecone",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\649035BC506D_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "649035BC506D",
+      "packaged_at": "2026-04-17T01:59:07.468361+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_649035BC506D_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "dramatic_dandelion_puff #Shorts",
+          "description": "A dandelion puff drifting like it has a tragic backstory.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "4B3848CDFB0B",
+      "packaged_at": "2026-04-17T01:59:07.468361+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_4B3848CDFB0B_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "dramatic_dandelion_puff",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "4B3848CDFB0B",
+      "packaged_at": "2026-04-17T01:59:07.468361+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_4B3848CDFB0B_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "dramatic_dandelion_puff",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\4B3848CDFB0B_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "4B3848CDFB0B",
+      "packaged_at": "2026-04-17T01:59:07.468361+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_4B3848CDFB0B_instagram_reels_20260416_205907.json"
+    },
+    {
+      "platform": "youtube_shorts",
+      "api_body": {
+        "snippet": {
+          "title": "mailbox_flag_movement #Shorts",
+          "description": "A mailbox flag slowly rising for no apparent reason.",
+          "tags": [
+            "Shorts"
+          ],
+          "categoryId": "22",
+          "defaultLanguage": "en"
+        },
+        "status": {
+          "privacyStatus": "public",
+          "selfDeclaredMadeForKids": false,
+          "embeddable": true
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\428BC8AEDEFD_20260416_205907.mp4",
+      "thumbnail_path": null,
+      "episode_id": "428BC8AEDEFD",
+      "packaged_at": "2026-04-17T01:59:07.473920+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_428BC8AEDEFD_youtube_shorts_20260416_205907.json"
+    },
+    {
+      "platform": "tiktok",
+      "api_body": {
+        "post_info": {
+          "title": "mailbox_flag_movement",
+          "privacy_level": "SELF_ONLY",
+          "disable_duet": false,
+          "disable_stitch": false,
+          "disable_comment": false,
+          "video_cover_timestamp_ms": 1000
+        },
+        "source_info": {
+          "source": "FILE_UPLOAD",
+          "video_size": 0,
+          "chunk_size": 0,
+          "total_chunk_count": 1
+        }
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\428BC8AEDEFD_20260416_205907.mp4",
+      "draft_mode": true,
+      "episode_id": "428BC8AEDEFD",
+      "packaged_at": "2026-04-17T01:59:07.473920+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_428BC8AEDEFD_tiktok_20260416_205907.json"
+    },
+    {
+      "platform": "instagram_reels",
+      "api_body": {
+        "media_type": "REELS",
+        "caption": "mailbox_flag_movement",
+        "share_to_feed": true,
+        "thumb_offset": 1000
+      },
+      "video_path": "C:\\content_bot\\output\\renders\\428BC8AEDEFD_20260416_205907.mp4",
+      "note": "Video must be hosted at a public URL for Instagram API.",
+      "episode_id": "428BC8AEDEFD",
+      "packaged_at": "2026-04-17T01:59:07.476868+00:00",
+      "_filepath": "C:\\content_bot\\output\\metadata\\META_428BC8AEDEFD_instagram_reels_20260416_205907.json"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "platform": "youtube_shorts",
+  "api_body": {
+    "snippet": {
+      "title": "micro_sprinkler_burst #Shorts",
+      "description": "A sprinkler sputtering a single rogue water droplet.",
+      "tags": [
+        "Shorts"
+      ],
+      "categoryId": "22",
+      "defaultLanguage": "en"
+    },
+    "status": {
+      "privacyStatus": "public",
+      "selfDeclaredMadeForKids": false,
+      "embeddable": true
+    }
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\0613EBFDA4AF_20260416_205907.mp4",
+  "thumbnail_path": null,
+  "episode_id": "0613EBFDA4AF",
+  "packaged_at": "2026-04-17T01:59:07.459678+00:00"
+}

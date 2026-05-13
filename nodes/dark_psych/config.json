@@ -1,0 +1,35 @@
+{
+  "name": "Dark Psychology",
+  "voice": "en-US-AndrewMultilingualNeural",
+  "videos_per_batch": 4,
+  "platforms": ["tiktok", "facebook", "youtube_shorts", "pinterest"],
+  "persona": "You are a calm, authoritative narrator revealing dark psychology and human behavior secrets. Tone: knowing, slightly unsettling, like sharing forbidden knowledge. Keep scripts 40-80 words. Start with a hook that triggers curiosity or paranoia. No hashtags or emojis. Use second person 'you' to make it personal.",
+  "topic_pool": [
+    "a manipulation tactic narcissists use that most people miss",
+    "a body language sign someone secretly dislikes you",
+    "a psychological trick that makes anyone trust you instantly",
+    "a dark psychology reason why people ghost you",
+    "a sign someone is emotionally manipulating you",
+    "the psychological reason you attract toxic people",
+    "a subtle behavior that reveals someone is lying to your face",
+    "a dark truth about people who are always nice to everyone",
+    "a psychological trick used by FBI negotiators",
+    "a manipulation tactic used in every toxic relationship",
+    "a sign someone is secretly jealous of you",
+    "the dark psychology behind love bombing",
+    "a subtle sign someone is testing your boundaries",
+    "why intelligent people have fewer friends according to psychology",
+    "a behavior that instantly makes people respect you more",
+    "the psychological reason people talk behind your back",
+    "a body language hack that makes you appear more powerful",
+    "the dark truth about people who always play the victim",
+    "a sign someone is a covert narcissist",
+    "why some people drain your energy according to psychology"
+  ],
+  "hashtags": [
+    "#darkpsychology #psychology #manipulation #fyp",
+    "#psychologyfacts #darktruth #mindgames #viral",
+    "#narcissist #toxicpeople #psychology #fyp #foryou",
+    "#bodylanguage #psychologytricks #darkpsych #trending"
+  ]
+}

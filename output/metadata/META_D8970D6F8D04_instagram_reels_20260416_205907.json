@@ -1,0 +1,13 @@
+{
+  "platform": "instagram_reels",
+  "api_body": {
+    "media_type": "REELS",
+    "caption": "rolling_toy_car",
+    "share_to_feed": true,
+    "thumb_offset": 1000
+  },
+  "video_path": "C:\\content_bot\\output\\renders\\D8970D6F8D04_20260416_205907.mp4",
+  "note": "Video must be hosted at a public URL for Instagram API.",
+  "episode_id": "D8970D6F8D04",
+  "packaged_at": "2026-04-17T01:59:07.417970+00:00"
+}

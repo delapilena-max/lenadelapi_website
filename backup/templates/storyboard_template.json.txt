@@ -1,0 +1,55 @@
+{
+  "storyboard_version": "1.0",
+  "episode_type": "heroic_rescue",
+
+  "shots": [
+    {
+      "id": "shot_01_setup",
+      "camera": "medium_side_profile",
+      "description": "Protagonist stands protectively near the pig. Slight breeze or subtle motion for emotional effect.",
+      "dialogue_source": "beats.setup.line",
+      "animation_note": "Minimal movement. Protagonist posture: sincere/protective. Pig idle."
+    },
+
+    {
+      "id": "shot_02_emotional_closeup",
+      "camera": "closeup",
+      "description": "Closeup on protagonist delivering a tender, overly sincere line to the pig.",
+      "dialogue_source": "beats.emotional_beat.line",
+      "animation_note": "Protagonist leans slightly toward pig. Pig blinks slowly."
+    },
+
+    {
+      "id": "shot_03_threat_reveal",
+      "camera": "medium_wide",
+      "description": "Threat enters frame or becomes visible. Protagonist notices it.",
+      "dialogue_source": null,
+      "animation_note": "Threat moves according to beats.threat.behavior. Protagonist reacts subtly (eye widen, slight turn)."
+    },
+
+    {
+      "id": "shot_04_escalation",
+      "camera": "dynamic_close",
+      "description": "Protagonist overreacts dramatically to the harmless threat.",
+      "dialogue_source": "beats.escalation.line",
+      "animation_note": "Use beats.escalation.action for pose. Pig remains calm."
+    },
+
+    {
+      "id": "shot_05_punchline",
+      "camera": "static_close",
+      "description": "Anticlimax moment. Threat does something harmless.",
+      "dialogue_source": "beats.punchline.line",
+      "animation_note": "Threat performs beats.punchline.event. Protagonist collapses or whispers dramatically."
+    },
+
+    {
+      "id": "shot_06_aftermath",
+      "camera": "wide_static",
+      "description": "Deadpan resolution. Pig drags protagonist or scene cuts abruptly.",
+      "dialogue_source": null,
+      "text_overlay_source": "beats.aftermath.resolution",
+      "animation_note": "Pig drags protagonist OR protagonist lies still. Threat exits or remains idle."
+    }
+  ]
+}

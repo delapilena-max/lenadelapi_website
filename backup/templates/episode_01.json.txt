@@ -1,0 +1,54 @@
+{
+  "episode_type": "heroic_rescue",
+  "version": "1.0",
+
+  "characters": {
+    "main": "protagonist",
+    "companion": "pig"
+  },
+
+  "beats": {
+    "setup": {
+      "camera": "medium_side_profile",
+      "emotion": "overly_sincere",
+      "line": "I’ll keep you safe."
+    },
+
+    "emotional_beat": {
+      "camera": "closeup",
+      "emotion": "tender",
+      "line": "Trust me."
+    },
+
+    "threat": {
+      "threat_name": "falling_leaf",
+      "threat_type": "environment",
+      "behavior": "falls",
+      "description": "A single leaf drifts slowly downward toward the characters."
+    },
+
+    "escalation": {
+      "camera": "dynamic_close",
+      "emotion": "panic_overreaction",
+      "line": "IT’S HAPPENING.",
+      "action": "shield_pig"
+    },
+
+    "punchline": {
+      "camera": "static",
+      "event": "leaf_lands_softly_on_head",
+      "line": "Tell my story…"
+    },
+
+    "aftermath": {
+      "camera": "wide",
+      "resolution": "Heroic rescue successful."
+    }
+  },
+
+  "metadata": {
+    "threat_id": "leaf_001",
+    "timestamp": "2026-04-16T17:33:00",
+    "tags": ["heroic_rescue", "parody", "brainrot", "absurdist"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "node_type": "text_content",
+  "build_face_cache": false,
+  "queue_min_threshold": 3,
+  "platforms": ["youtube"],
+  "frequency": {
+    "min_per_week": 4,
+    "max_per_week": 7
+  },
+  "post_commands": {
+    "youtube": ["uploaders/youtube_shorts.py"]
+  }
+}

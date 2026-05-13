@@ -1,0 +1,33 @@
+{
+  "pose_list_version": "1.0",
+
+  "protagonist": {
+    "neutral_stand": "upright posture, arms relaxed at sides, slight forward lean",
+    "sincere_stand": "upright posture, shoulders slightly raised, head angled toward pig",
+    "protective_stance": "torso angled forward, one arm positioned slightly outward",
+    "closeup_sincere": "head tilted downward, eyes softened, shoulders relaxed",
+    "alert_turn": "torso rotated slightly, head angled toward off‑screen area",
+    "wide_eyed": "head forward, eyes widened, eyebrows raised",
+    "dramatic_guard": "torso leaned forward, arms positioned outward in a shielding shape",
+    "collapsed_pose": "body angled downward, one knee bent, head lowered",
+    "whisper_pose": "head lowered, shoulders slightly forward, minimal movement",
+    "dragged_pose": "body extended horizontally, limbs relaxed, head angled back"
+  },
+
+  "pig": {
+    "neutral": "standing with even weight distribution, head level",
+    "blink": "neutral posture with eyelids lowered halfway",
+    "side_glance": "head angled slightly to one side, body unchanged",
+    "idle_shift": "weight shifted slightly to one side, stance unchanged",
+    "dragging_position": "body angled forward, legs extended, head level"
+  },
+
+  "threats": {
+    "floating_object": "object positioned mid‑air with slight vertical offset",
+    "falling_object": "object positioned above frame center with downward offset",
+    "rolling_object": "object positioned near ground plane with forward offset",
+    "stationary_creature": "creature positioned upright with minimal posture variation",
+    "slow_approach": "object or creature positioned slightly closer than previous frame",
+    "hovering_item": "object positioned mid‑air with symmetrical spacing"
+  }
+}

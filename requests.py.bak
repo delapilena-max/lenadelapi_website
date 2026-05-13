@@ -1,0 +1,77 @@
+﻿# requests shim: allow local file reads (file://, plain paths, Windows drive paths, UNC), block external HTTP(S).
+import os
+from urllib.parse import urlparse, unquote
+
+class _LocalResponse:
+    def __init__(self, content: bytes, url: str):
+        self.content = content
+        self.status_code = 200
+        self.url = url
+    @property
+    def text(self):
+        try:
+            return self.content.decode("utf-8")
+        except Exception:
+            return ""
+    def json(self):
+        import json
+        return json.loads(self.text)
+
+def _normalize_to_path(candidate):
+    candidate = str(candidate)
+    parsed = urlparse(candidate)
+    if parsed.scheme == "file":
+        path = unquote(parsed.path)
+        if os.name == "nt" and path.startswith("/") and len(path) > 2 and path[2] == ":":
+            path = path.lstrip("/")
+        if os.name == "nt":
+            path = path.replace("/", "\\")
+        return os.path.abspath(path)
+    if os.name == "nt":
+        cand = candidate.replace("/", "\\").strip('"').strip("'")
+        if (len(cand) >= 2 and cand[1] == ":" and cand[0].isalpha()) or cand.startswith("\\\\"):
+            return os.path.abspath(cand)
+    return os.path.abspath(candidate)
+
+def _read_local(candidate: str):
+    path = _normalize_to_path(candidate)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Local file not found: {path}")
+    with open(path, "rb") as f:
+        return f.read()
+
+def _is_local_path(candidate: str):
+    try:
+        path = _normalize_to_path(candidate)
+        return os.path.exists(path)
+    except Exception:
+        return False
+
+def _blocked(*args, **kwargs):
+    raise RuntimeError("Network disabled for local tests: external HTTP(S) blocked. Use file paths or remove requests.py to re-enable network.")
+
+def get(url, *args, **kwargs):
+    url = str(url)
+    lower = url.lower()
+    if lower.startswith("http://") or lower.startswith("https://"):
+        return _blocked()
+    if lower.startswith("file://"):
+        content = _read_local(url)
+        return _LocalResponse(content, url)
+    if _is_local_path(url):
+        content = _read_local(url)
+        return _LocalResponse(content, url)
+    return _blocked()
+
+def post(*args, **kwargs): return _blocked(*args, **kwargs)
+def put(*args, **kwargs): return _blocked(*args, **kwargs)
+def delete(*args, **kwargs): return _blocked(*args, **kwargs)
+def head(*args, **kwargs): return _blocked(*args, **kwargs)
+def options(*args, **kwargs): return _blocked(*args, **kwargs)
+
+class Session:
+    def __init__(self, *a, **k): pass
+    def request(self, method, url, *a, **k):
+        if method.lower() == "get":
+            return get(url, *a, **k)
+        return _blocked()
