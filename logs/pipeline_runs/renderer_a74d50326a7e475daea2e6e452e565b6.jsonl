@@ -1,0 +1,1 @@
+{"stage": "renderer", "script": "C:\\projects\\ai\\content_bot\\pipeline\\renderer\\renderer.py", "start_utc": "2026-05-24T05:54:51.286998", "correlation_id": "a74d50326a7e475daea2e6e452e565b6", "return_code": 1, "stdout": "", "stderr": "[renderer] ERROR: list indices must be integers or slices, not str\n", "end_utc": "2026-05-24T05:54:51.350148"}

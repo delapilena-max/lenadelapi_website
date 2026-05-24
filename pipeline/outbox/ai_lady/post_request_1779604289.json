@@ -1,0 +1,15 @@
+{
+  "created_at": "2026-05-24T06:31:29.257972",
+  "media": "pipeline\\outbox\\ai_lady\\life_gen_plant care_1779604289.mp4",
+  "meta": {
+    "caption": "Quick recipe: plant care.",
+    "theme": "plant care",
+    "tags": [
+      "plant_care"
+    ],
+    "confidence": 0.9,
+    "generated_at": 1779604289,
+    "format": "video"
+  },
+  "source": "life_engine_hook"
+}

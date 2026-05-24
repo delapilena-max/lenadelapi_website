@@ -1,0 +1,10 @@
+{
+  "source_id": "a491b4e019bb43008bbdb8dca6356e7d",
+  "node": "ai_lady",
+  "stage": "dialogue",
+  "timestamp_utc": "2026-05-24T06:12:54.533613",
+  "inputs": [
+    "prompt.txt"
+  ],
+  "params": {}
+}

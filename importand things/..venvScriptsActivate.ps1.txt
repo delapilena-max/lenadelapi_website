@@ -1,1 +1,8 @@
 .\.venv\Scripts\Activate.ps1
+
+RUN SUPERVISOR 
+
+# create logs folder
+New-Item -ItemType Directory -Path .\logs -Force
+# run supervisor (keep PowerShell open)
+.\start_nodes.ps1

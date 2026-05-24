@@ -1,0 +1,5 @@
+Attempt: 3
+Return code: 1
+Timestamp: 2026-05-14 21:05:58
+
+ERROR: Could not navigate to upload URL: Page.goto: Target page, context or browser has been closed

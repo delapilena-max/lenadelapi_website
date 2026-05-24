@@ -1,0 +1,164 @@
+2026-05-14 12:27:47,701 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:27:53,808 INFO Warmed session; title: Instagram
+2026-05-14 12:27:53,808 INFO Navigating to upload URL (attempt 1): https://www.instagram.com/create/select/?force=1
+2026-05-14 12:27:56,696 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1
+2026-05-14 12:27:56,696 INFO Reached upload page.
+2026-05-14 12:27:56,703 INFO Uploading video: C:\full\path\to\video.mp4
+2026-05-14 12:27:56,714 ERROR Unhandled exception: Message: invalid argument: File not found : C:\full\path\to\video.mp4
+  (Session info: chrome=148.0.7778.167)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x477123+10a23]
+	chromedriver!GetHandleVerifier [0x477254+10b54]
+	chromedriver!(No symbol) [0x291e90]
+	chromedriver!(No symbol) [0x2d5ccc]
+	chromedriver!(No symbol) [0x2fd78c]
+	chromedriver!(No symbol) [0x2d1db4]
+	chromedriver!(No symbol) [0x2fd954]
+	chromedriver!(No symbol) [0x31a936]
+	chromedriver!(No symbol) [0x2fd526]
+	chromedriver!(No symbol) [0x2d08f9]
+	chromedriver!(No symbol) [0x2d16b4]
+	chromedriver!GetHandleVerifier [0x711ac4+2ab3c4]
+	chromedriver!GetHandleVerifier [0x70d0ed+2a69ed]
+	chromedriver!GetHandleVerifier [0x72e4f5+2c7df5]
+	chromedriver!GetHandleVerifier [0x491128+2aa28]
+	chromedriver!GetHandleVerifier [0x498bbd+324bd]
+	chromedriver!GetHandleVerifier [0x47fb28+19428]
+	chromedriver!GetHandleVerifier [0x47fcd5+195d5]
+	chromedriver!GetHandleVerifier [0x4691cf+2acf]
+	KERNEL32!BaseThreadInitThunk [0x76aa5d49+19]
+	ntdll!RtlInitializeExceptionChain [0x7709d83b+6b]
+	ntdll!RtlGetAppContainerNamedObjectPath [0x7709d7c1+231]
+Traceback (most recent call last):
+  File "C:\projects\ai\content_bot\nodes\ai_lady_instagram\poster_selenium.py", line 106, in run_once
+    file_input.send_keys(video_path)
+  File "C:\projects\ai\content_bot\.venv\Lib\site-packages\selenium\webdriver\remote\webelement.py", line 276, in send_keys
+    self._execute(
+  File "C:\projects\ai\content_bot\.venv\Lib\site-packages\selenium\webdriver\remote\webelement.py", line 508, in _execute
+    return self._parent.execute(command, params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\projects\ai\content_bot\.venv\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 468, in execute
+    self.error_handler.check_response(response)
+  File "C:\projects\ai\content_bot\.venv\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.InvalidArgumentException: Message: invalid argument: File not found : C:\full\path\to\video.mp4
+  (Session info: chrome=148.0.7778.167)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x477123+10a23]
+	chromedriver!GetHandleVerifier [0x477254+10b54]
+	chromedriver!(No symbol) [0x291e90]
+	chromedriver!(No symbol) [0x2d5ccc]
+	chromedriver!(No symbol) [0x2fd78c]
+	chromedriver!(No symbol) [0x2d1db4]
+	chromedriver!(No symbol) [0x2fd954]
+	chromedriver!(No symbol) [0x31a936]
+	chromedriver!(No symbol) [0x2fd526]
+	chromedriver!(No symbol) [0x2d08f9]
+	chromedriver!(No symbol) [0x2d16b4]
+	chromedriver!GetHandleVerifier [0x711ac4+2ab3c4]
+	chromedriver!GetHandleVerifier [0x70d0ed+2a69ed]
+	chromedriver!GetHandleVerifier [0x72e4f5+2c7df5]
+	chromedriver!GetHandleVerifier [0x491128+2aa28]
+	chromedriver!GetHandleVerifier [0x498bbd+324bd]
+	chromedriver!GetHandleVerifier [0x47fb28+19428]
+	chromedriver!GetHandleVerifier [0x47fcd5+195d5]
+	chromedriver!GetHandleVerifier [0x4691cf+2acf]
+	KERNEL32!BaseThreadInitThunk [0x76aa5d49+19]
+	ntdll!RtlInitializeExceptionChain [0x7709d83b+6b]
+	ntdll!RtlGetAppContainerNamedObjectPath [0x7709d7c1+231]
+
+2026-05-14 12:27:56,742 INFO Closing browser.
+2026-05-14 12:27:58,915 INFO Exit code: 1
+2026-05-14 12:41:45,055 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:41:52,367 INFO Warmed session; title: Instagram
+2026-05-14 12:41:52,367 INFO Navigating to upload URL (attempt 1): https://www.instagram.com/create/select/?force=1
+2026-05-14 12:41:57,100 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1
+2026-05-14 12:41:57,104 INFO Reached upload page.
+2026-05-14 12:41:57,110 ERROR Video file not found at path: C:\real\path\to\video.mp4 — aborting upload and leaving browser open for inspection.
+2026-05-14 12:41:57,110 INFO No exception raised; closing browser.
+2026-05-14 12:41:59,297 INFO Exit code: 1
+2026-05-14 12:44:02,284 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:44:10,724 INFO Warmed session; title: Instagram
+2026-05-14 12:44:10,724 INFO Navigating to upload URL (attempt 1): https://www.instagram.com/create/select/?force=1
+2026-05-14 12:44:14,875 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1
+2026-05-14 12:44:14,878 INFO Reached upload page.
+2026-05-14 12:44:14,887 ERROR Video file not found at path: C:\real\path\to\video.mp4 — aborting upload and leaving browser open for inspection.
+2026-05-14 12:44:14,887 INFO No exception raised; closing browser.
+2026-05-14 12:44:17,099 INFO Exit code: 1
+2026-05-14 12:45:40,890 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:45:47,629 INFO Warmed session; title: Instagram
+2026-05-14 12:45:47,629 INFO Navigating to upload URL (attempt 1): https://www.instagram.com/create/select/?force=1
+2026-05-14 12:45:51,554 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1
+2026-05-14 12:45:51,556 INFO Reached upload page.
+2026-05-14 12:45:51,563 ERROR Video file not found at path: C:\real\path\to\video.mp4 — aborting upload and leaving browser open for inspection.
+2026-05-14 12:45:51,563 ERROR Unhandled exception: Video file not found: C:\real\path\to\video.mp4
+Traceback (most recent call last):
+  File "C:\projects\ai\content_bot\nodes\ai_lady_instagram\poster_selenium.py", line 121, in run_once
+    raise FileNotFoundError(f"Video file not found: {video_path}")
+FileNotFoundError: Video file not found: C:\real\path\to\video.mp4
+2026-05-14 12:45:51,563 INFO No exception raised; closing browser.
+2026-05-14 12:45:53,736 INFO Exit code: 1
+2026-05-14 12:52:31,954 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 12:52:31,954 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:52:31,954 INFO Resolved profile-directory: Default
+2026-05-14 12:52:31,954 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 12:52:34,783 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 12:52:34,783 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:52:34,783 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778781154
+2026-05-14 12:52:39,038 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778781154
+2026-05-14 12:52:39,045 INFO File input present on page: True
+2026-05-14 12:53:48,637 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 12:53:48,637 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:53:48,637 INFO Resolved profile-directory: Default
+2026-05-14 12:53:48,637 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 12:53:51,424 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 12:53:51,424 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 12:53:51,424 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778781231
+2026-05-14 12:53:55,605 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778781231
+2026-05-14 12:53:55,611 INFO File input present on page: True
+2026-05-14 13:00:19,041 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 13:00:19,041 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:00:19,041 INFO Resolved profile-directory: Default
+2026-05-14 13:00:19,041 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 13:00:21,834 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 13:00:21,834 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:00:21,834 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778781621
+2026-05-14 13:00:26,711 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778781621
+2026-05-14 13:00:26,723 INFO File input present on page: True
+2026-05-14 13:16:25,237 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 13:16:25,238 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:16:25,238 INFO Resolved profile-directory: Default
+2026-05-14 13:16:25,238 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 13:16:28,161 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 13:16:28,162 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:16:28,162 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778782588
+2026-05-14 13:16:32,228 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778782588
+2026-05-14 13:16:32,236 INFO File input present on page: True
+2026-05-14 13:22:24,726 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 13:22:24,726 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:22:24,726 INFO Resolved profile-directory: Default
+2026-05-14 13:22:24,726 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 13:22:27,560 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 13:22:27,560 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:22:27,560 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778782947
+2026-05-14 13:22:31,800 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778782947
+2026-05-14 13:22:31,808 INFO File input present on page: True
+2026-05-14 13:22:36,611 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 13:22:36,611 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:22:36,612 INFO Resolved profile-directory: Default
+2026-05-14 13:22:36,612 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 13:22:39,391 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 13:22:39,391 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:22:39,391 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778782959
+2026-05-14 13:22:43,533 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778782959
+2026-05-14 13:22:43,541 INFO File input present on page: True
+2026-05-14 13:43:05,219 DEBUG make_driver_force_profile: detected user-data-dir with Default profile.
+2026-05-14 13:43:05,219 INFO Resolved user-data-root: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:43:05,220 INFO Resolved profile-directory: Default
+2026-05-14 13:43:05,220 DEBUG Expected profile path: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile\Default
+2026-05-14 13:43:07,999 DEBUG Browser userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1
+2026-05-14 13:43:07,999 INFO Opened browser with profile: C:\projects\ai\content_bot\nodes\ai_lady_instagram\profile
+2026-05-14 13:43:07,999 INFO Navigating to profile URL first: https://www.instagram.com/lenadelapi/
+2026-05-14 13:43:11,019 INFO Navigating to upload URL: https://www.instagram.com/create/select/?force=1&_ts=1778784191
+2026-05-14 13:43:14,852 INFO Current URL after navigation: https://www.instagram.com/create/select/?force=1&_ts=1778784191
+2026-05-14 13:43:14,859 INFO File input present on page: True

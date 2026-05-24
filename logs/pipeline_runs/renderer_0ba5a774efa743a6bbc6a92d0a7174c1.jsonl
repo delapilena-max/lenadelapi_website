@@ -1,0 +1,1 @@
+{"stage": "renderer", "script": "C:\\projects\\ai\\content_bot\\pipeline\\renderer\\renderer.py", "start_utc": "2026-05-24T05:58:00.873723", "correlation_id": "0ba5a774efa743a6bbc6a92d0a7174c1", "return_code": 1, "stdout": "", "stderr": "[renderer] ERROR: No voice_*.wav found in TTS output folder\n", "end_utc": "2026-05-24T05:58:00.937760"}

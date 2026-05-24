@@ -1,0 +1,9 @@
+{
+  "outputs": {
+    "frames_dir": "pipeline\\output\\compositor\\frames"
+  },
+  "fps": 24,
+  "width": 1080,
+  "height": 1920,
+  "note": "Stub metadata for renderer compatibility"
+}

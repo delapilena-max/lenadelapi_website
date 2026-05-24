@@ -1,0 +1,16 @@
+{
+  "source_id": "cef839f5e0e048919102240932ea6410",
+  "node": "ai_lady",
+  "stage": "publisher",
+  "timestamp_utc": "2026-05-24T06:12:54.776792",
+  "inputs": [
+    "episode_893e7cb4a682408e8015d6d50329fb24.mp4"
+  ],
+  "params": {
+    "dry_run": true
+  },
+  "outputs": {
+    "pending_video": "outbox\\pending\\cef839f5e0e048919102240932ea6410.mp4",
+    "publish_request": "outbox\\pending\\cef839f5e0e048919102240932ea6410.publish_request.json"
+  }
+}

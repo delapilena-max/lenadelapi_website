@@ -1,0 +1,19 @@
+{
+  "source_id": "893e7cb4a682408e8015d6d50329fb24",
+  "node": "ai_lady",
+  "stage": "renderer",
+  "timestamp_utc": "2026-05-24T06:12:54.712760",
+  "inputs": [
+    "pipeline\\output\\compositor\\frames",
+    "voice_0001.wav"
+  ],
+  "params": {
+    "fps": 30,
+    "vcodec": "libx264",
+    "acodec": "aac",
+    "note": "Renderer stub, no real ffmpeg call"
+  },
+  "outputs": {
+    "video": "pipeline\\output\\renderer\\episode_893e7cb4a682408e8015d6d50329fb24.mp4"
+  }
+}

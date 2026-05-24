@@ -1,0 +1,15 @@
+{
+  "created_at": "2026-05-24T06:09:55.819677",
+  "media": "pipeline\\outbox\\ai_lady\\life_gen_vegan baking_1779602995.jpg",
+  "meta": {
+    "caption": "Plant update: vegan baking. Growth feels like a new recipe. #plantparent",
+    "theme": "vegan baking",
+    "tags": [
+      "vegan_baking"
+    ],
+    "confidence": 0.9,
+    "generated_at": 1779602995,
+    "format": "image"
+  },
+  "source": "life_engine_hook"
+}

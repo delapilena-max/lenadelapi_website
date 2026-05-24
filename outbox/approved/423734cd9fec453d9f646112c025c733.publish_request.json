@@ -1,0 +1,14 @@
+{
+  "publish_id": "423734cd9fec453d9f646112c025c733",
+  "node": "ai_lady",
+  "timestamp_utc": "2026-05-24T06:00:59.410945",
+  "media_path": "outbox\\pending\\423734cd9fec453d9f646112c025c733.mp4",
+  "metadata": {
+    "source_video": "episode_527e5b10bf694567bfde5b95cb44f232.mp4"
+  },
+  "publish_window": {
+    "start_utc": "2026-05-24T06:01:59.410945",
+    "end_utc": "2026-05-24T07:00:59.410945"
+  },
+  "dry_run": true
+}

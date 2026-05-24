@@ -1,0 +1,26 @@
+[
+  {
+    "ts": "2026-05-24T06:31:29.242295",
+    "theme": "plant care",
+    "media": "pipeline\\outbox\\ai_lady\\life_gen_plant care_1779604289.mp4",
+    "prefer": "video"
+  },
+  {
+    "ts": "2026-05-24T06:09:55.810474",
+    "theme": "vegan baking",
+    "media": "pipeline\\outbox\\ai_lady\\life_gen_vegan baking_1779602995.jpg",
+    "prefer": "image"
+  },
+  {
+    "ts": "2026-05-24T06:28:15.805310",
+    "theme": "coffee",
+    "media": "C:\\\\projects\\\\ai\\\\content_bot\\\\pipeline\\\\published\\\\ai_lady\\\\life_gen_coffee_1779603919.jpg",
+    "prefer": "image"
+  },
+  {
+    "ts": "2026-05-24T06:31:54.305781",
+    "theme": "plant care",
+    "media": "C:\\\\projects\\\\ai\\\\content_bot\\\\pipeline\\\\published\\\\ai_lady\\\\life_gen_plant care_1779604289.mp4",
+    "prefer": "video"
+  }
+]

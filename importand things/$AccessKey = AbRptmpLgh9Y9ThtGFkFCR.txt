@@ -12,4 +12,4 @@ $env:KLING_COOKIE = "ChNrc2kxOG4uYWkucG9ydGFsLnN0EqABUfveNdW2LbQEeT-52_crhXyYajB
 echo "KLING_COOKIE now: $env:KLING_COOKIE"
 
 
-GitHub token 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
+GitHub token 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

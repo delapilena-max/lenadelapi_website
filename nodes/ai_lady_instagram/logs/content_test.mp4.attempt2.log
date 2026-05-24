@@ -1,0 +1,10 @@
+Attempt: 2
+Return code: 1
+Timestamp: 2026-05-14 21:05:44
+
+ERROR: Exception while locating file input: Page.wait_for_selector: Target page, context or browser has been closed
+Call log:
+  - waiting for locator("input[type='file']") to be visible
+
+Could not save page HTML: Page.content: Target page, context or browser has been closed
+Could not save page snapshot: Page.evaluate: Target page, context or browser has been closed

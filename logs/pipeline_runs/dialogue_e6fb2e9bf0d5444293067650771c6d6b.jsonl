@@ -1,0 +1,1 @@
+{"stage": "dialogue", "script": "C:\\projects\\ai\\content_bot\\pipeline\\dialogue\\dialogue.py", "start_utc": "2026-05-24T05:15:03.333255", "correlation_id": "e6fb2e9bf0d5444293067650771c6d6b", "return_code": 1, "stdout": "", "stderr": "[dialogue] ERROR: Missing prompt.txt in dialogue input folder\n", "end_utc": "2026-05-24T05:15:03.555776"}
