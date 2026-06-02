@@ -15,3 +15,5 @@ This site is intended to be published via GitHub Pages. After pushing to `main`,
 ## Contact
 For privacy or legal inquiries: privacy@lenadelapi.example
 
+
+
