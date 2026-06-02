@@ -1,0 +1,12 @@
+﻿name: main_ci_check
+on:
+  pull_request:
+jobs:
+  main_ci_check:
+    name: main_ci_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Quick success
+        run: echo "main_ci_check OK"
