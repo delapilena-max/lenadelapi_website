@@ -1,0 +1,2540 @@
+{
+  "version": "v1.0.0",
+  "generated_date": "2026-06-23",
+  "target_platforms": [
+    "Facebook Feed",
+    "Facebook Reels",
+    "Instagram Feed",
+    "Instagram Reels"
+  ],
+  "categories": [
+    "outfit_problem",
+    "casual_but_not",
+    "mirror_fitcheck",
+    "errand_attention",
+    "gym_confidence",
+    "coffee_daylife",
+    "should_i_post_this",
+    "playful_confession"
+  ],
+  "hooks": [
+    {
+      "id": "op_001",
+      "category": "outfit_problem",
+      "hook_text": "This Outfit Started A Problem",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "fitted outfit, direct gaze, errand or street context",
+      "caption_followup": "I was just running one errand.",
+      "optional_reels_opening_line": "I need to talk about what happened when I wore this outside.",
+      "suggested_comment_reply_angle": "Blame the outfit, not me.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_002",
+      "category": "outfit_problem",
+      "hook_text": "I Was Behaving Until This Outfit",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "mirror or doorway, confident expression, outfit prominent",
+      "caption_followup": "One fit check too many.",
+      "optional_reels_opening_line": "I was doing so well until I put this on.",
+      "suggested_comment_reply_angle": "The outfit knew exactly what it was doing.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_003",
+      "category": "outfit_problem",
+      "hook_text": "The Outfit Was Not Supposed To Do That",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena candid, surprised or amused expression mid-errand",
+      "caption_followup": "I put it on and immediately had second thoughts.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "It did what it wanted.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_004",
+      "category": "outfit_problem",
+      "hook_text": "I Wore This Once And Created Chaos",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "bold outfit, confident pose, street or errand setting",
+      "caption_followup": "Never again. Probably.",
+      "optional_reels_opening_line": "This is the outfit that caused an incident.",
+      "suggested_comment_reply_angle": "The chaos was worth it.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_005",
+      "category": "outfit_problem",
+      "hook_text": "This Was Supposed To Be A Simple Outfit",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "outfit reads elevated despite casual intent, natural setting",
+      "caption_followup": "Simple was not what happened.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "Nothing about this reads simple.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 42
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_006",
+      "category": "outfit_problem",
+      "hook_text": "The Outfit Had Other Plans",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena mid-step or glancing over shoulder, outfit fully visible",
+      "caption_followup": "I thought I was in control. I was not.",
+      "optional_reels_opening_line": "My outfit and I had a disagreement this morning.",
+      "suggested_comment_reply_angle": "The outfit always wins.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_007",
+      "category": "outfit_problem",
+      "hook_text": "I Did Not Mean For This To Happen",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena amused, slightly caught-off-guard expression",
+      "caption_followup": "I really thought this was a reasonable choice.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "It happened though.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_008",
+      "category": "outfit_problem",
+      "hook_text": "This Fit Was Not Supposed To Be Cute",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "comfortable but unexpectedly flattering outfit, natural setting",
+      "caption_followup": "It was just supposed to be comfortable.",
+      "optional_reels_opening_line": "I need someone to explain what happened here.",
+      "suggested_comment_reply_angle": "And yet.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_009",
+      "category": "outfit_problem",
+      "hook_text": "Wore This Once And Regretted Nothing",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "confident full-body shot, specific location implied",
+      "caption_followup": "Zero regrets, actually.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "No regrets is the only answer.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 7,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 42
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_010",
+      "category": "outfit_problem",
+      "hook_text": "The Dress Code Said Casual",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "outfit reads dressed-up in a clearly casual context",
+      "caption_followup": "I interpreted casual very loosely.",
+      "optional_reels_opening_line": "The dress code said casual. I said okay.",
+      "suggested_comment_reply_angle": "My version of casual, apparently.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_011",
+      "category": "outfit_problem",
+      "hook_text": "I Called This Business Casual",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "polished-but-not-office outfit, confident stance, neutral background",
+      "caption_followup": "Nobody agreed with that description.",
+      "optional_reels_opening_line": "I submitted this as business casual and I stand by it.",
+      "suggested_comment_reply_angle": "The business is personal at this point.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "op_012",
+      "category": "outfit_problem",
+      "hook_text": "It Was Giving More Than Intended",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "elevated look, Lena slightly surprised by the result",
+      "caption_followup": "I was going for low-key. This is not that.",
+      "optional_reels_opening_line": "The intention was quiet. The result was not.",
+      "suggested_comment_reply_angle": "Unintentional but not unhappy about it.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "slang: giving - assess shelf life on reuse"
+    },
+    {
+      "id": "op_013",
+      "category": "outfit_problem",
+      "hook_text": "Nobody Told The Outfit To Calm Down",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "bold, visually confident look, Lena fully committed",
+      "caption_followup": "It refused to be subtle.",
+      "optional_reels_opening_line": "At no point did this outfit take direction.",
+      "suggested_comment_reply_angle": "The outfit does not take notes.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_001",
+      "category": "casual_but_not",
+      "hook_text": "I Was Trying To Be Casual",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in casual setting but clearly elevated, errand or daylight context",
+      "caption_followup": "The outfit had a different idea.",
+      "optional_reels_opening_line": "I told myself casual. The outfit said no.",
+      "suggested_comment_reply_angle": "Casual is a setting I do not have.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_002",
+      "category": "casual_but_not",
+      "hook_text": "This Is My Casual Look Apparently",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "naturally elevated but not overdone, Lena relaxed expression, outdoor light",
+      "caption_followup": "I have one version of casual and it looks like this.",
+      "optional_reels_opening_line": "Apparently this is what casual looks like for me.",
+      "suggested_comment_reply_angle": "Apparently this is what casual looks like for me.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_003",
+      "category": "casual_but_not",
+      "hook_text": "Casual But Make It A Situation",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "daytime look that escalated visually beyond the original plan",
+      "caption_followup": "I tried to keep it low-key.",
+      "optional_reels_opening_line": "Casual was the starting point. This is where it ended up.",
+      "suggested_comment_reply_angle": "The situation escalated quietly.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_004",
+      "category": "casual_but_not",
+      "hook_text": "Tried To Dress Down. Failed.",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena clearly put-together despite stated low-effort intent, slight smirk",
+      "caption_followup": "Actively attempted low effort. Did not work.",
+      "optional_reels_opening_line": "I tried. I really did.",
+      "suggested_comment_reply_angle": "Dressing down is not a skill I have.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_005",
+      "category": "casual_but_not",
+      "hook_text": "I Thought This Was The Relaxed Option",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "outfit reads elevated but was genuinely chosen as the safe pick",
+      "caption_followup": "Out of several choices, this was the mellow one.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "You should see the other options.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 42
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_006",
+      "category": "casual_but_not",
+      "hook_text": "This Was The Low-Effort Version",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "looks effortful, Lena nonchalant, daylight or errand context",
+      "caption_followup": "The high-effort version is not ready for the internet.",
+      "optional_reels_opening_line": "This is me on a low-effort day. Yes, really.",
+      "suggested_comment_reply_angle": "Low effort for me, apparently.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_007",
+      "category": "casual_but_not",
+      "hook_text": "This Was The Toned-Down Choice",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "refined, quietly elevated look, natural relaxed expression",
+      "caption_followup": "I genuinely selected the most understated option.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The original choice was a lot.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_008",
+      "category": "casual_but_not",
+      "hook_text": "All I Did Was Put On Jeans",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "jeans and simple top that unexpectedly works, full body visible",
+      "caption_followup": "How did it end up like this.",
+      "optional_reels_opening_line": "I put on jeans. That is it. That is the whole decision.",
+      "suggested_comment_reply_angle": "Jeans plus this specific combination, apparently.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_009",
+      "category": "casual_but_not",
+      "hook_text": "I Genuinely Thought This Was Understated",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "visually strong look, Lena seems unaware of how it reads",
+      "caption_followup": "My perception of understated might need calibrating.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "I have now been corrected.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 42
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_010",
+      "category": "casual_but_not",
+      "hook_text": "The Casual Bar Is Broken",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena casual but unmistakably striking, street or errand context",
+      "caption_followup": "I do not know where it went. This is what is left.",
+      "optional_reels_opening_line": "The casual bar is broken and I am not fixing it.",
+      "suggested_comment_reply_angle": "The bar is on the floor and I am still clearing it.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_011",
+      "category": "casual_but_not",
+      "hook_text": "I Said Simple And Did This",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "looks anything but simple, Lena deadpan or lightly amused",
+      "caption_followup": "Simple is a suggestion I cannot follow.",
+      "optional_reels_opening_line": "I said simple. I did this. These are related.",
+      "suggested_comment_reply_angle": "Simple said goodbye at some point.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_012",
+      "category": "casual_but_not",
+      "hook_text": "This Was Supposed To Be Nothing",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "looks like something, Lena nonchalant, low-key setting",
+      "caption_followup": "A nothing fit. This.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "Nothing is doing a lot here.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cbn_013",
+      "category": "casual_but_not",
+      "hook_text": "Running Errands Was An Excuse",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "errand-context outfit that clearly went beyond the stated reason",
+      "caption_followup": "The errand was a cover story. Obviously.",
+      "optional_reels_opening_line": "The errand was always a cover story.",
+      "suggested_comment_reply_angle": "The errand was a formality.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_001",
+      "category": "mirror_fitcheck",
+      "hook_text": "The Mirror Was Not Ready For This",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena full-body mirror reflection, outfit fully visible, confident expression",
+      "caption_followup": "I stood there for a minute. So did the mirror.",
+      "optional_reels_opening_line": "The mirror has been dealing with a lot lately.",
+      "suggested_comment_reply_angle": "The mirror and I are in a complicated relationship.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_002",
+      "category": "mirror_fitcheck",
+      "hook_text": "I Checked The Mirror Twice",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "close-medium mirror reflection, Lena looking at outfit, slightly amused",
+      "caption_followup": "Once was not going to be enough.",
+      "optional_reels_opening_line": "I had to check twice. Then a third time. Just in case.",
+      "suggested_comment_reply_angle": "The second check was the one that got me.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_003",
+      "category": "mirror_fitcheck",
+      "hook_text": "The Mirror And I Had A Moment",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "bedroom or hallway mirror, Lena full outfit visible, candid pose",
+      "caption_followup": "We came to an understanding.",
+      "optional_reels_opening_line": "Me and the mirror have a whole situation going on.",
+      "suggested_comment_reply_angle": "The mirror never lies, which is the problem.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_004",
+      "category": "mirror_fitcheck",
+      "hook_text": "Mirror Check Gone Wrong",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena surprised by her own reflection, unexpectedly strong fit check result",
+      "caption_followup": "I was just verifying. It escalated.",
+      "optional_reels_opening_line": "Started as a quick check. Ended differently.",
+      "suggested_comment_reply_angle": "Wrong in the best possible direction.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_005",
+      "category": "mirror_fitcheck",
+      "hook_text": "I Looked In The Mirror And Stayed",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena mid-fit-check, clearly not going anywhere soon",
+      "caption_followup": "The plan was to leave. The mirror had other ideas.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "Sometimes you just have to stand there for a while.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_006",
+      "category": "mirror_fitcheck",
+      "hook_text": "The Mirror Approved First",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena stepping away from mirror, confident stride, outfit fully visible",
+      "caption_followup": "I needed the second opinion. It came through.",
+      "optional_reels_opening_line": "The mirror gave its verdict before I did.",
+      "suggested_comment_reply_angle": "The mirror has good taste, it turns out.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_007",
+      "category": "mirror_fitcheck",
+      "hook_text": "Mirror Said Yes Before I Did",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena uncertain then confident, mirror reflection visible in frame",
+      "caption_followup": "I was on the fence. The mirror was not.",
+      "optional_reels_opening_line": "I was going to change. Then I checked the mirror.",
+      "suggested_comment_reply_angle": "The mirror is the most honest opinion I get.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_008",
+      "category": "mirror_fitcheck",
+      "hook_text": "I Did Not Expect The Mirror To Do That",
+      "word_count": 9,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena caught off-guard by her own reflection, amused or surprised",
+      "caption_followup": "The mirror did something to this outfit and I am not complaining.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The mirror revealed something I was not prepared for.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_009",
+      "category": "mirror_fitcheck",
+      "hook_text": "One Mirror Check Changed The Plan",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena paused at mirror, expression shows the plan just changed",
+      "caption_followup": "I was going out casually. The mirror said no.",
+      "optional_reels_opening_line": "I checked once. Changed the whole plan.",
+      "suggested_comment_reply_angle": "Sometimes the mirror redirects the entire evening.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_010",
+      "category": "mirror_fitcheck",
+      "hook_text": "The Mirror Has Been Staring Back",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "bedroom mirror, Lena fully dressed, standing still in standoff",
+      "caption_followup": "We have been in this standoff for ten minutes.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "At some point one of us has to move.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_011",
+      "category": "mirror_fitcheck",
+      "hook_text": "Mirror Fit Check At Your Own Risk",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena bold outfit, deliberate fit check pose in front of mirror",
+      "caption_followup": "You might not be ready for what you see.",
+      "optional_reels_opening_line": "I warned myself. I checked anyway.",
+      "suggested_comment_reply_angle": "The risk was worth it, clearly.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_012",
+      "category": "mirror_fitcheck",
+      "hook_text": "The Reflection Was Not Subtle",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "full-length mirror, bold outfit visible, Lena confident and unapologetic",
+      "caption_followup": "The reflection does what it wants.",
+      "optional_reels_opening_line": "I asked the mirror to be gentle. It was not.",
+      "suggested_comment_reply_angle": "Subtle was never the goal.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "mf_013",
+      "category": "mirror_fitcheck",
+      "hook_text": "I Asked The Mirror. The Mirror Answered.",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena stepping away from mirror, satisfied or amused expression",
+      "caption_followup": "I liked what it said.",
+      "optional_reels_opening_line": "I asked the mirror a question. I got an answer.",
+      "suggested_comment_reply_angle": "The mirror gave exactly the feedback I needed.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_001",
+      "category": "errand_attention",
+      "hook_text": "The Store Was Expecting Someone Else",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena visibly over-dressed for a mundane errand setting, confident expression",
+      "caption_followup": "I showed up and the vibe shifted.",
+      "optional_reels_opening_line": "The store was prepared for a regular Tuesday. Then I walked in.",
+      "suggested_comment_reply_angle": "They were not expecting this level of commitment to a store run.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_002",
+      "category": "errand_attention",
+      "hook_text": "Nobody Dresses Like This For Errands",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a striking outfit mid-errand, mundane environment around her",
+      "caption_followup": "Apparently I do.",
+      "optional_reels_opening_line": "People kept asking where I was going. I said the store.",
+      "suggested_comment_reply_angle": "Somebody has to raise the errand standard.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_003",
+      "category": "errand_attention",
+      "hook_text": "I Only Needed Two Things From The Store",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in elevated outfit at an errand location, slightly amused",
+      "caption_followup": "The outfit was not one of them.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The two things are irrelevant. The outfit is the story.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_004",
+      "category": "errand_attention",
+      "hook_text": "I Ran One Errand And Caused A Scene",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident stride in errand setting, full outfit visible",
+      "caption_followup": "It was supposed to be a quick trip.",
+      "optional_reels_opening_line": "One errand. That is all it took.",
+      "suggested_comment_reply_angle": "The scene was not planned. The outfit was.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_005",
+      "category": "errand_attention",
+      "hook_text": "Just Picking Something Up",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in polished casual outfit at a pickup context, subtle smirk",
+      "caption_followup": "The outfit did not match the assignment.",
+      "optional_reels_opening_line": "A pickup run does not usually look like this.",
+      "suggested_comment_reply_angle": "The something I was picking up is irrelevant.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_006",
+      "category": "errand_attention",
+      "hook_text": "The Grocery Store Was Not Ready",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena put-together outfit near grocery or errand context, confident",
+      "caption_followup": "Neither was I, honestly.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The grocery store handles a lot but this was a stretch.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_007",
+      "category": "errand_attention",
+      "hook_text": "Running Errands Was Never This Complicated",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena slightly amused, outfit clearly overdone for the errand context",
+      "caption_followup": "It used to be simple.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The outfit complicated everything in the best way.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_008",
+      "category": "errand_attention",
+      "hook_text": "I Was Just Returning Something",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in elevated look at a return stop or errand destination",
+      "caption_followup": "That part was true.",
+      "optional_reels_opening_line": "The return was legitimate. The outfit was another matter.",
+      "suggested_comment_reply_angle": "The receipt was real. The rest was intentional.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_009",
+      "category": "errand_attention",
+      "hook_text": "The Errand Did Not Require This",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a bold look doing something completely mundane",
+      "caption_followup": "And yet here we are.",
+      "optional_reels_opening_line": "The task required a trip to the store. Not this.",
+      "suggested_comment_reply_angle": "The errand did not require it. I required it.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_010",
+      "category": "errand_attention",
+      "hook_text": "Every Errand Turned Into Something Else",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena candid, out for errands but the look tells a different story",
+      "caption_followup": "I go out for one thing and it becomes an event.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The errand was the starting point, not the destination.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_011",
+      "category": "errand_attention",
+      "hook_text": "I Went Out For One Thing",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena fully dressed, returning or en route, errand context implied",
+      "caption_followup": "I came back with a whole situation.",
+      "optional_reels_opening_line": "One thing. That was the plan. The outfit had other plans.",
+      "suggested_comment_reply_angle": "The one thing was never just the one thing.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "ea_012",
+      "category": "errand_attention",
+      "hook_text": "The Parking Lot Disagreed With My Plans",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in elevated errand outfit near a car or parking area, candid",
+      "caption_followup": "I just needed to park.",
+      "optional_reels_opening_line": "The parking lot was not ready for this level of effort.",
+      "suggested_comment_reply_angle": "Parking lots are underrated as a backdrop.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_001",
+      "category": "gym_confidence",
+      "hook_text": "I Did Not Want To Come",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in athletic set, gym background, confident expression despite stated reluctance",
+      "caption_followup": "I did not want to come. I came.",
+      "optional_reels_opening_line": "Did not want to be here. Changed my mind as soon as I walked in.",
+      "suggested_comment_reply_angle": "Showing up is the hardest part. Everything after that is easy.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_002",
+      "category": "gym_confidence",
+      "hook_text": "The Gym Was Not Ready For This",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena full athletic look, confident gym stance, equipment visible but not prominent",
+      "caption_followup": "The mirrors had a lot to process today.",
+      "optional_reels_opening_line": "I walked in and the gym had to adjust.",
+      "suggested_comment_reply_angle": "The gym has seen things. Today it saw this.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_003",
+      "category": "gym_confidence",
+      "hook_text": "Pretty Girl Discipline Hits Different",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena athletic set, focused or post-workout expression, confident body-forward frame",
+      "caption_followup": "The results show up whether or not you wanted to come.",
+      "optional_reels_opening_line": "Pretty girl discipline. No negotiating. Just showing up.",
+      "suggested_comment_reply_angle": "The discipline is the look at this point.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_004",
+      "category": "gym_confidence",
+      "hook_text": "Gym Day Was Looking Like This",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in athletic or pre-gym outfit, confident and put-together, neutral setting",
+      "caption_followup": "A very specific kind of gym day.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "Every gym day hits differently when the fit is right.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_005",
+      "category": "gym_confidence",
+      "hook_text": "I Showed Up. That Is The Win.",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena at gym, satisfied post-workout energy, athletic look, relaxed confidence",
+      "caption_followup": "The rest is just details.",
+      "optional_reels_opening_line": "Showed up. That was the whole plan. Everything else was a bonus.",
+      "suggested_comment_reply_angle": "Showing up is the metric. Everything else is extra.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_006",
+      "category": "gym_confidence",
+      "hook_text": "The Athletic Set Did Something",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a well-fitting athletic set, confident close-medium shot, gym or street context",
+      "caption_followup": "I am not sure what exactly but it happened.",
+      "optional_reels_opening_line": "The set did something I was not expecting.",
+      "suggested_comment_reply_angle": "The athletic set carries its own energy.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_007",
+      "category": "gym_confidence",
+      "hook_text": "Post-Workout Confidence Is A Different Energy",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena post-workout glow, athletic outfit, relaxed and confident expression",
+      "caption_followup": "Before the shower. After the lift.",
+      "optional_reels_opening_line": "Post-workout before the mirror is its own category.",
+      "suggested_comment_reply_angle": "The post-workout energy is a specific thing.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_008",
+      "category": "gym_confidence",
+      "hook_text": "I Came. I Lifted. I Left Like This.",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena at gym exit or parking area, post-workout, athletic set, satisfied expression",
+      "caption_followup": "That is the whole story.",
+      "optional_reels_opening_line": "Walked in. Did the work. Left looking like this.",
+      "suggested_comment_reply_angle": "The sequence is always the same. The result is the result.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_009",
+      "category": "gym_confidence",
+      "hook_text": "The Gym Outfit Had No Business",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in an unexpectedly elevated athletic outfit at the gym, confident stance",
+      "caption_followup": "Being this good.",
+      "optional_reels_opening_line": "The gym outfit had no business doing what it did today.",
+      "suggested_comment_reply_angle": "The outfit raised the stakes on a regular gym day.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_010",
+      "category": "gym_confidence",
+      "hook_text": "I Told Myself Just One Workout",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena still at gym, amused expression, outfit and gym context visible",
+      "caption_followup": "One was the plan. The plan changed.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "One workout turns into a whole thing every time.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_011",
+      "category": "gym_confidence",
+      "hook_text": "Athletic Is An Aesthetic Now",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena athletic set, confident full-body pose, gym or street context",
+      "caption_followup": "I accept this.",
+      "optional_reels_opening_line": "Athletic was never just functional. It is a full look.",
+      "suggested_comment_reply_angle": "The aesthetic was always the point.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "gc_012",
+      "category": "gym_confidence",
+      "hook_text": "This Is What Locked In Looks Like",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena focused, athletic outfit, gym context, serious and confident expression",
+      "caption_followup": "No chaos. No negotiation. Just this.",
+      "optional_reels_opening_line": "Locked in. No distractions. This is the vibe.",
+      "suggested_comment_reply_angle": "Locked in is a whole personality, it turns out.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_001",
+      "category": "coffee_daylife",
+      "hook_text": "The Iced Coffee Is Doing Its Job",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in casual elevated look, iced coffee in hand, outdoor or cafe-adjacent setting",
+      "caption_followup": "We are moving.",
+      "optional_reels_opening_line": "The iced coffee is doing what it needs to do and so am I.",
+      "suggested_comment_reply_angle": "The iced coffee always comes through.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_002",
+      "category": "coffee_daylife",
+      "hook_text": "This Was Supposed To Be A Quick Coffee Run",
+      "word_count": 9,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena clearly overdressed for a coffee run, amused expression, cafe or outdoor context",
+      "caption_followup": "It escalated.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The quick part was optimistic.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_003",
+      "category": "coffee_daylife",
+      "hook_text": "Iced Coffee And No Plans",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena relaxed, coffee in hand, outdoor or casual city setting, low-effort elevated look",
+      "caption_followup": "The best kind of afternoon.",
+      "optional_reels_opening_line": "Iced coffee. No agenda. This is the whole plan.",
+      "suggested_comment_reply_angle": "No plans is actually the plan.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_004",
+      "category": "coffee_daylife",
+      "hook_text": "The Afternoon Needed This",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in afternoon light, coffee or errand context, satisfied expression",
+      "caption_followup": "I agreed.",
+      "optional_reels_opening_line": "The afternoon was going a certain way. This helped.",
+      "suggested_comment_reply_angle": "Some afternoons just need a reset.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_005",
+      "category": "coffee_daylife",
+      "hook_text": "Day Off Energy Looks Like This",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena casual elevated look, relaxed expression, day-off vibe, no specific prop required",
+      "caption_followup": "Nothing scheduled. Everything intentional.",
+      "optional_reels_opening_line": "A day off does not mean a low-effort day.",
+      "suggested_comment_reply_angle": "Day off looks different for everyone. This is mine.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_006",
+      "category": "coffee_daylife",
+      "hook_text": "Coffee First. Everything Else Is Negotiable.",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena with iced coffee, confident expression, morning or early afternoon context",
+      "caption_followup": "The order of operations is non-negotiable.",
+      "optional_reels_opening_line": "Coffee is the variable that makes everything else work.",
+      "suggested_comment_reply_angle": "Once the coffee happens, the day makes more sense.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_007",
+      "category": "coffee_daylife",
+      "hook_text": "The Coffee Run Became A Whole Thing",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena clearly stayed longer than planned, coffee in hand, cafe or outdoor setting",
+      "caption_followup": "I was only going to grab one thing.",
+      "optional_reels_opening_line": "A quick coffee run is never just a quick coffee run.",
+      "suggested_comment_reply_angle": "The coffee run is always a whole thing.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_008",
+      "category": "coffee_daylife",
+      "hook_text": "I Came For The Coffee. Obviously.",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena at or near a cafe setting, outfit clearly elevated for the stated purpose",
+      "caption_followup": "The outfit was secondary.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The coffee was the official reason.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_009",
+      "category": "coffee_daylife",
+      "hook_text": "Afternoon Mode Activated",
+      "word_count": 3,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in afternoon light, relaxed and confident, casual elevated outfit",
+      "caption_followup": "The morning is a different person.",
+      "optional_reels_opening_line": "Morning energy versus afternoon mode. Two completely different people.",
+      "suggested_comment_reply_angle": "Afternoon mode is the more relaxed version. Same outfit, different energy.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_010",
+      "category": "coffee_daylife",
+      "hook_text": "This Is What The Middle Of The Day Looks Like",
+      "word_count": 10,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena mid-day, candid and relaxed, not going anywhere in particular, just existing",
+      "caption_followup": "Not morning. Not evening. Just this.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The middle of the day gets overlooked. This is what it looks like.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_011",
+      "category": "coffee_daylife",
+      "hook_text": "I Have A Coffee And A Plan",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena with iced coffee, confident focused expression, city or outdoor context",
+      "caption_followup": "The plan is still being developed.",
+      "optional_reels_opening_line": "I said coffee and a plan. The coffee is confirmed. The plan is flexible.",
+      "suggested_comment_reply_angle": "The coffee is the more reliable of the two.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "cd_012",
+      "category": "coffee_daylife",
+      "hook_text": "The Coffee Was Worth The Outfit",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in elevated look holding a coffee, satisfied expression, outdoor or city setting",
+      "caption_followup": "Both decisions were correct.",
+      "optional_reels_opening_line": "I wore this for coffee. No regrets.",
+      "suggested_comment_reply_angle": "Sometimes the outfit is the reason to leave the house.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_001",
+      "category": "should_i_post_this",
+      "hook_text": "I Debated This One",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident look, slightly amused or uncertain expression, clearly landed on yes",
+      "caption_followup": "The debate is over now.",
+      "optional_reels_opening_line": "I went back and forth on this one for a while. Then I posted it.",
+      "suggested_comment_reply_angle": "The debate was the whole point. It always ends the same way.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_002",
+      "category": "should_i_post_this",
+      "hook_text": "The Answer Was Yes",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident, direct expression, result energy \u2014 look clearly post-decision",
+      "caption_followup": "It always is.",
+      "optional_reels_opening_line": "I asked myself if I should post this. The answer was yes.",
+      "suggested_comment_reply_angle": "The answer is always yes. That is just how it goes.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_003",
+      "category": "should_i_post_this",
+      "hook_text": "I Was Going To Delete This",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a particularly striking or bold look, confident now that the decision is made",
+      "caption_followup": "I did not.",
+      "optional_reels_opening_line": "I opened the camera roll to delete this. I did not delete this.",
+      "suggested_comment_reply_angle": "Glad I kept it, clearly.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_004",
+      "category": "should_i_post_this",
+      "hook_text": "Posting This Before I Change My Mind",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena bold or elevated look, decisive expression, posting-now energy",
+      "caption_followup": "Posted.",
+      "optional_reels_opening_line": "The window for changing my mind is closed. This is posted now.",
+      "suggested_comment_reply_angle": "Post first. Think later. Always.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_005",
+      "category": "should_i_post_this",
+      "hook_text": "I Went Back And Forth On This One",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in a bold or unexpected look, candid expression, clearly the reason for the debate",
+      "caption_followup": "Ultimately landed on yes.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "Back and forth is part of the process. This is the result.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 9,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_006",
+      "category": "should_i_post_this",
+      "hook_text": "The Inner Debate Was Short",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident and decisive, full look visible, no hesitation in the expression",
+      "caption_followup": "Very short, actually.",
+      "optional_reels_opening_line": "The debate lasted about four seconds. Then this happened.",
+      "suggested_comment_reply_angle": "The short debates always end the same way.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_007",
+      "category": "should_i_post_this",
+      "hook_text": "I Decided To Post It Anyway",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena slightly amused, outfit clearly the subject of the internal debate",
+      "caption_followup": "Good decision.",
+      "optional_reels_opening_line": "There was a moment of hesitation. Then I posted it anyway.",
+      "suggested_comment_reply_angle": "Anyway is always the right call here.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_008",
+      "category": "should_i_post_this",
+      "hook_text": "Should I Post This. Yes.",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena direct and confident, expression says the answer was never really in question",
+      "caption_followup": "That was fast.",
+      "optional_reels_opening_line": "The question lasted one second. The answer was obvious.",
+      "suggested_comment_reply_angle": "The yes was always going to happen.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_009",
+      "category": "should_i_post_this",
+      "hook_text": "The Post Happened",
+      "word_count": 3,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena matter-of-fact expression, confident, post-decision energy, full look visible",
+      "caption_followup": "As it was always going to.",
+      "optional_reels_opening_line": "The post was going to happen. It was just a matter of when.",
+      "suggested_comment_reply_angle": "The post was inevitable. It always is.",
+      "scores": {
+        "visual_pairing_score": 7,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 43
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_010",
+      "category": "should_i_post_this",
+      "hook_text": "This Stayed In My Camera Roll Too Long",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in a striking look deserving of the post, confident expression",
+      "caption_followup": "Fixing that now.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The camera roll held onto this one too long.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_011",
+      "category": "should_i_post_this",
+      "hook_text": "Posting This. Moving On.",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena decisive, no-nonsense confident expression, clean full look",
+      "caption_followup": "Done.",
+      "optional_reels_opening_line": "Posted. Moving on. That is the whole update.",
+      "suggested_comment_reply_angle": "Decisive posting is an underrated skill.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_012",
+      "category": "should_i_post_this",
+      "hook_text": "The Debate Is Over. Here It Is.",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident result energy, full look clearly worthy of whatever debate happened",
+      "caption_followup": "It was a close one.",
+      "optional_reels_opening_line": "The debate ran longer than expected. The result speaks for itself.",
+      "suggested_comment_reply_angle": "Some debates are worth having just to arrive at yes.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "sip_013",
+      "category": "should_i_post_this",
+      "hook_text": "I Asked Nobody. Posted Anyway.",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena self-assured, unapologetically confident, direct expression, full look visible",
+      "caption_followup": "The council was not consulted.",
+      "optional_reels_opening_line": "No second opinions were collected. No notes were taken. Posted.",
+      "suggested_comment_reply_angle": "The council has never stopped this from happening.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_001",
+      "category": "playful_confession",
+      "hook_text": "I Overdressed. On Purpose.",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena clearly overdressed for a mundane context, unapologetic expression",
+      "caption_followup": "Every single time.",
+      "optional_reels_opening_line": "I assessed the situation and chose to overdress anyway. On purpose.",
+      "suggested_comment_reply_angle": "The over is the point.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_002",
+      "category": "playful_confession",
+      "hook_text": "The Outfit Takes Longer Than The Errand",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena clearly put-together for a short errand, aware of the time investment",
+      "caption_followup": "Worth it.",
+      "optional_reels_opening_line": "The errand took seven minutes. The outfit took forty. Worth it.",
+      "suggested_comment_reply_angle": "The outfit is always the longer commitment.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_003",
+      "category": "playful_confession",
+      "hook_text": "I Dressed Up For Absolutely No Reason",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena elevated look, no occasion implied, relaxed and confident about it",
+      "caption_followup": "And I would do it again.",
+      "optional_reels_opening_line": "There was no event. No occasion. No reason. Just this.",
+      "suggested_comment_reply_angle": "No reason is a valid reason at this point.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_004",
+      "category": "playful_confession",
+      "hook_text": "Nobody Asked For This Level Of Effort",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in a particularly elevated or detailed look, slightly amused expression",
+      "caption_followup": "I provided it anyway.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The request was not required.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_005",
+      "category": "playful_confession",
+      "hook_text": "The Fit Check Was For Me",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena doing a mirror check moment, self-directed energy, confident expression",
+      "caption_followup": "The audience was internal.",
+      "optional_reels_opening_line": "I did this for me. The posting was secondary.",
+      "suggested_comment_reply_angle": "The fit check does not always need an external audience.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_006",
+      "category": "playful_confession",
+      "hook_text": "I Take Every Errand Seriously",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena fully dressed for a mundane errand, committed and confident expression",
+      "caption_followup": "This is just how I operate.",
+      "optional_reels_opening_line": "The errand does not care. I do.",
+      "suggested_comment_reply_angle": "The errand gets what the errand gets.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 44
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_007",
+      "category": "playful_confession",
+      "hook_text": "I Wear Heels To The Grocery Store",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in heels or elevated footwear at or near a grocery or errand context",
+      "caption_followup": "Always have. Not planning to stop.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The grocery store is a venue. Act accordingly.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_008",
+      "category": "playful_confession",
+      "hook_text": "This Was For The Camera Roll",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a clearly intentional look, candid confession energy, slight smirk",
+      "caption_followup": "I am being honest about it.",
+      "optional_reels_opening_line": "I staged this a little. I am telling you.",
+      "suggested_comment_reply_angle": "The honesty makes it better, not worse.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_009",
+      "category": "playful_confession",
+      "hook_text": "I Looked This Good For Nobody",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena confident elevated look, no occasion implied, direct candid expression",
+      "caption_followup": "Nobody and the camera roll.",
+      "optional_reels_opening_line": "There was no event. No person. Just me and the mirror.",
+      "suggested_comment_reply_angle": "Nobody is a perfectly valid audience.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_010",
+      "category": "playful_confession",
+      "hook_text": "The Occasion Was Not That Serious",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "visual_pairing": "Lena in elevated look for a clearly non-serious occasion, amused expression",
+      "caption_followup": "The outfit disagreed.",
+      "optional_reels_opening_line": null,
+      "suggested_comment_reply_angle": "The outfit makes its own decisions about the occasion.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_011",
+      "category": "playful_confession",
+      "hook_text": "I May Have Put Too Much Into This",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in a particularly detailed or elevated look, slight acknowledgment of effort",
+      "caption_followup": "May have.",
+      "optional_reels_opening_line": "I looked at this after and realized the effort level was high. I kept it.",
+      "suggested_comment_reply_angle": "Too much is always the right amount here.",
+      "scores": {
+        "visual_pairing_score": 8,
+        "curiosity_score": 8,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 45
+      },
+      "risk_notes": "none"
+    },
+    {
+      "id": "pc_012",
+      "category": "playful_confession",
+      "hook_text": "Honestly The Outfit Was The Plan All Along",
+      "word_count": 8,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena clearly dressed with intention, look far too elevated for the stated activity",
+      "caption_followup": "The errand was secondary.",
+      "optional_reels_opening_line": "I said I was going out for one reason. The outfit was the actual reason.",
+      "suggested_comment_reply_angle": "The outfit was always the plan. Everything else was logistics.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 9,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 47
+      },
+      "risk_notes": "none"
+    }
+  ]
+}
