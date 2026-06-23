@@ -2565,43 +2565,67 @@ def clean_public_caption(text: str) -> str:
 
 def build_photo_prompt(recipe: dict[str, Any], node: dict[str, Any]) -> str:
     identity = node["kling"]["identity_elements"]["primary"]
-    return f"""
-Create a scroll-stopping vertical lifestyle photo of Lena — a hot human lifestyle influencer. She must look visually magnetic, curvy feminine, and real. This should feel like a genuine camera-roll moment from her day.
 
-Identity:
-Use the {identity} character element/reference as the identity anchor. Lena must look like the same real adult woman across posts, with consistent face, hair, skin tone, body proportions, and recognizable presence.
 
-Why this photo exists:
-{recipe['human_reason']}
+    _avoid = (
+        "No text/logos/signs in frame; "
+        "no studio finish; "
+        "no skin blotches or freckle clusters; "
+        "no anatomy distortion."
+    )
+
+    def _build(hr, st, ac, wd, sh):
+        return f"""Identity:
+Use the {identity} character element/reference as the identity anchor.
+{LENA_MASTER_IDENTITY_BLUEPRINT}
+
+Moment:
+{hr}
 
 Scene:
-{recipe['setting']}
+{st}
 
-Action and pose:
-{recipe['action']}
+Pose:
+{ac}
 
-Wardrobe and styling:
-{recipe['wardrobe']}
-
-Silhouette:
-Preserve Lena's saved Kling element identity, face, hairstyle, body look, proportions, and character consistency. Do not redesign her. The Lena element is the visual source of truth. Never shapeless or oversized.
+Wardrobe:
+{wd}
 
 Camera:
-{recipe['shot']}
+{sh}
 
-Human standard:
-The post must feel like something a real creator would capture during a real day — real place, lived-in details, Lena mid-moment. Not a random model render, stock photo, or staged prompt scene.
+Avoid:
+{_avoid}""".strip()
 
-Hard visual bans:
-{VISUAL_BANS[0]}
-{VISUAL_BANS[1]}
-{VISUAL_BANS[2]}
-{VISUAL_BANS[3]}
-{VISUAL_BANS[4]}
-
-Quality:
-Natural skin texture, believable hands, relaxed shoulders, realistic body weight, clean composition, no visual junk, no text artifacts. Preserve natural pores, subtle redness, and realistic facial detail — avoid freckle-like spot clusters, heavy speckling, identity-changing freckle patterns, acne-like blotches, or dark facial spots.
-""".strip()
+    prompt = _build(
+        recipe["human_reason"],
+        recipe["setting"],
+        recipe["action"],
+        recipe["wardrobe"],
+        recipe["shot"],
+    )
+    issues = validate_prompt(prompt)
+    if any(x.startswith("ABORT") for x in issues):
+        budget = (
+            PROMPT_MAX_CHARS
+            - len(_build("", "", "", "", ""))
+            - 50
+        )
+        pf = max(40, budget // 5)
+        prompt = _build(
+            recipe["human_reason"][:pf],
+            recipe["setting"][:pf],
+            recipe["action"][:pf],
+            recipe["wardrobe"][:pf],
+            recipe["shot"][:pf],
+        )
+        issues = validate_prompt(prompt)
+        if any(x.startswith("ABORT") for x in issues):
+            raise ValueError(
+                "build_photo_prompt: prompt exceeds "
+                f"{PROMPT_MAX_CHARS} chars after field trim"
+            )
+    return prompt
 
 
 def build_video_seed_prompt(recipe: dict[str, Any], node: dict[str, Any]) -> str:
