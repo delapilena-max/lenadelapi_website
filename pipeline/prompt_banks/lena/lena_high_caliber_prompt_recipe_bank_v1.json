@@ -1,0 +1,332 @@
+{
+  "version": "v1.0.0",
+  "generated_date": "2026-06-23",
+  "target_platforms": [
+    "Facebook Feed",
+    "Facebook Reels",
+    "Instagram Feed",
+    "Instagram Reels"
+  ],
+  "valid_hook_categories": [
+    "outfit_problem",
+    "casual_but_not",
+    "mirror_fitcheck",
+    "errand_attention",
+    "gym_confidence",
+    "coffee_daylife",
+    "should_i_post_this",
+    "playful_confession"
+  ],
+  "recipes": [
+    {
+      "id": "hcr_001",
+      "scene_type": "apartment_mirror_fitcheck",
+      "title": "Apartment Mirror Fit Check",
+      "content_pillar": "fit_check_mirror_getting_ready",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She was checking her fit before leaving and the window light made the moment worth keeping.",
+      "style_lighting": "Soft natural window light enters from one side and wraps her body with a warm directional gradient. A warm lamp behind the frame fills the near shoulder and lifts hair detail. No ring light, no flash -- scene-motivated light only. The room's warm ambient tone keeps the image from reading as artificial.",
+      "subject_pose": "Lena at roughly 35 degrees to the mirror, body angled toward the glass not the camera. One hand adjusts hem or sleeve -- small candid action. Other arm loose at her side. Weight on back foot, natural hip-shift. Eyes at the mirror reflection, not the real lens. Head level or slight chin-down. Expression unhurried, self-aware, not performed.",
+      "fashion_accessories": "Fitted midi skirt in stone, cream, or dusty rose with a structured crop above the waistband -- or straight-leg trousers and an open blazer. Stacked gold rings, small hoops, minimal chain. Glossy or MLBB lip. Clean matte nails. Heeled sandals or clean sneakers partially in frame. No logos.",
+      "setting_background": "Apartment bedroom or hallway. Frameless or simple black-frame full-length mirror. Bed edge, throw, or wardrobe softly blurred behind her. Warm lamp and one plant in background bokeh. Wall is warm neutral -- off-white, greige, or terracotta. No clinical white walls. No visible screens. Room reads lived-in and elevated, not staged.",
+      "technical_keywords": "50mm portrait, natural window light, dual ambient fill, shallow depth of field, warm tonal range, lifestyle editorial candid, real skin texture, visible pores, soft background bokeh, analog warmth, non-studio.",
+      "negative_constraints": "No ring light or flash. No phone or camera arm visible in mirror reflection. No dead-on frontal pose -- body must angle toward mirror. No blank white or studio background. No satin, sheer, or mesh fabric. No bra as outerwear. No visible text on mirror surface. No hotel or showroom setting.",
+      "visual_hook_reason": "Mirror framing shows the outfit from two angles -- direct and reflected. The adjustment gesture signals a real moment, not a fashion shoot. Dual light lifts image quality without artificiality.",
+      "linked_hook_categories": [
+        "mirror_fitcheck",
+        "outfit_problem",
+        "should_i_post_this"
+      ],
+      "caption_angle": "Playful self-aware -- she checked, the mirror agreed, she posted. Short, present-tense, quiet punchline.",
+      "caption_draft": "the mirror said yes first",
+      "provider_rendering_notes": {
+        "kling_omni": "Body at 35 degrees toward mirror, eyes at reflection not lens. Window plus warm lamp fill. No phone or arm in mirror. Under 2500 chars.",
+        "openart": "Lead: natural window light, apartment bedroom, three-quarter mirror angle, candid adjustment. Negative: ring light, phone in reflection, frontal pose, white background."
+      }
+    },
+    {
+      "id": "hcr_002",
+      "scene_type": "coffee_run_street",
+      "title": "Coffee Run Street",
+      "content_pillar": "street_errands_outdoor",
+      "platform_fit": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She was out getting coffee and the outfit happened to be doing too much for the errand.",
+      "style_lighting": "Natural daylight, slightly overcast or bright indirect morning sun -- soft shadows, natural contrast. Street photography energy with no dramatic light placement: real outdoor light hitting her at its available angle. 85mm focal compression softly flattens the background and separates her from the urban street behind her.",
+      "subject_pose": "Lena paused mid-stride on the sidewalk, body at a 3/4 angle toward camera -- not straight-on walking, which causes body drift. A plain coffee cup held naturally in one hand, not displayed or offered to camera. Other hand loose at side or touching bag strap. Eyes toward camera or fractionally away. Weight on one foot, slight lean, caught-in-movement energy without motion blur.",
+      "fashion_accessories": "Wide-leg trousers with a fitted tank or a sleek cami tucked into structured pants. Leather or canvas crossbody worn on body, not carried. Single gold chain or stacked bracelets. Sunglasses on face or tucked into neckline. Clean sneakers or flat sandals. Glossy lip. No readable cup branding. No loud logos on bag or clothing.",
+      "setting_background": "Austin-adjacent sidewalk -- mixed building facades or a plain wall behind her, planted street trees, natural urban texture. Background: soft-focus pedestrians, cars, and architecture. No readable business names, storefront signs, menus, or license plates. Pavement texture visible underfoot. City feel without specific location identity.",
+      "technical_keywords": "85mm f/1.8, natural daylight, shallow depth of field, urban street candid, soft bokeh background, warm morning tones, minimal film-look grade, realistic skin texture, motion energy, non-studio.",
+      "negative_constraints": "No readable brand on cup, bag, or clothing. No menus, storefront names, signage, or license plates in frame. No straight-on walking pose -- 3/4 angle or paused only. No staged outdoor cafe table setup. No stiff arms. No ring light or softbox. No floating or composite-artifact hair.",
+      "visual_hook_reason": "Elevated outfit in an ordinary errand context creates immediate contrast tension. The cup grounds her in real life; the outfit argues she is going somewhere more important than a coffee run.",
+      "linked_hook_categories": [
+        "errand_attention",
+        "casual_but_not",
+        "coffee_daylife"
+      ],
+      "caption_angle": "Dry self-aware -- the errand was optional, the outfit was not. Short and matter-of-fact.",
+      "caption_draft": "quick run. ended up dressed like this.",
+      "provider_rendering_notes": {
+        "kling_omni": "Paused mid-stride sidewalk, 3/4 angle. Coffee cup in hand naturally, not displayed. Natural daylight, blurred street background. No readable text. Under 2500 chars.",
+        "openart": "Street photography, natural daylight, urban sidewalk, 85mm. Negative: readable text, brand logos, straight-on walking, staged background."
+      }
+    },
+    {
+      "id": "hcr_003",
+      "scene_type": "grocery_errand_attention",
+      "title": "Grocery Errand Attention",
+      "content_pillar": "street_errands_outdoor",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "human_reason": "She was in the grocery store dressed better than she needed to be and that is the whole story.",
+      "style_lighting": "Soft warm-toned retail ambient -- not harsh overhead fluorescent, not studio fill. The store's interior light, corrected toward warm by white balance or natural fill near the entrance, creates a documentary editorial atmosphere without manufacturing drama. Background falls into natural in-store bokeh at depth.",
+      "subject_pose": "Lena paused near a produce section or open refrigerator case, body at 30-40 degrees to the shelving -- not facing straight into it. One hand holds a basket handle or a produce item with candid lightness. The other arm hangs loose. Face turned toward camera with a slight expression of amusement -- the outfit-versus-setting mismatch is implicit.",
+      "fashion_accessories": "Deliberately overdressed: fitted straight-leg trousers, a structured blazer, or a close-fitting long-sleeve top. Small structured shoulder bag. Gold hoop earrings. Clean low heels or pristine sneakers. Glossy lip. The bag stays on her shoulder -- no shopping cart. No readable food brand labels or logos on any items she holds or that appear in frame.",
+      "setting_background": "Grocery store interior. Produce display or refrigerator case bokeh behind her -- color and warm ambient light without readable text. No aisle signs, price tags, store brand names, or product labels in focus anywhere in frame. Background reads clearly as a store environment without revealing the brand or location.",
+      "technical_keywords": "50mm candid, indoor retail ambient, shallow depth of field, grocery store environmental bokeh, editorial documentary, warm highlight correction, realistic skin, lifestyle editorial, non-studio.",
+      "negative_constraints": "No readable store names, product labels, price tags, aisle signs, or brand logos. No harsh green or blue fluorescent cast. No forced product-holding pose. No cluttered environment. No studio backdrop. No heavy retouching. No blank white background.",
+      "visual_hook_reason": "Outfit-versus-environment contrast is the entire hook. She is dressed for somewhere more important than this store. The mismatch between look and location creates immediate curiosity.",
+      "linked_hook_categories": [
+        "errand_attention",
+        "outfit_problem",
+        "playful_confession"
+      ],
+      "caption_angle": "Playful confession -- overdressed for the errand and fully aware of it. Short, dry, present-tense.",
+      "caption_draft": "the store was not ready for this.",
+      "provider_rendering_notes": {
+        "kling_omni": "Near produce section or refrigerator case, 3/4 angle. Warm ambient indoor lighting. No readable store text anywhere in frame. Slight amused expression. Under 2500 chars.",
+        "openart": "Grocery store interior, produce section background, warm ambient. Negative: readable labels, price tags, aisle signs, product brands, studio background."
+      }
+    },
+    {
+      "id": "hcr_004",
+      "scene_type": "gym_confidence",
+      "title": "Gym Confidence",
+      "content_pillar": "fitness_glam_athletic",
+      "platform_fit": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She finished her set, the energy was still there, and the gym light was actually doing something.",
+      "style_lighting": "Gym interior lighting -- overhead ambient softened by depth and shallow focus, or natural fill from a large window wall on one side. High contrast: Lena well-lit in the foreground, gym equipment falling into soft background blur behind her. No ring light, no beauty dish, no artificial setup. Real-environment athletic light with directional quality where available.",
+      "subject_pose": "Lena standing near a plain painted gym wall or beside a window, post-set or between sets. Feet shoulder-width, slight weight shift, one hand on hip or adjusting the top hem -- confident, not posing hard. Body at 3/4 angle toward camera. Face: post-workout flush, direct and confident expression. Not a hard flex -- present, done, and fully in her own energy.",
+      "fashion_accessories": "Athletic set -- fitted sports bra and high-waist leggings in a solid color or subtle texture, platform-safe coverage throughout. Coordinating sneakers, worn or clean. High ponytail or bun with a few strands loose. Small stud earrings or none. Minimal or no visible makeup -- post-workout skin showing natural flush. Water bottle partially in frame with no visible brand. No jewelry beyond studs.",
+      "setting_background": "Gym interior. Plain painted wall as primary background, or window wall with natural side light flooding in. Weights rack or cable station visible but in natural soft blur beyond her. No readable machine brand names, screen interfaces, or gym logos. Rubber gym floor texture underfoot. Space reads as a real gym, not a white studio with equipment props.",
+      "technical_keywords": "50mm portrait, gym interior ambient, natural side light or overhead bokeh, shallow depth of field, athletic body photography, post-workout energy, confident body-forward, real skin texture, non-studio.",
+      "negative_constraints": "No branded gym equipment readable in frame. No hard-flex or bodybuilding pose. No ring light or studio setup. No blank white background. No non-athletic clothing or heavy jewelry. No machine-leaning or equipment-prop poses that read as staged. No hotel or luxury gym backdrop.",
+      "visual_hook_reason": "Pretty girl discipline energy -- clearly and actually in the gym, not posing with equipment as a prop. Athletic body confidence plus real gym environment creates aspirational but believable content.",
+      "linked_hook_categories": [
+        "gym_confidence",
+        "casual_but_not",
+        "playful_confession"
+      ],
+      "caption_angle": "Post-workout quiet confidence -- no hype, no hustle-culture language. Just presence and completion.",
+      "caption_draft": "the session happened. rest is optional.",
+      "provider_rendering_notes": {
+        "kling_omni": "Near gym window wall or plain wall, natural side light, 3/4 angle. Athletic set, high-waist leggings. Blurred gym interior background. Reference element for body. Under 2500 chars.",
+        "openart": "Gym interior lifestyle photography, athletic body portrait, shallow focus, real gym environment. Negative: brand logos, ring light, studio background, hard flex."
+      }
+    },
+    {
+      "id": "hcr_005",
+      "scene_type": "doorway_fitcheck",
+      "title": "Doorway Fit Check",
+      "content_pillar": "fit_check_mirror_getting_ready",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She was leaving and the doorframe caught the outfit before she made it to the street.",
+      "style_lighting": "Warm indoor ambient from the apartment behind her, soft natural daylight entering from outside in front. The dual-source quality is the defining quality of this recipe: warm rim light on her hair and near shoulder from the interior, natural outdoor fill softening the front-facing side. Available-light editorial from two directions simultaneously, with no artificial augmentation.",
+      "subject_pose": "Lena in the doorframe or threshold -- slight lean against the door edge, or mid-step out with one foot forward on the threshold. Full body visible head-to-thigh. Face turned toward camera at a 3/4 angle, ready-to-go expression. One hand holds keys or grips bag strap. The doorframe acts as a natural compositional frame around her body. Body at a slight angle -- not dead-center in the opening.",
+      "fashion_accessories": "Full assembled look appropriate to time of day. Evening: sleek mini or fitted dress, heeled mules or sandals, small chain bag, bold or glossy lip. Daytime: fitted co-ord or open blazer over bodysuit, clean heeled mules or sneakers. Jewelry complete and matching. Nails visible. Hair finished -- this is a leaving-the-apartment moment, outfit fully assembled and ready.",
+      "setting_background": "Apartment doorway or threshold. Door visible -- plain painted wood with no visible number or address plate. Interior ambient behind her: warm lamp light, plant corner, or neutral wall partially visible and blurred. Exterior building hallway or outside naturally blurred beyond the threshold. No lobby signage, apartment numbers, or address plates anywhere in frame.",
+      "technical_keywords": "50mm lifestyle editorial, doorway portrait, dual ambient and natural light, full-body outfit readable, leaving-the-apartment energy, shallow depth of field, warm interior backlight, natural outdoor front fill.",
+      "negative_constraints": "No mirror in scene. No visible apartment number or address on door. No lobby or hallway signage in background. No symmetrical dead-center doorframe pose. No blank hallway void as sole background. No CGI-clean or rendered door environment. No ring light or artificial fill.",
+      "visual_hook_reason": "The doorframe creates natural composition lines that frame her body. Dual light source gives editorial depth without staging. The about-to-leave energy makes the image feel like a screenshot from a real life moment.",
+      "linked_hook_categories": [
+        "outfit_problem",
+        "should_i_post_this",
+        "mirror_fitcheck"
+      ],
+      "caption_angle": "Ready-to-leave self-awareness -- the outfit is better than the destination warrants. Short, dry.",
+      "caption_draft": "the door was the only thing between this and the street.",
+      "provider_rendering_notes": {
+        "kling_omni": "Apartment doorway threshold, 3/4 angle, one foot in doorframe. Warm indoor ambient behind, natural light from front. No door numbers. Full-body visible. Under 2500 chars.",
+        "openart": "Doorway lifestyle portrait, dual ambient and natural light. Negative: mirror, door numbers, address, lobby signage, dead-center symmetrical pose."
+      }
+    },
+    {
+      "id": "hcr_006",
+      "scene_type": "parking_garage_flash",
+      "title": "Parking Garage Flash",
+      "content_pillar": "street_outdoor_editorial",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "human_reason": "She was parked, the flash fired, and the concrete turned it into a frame.",
+      "style_lighting": "Hard direct on-camera flash from front-center -- strong foreground exposure with sharp falloff behind her. The cool fluorescent ambient of the parking structure recedes into shadow, leaving a high-contrast split: flash-lit warmth on her skin and fabric against underexposed blue-gray concrete background. Analog grain texture across the full frame is appropriate and adds editorial grit to the industrial environment.",
+      "subject_pose": "Lena beside or between concrete parking columns, body at a 3/4 angle toward camera. Direct, confident gaze -- not a fashion-shoot smile, not performed warmth. Cool and still expression: unbothered, magnetic, vaguely amused. One hand in jacket pocket or touching collar at chest. Weight on the back foot with a slight forward lean of the shoulders. The pose is street editorial, not model-on-set.",
+      "fashion_accessories": "Deliberately elevated for a parking garage -- the contrast is the entire visual argument. Leather or structured jacket over a fitted bodysuit, straight-leg trousers, pointed boots or heeled mules. OR fitted blazer, mini dress, heeled sandals. Statement chain necklace, gold or silver earrings. Dark nails. A bag on body. Nothing casual, nothing minimal-effort -- the outfit reads as overdressed for this location by design.",
+      "setting_background": "Parking garage interior. Concrete ceiling with structural beams overhead. Painted column visible to one side of frame. Background gradient: more columns, deep ambient shadow, cool blue-toned fluorescent light in the distance. No readable level numbers, exit signs, or directional arrows. No visible license plates. Concrete floor texture visible underfoot. Industrial and real -- not cleaned up.",
+      "technical_keywords": "Parking garage, hard flash editorial, concrete architecture, cool fluorescent ambient bokeh, high contrast, analog grain, 35mm street photography, urban industrial, flash-lit foreground, underexposed background, cool-toned palette.",
+      "negative_constraints": "No readable floor or level signage. No visible license plates. No soft studio lighting or golden-hour warmth -- this is a cool-toned industrial environment. No car-hood posing. No overly rendered or CGI-clean concrete. No visible exit sign glow. No warm ambient color cast.",
+      "visual_hook_reason": "A parking garage is not a fashion setting -- that collision is the hook. Hard flash editorial treatment against raw industrial concrete gives the image immediate visual credibility and unexpected tension.",
+      "linked_hook_categories": [
+        "outfit_problem",
+        "should_i_post_this",
+        "casual_but_not"
+      ],
+      "caption_angle": "Dry self-aware -- what was she doing here and why did she look like this? No explanation offered.",
+      "caption_draft": "the parking garage was not the plan. the photo was.",
+      "provider_rendering_notes": {
+        "kling_omni": "Parking garage, concrete column, hard direct flash, cool blue-gray palette, high contrast, underexposed background. No readable signage. 3/4 angle. Under 2500 chars.",
+        "openart": "Hard flash parking garage editorial portrait, concrete interior, cool fluorescent ambient. Negative: studio background, golden hour, license plates, floor numbering, exit sign glow."
+      }
+    },
+    {
+      "id": "hcr_007",
+      "scene_type": "home_kitchen_candid",
+      "title": "Home Kitchen Candid",
+      "content_pillar": "apartment_home_routines",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "human_reason": "She was in her kitchen, the light was right, and she looked like this for no occasion at all.",
+      "style_lighting": "Natural window light from one side if morning -- soft and directional, raking across the counter surface and catching her face at a flattering angle. Warm under-cabinet or pendant ambient if evening. Real kitchen light, not a food-photography setup and not a studio softbox simulation. The kitchen's warm materials -- tile, wood, ceramics -- absorb and reflect the light in a way that feels lived-in rather than engineered.",
+      "subject_pose": "Lena mid-action in the kitchen -- pouring coffee, rinsing something, reaching into a cabinet, or wiping the counter. Body at a 3/4 angle, face visible in partial profile or glancing toward camera mid-task. Not posing for the shot: caught in a real moment. Hands are engaged with the task, not arranged. Shoulders relaxed. This is a lifestyle candid, not a kitchen-as-backdrop fashion pose.",
+      "fashion_accessories": "At-home elevated casual -- a fitted ribbed lounge set, soft two-piece, or an athletic set that reads intentional. Not a bathrobe or oversized shapeless loungewear. Still clearly Lena. Hair loosely back -- low bun with pieces falling forward, or half-up. Minimal or no visible makeup -- light mascara acceptable. Clean matte nails. Barefoot or clean socks. Small stud earrings only if worn.",
+      "setting_background": "Apartment kitchen. Counter surface with real but clean props: ceramic mug, a piece of fruit, coffee equipment, one small plant. No cluttered mess. No visible food brand labels or readable packaging. Warm tile or painted backsplash. Side window providing natural light. Upper cabinets partially visible at the top of frame. The kitchen reads real, lived-in, and elevated -- not a commercial shoot set.",
+      "technical_keywords": "35mm equivalent, apartment kitchen, natural window light, warm interior ambient, lifestyle candid, soft interior bokeh, morning or evening routine, real kitchen atmosphere, analog warmth, non-studio.",
+      "negative_constraints": "No readable food brand logos or packaging. No harsh sole-source recessed overhead lighting. No commercial or restaurant kitchen setting. No food-photography prop staging. No visible phone or camera equipment. No cluttered or messy counter surfaces. No blank or clinical white kitchen environment.",
+      "visual_hook_reason": "Kitchen candid is the most believable real-life content type. Looking elevated in her own kitchen for no occasion is a quiet relatable hook -- the kind that generates comments.",
+      "linked_hook_categories": [
+        "playful_confession",
+        "coffee_daylife",
+        "casual_but_not"
+      ],
+      "caption_angle": "Morning or evening routine energy -- dry, matter-of-fact, no performance required.",
+      "caption_draft": "the coffee is doing the work today.",
+      "provider_rendering_notes": {
+        "kling_omni": "Apartment kitchen, morning routine, natural window light, 3/4 body angle mid-action. No readable labels. Under 2500 chars.",
+        "openart": "Kitchen lifestyle candid portrait, natural window light, warm interior bokeh. Negative: restaurant kitchen, food product labels, brand logos, commercial staging."
+      }
+    },
+    {
+      "id": "hcr_008",
+      "scene_type": "rooftop_evening",
+      "title": "Rooftop Evening",
+      "content_pillar": "social_going_out",
+      "platform_fit": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She went up to the roof and the sky happened to be doing exactly that.",
+      "style_lighting": "Golden hour to blue-hour transition. Warm orange-pink natural light rakes from one side at a low angle, creating long soft shadows and wrapping the face and figure with atmospheric warmth. Alternatively, deep blue-hour ambient with subtle warm detail -- string lights or lit building windows -- visible in the background. Natural backlight rim on hair and shoulder if the sun is just below the horizon. Real sky color, not oversaturated filter processing.",
+      "subject_pose": "Lena near or at the rooftop railing -- standing with one hand resting on the rail, or perched on a low surface with the city visible behind her. Body at a 3/4 angle toward camera, slight look toward the horizon or glancing back at the lens. Other hand holding an unlabeled cup or loose at her side. Hair with subtle natural wind movement where possible. Shoulders relaxed -- she is there for the view, not performing for a shoot.",
+      "fashion_accessories": "Evening elevated: fitted mini or midi dress in a rich tone -- deep green, warm terracotta, champagne, or all-black. Strappy heeled sandals or heeled mules. Gold statement earrings, thin chain necklace, stacked bracelets. Glossy or bold lip. Small chain bag or clutch on shoulder or in hand. Sunglasses optional if golden hour. The look is event-adjacent; the occasion is simply the rooftop.",
+      "setting_background": "Rooftop surface -- concrete, gravel, or roof deck texture visible underfoot. City skyline in natural soft focus behind her: building tops, distant tree lines, water tower silhouettes possible in the bokeh. No readable building names, rooftop bar logos, or recognizable iconic landmarks. Sky gradient: warm orange-pink to purple, or deep blue-hour blue. No artificial sunset color grading.",
+      "technical_keywords": "85mm portrait, rooftop, golden hour or blue-hour, city skyline bokeh, natural side raking light, outdoor evening lifestyle, shallow depth of field, atmospheric sky tones, real environment, hair movement, non-studio.",
+      "negative_constraints": "No readable building names, rooftop bar signage, or iconic recognizable city landmarks. No restaurant or venue branding in frame. No oversaturated HDR sky processing. No ring light or artificial warm-up. No obvious tourist photo energy. No harsh HVAC or mechanical equipment visible.",
+      "visual_hook_reason": "Rooftop at golden or blue hour gives aspirational city-life energy without being unreachable. The real sky and wind-moved hair add environmental life the image earns rather than manufactures.",
+      "linked_hook_categories": [
+        "outfit_problem",
+        "should_i_post_this",
+        "casual_but_not"
+      ],
+      "caption_angle": "Present in the moment -- the city was the backdrop, the outfit was just there. Short and confident.",
+      "caption_draft": "the city does not care. I dressed up anyway.",
+      "provider_rendering_notes": {
+        "kling_omni": "Rooftop, golden hour or blue hour, city skyline in soft focus behind, natural side raking light. Subtle wind movement in hair. No building names readable. Under 2500 chars.",
+        "openart": "Rooftop lifestyle editorial portrait, golden hour or blue-hour sky, city skyline bokeh. Negative: building names, rooftop bar signage, HDR sky, ring light."
+      }
+    },
+    {
+      "id": "hcr_009",
+      "scene_type": "night_staircase_event",
+      "title": "Night Staircase Event",
+      "content_pillar": "social_going_out",
+      "platform_fit": [
+        "Facebook Feed",
+        "Instagram Feed"
+      ],
+      "best_content_type": "photo",
+      "human_reason": "She was heading out and the staircase light made the moment worth stopping for.",
+      "style_lighting": "Warm ambient sconce lighting from fixtures on the staircase wall -- available light only, no direct flash. This is the key distinction from the flash-editorial staircase lane: here the light is tungsten-warm, motivated, and unmounted. Pools of warm light fall on her face and upper body; deep shadow fills the corners and the space above and below. The contrast between lit and unlit is cinematic and earned from the environment itself.",
+      "subject_pose": "Lena mid-step ascending or descending the staircase -- one foot raised, weight clearly on the planted foot. Hand trailing lightly on the banister, elbow at a natural angle. Body at a 3/4 angle toward camera. Face turned toward camera mid-movement: composed, intentional, she knows where she is going and is not in a hurry about it. Eyes level or slight chin-up. Movement is implied, not frozen.",
+      "fashion_accessories": "Full going-out look with nothing missing. Fitted mini or midi dress in a deep saturated tone -- burgundy, forest green, all-black, or champagne. Pointed-toe heels. Small evening bag or chain clutch in hand or on shoulder. Gold or silver statement earrings, thin chain necklace. Bold or deep lip -- wine, berry, or warm red. Finished nails. The complete going-out presentation.",
+      "setting_background": "Interior staircase with architectural character -- carved or painted banister, carpeted or stone steps. Warm sconce or pendant wall fixtures visible mounted on the wall surface beside or above her. More steps receding into shadow in the background, or a warm landing partially visible at the far edge of frame. No event signage, venue branding, or other guests in frame. Not a fire escape or utilitarian stairwell -- architectural and intentional.",
+      "technical_keywords": "Interior staircase, warm ambient sconce light, available light only, cinematic tungsten palette, 50mm f/1.4, shallow depth of field, evening going-out portrait, mid-step motion energy, warm shadow contrast, no flash.",
+      "negative_constraints": "No direct flash -- available sconce light only for this recipe, distinct from flash editorial lanes. No event signage, venue name, or branding. No fire escape or utilitarian stairwell environment. No cold fluorescent overhead. No other guests or figures visible in frame. No phone in hand while mid-step. No harsh underexposure that loses face detail entirely.",
+      "visual_hook_reason": "Mid-step movement creates cinematic energy and implies a destination. Warm available light elevates the scene without manufacturing drama. The full going-out look on a dramatic staircase stops the scroll.",
+      "linked_hook_categories": [
+        "outfit_problem",
+        "should_i_post_this",
+        "casual_but_not"
+      ],
+      "caption_angle": "Going-out energy -- composed and in the moment. Not explaining where or why. Short.",
+      "caption_draft": "running late. still showing up like this.",
+      "provider_rendering_notes": {
+        "kling_omni": "Interior staircase, warm sconce ambient light only, no flash, mid-step motion, 3/4 angle, tungsten warm palette. Under 2500 chars.",
+        "openart": "Interior staircase cinematic ambient portrait, warm sconce light, available light only. Negative: direct flash, event signage, fire stairwell, cold fluorescent."
+      }
+    },
+    {
+      "id": "hcr_010",
+      "scene_type": "casual_street_walk",
+      "title": "Casual Street Walk",
+      "content_pillar": "street_errands_outdoor",
+      "platform_fit": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "human_reason": "She was outside with no particular destination and she happened to look like this.",
+      "style_lighting": "Natural daylight in any available register -- morning, midday, or late afternoon golden. Soft overcast creates even diffuse light with gentle wrap and minimal harsh shadows. Bright directional sun from one side creates a clean shadow line, high contrast, and a street-photography energy. Either reads correctly for this recipe. No artificial light, no motivated flash, no fill. The light is whatever was available and it is enough.",
+      "subject_pose": "Lena paused mid-stride on the sidewalk, body at a 3/4 angle toward camera -- not straight-on walking, which creates body drift artifacts. Or fully stopped with weight on one leg and body angled naturally. Arms in a natural motion position -- one slightly forward, one trailing, or one hand in pocket. Bag on body. Eyes toward camera or fractionally off-axis with a self-aware energy. Not rigidly posed -- this is caught, not arranged.",
+      "fashion_accessories": "Versatile elevated street look appropriate to any pillar. Wide-leg jeans, fitted white tee, clean leather sneakers. OR fitted straight-leg trousers, a cropped knit, heeled sandals. OR an athletic set with a blazer thrown open. Crossbody or shoulder bag on body. Sunglasses on face or held in hand. Minimal jewelry or one statement piece depending on the look. Glossy or natural lip. Clean nails. No visible brand logos.",
+      "setting_background": "American city sidewalk -- Austin or generic urban. Mixed-use street, planted trees, plain building facades, parked cars in soft background blur. Pavement texture readable underfoot. Background carries city context and depth without being location-specific. No readable business names, menus, storefront signs, or license plates anywhere in frame. City feel, no identifiable location.",
+      "technical_keywords": "85mm f/1.8, natural daylight, shallow depth of field, street photography, urban sidewalk, soft bokeh background, lifestyle candid, film grain optional, warm or neutral street tones, real skin texture, non-studio.",
+      "negative_constraints": "No readable signage, business names, or menus in background. No straight-on walking pose. No visible license plates. No phone-in-hand selfie angle. No artificial light sources visible. No studio or forced backdrop. No tourist-location-specific environment. No floating hair or body composite artifacts from AI drift.",
+      "visual_hook_reason": "The most relatable public setting combined with an outfit that exceeds the occasion. She is just outside with no explanation, looking like this for no reason. That quiet confidence is the hook.",
+      "linked_hook_categories": [
+        "casual_but_not",
+        "errand_attention",
+        "playful_confession"
+      ],
+      "caption_angle": "Self-aware about the outfit versus the complete absence of occasion. Just outside. No reason. Short.",
+      "caption_draft": "just outside. no reason.",
+      "provider_rendering_notes": {
+        "kling_omni": "Paused mid-stride sidewalk, 3/4 angle, not straight-on walking. Natural daylight, 85mm compression, blurred street background. No readable text in frame. Under 2500 chars.",
+        "openart": "Street photography lifestyle portrait, natural daylight, urban sidewalk, shallow focus. Negative: readable signage, license plates, straight-on walking pose, studio backdrop."
+      }
+    }
+  ]
+}
