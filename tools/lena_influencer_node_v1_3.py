@@ -109,48 +109,110 @@ LANE_FAMILIES = {
     "home_luxury_lifestyle": set(),
 }
 
-# Element-anchored identity brief — used in all high-quality prompt paths.
-# Explicit body descriptors kept as internal QA language only, not live prompts.
-LENA_IDENTITY_BRIEF = (
-    "@Lena is the identity reference. "
-    "Generate a new candid in-scene photo of Lena "
-    "using the element for recognizable face, hair, body, "
-    "skin tone, and overall identity. "
-    "Preserve her natural proportions from the element references, "
-    "but do not copy the exact reference image, face crop, "
-    "pose, expression, lighting, or composition. "
-    "Lena's face, body build, and silhouette must remain "
-    "consistent with the element across all poses, "
-    "angles, outfits, and scenes. "
-    "This is a baseline quality requirement, "
-    "not optional scene guidance."
+LENA_MASTER_IDENTITY_BLUEPRINT = (
+    "@Lena is the approved visual identity reference. "
+    "Preserve the same realistic Lena face and the same natural "
+    "curvy hourglass body from the approved element "
+    "in every generation. "
+    "Lena has a realistic, naturally beautiful face with a softly "
+    "oval-to-heart-shaped structure, high natural cheekbones, "
+    "a slim softly defined jawline, and a small rounded chin. "
+    "Her eyes are warm medium brown, almond-shaped, "
+    "slightly hooded, and softly upturned at the outer corners, "
+    "with a calm sultry gaze. "
+    "Her eyebrows are thick, dark, naturally arched, and expressive, "
+    "not thin or overly polished. "
+    "Her nose is slim and straight with a soft bridge, "
+    "narrow nostrils, and a rounded natural tip. "
+    "Her lips are full and natural with a defined cupid's bow, "
+    "soft pink-nude color, a fuller lower lip, "
+    "and a relaxed slightly parted shape. "
+    "Her skin tone is warm light-to-medium with peach/olive undertones, "
+    "visible pores, subtle redness, tiny natural skin speckles, "
+    "and real human texture; "
+    "her skin must not look plastic, poreless, airbrushed, or doll-like. "
+    "Her hair is dark brunette with warm auburn-brown highlights, "
+    "soft volume, natural waves, and loose face-framing strands. "
+    "Preserve her realistic curvy hourglass body: "
+    "full rounded bust, compact torso, narrow defined waist, "
+    "strong natural hip flare, rounded hips/glutes, "
+    "fuller upper thighs, shapely legs, soft athletic tone, "
+    "and believable feminine proportions. "
+    "Her waist-to-hip curve should stay clear and natural "
+    "across poses and outfits. "
+    "Do not randomly slim her down, make her boxy, erase her waist, "
+    "narrow her hips, flatten her curves, over-muscle her, "
+    "exaggerate her body, or create doll-like/caricatured proportions. "
+    "Generate a new in-scene photo of the same woman "
+    "while allowing a new pose, outfit, crop, camera angle, "
+    "lighting, and environment. "
+    "Do not copy the exact reference expression, "
+    "crop, lighting, or pose."
 )
 
-# Anti-copy negatives — append to all live generation prompts.
+LENA_IDENTITY_BRIEF = LENA_MASTER_IDENTITY_BLUEPRINT
+
 LENA_NEGATIVE_BRIEF = (
-    "source image copy, exact reference copy, pasted face, "
-    "face cutout, sticker face, face swap look, "
-    "cloned expression, same expression as reference, "
-    "copied reference lighting, copied reference composition, "
-    "exaggerated body proportions, over-enlarged bust, "
-    "over-enlarged hips, exaggerated glutes, "
-    "doll-like proportions, plastic skin, over-smoothed face, "
-    "lingerie drift, underwear styling, unsafe wardrobe drift, "
-    "random body slimming, silhouette drift, "
-    "body-build change between scenes, different-person drift"
+    "generic AI influencer face, different woman, redesigned face, "
+    "beautified face, doll face, plastic face, poreless skin, "
+    "over-smoothed skin, airbrushed face, wrong eye shape, "
+    "wrong brow shape, wrong nose, wrong mouth, wrong jawline, "
+    "wrong hairline, face identity drift, face swap look, "
+    "pasted face, sticker face, source image copy, "
+    "random body slimming, skinny body drift, body-build change, "
+    "silhouette drift, boxy torso, erased waist, thick blocky waist, "
+    "narrow hips, flattened curves, flat chest, reduced bust, "
+    "over-enlarged bust, over-enlarged hips, exaggerated glutes, "
+    "caricatured hourglass, BBL caricature, doll-like proportions, "
+    "stretched legs, tiny torso, oversized head, "
+    "distorted waist-to-hip ratio, overly muscular body, "
+    "masculine build, "
+    "shapeless clothing hiding body identity"
 )
 
 LENA_QA_STANDARD = (
-    "Reject when: face identity changes, "
-    "body build clearly altered, silhouette drifts, "
-    "face looks pasted/swapped/stamped, "
-    "expression copied from reference, body caricatured, "
-    "or Lena no longer resembles the approved element. "
-    "Full pose range allowed: front, side, 3/4, rear, "
-    "walking, sitting, leaning, turning, reaching, "
-    "mirror shots, candids, props, motion. "
-    "Reject only on identity/body consistency failure."
+    "Reject if Lena's face OR body would not pass human "
+    "identity review against the approved element. "
+    "Face and body identity must match before judging "
+    "pose, outfit, setting, or style. "
+    "Full pose range is allowed, but the same face/body identity "
+    "must remain consistent across poses, angles, crops, "
+    "outfits, and scenes."
 )
+
+
+LENA_PROMPT_QUALITY_STANDARD = (
+    "Every Lena live prompt must be built like a "
+    "high-end photographic art direction brief: "
+    "specific lighting, concrete pose, detailed wardrobe, "
+    "grounded setting, realistic skin/camera texture, "
+    "and cinematic/social-media visual hierarchy. "
+    "Do not compress prompts into generic scene fragments. "
+    "Use the proven staircase prompt as the quality bar "
+    "for specificity and realism, not as a mandatory style."
+)
+
+PROMPT_MIN_CHARS = 1900
+PROMPT_MAX_CHARS = 2500
+
+
+def validate_prompt(
+    prompt: str, short_test: bool = False
+) -> list[str]:
+    """Return list of issues; empty = pass."""
+    issues: list[str] = []
+    n = len(prompt)
+    if n > PROMPT_MAX_CHARS:
+        issues.append(
+            f"ABORT: prompt {n} chars exceeds {PROMPT_MAX_CHARS}"
+        )
+    if not short_test and n < PROMPT_MIN_CHARS:
+        issues.append(
+            f"WARN: prompt {n} chars below {PROMPT_MIN_CHARS}"
+            " — too generic; use short_test=True to bypass"
+        )
+    return issues
+
 
 # 10-part prompt structure for all direct_flash_ugc recipes.
 DIRECT_FLASH_PROMPT_STRUCTURE = [
