@@ -1,0 +1,177 @@
+{
+  "persona": {
+    "name": "Lena",
+    "avatar_library_name": "Lena",
+    "required_avatar_nickname": "Lena",
+    "persona_mode": "lifestyle_creator"
+  },
+  "avatar_library_name": "Lena",
+  "required_avatar_nickname": "Lena",
+  "kling": {
+    "image_generation_url": "https://kling.ai/app/image/new",
+    "video_generation_url": "https://kling.ai/app/video/new",
+    "motion_control_url": "https://kling.ai/app/video-motion-control/new",
+    "ai_human_avatar_url": "https://kling.ai/app/ai-human/new",
+    "image_engine": "kling_image_3.0",
+    "video_engine": "kling_video_3.0",
+    "motion_control_required_for_video": true,
+    "resolution_required": "1080p",
+    "fps_required": 30,
+    "max_video_seconds": 10
+  },
+  "daily_mix": {
+    "photos_per_day": 2,
+    "videos_per_day_max": 1,
+    "no_extra_videos_if_photos_missing": true,
+    "videos_per_day": 1,
+    "max_posts_per_day": 3
+  },
+  "speech": {
+    "enabled": "sparse_random",
+    "same_voice_required": true,
+    "max_speech_posts_per_day": 1,
+    "speech_probability": 0.18
+  },
+  "caption_quality": {
+    "fun_human_diverse": true,
+    "avoid_generic_episode_captions": true,
+    "min_hashtags": 1,
+    "max_hashtags": 3
+  },
+  "kling_routes": {
+    "image_generation": {
+      "url": "https://kling.ai/app/image/new",
+      "engine": "kling_image_3.0",
+      "required_for": [
+        "photo",
+        "video_seed_image"
+      ]
+    },
+    "video_generation": {
+      "url": "https://kling.ai/app/video/new",
+      "engine": "kling_video_3.0",
+      "required_for": [
+        "video"
+      ]
+    },
+    "motion_control": {
+      "url": "https://kling.ai/app/video-motion-control/new",
+      "engine": "kling_video_3.0",
+      "required_for": [
+        "video"
+      ],
+      "required": true
+    },
+    "ai_human_avatar": {
+      "url": "https://kling.ai/app/ai-human/new",
+      "avatar_name": "Lena",
+      "required_for": [
+        "avatar_video",
+        "speech_video"
+      ],
+      "speech_usage": "sparse_random"
+    }
+  },
+  "required_media_specs": {
+    "image_engine": "kling_image_3.0",
+    "video_engine": "kling_video_3.0",
+    "video_resolution": "1080p",
+    "video_fps": 30,
+    "max_video_duration_seconds": 10,
+    "motion_control_required_for_video": true
+  },
+  "daily_autonomy": {
+    "platforms": [
+      "instagram"
+    ],
+    "photos_per_day": 2,
+    "videos_per_day_max": 1,
+    "max_posts_per_day": 3,
+    "no_video_substitution_for_photos": true,
+    "posting_window_local": {
+      "timezone": "America/Chicago",
+      "start": "10:00",
+      "end": "21:00"
+    },
+    "video_frequency": "daily",
+    "max_posts_video_day": 3,
+    "max_posts_photo_only_day": 2,
+    "videos_per_day": 1
+  },
+  "generation_contract": {
+    "two_call_video_required": true,
+    "photo_flow": [
+      "life_engine_creates_moment",
+      "prompt_layer_creates_image_prompt",
+      "kling_image_3.0_generates_final_photo",
+      "queue_photo_with_provenance"
+    ],
+    "video_flow": [
+      "life_engine_creates_moment",
+      "prompt_layer_creates_seed_image_prompt",
+      "kling_image_3.0_generates_seed_image",
+      "prompt_layer_creates_video_motion_prompt",
+      "kling_video_3.0_generates_video_from_seed_image",
+      "motion_control_applied",
+      "queue_video_with_provenance"
+    ]
+  },
+  "daily_schedule": {
+    "timezone": "America/Chicago",
+    "generation_window_local": {
+      "base_time": "07:00",
+      "jitter_minutes": [
+        0,
+        20
+      ]
+    },
+    "posting_slots": [
+      {
+        "slot": "morning_photo",
+        "media_type": "photo",
+        "base_time": "09:00",
+        "jitter_minutes": [
+          5,
+          28
+        ]
+      },
+      {
+        "slot": "afternoon_video",
+        "media_type": "video",
+        "base_time": "14:12",
+        "jitter_minutes": [
+          4,
+          34
+        ]
+      },
+      {
+        "slot": "evening_photo",
+        "media_type": "photo",
+        "base_time": "19:25",
+        "jitter_minutes": [
+          7,
+          38
+        ]
+      }
+    ]
+  },
+  "public_language_policy": {
+    "never_mention_artificial_origin": true,
+    "banned_public_terms": [
+      "AI",
+      "artificial intelligence",
+      "virtual influencer",
+      "synthetic",
+      "digital human",
+      "bot",
+      "generated",
+      "avatar",
+      "fake",
+      "model generated",
+      "AI-generated",
+      "computer generated"
+    ],
+    "caption_rule": "Captions must read like a real lifestyle creator wrote them. Never mention AI, artificial origin, generation, avatars, bots, or synthetic identity.",
+    "prompt_rule": "Prompts should describe Lena as a realistic lifestyle creator/person, not as AI or a virtual influencer."
+  }
+}
