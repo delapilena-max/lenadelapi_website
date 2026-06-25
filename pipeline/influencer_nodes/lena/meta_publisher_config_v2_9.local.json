@@ -2,9 +2,10 @@
   "version": "v2.9.0",
   "auth_mode": "facebook_login",
   "graph_api_version": "v25.0",
-  "instagram_business_account_id": "17841411474490274",
+  "instagram_business_account_id": "17841409711154047",
   "facebook_page_id": "1267219163131062",
   "ig_share_reels_to_feed": true,
+  "media_public_base_url": "https://pub-ee462a06dda9471ca44720da4c8597b5.r2.dev",
   "dry_run": false,
   "notes": [
     "auth_mode: facebook_login uses META_PAGE_ACCESS_TOKEN via graph.facebook.com.",
