@@ -142,6 +142,28 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             ),
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "just her 🌿",
+            "required_visual_evidence": [
+                "Lena's face and soft glam makeup visible",
+                'apartment interior behind her (plants, window, or room context)',
+                'natural phone-held framing angle',
+                'warm window or lamp light on face',
+            ],
+            "forbidden_contradictions": [
+                'outdoor location',
+                'studio lighting or ring light glow in eyes',
+                'no apartment context behind her',
+                'blank white or gray studio background',
+            ],
+            "caption_intent": 'identity anchor — honest unposed creator face to open the batch',
+            "environment_realism_notes": 'apartment plants and soft living room blur behind; window light or soft lamp',
+            "photo_realism_notes": 'handheld slightly above eye level, off-center, natural tilt, no ring light',
+            "body_visibility_requirement": 'medium to close shot; face primary; shoulders and neckline visible',
+            "qa_rejection_criteria": [
+                'no apartment context visible',
+                'studio lighting or professional backdrop',
+                'outdoor setting',
+                'ring light reflection in eyes',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -182,6 +204,30 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             "outfit_continuity_notes": OUTFIT_CONTINUITY,
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "the apartment is thriving. i am also doing okay. 🌿",
+            "required_visual_evidence": [
+                'apartment interior',
+                'houseplants visible (multiple preferred)',
+                'drink or beverage nearby (iced coffee or warm drink)',
+                'natural window or lamp light',
+                'couch, floor, or window as setting',
+            ],
+            "forbidden_contradictions": [
+                'outdoor location',
+                'bare or plant-free room',
+                'studio lighting',
+                'cafe or public setting',
+                'no drink or apartment prop',
+            ],
+            "caption_intent": 'natural apartment habitat moment — cozy, plant-filled, unposed',
+            "environment_realism_notes": 'multiple houseplants hanging/shelved/on windowsill; laptop or journal nearby; warm morning or afternoon light',
+            "photo_realism_notes": 'environmental composition; Lena occupies 40-60% of frame; plants and light fill the rest',
+            "body_visibility_requirement": 'waist-up or three-quarter; seated or near window; environmental framing',
+            "qa_rejection_criteria": [
+                'outdoor location',
+                'no plants visible',
+                'cafe or public interior setting',
+                'sterile apartment without lived-in details',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -226,6 +272,30 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             "outfit_continuity_notes": OUTFIT_CONTINUITY,
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "he needed me. i was available. 🐾",
+            "required_visual_evidence": [
+                'dog clearly visible in frame',
+                'both Lena and dog visible',
+                'apartment floor or couch as setting',
+                'plants in background',
+                'natural apartment lighting',
+            ],
+            "forbidden_contradictions": [
+                'no dog visible in frame',
+                'dog barely visible or out of frame',
+                'outdoor dog park without apartment context',
+                'posed professional pet portrait staging',
+                'studio or bright artificial lighting',
+            ],
+            "caption_intent": 'dog as natural unplanned participant — genuine interruption or cuddle',
+            "environment_realism_notes": 'apartment floor or couch; plants visible; dog leaning, in lap, or nudging into frame',
+            "photo_realism_notes": 'camera angle slightly lower; handheld side or lap feel; dog as co-subject',
+            "body_visibility_requirement": "both Lena and dog in frame; dog at or near camera level; Lena's reaction visible",
+            "qa_rejection_criteria": [
+                'no dog visible',
+                'dog is barely a background element',
+                'outdoor or non-apartment setting',
+                'professional pet photography staging',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -271,6 +341,30 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             "outfit_continuity_notes": OUTFIT_CONTINUITY,
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "he does not care about my schedule and i respect it 🐢",
+            "required_visual_evidence": [
+                'turtle clearly visible and identifiable',
+                'both Lena and turtle in frame',
+                'apartment details in background',
+                'natural apartment lighting',
+                'close enough framing to see turtle clearly',
+            ],
+            "forbidden_contradictions": [
+                'no turtle visible in frame',
+                'turtle barely visible or too small',
+                'outdoor or wildlife photography setting',
+                'dark or moody turtle-as-object framing',
+                'studio or artificial lighting',
+            ],
+            "caption_intent": 'turtle as surprising differentiator — delight and novelty, not performance',
+            "environment_realism_notes": "turtle on floor, surface, or near Lena's hand; apartment desk, plants, or lived-in surfaces",
+            "photo_realism_notes": "tighter composition than dog moment; turtle at or near camera level; Lena's reaction visible",
+            "body_visibility_requirement": "both Lena and turtle in frame; Lena's expression of amused curiosity visible",
+            "qa_rejection_criteria": [
+                'no turtle visible',
+                'turtle too small or unclear to identify',
+                'outdoor or wildlife setting',
+                'Lena not reacting to turtle',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -318,6 +412,30 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             "outfit_continuity_notes": OUTFIT_CONTINUITY,
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "going out looking like this. that\'s it. that\'s the post. 💋",
+            "required_visual_evidence": [
+                'going-out outfit visible (sleek dress, co-ord, or elevated look)',
+                'heels or elevated shoes visible',
+                'gold jewelry visible',
+                'apartment entryway or mirror context',
+                'warm ambient apartment light',
+            ],
+            "forbidden_contradictions": [
+                'casual daytime outfit',
+                'athletic wear or gym outfit',
+                'outdoor street without apartment entryway',
+                'no heels or elevated shoes',
+                'lingerie or explicit styling',
+            ],
+            "caption_intent": 'polished luxury going-out look — the reveal moment before leaving',
+            "environment_realism_notes": 'apartment entryway or full-length mirror; warm ambient light; no readable text or logos',
+            "photo_realism_notes": 'full body or three-quarter; outfit readable from head to thigh; heels and jewelry clearly visible',
+            "body_visibility_requirement": 'full body or three-quarter; heels, jewelry, glossy lip all visible; outfit reads expensive',
+            "qa_rejection_criteria": [
+                'casual or athletic outfit inconsistent with going-out caption',
+                'no heels visible',
+                'outdoor or public setting without entryway context',
+                'cheap or discount-looking styling',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -367,6 +485,30 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             ),
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "productive night or cozy night. the setup does not judge. 🎮",
+            "required_visual_evidence": [
+                'gaming setup visible (monitor, desk, or RGB/lamp glow)',
+                'cozy atmosphere (warm lamp or ambient glow)',
+                'Lena near or at the setup',
+                'plants visible nearby or reflected',
+                'apartment evening context',
+            ],
+            "forbidden_contradictions": [
+                'no gaming setup or desk visible',
+                'outdoor or public setting',
+                'bright studio or harsh lighting',
+                'aggressive neon RGB rainbow without cozy quality',
+                'bare room without gaming context',
+            ],
+            "caption_intent": 'gaming setup as cozy aesthetic anchor — the tech-meets-glam corner',
+            "environment_realism_notes": 'monitor glow, RGB accent or warm desk lamp, plants nearby, snack or drink on desk',
+            "photo_realism_notes": 'environmental shot; setup and Lena share frame; monitor glow as light source',
+            "body_visibility_requirement": 'Lena and setup both in frame; Lena not in full gaming mode — transitional moment',
+            "qa_rejection_criteria": [
+                'no gaming setup or desk visible',
+                'outdoor or non-apartment setting',
+                'Lena not near or at the setup',
+                'aggressive gaming den aesthetic without cozy quality',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
 
@@ -419,6 +561,29 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
             "outfit_continuity_notes": OUTFIT_CONTINUITY,
             "scene_continuity_notes":  SCENE_CONTINUITY,
             "caption_seed":            "the vibe is a process 😭",
+            "required_visual_evidence": [
+                'apartment environment visible (plants, clutter, lived-in surfaces)',
+                'expressive or candid face visible',
+                'natural apartment light (whatever is available)',
+                'unstaged or slightly chaotic background',
+            ],
+            "forbidden_contradictions": [
+                'carefully curated or cleaned-up background',
+                'outdoor or public setting',
+                'studio lighting or professional backdrop',
+                'overly posed or stiff composition',
+                'no visible apartment context',
+            ],
+            "caption_intent": 'candid chaotic moment — raw expression over polish, story-screenshot energy',
+            "environment_realism_notes": 'apartment fully visible — plants, clutter, lived-in surfaces; no attempt to clean up',
+            "photo_realism_notes": 'off-center or tilted; story-frame aesthetic; slightly unusual angle acceptable; raw energy',
+            "body_visibility_requirement": 'expression is primary subject; upper body or full body; experimental framing acceptable',
+            "qa_rejection_criteria": [
+                'no apartment context visible',
+                'outdoor or non-apartment setting',
+                'staged or perfectly composed shot inconsistent with experimental intent',
+                'no candid or expressive element',
+            ],
             "platform_fit":            ["instagram", "facebook"],
         },
     ]
@@ -437,6 +602,33 @@ def build_photo_slots(run_date: str, pillars: dict) -> list:
 # ---------------------------------------------------------------------------
 # Batch builder
 # ---------------------------------------------------------------------------
+
+EVIDENCE_REQUIRED_SLOT_FIELDS = [
+    "required_visual_evidence",
+    "forbidden_contradictions",
+    "caption_intent",
+    "environment_realism_notes",
+    "photo_realism_notes",
+    "body_visibility_requirement",
+    "qa_rejection_criteria",
+]
+
+
+def validate_slot_evidence_present(
+    slots: list,
+) -> None:
+    """Raise ValueError if any slot is missing
+    required scene evidence contract fields.
+    """
+    for slot in slots:
+        st = slot.get("slot_type", "unknown")
+        for field in EVIDENCE_REQUIRED_SLOT_FIELDS:
+            if not slot.get(field):
+                raise ValueError(
+                    f"Slot {st!r} missing "
+                    f"required field: {field!r}"
+                )
+
 
 def build_batch(batch_id: str, run_date: str, photo_slots: list) -> dict:
     return {
@@ -486,6 +678,10 @@ def validate(filepath: str) -> tuple[bool, list]:
         "prompt", "negative_prompt", "composition_notes", "texture_quality_notes",
         "angle_compensation_notes", "outfit_continuity_notes", "scene_continuity_notes",
         "caption_seed", "platform_fit",
+        "required_visual_evidence", "forbidden_contradictions",
+        "caption_intent", "environment_realism_notes",
+        "photo_realism_notes", "body_visibility_requirement",
+        "qa_rejection_criteria",
         "approval_status", "generation_status", "publishing_approval",
         "provider_call_enabled", "generation_call_performed", "credits_spent",
     ]
