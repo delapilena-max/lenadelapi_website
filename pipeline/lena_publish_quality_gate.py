@@ -222,8 +222,11 @@ def _caption_scene_coherence_check(
     )
 
     for contradiction in forbidden:
+        c_lower = contradiction.lower()
+        if c_lower.startswith("no ") or " without " in c_lower:
+            continue
         kws = [
-            w for w in contradiction.lower().split()
+            w for w in c_lower.split()
             if len(w) > 3
         ]
         hits = [kw for kw in kws if kw in cap]
