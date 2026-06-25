@@ -153,6 +153,104 @@ def _hashtag_count(text: str) -> int:
     return len(re.findall(r"#\w+", text or ""))
 
 
+
+_CAPTION_ACTIVITY_SIGNALS: dict = {
+    "food": [
+        "eating", "dinner", "snack", "breakfast",
+        "lunch", "strawberry", "food",
+    ],
+    "coffee": [
+        "coffee", "latte", "espresso",
+        "iced coffee", "americano",
+    ],
+    "gym": [
+        "gym", "workout", "fitness", "athletic",
+        "earned",
+    ],
+    "dog": ["dog", "herby", "paw", "puppy"],
+    "turtle": ["turtle", "tortoise"],
+    "rain": ["rain", "rainy", "umbrella"],
+    "airport": [
+        "airport", "terminal", "boarding",
+    ],
+    "flowers": ["flower", "bouquet"],
+    "record": ["record", "vinyl", "album"],
+}
+
+_SIGNAL_EVIDENCE_KEYWORDS: dict = {
+    "food": [
+        "food", "kitchen", "eating", "sink",
+        "bowl", "plate", "snack",
+    ],
+    "coffee": [
+        "coffee", "cafe", "cup", "drink", "latte",
+    ],
+    "gym": [
+        "gym", "fitness", "athletic", "bench",
+    ],
+    "dog": ["dog", "herby"],
+    "turtle": ["turtle"],
+    "rain": [
+        "rain", "wet", "overcast", "umbrella",
+    ],
+    "airport": [
+        "airport", "terminal", "suitcase",
+    ],
+    "flowers": ["flower", "bouquet"],
+    "record": ["record", "vinyl", "album"],
+}
+
+
+def _caption_scene_coherence_check(
+    caption: str,
+    scene_meta: dict,
+) -> "tuple[list[str], list[str]]":
+    """Return (errors, warnings) for caption vs scene_meta.
+
+    errors   — hard contradictions that block publish
+    warnings — soft mismatches that flag for review
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    cap = (caption or "").lower()
+
+    required = (
+        scene_meta.get("required_visual_evidence") or []
+    )
+    forbidden = (
+        scene_meta.get("forbidden_contradictions") or []
+    )
+
+    for contradiction in forbidden:
+        kws = [
+            w for w in contradiction.lower().split()
+            if len(w) > 3
+        ]
+        hits = [kw for kw in kws if kw in cap]
+        if hits:
+            errors.append(
+                "caption conflicts with forbidden "
+                f"contradiction '{contradiction}': "
+                f"matched {hits}"
+            )
+
+    evidence_text = " ".join(required).lower()
+    for activity, signals in _CAPTION_ACTIVITY_SIGNALS.items():
+        if not any(s in cap for s in signals):
+            continue
+        needed = _SIGNAL_EVIDENCE_KEYWORDS.get(
+            activity, []
+        )
+        if not any(kw in evidence_text for kw in needed):
+            warnings.append(
+                f"caption implies '{activity}' activity "
+                "but scene evidence has no matching "
+                f"context; evidence: {required}"
+            )
+
+    return errors, warnings
+
+
 def caption_has_banned_terms(caption: str) -> bool:
     return bool(_banned_term_hits(caption))
 
@@ -248,6 +346,7 @@ def quality_gate_media(
     caption: str,
     media_type: str | None = None,
     config: QualityGateConfig | None = None,
+    scene_meta: dict | None = None,
 ) -> QualityGateResult:
     config = config or QualityGateConfig()
     path = Path(media_path).expanduser().resolve()
@@ -324,6 +423,19 @@ def quality_gate_media(
             f"caption has too many hashtags: {tag_count} found, "
             f"max allowed is {_MAX_CAPTION_HASHTAGS}"
         )
+
+    if scene_meta:
+        c_errors, c_warns = _caption_scene_coherence_check(
+            caption, scene_meta
+        )
+        for e in c_errors:
+            result.errors.append(
+                "scene coherence: " + e
+            )
+        for w in c_warns:
+            result.warnings.append(
+                "scene coherence: " + w
+            )
 
     try:
         result.fingerprint = file_sha256(path)
