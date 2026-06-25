@@ -196,6 +196,37 @@ def config_status(test_api: bool = False) -> dict:
         "api_test": api_result
     }
 
+
+
+def preflight_token(cfg: dict, platform: str = "") -> dict:
+    """Validate token resolves cleanly before touching R2 or the Graph API."""
+    token = token_for_platform(cfg, platform)
+    if not token:
+        return {"ok": False, "reason": "no_token_in_config"}
+    try:
+        data = graph_get("/me", {"fields": "id"}, cfg,
+                         token_override=token, platform=platform)
+        if "error" in data:
+            code = data["error"].get("code", 0)
+            sub  = data["error"].get("error_subcode", 0)
+            msg  = data["error"].get("message", "unknown")
+            if code == 190:
+                return {
+                    "ok": False, "reason": "token_expired",
+                    "code": code, "subcode": sub, "message": msg,
+                }
+            return {
+                "ok": False, "reason": "token_invalid",
+                "code": code, "message": msg,
+            }
+        return {"ok": True, "me_id": data.get("id", "")}
+    except Exception as exc:
+        raw = str(exc)
+        if "190" in raw:
+            return {"ok": False, "reason": "token_expired", "detail": raw}
+        return {"ok": False, "reason": "preflight_error", "detail": raw}
+
+
 def validate_config_for(platform: str, media_type: str) -> dict:
     status = config_status(False)
     cfg = load_config()
@@ -416,3 +447,106 @@ def fail(platform, payload, reason, extra=None):
         "platform": platform, "queue_id": payload.get("queue_id"), "slot_id": payload.get("slot_id"),
         "reason": reason, "extra": extra or {}
     }
+
+
+# ── Final publish approval gate ───────────────────────────────────────────────
+
+
+def _gate_resolve_path(raw: str) -> Path:
+    p = Path(raw)
+    if not p.is_absolute():
+        p = ROOT / p
+    return p.resolve()
+
+
+def check_final_publish_approval(payload: dict) -> dict:
+    """Hard gate: verify FINAL_PUBLISH_APPROVED_BY_NICOLAS in asset sidecar.
+    Call before token preflight, R2, or any Graph API call. Fails closed.
+    """
+    asset_raw = payload.get("asset_path", "")
+    if not asset_raw:
+        return {"ok": False, "reason": "gate_fail: payload missing asset_path"}
+
+    asset_path = _gate_resolve_path(asset_raw)
+    sidecar_path = asset_path.with_suffix(".status.json")
+
+    if not sidecar_path.exists():
+        return {
+            "ok": False,
+            "reason": "gate_fail: sidecar not found — " + sidecar_path.name,
+        }
+
+    try:
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"ok": False, "reason": "gate_fail: sidecar unreadable"}
+
+    blocked = sidecar.get("publish_blocked_reason")
+    if blocked:
+        return {
+            "ok": False,
+            "reason": "gate_fail: publish_blocked_reason=" + str(blocked),
+        }
+
+    gate = sidecar.get("FINAL_PUBLISH_APPROVED_BY_NICOLAS")
+    if not isinstance(gate, dict):
+        return {
+            "ok": False,
+            "reason": (
+                "gate_fail: FINAL_PUBLISH_APPROVED_BY_NICOLAS"
+                " missing from sidecar"
+            ),
+        }
+
+    if sidecar.get("instagram_published") is True:
+        if gate.get("republish_override") is not True:
+            return {
+                "ok": False,
+                "reason": (
+                    "gate_fail: instagram_published=true — set"
+                    " FINAL_PUBLISH_APPROVED_BY_NICOLAS"
+                    ".republish_override=true to republish"
+                ),
+            }
+
+    fails = []
+
+    if gate.get("approved") is not True:
+        fails.append("approved != true")
+    if gate.get("caption_visual_match_approved") is not True:
+        fails.append("caption_visual_match_approved != true")
+    objections = gate.get("known_visual_qa_objections")
+    if objections not in (None, []):
+        fails.append("known_visual_qa_objections not empty")
+    if gate.get("approved_by") != "Nicolas":
+        fails.append("approved_by != Nicolas")
+    if not gate.get("approved_at"):
+        fails.append("approved_at missing or empty")
+    if payload.get("caption", "") != gate.get("caption", ""):
+        fails.append("caption mismatch: payload vs gate")
+    gate_asset_raw = gate.get("asset_path", "")
+    if not gate_asset_raw:
+        fails.append("asset_path missing from gate")
+    elif _gate_resolve_path(gate_asset_raw) != asset_path:
+        fails.append("asset_path mismatch: payload vs gate")
+    payload_platform = payload.get("platform", "")
+    gate_platform = gate.get("target_platform", "")
+    if payload_platform != gate_platform:
+        fails.append(
+            "target_platform mismatch: payload="
+            + repr(payload_platform)
+            + " gate="
+            + repr(gate_platform)
+        )
+
+    if fails:
+        return {
+            "ok": False,
+            "reason": (
+                "gate_fail: FINAL_PUBLISH_APPROVED_BY_NICOLAS"
+                " field checks failed: "
+                + "; ".join(fails)
+            ),
+        }
+
+    return {"ok": True}
