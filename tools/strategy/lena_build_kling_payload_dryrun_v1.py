@@ -25,6 +25,7 @@ from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
     format_style_override,
     pick_style,
+    pick_style_production,
 )
 
 # ── Lena character binding (no secrets) ───────────────────────────────
@@ -411,7 +412,7 @@ def main() -> int:
         }
     else:
         rng = rng_for_packet(date, recipe_id)
-        style = pick_style(rng)
+        style = pick_style_production(rng)
         final_prompt, _ = build_final_prompt(
             packet["compact_kling_prompt_preview"], style
         )

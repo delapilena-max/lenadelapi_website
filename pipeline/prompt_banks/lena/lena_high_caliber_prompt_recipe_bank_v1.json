@@ -112,7 +112,9 @@
       },
       "wardrobe_outfit_id": "wc_e001",
       "wardrobe_allow_high_risk": false,
-      "wardrobe_notes": "QA-confirmed white French terry hoodie set. task 899503921557798966."
+      "wardrobe_notes": "QA-confirmed white French terry hoodie set. task 899503921557798966.",
+      "production_status": "test_only",
+      "production_exclude_reason": "Grocery/produce-aisle scene rejected 2026-06-26; not aligned with Lena fashion/beauty/selfie/model production direction."
     },
     {
       "id": "hcr_004",
