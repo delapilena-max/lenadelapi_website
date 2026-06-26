@@ -1,0 +1,2486 @@
+{
+  "schema_version": "1",
+  "description": "Lena hot creator/model environment catalog — production scene settings",
+  "environment_rule": "All environments are used as prompt context for scene/setting only. No environment ID is wired into generation yet. All entries default to status=untested. Do not use any environment with status != approved in live generation.",
+  "status_values": {
+    "untested": "Not yet run through generation; cannot be used in production",
+    "approved": "QA-confirmed; safe for production use",
+    "high_risk": "Usable only with explicit allow_high_risk flag in recipe",
+    "rejected": "Permanently excluded; do not use"
+  },
+  "hard_excludes": [
+    "grocery",
+    "shopping",
+    "produce",
+    "basket",
+    "cart",
+    "hotel room",
+    "hotel bedroom",
+    "readable logo",
+    "readable text",
+    "alcohol-focused"
+  ],
+  "environments": [
+    {
+      "environment_id": "env_m001",
+      "name": "Apartment Bedroom Mirror — Warm Morning Window Light",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "35-degree angle toward mirror, body turned slightly toward glass",
+      "framing": "full-body or head-to-thigh, mirror frame as natural border",
+      "lighting": "soft natural window light from one side, warm floor lamp fill behind",
+      "background_detail": "frameless or simple black-frame full-length mirror; blurred bed edge, folded throw, wardrobe door; warm floor lamp in bokeh; off-white or greige wall",
+      "realism_details": "slight smudge marks on mirror glass, morning light casting soft diagonal shadows, small plant in distant bokeh, carpet texture at edges",
+      "props_allowed": [
+        "mirror",
+        "bed edge visible",
+        "small plant",
+        "warm floor lamp",
+        "folded throw"
+      ],
+      "props_blocked": [
+        "ring light",
+        "phone arm in reflection",
+        "readable text on mirror",
+        "studio backdrop",
+        "hotel-style headboard"
+      ],
+      "mood": "candid getting-ready, self-aware, unhurried morning energy",
+      "risk_tags": [],
+      "prompt_fragment": "apartment bedroom, full-length mirror against warm neutral wall, soft morning window light with warm lamp fill, shallow bokeh with blurred bed edge and folded throw, slight mirror smudge, lived-in warmth",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m002",
+      "name": "Apartment Bedroom Mirror — Blue Hour Pre-Going-Out",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "20-degree angle or straight-on, full figure in frame",
+      "framing": "full-body showing complete outfit, mirror frame edges visible",
+      "lighting": "cool blue-hour window light from behind, warm bedside lamp countering it from one side",
+      "background_detail": "full-length mirror, blurred bedroom with jacket tossed on chair arm, heels near mirror base, warm lamp glow offset in bokeh",
+      "realism_details": "mirror slightly smudged, dresser edge in background, heels visible near mirror base, jacket tossed on chair",
+      "props_allowed": [
+        "mirror",
+        "heels near mirror base",
+        "jacket on chair",
+        "bedside lamp",
+        "small evening clutch"
+      ],
+      "props_blocked": [
+        "ring light",
+        "phone in mirror reflection",
+        "alcohol",
+        "hotel-style headboard",
+        "readable text"
+      ],
+      "mood": "pre-going-out energy, polished, anticipatory",
+      "risk_tags": [],
+      "prompt_fragment": "apartment bedroom mirror, blue-hour cool window light with warm bedside lamp fill, heels near mirror base, jacket on chair in background bokeh, evening going-out energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m003",
+      "name": "Apartment Hallway Mirror — Natural Afternoon Light",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "slightly elevated angle, straight into hallway mirror",
+      "framing": "full-body with narrow hallway corridor as frame",
+      "lighting": "warm afternoon side window light from a nearby room, soft ambient spill",
+      "background_detail": "plain hallway wall, door edge at one side, wall outlet plate visible, floor runner rug edge",
+      "realism_details": "flat wall texture with slight scuff at baseboard, outlet plate, umbrella or bag on wall hook in background",
+      "props_allowed": [
+        "mirror",
+        "wall hook with one bag",
+        "door edge",
+        "floor runner rug"
+      ],
+      "props_blocked": [
+        "ring light",
+        "studio backdrop",
+        "hotel corridor look",
+        "readable text"
+      ],
+      "mood": "quick leaving-energy check, candid, functional-but-stylish",
+      "risk_tags": [],
+      "prompt_fragment": "narrow apartment hallway, full-length wall mirror, warm afternoon side light from adjacent room, plain neutral wall with outlet plate, door edge in background, leaving-energy framing",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m004",
+      "name": "Bathroom Vanity Mirror — Morning Beauty Prep",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "medium close, portrait to head-and-waist",
+      "framing": "waist-to-head, mirror frame and counter visible at bottom",
+      "lighting": "warm bathroom wall sconces on both sides, soft daylight from frosted window",
+      "background_detail": "bathroom vanity counter with skincare products scattered, folded hand towel, tiled backsplash, small green plant on counter edge",
+      "realism_details": "product bottles on counter in background, toothbrush holder, clean tile grouting, folded towel corner",
+      "props_allowed": [
+        "skincare bottle cluster",
+        "folded towel",
+        "small plant",
+        "soap dispenser",
+        "clean tile"
+      ],
+      "props_blocked": [
+        "ring light arm visible",
+        "alcohol",
+        "readable product logos",
+        "studio backdrop",
+        "hotel bathroom look"
+      ],
+      "mood": "morning ritual, beauty, intimate self-care",
+      "risk_tags": [],
+      "prompt_fragment": "bathroom vanity, warm wall sconces on both sides, tiled backsplash, skincare products scattered on counter in background, frosted window light, close warm portrait",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m005",
+      "name": "Apartment Living Room Floor Mirror — Afternoon Natural",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "30-degree angle, full body from slight distance showing room context",
+      "framing": "full-body with living room context visible around mirror edges",
+      "lighting": "bright afternoon side window light, natural and clean",
+      "background_detail": "living room setting, blurred couch edge, floor plant, afternoon window light streaking diagonally across floor",
+      "realism_details": "couch edge in bokeh, floor plant, rug texture at feet, window frame edge casting light stripe",
+      "props_allowed": [
+        "couch edge",
+        "floor plant",
+        "area rug",
+        "window light stripe"
+      ],
+      "props_blocked": [
+        "ring light",
+        "studio backdrop",
+        "hotel feel",
+        "alcohol on table",
+        "readable magazine titles"
+      ],
+      "mood": "relaxed, self-aware, elevated home energy",
+      "risk_tags": [],
+      "prompt_fragment": "apartment living room, large floor mirror leaning against wall, bright afternoon side window light, blurred couch edge and floor plant, warm neutral rug texture, clean natural light",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m006",
+      "name": "Black-Frame Bedroom Mirror — Soft Lamp Evening",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "45-degree angle, full body toward mirror",
+      "framing": "full-body, black mirror frame as graphic border element",
+      "lighting": "warm bedside lamp as primary light source, soft ambient from elsewhere in room",
+      "background_detail": "deep neutral or dark wall behind, bedside lamp glow, dresser corner edge, candle silhouette in bokeh",
+      "realism_details": "lamp casting warm circle of light, soft wall shadow from mirror frame, folded blanket on bed edge",
+      "props_allowed": [
+        "bedside lamp",
+        "dresser edge",
+        "folded blanket",
+        "candle silhouette"
+      ],
+      "props_blocked": [
+        "ring light",
+        "phone visible",
+        "alcohol",
+        "hotel feel",
+        "readable text on surfaces"
+      ],
+      "mood": "evening warmth, intentional styling, intimate editorial",
+      "risk_tags": [],
+      "prompt_fragment": "bedroom, black-frame full-length mirror, warm bedside lamp as primary light, deep neutral walls, soft shadow from frame, dresser edge and candle silhouette in shallow bokeh, evening warmth",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m007",
+      "name": "Apartment Entryway Narrow Mirror — Leaving Energy",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "slightly low angle, full-body with door and wall context",
+      "framing": "full-body with narrow entryway visible on both sides",
+      "lighting": "warm interior lamp plus cool daylight from door sidelight or gap",
+      "background_detail": "apartment entry, door partially visible, coat hook with jacket or bag, hardwood or tile entry floor, wall switch plate",
+      "realism_details": "jacket or bag on door hook, floor transition visible, wall switch plate, small entry mat",
+      "props_allowed": [
+        "jacket or bag on hook",
+        "door edge",
+        "entry floor",
+        "wall switch plate",
+        "entry mat"
+      ],
+      "props_blocked": [
+        "ring light",
+        "alcohol",
+        "studio backdrop",
+        "hotel lobby aesthetic"
+      ],
+      "mood": "leaving-hot, final look check, exit energy",
+      "risk_tags": [],
+      "prompt_fragment": "apartment entryway, narrow full-length mirror, warm interior lamp with cool sidelight from door gap, jacket on wall hook, hardwood floor, wall switch plate, leaving-hot energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m008",
+      "name": "Bathroom Mirror — Close Beauty Portrait",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity"
+      ],
+      "camera_position": "tight portrait, mirror surface as primary frame, camera near mirror",
+      "framing": "head-and-shoulders to mid-chest, mirror edge visible at corners",
+      "lighting": "warm vanity sconce, close and flattering, soft fill",
+      "background_detail": "clean white or cream tile, product bottles blurred on counter below, soft background",
+      "realism_details": "product containers on counter out of focus, clean tile grout, small folded washcloth edge visible",
+      "props_allowed": [
+        "skincare products blurred on counter",
+        "clean tile",
+        "folded washcloth"
+      ],
+      "props_blocked": [
+        "ring light arm",
+        "readable product logos",
+        "alcohol",
+        "studio backdrop",
+        "hotel bathroom"
+      ],
+      "mood": "intimate beauty moment, close and glowing, selfie context",
+      "risk_tags": [],
+      "prompt_fragment": "bathroom mirror close-up, warm vanity sconce light, cream or white tile background, skincare products blurred on counter, tight portrait framing, intimate beauty energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m009",
+      "name": "Large Frameless Bedroom Mirror — Bright Open Apartment",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "straight-on or 15-degree angle, full-body",
+      "framing": "full-body with minimal mirror border",
+      "lighting": "bright natural light from large window, clean and airy",
+      "background_detail": "white or very light walls, clean minimalist room, small succulent or white linens in background",
+      "realism_details": "slight glare on mirror edge from window, clean floor, minimalist room details, plant pot in corner",
+      "props_allowed": [
+        "small succulent",
+        "white linen bed edge",
+        "window light visible",
+        "thin black rod stand if needed"
+      ],
+      "props_blocked": [
+        "ring light",
+        "clutter",
+        "hotel feel",
+        "alcohol",
+        "readable text on any surface"
+      ],
+      "mood": "clean, airy, aspirational minimal apartment",
+      "risk_tags": [],
+      "prompt_fragment": "bright minimalist apartment bedroom, large frameless full-length mirror, natural window light from one side, white walls, clean floor, small plant in background bokeh, open and airy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m010",
+      "name": "Gym Mirror — Post-Set Athletic Context",
+      "production_lane": "gym_glam",
+      "allowed_recipe_types": [
+        "fitness_glam_athletic"
+      ],
+      "camera_position": "front-facing at mirror, gym context in background",
+      "framing": "full-body in gym environment",
+      "lighting": "overhead gym LED ambient, slight cool tone with warm equipment reflections",
+      "background_detail": "gym floor, free weights on rack behind in bokeh, painted gym wall, equipment blurred",
+      "realism_details": "rubber floor mat texture, gym equipment visible but blurred, slight sweat-energy context, metal rack bars",
+      "props_allowed": [
+        "free weight rack in background",
+        "rubber floor mat",
+        "gym wall"
+      ],
+      "props_blocked": [
+        "ring light",
+        "bedroom context",
+        "studio backdrop",
+        "hotel fitness center look"
+      ],
+      "mood": "post-set confidence, athletic energy, gym-glam self-check",
+      "risk_tags": [
+        "gym_context_required"
+      ],
+      "prompt_fragment": "gym floor, full-length wall mirror, overhead LED ambient, free weight rack and equipment blurred in background, rubber floor texture, athletic post-set energy",
+      "status": "untested",
+      "notes": "Gym outfits only. Context makes athletic wear read athletic, not lingerie."
+    },
+    {
+      "environment_id": "env_m011",
+      "name": "Living Room Floor Mirror — Late Afternoon Golden Light",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "25-degree angle, full-body with room context",
+      "framing": "full-body, mirror at full height with room context around edges",
+      "lighting": "late afternoon golden sun from side window, warm and directional",
+      "background_detail": "soft bokeh living room — couch, floor lamp, throw pillow, golden sun stripe across floor",
+      "realism_details": "golden sun stripe on floor, warm lamp accent, slight dust mote in light beam visible",
+      "props_allowed": [
+        "couch in bokeh",
+        "floor lamp",
+        "throw pillow",
+        "window golden stripe"
+      ],
+      "props_blocked": [
+        "ring light",
+        "hotel feel",
+        "alcohol on table",
+        "readable text"
+      ],
+      "mood": "golden hour apartment, warm editorial, fashion moment",
+      "risk_tags": [],
+      "prompt_fragment": "apartment living room floor mirror, golden afternoon light from side window casting stripe on floor, warm lamp fill, blurred couch and throw pillow in background, golden warm editorial mood",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_m012",
+      "name": "Tall Frameless Bedroom Mirror — Blue-Hour Window Light",
+      "production_lane": "mirror_fitcheck",
+      "allowed_recipe_types": [
+        "apartment_mirror_fitcheck",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "20-degree angle, full-body, mirror top just cropped",
+      "framing": "full-body, frameless mirror with room visible on both sides",
+      "lighting": "cool blue-hour window light from one side, warm bedside lamp contrasting from other side",
+      "background_detail": "neutral bedroom wall, blurred bedside lamp glow, small side table with one object, plant silhouette",
+      "realism_details": "cool blue exterior visible at window edge, warm lamp circle on wall, soft room shadow gradient",
+      "props_allowed": [
+        "bedside lamp",
+        "small side table",
+        "plant silhouette in bokeh"
+      ],
+      "props_blocked": [
+        "ring light",
+        "alcohol",
+        "hotel-style headboard",
+        "readable text"
+      ],
+      "mood": "evening contrast, cinematic, stylish going-out prep",
+      "risk_tags": [],
+      "prompt_fragment": "bedroom, tall frameless full-length mirror, cool blue-hour window light from one side, warm bedside lamp from the other, neutral wall, soft shadow gradient, cinematic evening contrast",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g001",
+      "name": "Apartment Entryway — Pre-Night-Out",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "full-body, door or hallway behind as framing",
+      "framing": "full-body or three-quarter, door frame as context",
+      "lighting": "warm interior lamp from room, cool hallway or corridor light bleeding in",
+      "background_detail": "apartment entryway, door visible or open, heels on floor by door, small console table with keys and clutch",
+      "realism_details": "heels near door on floor, keys on console table, jacket on wall hook, hardwood floor grain visible",
+      "props_allowed": [
+        "heels near door",
+        "console table with keys",
+        "coat hook with jacket",
+        "hardwood floor"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "alcohol",
+        "hotel lobby look",
+        "readable text on mail"
+      ],
+      "mood": "about to leave, polished, anticipatory night-out energy",
+      "risk_tags": [],
+      "prompt_fragment": "apartment entryway, warm interior lamp, cool light from door gap, heels on floor near door, console table with clutch and keys, jacket on hook, about-to-leave energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g002",
+      "name": "Residential Building Lobby — Polished Interior",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body, lobby behind with depth",
+      "framing": "full-body with lobby architecture framing",
+      "lighting": "warm overhead lobby ambient from recessed ceiling lights",
+      "background_detail": "polished marble or stone floor with reflections, closed elevator doors in background, minimal lobby seating, lobby plant",
+      "realism_details": "reflective lobby floor, elevator door seam, potted lobby plant, carpet runner edge leading to elevator",
+      "props_allowed": [
+        "elevator doors closed",
+        "lobby seating",
+        "lobby plant",
+        "polished floor reflection"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "alcohol",
+        "readable building directory",
+        "hotel-chain signage"
+      ],
+      "mood": "polished upscale building, elegant departure",
+      "risk_tags": [],
+      "prompt_fragment": "apartment building lobby, polished marble floor with reflections, warm recessed ceiling ambient, closed elevator doors in background, blurred lobby plant and seating, upscale residential energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g003",
+      "name": "Interior Staircase — Warm Sconce Going-Out Motion",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "angle from below looking up, or from level showing stairs receding",
+      "framing": "full-body with staircase context, railing visible",
+      "lighting": "warm wall sconces casting directional light along staircase",
+      "background_detail": "painted interior wall, dark carpet runner on stairs, wrought iron or wooden railing, wall sconce fixture visible",
+      "realism_details": "carpet runner seam between steps, wall sconce fixture hardware, painted wall texture, banister rail shadow on wall",
+      "props_allowed": [
+        "staircase railing",
+        "wall sconce",
+        "carpet runner",
+        "painted wall"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "alcohol bottles",
+        "hotel ballroom staircase",
+        "elevator bank"
+      ],
+      "mood": "cinematic mid-descent, going-out confidence, motion energy",
+      "risk_tags": [],
+      "prompt_fragment": "interior staircase, warm wall sconces casting directional light, painted walls, dark carpet runner, railing shadow, cinematic going-out descent, warm interior light",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g004",
+      "name": "Apartment Doorway Threshold — Indoor/Outdoor Dual Light",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "fit_check_mirror_getting_ready",
+        "social_going_out"
+      ],
+      "camera_position": "full-body facing door threshold, doorway as frame",
+      "framing": "full-body with doorway architecture as natural border",
+      "lighting": "warm interior lamp from room behind, cool corridor or outdoor light from front",
+      "background_detail": "door frame edges, floor transition from interior to hall, blurred interior room behind, slight cool hall glow from front",
+      "realism_details": "door frame detail, floor material transition, wall switch plate at frame edge, slight exterior glow",
+      "props_allowed": [
+        "door frame",
+        "floor transition",
+        "warm lamp glow from room behind"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "visible neighbors in hall",
+        "hotel corridor",
+        "readable mail or numbers"
+      ],
+      "mood": "leaving energy, dual-light fashion drama, confident exit",
+      "risk_tags": [],
+      "prompt_fragment": "apartment doorway threshold, warm interior lamp from one side, cool hallway light from the other, door frame as natural border, floor transition visible, dual-light fashion framing",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g005",
+      "name": "City Sidewalk at Night — Warm Streetlight",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "street_errands_outdoor"
+      ],
+      "camera_position": "full-body or three-quarter, street behind",
+      "framing": "full-body on sidewalk with city context",
+      "lighting": "warm sodium overhead streetlight from above and one side, warm city glow ambient",
+      "background_detail": "city sidewalk, blurred passing cars and distant storefronts, crosswalk stripe at edge, wet pavement sheen from earlier rain",
+      "realism_details": "wet sidewalk sheen, blurred car light streaks, street crack in pavement, blurred shop windows",
+      "props_allowed": [
+        "streetlight above",
+        "blurred cars",
+        "wet pavement sheen",
+        "distant city lights"
+      ],
+      "props_blocked": [
+        "readable street signs",
+        "grocery bags",
+        "alcohol",
+        "hotel exterior"
+      ],
+      "mood": "city night energy, main character, going-out social",
+      "risk_tags": [],
+      "prompt_fragment": "city sidewalk at night, warm overhead sodium streetlight, blurred car lights and city glow in background, wet pavement sheen, going-out energy, shallow depth of field",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g006",
+      "name": "Venue Exterior Doorway — Warm Entry Light",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, venue entry behind",
+      "framing": "full-body with venue doorway context",
+      "lighting": "warm pendant or spot from venue light above door, cooler street ambient behind",
+      "background_detail": "venue exterior, warm-lit doorway opening, slight canopy or awning overhead, blurred street and city behind",
+      "realism_details": "venue doorway warm light pool, step at entrance, blurred distant pedestrians, awning edge",
+      "props_allowed": [
+        "doorway warm light pool",
+        "entrance step",
+        "blurred background people at distance"
+      ],
+      "props_blocked": [
+        "readable venue name or logo",
+        "alcohol in hand",
+        "hotel porte-cochere",
+        "grocery store entrance"
+      ],
+      "mood": "arriving at event, confident, social going-out",
+      "risk_tags": [],
+      "prompt_fragment": "venue exterior doorway, warm overhead entry light, cooler street ambient behind, step at entrance, blurred city background, arriving-for-night-out social energy",
+      "status": "untested",
+      "notes": "Venue name must not be readable."
+    },
+    {
+      "environment_id": "env_g007",
+      "name": "Car Backseat — Night, City Lights Through Window",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "close portrait or head-to-waist from front-seat angle looking back",
+      "framing": "waist-to-head, window beside body, car seat visible",
+      "lighting": "ambient city light from window as primary, subtle warm dashboard reflection",
+      "background_detail": "car interior, city lights streaming past window in bokeh streaks, leather or upholstered seat texture",
+      "realism_details": "car seat texture, headrest shape visible, streaked city light bokeh through window, seatbelt near body",
+      "props_allowed": [
+        "window city lights in bokeh",
+        "car seat texture",
+        "headrest visible",
+        "dashboard glow"
+      ],
+      "props_blocked": [
+        "alcohol in car",
+        "readable text through window",
+        "phone visibly in hand",
+        "hotel pickup line"
+      ],
+      "mood": "going somewhere electric, city night movement, backseat glam",
+      "risk_tags": [],
+      "prompt_fragment": "car backseat at night, city lights streaming through window in bokeh streaks, warm dashboard ambient glow, leather seat texture, headrest visible, backseat night-out energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_g008",
+      "name": "Elegant Interior Corridor — Pre-Event Building",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body, corridor receding behind as depth element",
+      "framing": "full-body with corridor depth and lighting pattern",
+      "lighting": "warm overhead spot track lighting along corridor ceiling, warm ambient fill",
+      "background_detail": "carpeted corridor with subtle pattern, wall sconces or track spots along ceiling, closed door edges receding, neutral wall paint",
+      "realism_details": "carpet pattern visible at feet, wall sconce fixture detail, door handle in background, baseboard along wall",
+      "props_allowed": [
+        "corridor carpet",
+        "wall sconces",
+        "closed door edges receding",
+        "wall art if unreadable"
+      ],
+      "props_blocked": [
+        "readable hotel signage",
+        "grocery bags",
+        "alcohol",
+        "store awning"
+      ],
+      "mood": "upscale residential or event building movement, polished",
+      "risk_tags": [],
+      "prompt_fragment": "upscale interior corridor, warm overhead spot lighting, patterned carpet, wall sconces, closed door edges receding in background, elegant warm movement",
+      "status": "untested",
+      "notes": "No hotel chain signage. Residential or event venue only."
+    },
+    {
+      "environment_id": "env_g009",
+      "name": "Rooftop Party Space — Night City View",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, city skyline behind",
+      "framing": "full-body with rooftop railing and city skyline as background",
+      "lighting": "string lights as bokeh ambient, city glow as warm backlight, subtle rooftop overhead",
+      "background_detail": "rooftop concrete surface, string lights overhead in bokeh, blurred city skyline, railing edge visible",
+      "realism_details": "string light orb bokeh, rooftop concrete texture underfoot, railing metal texture, distant city building lights",
+      "props_allowed": [
+        "string lights in bokeh",
+        "rooftop railing",
+        "city skyline bokeh"
+      ],
+      "props_blocked": [
+        "alcohol in hand",
+        "readable labels",
+        "hotel rooftop sign",
+        "grocery bags",
+        "studio backdrop"
+      ],
+      "mood": "rooftop social energy, city night, going-out celebration",
+      "risk_tags": [],
+      "prompt_fragment": "rooftop party space at night, string lights in bokeh, city skyline behind, warm ambient from city glow, rooftop railing visible, rooftop social energy",
+      "status": "untested",
+      "notes": "No alcohol. No readable labels. Party context implied through lights and setting."
+    },
+    {
+      "environment_id": "env_g010",
+      "name": "Elevator Lobby — Pre-Night-Out Interior",
+      "production_lane": "going_out",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, elevator lobby context",
+      "framing": "full-body with elevator lobby depth",
+      "lighting": "warm recessed overhead lighting in lobby, soft ambient fill",
+      "background_detail": "elevator lobby with polished elevator doors closed, lobby seating blurred, recessed lights overhead, floor reflection",
+      "realism_details": "elevator door seam visible, floor material reflection, lobby bench or art wall, overhead light fixture",
+      "props_allowed": [
+        "closed elevator doors",
+        "lobby bench or art",
+        "floor reflection",
+        "overhead recessed lights"
+      ],
+      "props_blocked": [
+        "readable floor number display",
+        "alcohol",
+        "hotel chain signage",
+        "grocery bags"
+      ],
+      "mood": "about to head out, polished, warm interior elegance",
+      "risk_tags": [],
+      "prompt_fragment": "elevator lobby interior, polished elevator doors, warm recessed overhead lighting, lobby bench in background, floor reflection, pre-night-out energy, warm ambient",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s001",
+      "name": "Austin Urban Sidewalk — Morning Natural Light",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body or three-quarter, sidewalk extending behind",
+      "framing": "full-body with urban sidewalk context, building facades behind",
+      "lighting": "bright clean morning natural light, slight soft shadow from overhead",
+      "background_detail": "urban sidewalk with clean concrete, building facades in background, parked cars edge, tree canopy edge from nearby plantings",
+      "realism_details": "sidewalk crack or expansion joint underfoot, building facade texture, parked car bumper edge in bokeh, tree shadow dapple",
+      "props_allowed": [
+        "building facade",
+        "parked car edge",
+        "tree edge",
+        "sidewalk texture"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable store signage",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "fresh morning main-character energy, confident urban movement",
+      "risk_tags": [],
+      "prompt_fragment": "Austin city sidewalk, morning natural light, clean concrete sidewalk, building facades in background bokeh, parked car edge at side, fresh urban morning energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s002",
+      "name": "Austin Urban Sidewalk — Afternoon Golden Light",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body, walking direction or posed, sidewalk receding behind",
+      "framing": "full-body with golden light direction clear",
+      "lighting": "warm late-afternoon golden side light from low sun, directional and dramatic",
+      "background_detail": "city sidewalk, warm-lit building facade, long shadow cast by subject, slightly hazy golden ambient",
+      "realism_details": "long shadow on sidewalk, golden glow on building facade, slight lens flare from sun angle, tree base in sidewalk planter",
+      "props_allowed": [
+        "building facade",
+        "long shadow on pavement",
+        "tree in planter",
+        "warm lens flare edge"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable signs",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "golden hour main character, fashion editorial energy",
+      "risk_tags": [],
+      "prompt_fragment": "Austin city sidewalk, warm golden afternoon side light, long shadow on concrete, warm building facade, hazy golden ambient, main-character fashion energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s003",
+      "name": "Planted Boulevard — Soft Overcast Natural",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body, boulevard receding behind, plantings on both sides",
+      "framing": "full-body with boulevard width as context",
+      "lighting": "soft even overcast light, no harsh shadow, clean and flattering",
+      "background_detail": "wide boulevard with planted median or sidewalk trees, clean pavement, blurred parked cars, soft sky above",
+      "realism_details": "tree trunks and leaf canopy, planted median edge, clean wide pavement, soft sky without harsh contrast",
+      "props_allowed": [
+        "boulevard trees",
+        "planted median",
+        "parked cars in bokeh"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable store names",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "effortless outdoor fashion, styled walk, clean European boulevard energy",
+      "risk_tags": [],
+      "prompt_fragment": "planted city boulevard, soft even overcast light, trees with canopy, wide clean pavement, parked cars in background bokeh, effortless styled outdoor energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s004",
+      "name": "Urban Alley — Clean Painted Concrete Wall",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body or three-quarter against wall, wall texture behind",
+      "framing": "full-body with wall texture as graphic background",
+      "lighting": "indirect ambient from open alley sky, slight warm bounce from adjacent wall",
+      "background_detail": "painted concrete or cinder block wall in muted tone, clean alley floor, wall texture with paint layers, slight rust streak from pipe or drain above",
+      "realism_details": "paint layer chips or subtle graffiti buffed clean, rust streak from drain above, concrete floor seam, wall imperfection texture",
+      "props_allowed": [
+        "painted wall texture",
+        "concrete floor",
+        "pipe or drain detail overhead"
+      ],
+      "props_blocked": [
+        "readable graffiti text",
+        "grocery bags",
+        "dumpster",
+        "hotel service entrance"
+      ],
+      "mood": "urban editorial, cool industrial backdrop, street-glam",
+      "risk_tags": [],
+      "prompt_fragment": "clean painted concrete alley wall, indirect ambient light, subtle paint layer texture, slight rust streak from above drain, concrete floor seam, urban editorial",
+      "status": "untested",
+      "notes": "Any graffiti must be non-readable or abstract."
+    },
+    {
+      "environment_id": "env_s005",
+      "name": "Plain Brick Wall — Afternoon Direct Sun",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial",
+        "street_errands_outdoor"
+      ],
+      "camera_position": "full-body or three-quarter against wall",
+      "framing": "full-body with warm brick texture behind",
+      "lighting": "afternoon direct sun from one side casting hard fashion shadow on brick wall",
+      "background_detail": "textured red or tan brick wall, mortar lines visible, hard shadow of body on brick",
+      "realism_details": "brick mortar detail, slight weathering on brick face, body shadow falling clearly on brick texture",
+      "props_allowed": [
+        "brick wall texture",
+        "body shadow on brick",
+        "mortar lines"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable painted signage on brick",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "direct sun editorial, fashion shadow play, bold street",
+      "risk_tags": [],
+      "prompt_fragment": "plain brick wall, warm afternoon direct sun, hard shadow of body on brick surface, brick mortar texture, editorial shadow play, bold street energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s006",
+      "name": "Downtown Glass Facade — City Reflection",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body against or near glass building, reflection catching city",
+      "framing": "full-body with glass building facade as context and background",
+      "lighting": "mixed — reflected sky light from glass, ambient street light",
+      "background_detail": "glass and steel building facade with city reflection in panes, reflected sky and buildings visible in glass, clean sidewalk at feet",
+      "realism_details": "glass panel seams, city reflection distorted in glass, slight flare from glass edge, sidewalk edge at feet",
+      "props_allowed": [
+        "glass building facade",
+        "city reflection in glass",
+        "glass panel seams"
+      ],
+      "props_blocked": [
+        "readable company signage on building",
+        "grocery bags",
+        "shopping entrance",
+        "hotel marquee"
+      ],
+      "mood": "city editorial, architectural fashion, downtown modern",
+      "risk_tags": [],
+      "prompt_fragment": "downtown glass building facade, city reflection in glass panels, mixed ambient and reflected sky light, glass panel seams, clean sidewalk, architectural fashion editorial",
+      "status": "untested",
+      "notes": "No readable company name on building."
+    },
+    {
+      "environment_id": "env_s007",
+      "name": "Tree-Lined Residential Sidewalk — Dappled Light",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body walking or posed, tree canopy overhead",
+      "framing": "full-body with tree canopy framing",
+      "lighting": "dappled light through tree canopy, warm afternoon moving light patches",
+      "background_detail": "residential sidewalk with mature trees, tree root lifting pavement at edge, blurred houses or fences behind",
+      "realism_details": "dappled light patches on pavement, tree root bump at sidewalk edge, blurred residential house behind, leaf shadow on body",
+      "props_allowed": [
+        "tree canopy",
+        "dappled light patches",
+        "residential blur behind",
+        "tree root at pavement edge"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable house numbers",
+        "shopping bags",
+        "readable street sign"
+      ],
+      "mood": "residential walk, styled and effortless, neighborhood main character",
+      "risk_tags": [],
+      "prompt_fragment": "tree-lined residential sidewalk, dappled afternoon light through canopy, leaf shadow patterns, blurred houses behind, tree root at pavement edge, effortless styled walk",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s008",
+      "name": "City Street Corner — Golden Hour Side Light",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial",
+        "street_errands_outdoor"
+      ],
+      "camera_position": "full-body at corner, city extending behind in two directions",
+      "framing": "full-body with street corner geometry",
+      "lighting": "late golden hour sun from low angle catching side of body, one cheek and shoulder in warm glow",
+      "background_detail": "corner building edge, city blocks receding in both directions in bokeh, crosswalk edge, distant traffic",
+      "realism_details": "corner building edge in foreground frame, crosswalk yellow stripe, distant city blur, golden glow on building corner",
+      "props_allowed": [
+        "building corner edge",
+        "crosswalk stripe",
+        "blurred city distance",
+        "golden building glow"
+      ],
+      "props_blocked": [
+        "readable street sign",
+        "grocery bags",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "golden hour main-character corner, fashion editorial, city energy",
+      "risk_tags": [],
+      "prompt_fragment": "city street corner, late golden hour side light, corner building edge, crosswalk stripe, city blocks receding in bokeh, golden glow on building, fashion editorial corner shot",
+      "status": "untested",
+      "notes": "Street sign must be too blurred to read."
+    },
+    {
+      "environment_id": "env_s009",
+      "name": "White-Wall Urban Strip — Minimal Fashion Background",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body against white wall, direct or slight angle",
+      "framing": "full-body with clean white wall as graphic minimalist backdrop",
+      "lighting": "soft even ambient from open sky, slight warm bounce from wall",
+      "background_detail": "plain white or very light painted wall, clean pavement at feet, wall baseboard or subtle crack line, one small vine or plant clipping",
+      "realism_details": "wall texture and subtle surface imperfection, small shadow at baseboard, clean pavement edge, slight paint variance",
+      "props_allowed": [
+        "white wall texture",
+        "clean pavement",
+        "subtle plant vine",
+        "shadow at baseboard"
+      ],
+      "props_blocked": [
+        "readable painted text",
+        "grocery bags",
+        "shopping carts",
+        "readable signage"
+      ],
+      "mood": "clean fashion editorial, minimal background, outfit as hero",
+      "risk_tags": [],
+      "prompt_fragment": "clean white painted urban wall, soft even ambient light, slight wall texture and paint imperfection, clean pavement at feet, minimal fashion editorial backdrop",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s010",
+      "name": "Commercial Street Exterior — Blurred Storefronts Bokeh",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body on sidewalk, storefronts behind in bokeh",
+      "framing": "full-body with commercial street blur as background",
+      "lighting": "bright overcast or afternoon ambient, even and flattering",
+      "background_detail": "blurred commercial storefront facades in bokeh, awning color blurs, pedestrian silhouettes far in background",
+      "realism_details": "blurred awning stripe color, shop window glass glare blurred, pavement edge at feet, far pedestrian silhouettes",
+      "props_allowed": [
+        "blurred storefronts",
+        "awning color bokeh",
+        "far pedestrian silhouettes"
+      ],
+      "props_blocked": [
+        "readable store names",
+        "grocery bags in hands",
+        "shopping carts",
+        "grocery store entrance"
+      ],
+      "mood": "styled urban walk, city energy, commercial street main character",
+      "risk_tags": [],
+      "prompt_fragment": "commercial street sidewalk, storefronts blurred in bokeh, awning color streaks, far pedestrian silhouettes, bright even ambient, styled urban walk energy",
+      "status": "untested",
+      "notes": "All storefront text must be unreadable in bokeh."
+    },
+    {
+      "environment_id": "env_s011",
+      "name": "Urban Crosswalk / City Intersection — Motion Background",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial",
+        "street_errands_outdoor"
+      ],
+      "camera_position": "full-body on or at crosswalk, intersection visible",
+      "framing": "full-body with crosswalk stripes as graphic ground element",
+      "lighting": "bright midday or afternoon ambient, slight overhead haze",
+      "background_detail": "white crosswalk stripes on road, city intersection in bokeh beyond, blurred traffic and pedestrians far away, traffic light structure in background",
+      "realism_details": "crosswalk stripe at feet, intersection road surface, blurred signal pole, far traffic color blur",
+      "props_allowed": [
+        "crosswalk stripes",
+        "traffic light structure in bokeh",
+        "blurred cars and people far away"
+      ],
+      "props_blocked": [
+        "readable street signs",
+        "grocery bags",
+        "shopping carts",
+        "readable traffic light display"
+      ],
+      "mood": "city movement, intersection energy, confident urban stride",
+      "risk_tags": [],
+      "prompt_fragment": "urban crosswalk at city intersection, white stripe on road, city in bokeh beyond, blurred traffic and distant pedestrians, overhead ambient, confident urban stride energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_s012",
+      "name": "Mixed Urban Block — Varied Facade Morning",
+      "production_lane": "street_glam",
+      "allowed_recipe_types": [
+        "street_errands_outdoor",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body walking or posed, mid-block on sidewalk",
+      "framing": "full-body with urban block variety in background",
+      "lighting": "clean morning light, slight warm side direction",
+      "background_detail": "mixed urban building facades — brick, glass, painted — blurred in background, sidewalk with tree planter, parked cars on street",
+      "realism_details": "mixed facade textures in bokeh, tree planter box at sidewalk edge, parked car chrome detail blurred, morning sky above",
+      "props_allowed": [
+        "mixed facades in bokeh",
+        "tree planter",
+        "parked cars in bokeh",
+        "morning sky"
+      ],
+      "props_blocked": [
+        "readable store names",
+        "grocery bags",
+        "shopping carts",
+        "hotel entrance"
+      ],
+      "mood": "morning city energy, styled movement, urban variety",
+      "risk_tags": [],
+      "prompt_fragment": "mixed urban sidewalk block, morning clean light, brick and glass building facades in bokeh, tree planter at edge, parked cars in background, styled morning city energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r001",
+      "name": "Concrete Rooftop — Golden Hour Sky",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, city or sky behind",
+      "framing": "full-body with rooftop and sky context",
+      "lighting": "direct golden hour sun from low angle, warm and dramatic",
+      "background_detail": "flat concrete rooftop surface, HVAC unit edge in background, city roofline and warm golden sky behind",
+      "realism_details": "concrete surface texture underfoot, rooftop seam lines, HVAC duct edge visible, warm glow on city rooftops in distance",
+      "props_allowed": [
+        "HVAC edge in background",
+        "city roofline",
+        "golden sky",
+        "concrete texture"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable signage",
+        "hotel rooftop branding",
+        "shopping bags"
+      ],
+      "mood": "golden hour rooftop, fashion editorial, warm glow",
+      "risk_tags": [],
+      "prompt_fragment": "concrete rooftop, golden hour sun from low angle, warm glow on city rooftops in background, HVAC unit edge, rooftop seam lines underfoot, golden sky",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r002",
+      "name": "Rooftop Deck — Blue Hour City Skyline",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body, city skyline behind at distance",
+      "framing": "full-body with city skyline as backdrop at blue hour",
+      "lighting": "cool blue-hour ambient, city light glow rising from below, warm fill from rooftop deck lamp",
+      "background_detail": "rooftop deck with wooden or concrete surface, city skyline in blue-hour haze, building lights coming on, one deck chair edge visible",
+      "realism_details": "deck surface texture, railing edge, distant building windows lit up, blue sky gradient to warm city glow below",
+      "props_allowed": [
+        "deck railing",
+        "city skyline",
+        "deck surface",
+        "one deck chair edge"
+      ],
+      "props_blocked": [
+        "alcohol glasses",
+        "hotel rooftop bar sign",
+        "readable city building names",
+        "shopping bags"
+      ],
+      "mood": "blue hour rooftop, city view, going-out glamour",
+      "risk_tags": [],
+      "prompt_fragment": "rooftop deck at blue hour, city skyline in cool blue haze, building lights emerging, warm rooftop lamp fill, deck surface and railing, blue-to-city-glow gradient sky",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r003",
+      "name": "Building Rooftop Edge — Warm Sunset Glow",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body at rooftop edge, city and sunset behind",
+      "framing": "full-body with low sun and warm sky in background",
+      "lighting": "direct warm sunset from behind or side, golden rim light on body",
+      "background_detail": "rooftop parapet or low wall at edge, warm orange-pink sunset sky, city silhouette on horizon",
+      "realism_details": "rooftop parapet texture, city rooftop silhouettes on horizon, warm glow rim light on body, slight lens flare from sunset angle",
+      "props_allowed": [
+        "rooftop parapet",
+        "city horizon silhouette",
+        "sunset sky",
+        "rim light glow"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable signage",
+        "hotel rooftop branding",
+        "shopping bags"
+      ],
+      "mood": "sunset rooftop fashion, warm glow editorial, golden rim",
+      "risk_tags": [],
+      "prompt_fragment": "building rooftop edge, warm sunset from behind casting golden rim light, orange-pink sky, city rooftop silhouettes on horizon, rooftop parapet texture, warm editorial glow",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r004",
+      "name": "Rooftop with String Lights — Twilight",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, string lights framing overhead or behind",
+      "framing": "full-body with string light bokeh creating environment",
+      "lighting": "string light warm orbs as primary, twilight cool ambient from sky",
+      "background_detail": "rooftop surface, overhead string lights creating warm orb bokeh, twilight blue-gray sky, city edge visible at distance",
+      "realism_details": "string light bulb orbs in varying sizes of bokeh, wire between light points, rooftop rough texture, city edge glow in distance",
+      "props_allowed": [
+        "string light bokeh",
+        "rooftop surface",
+        "city edge in distance",
+        "twilight sky"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "rooftop bar name",
+        "readable labels",
+        "shopping bags"
+      ],
+      "mood": "twilight rooftop, romantic social energy, warm light bokeh",
+      "risk_tags": [],
+      "prompt_fragment": "rooftop at twilight, overhead string lights creating warm orb bokeh, cool blue-gray sky, city edge visible at distance, warm string light ambient, social rooftop energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r005",
+      "name": "High-Rise Rooftop — Full City Panorama Night",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, full city panorama behind",
+      "framing": "full-body with expansive city night panorama",
+      "lighting": "city ambient glow as backlight, soft rooftop overhead ambient from above",
+      "background_detail": "high-rise rooftop with 360 city view, city lights sprawling in all directions, building tops at similar level, glowing windows",
+      "realism_details": "rooftop parapet edge, city building array, orange and white light mix from buildings below, slight wind energy",
+      "props_allowed": [
+        "city panorama",
+        "rooftop parapet",
+        "glowing city buildings",
+        "night sky above"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable building signs",
+        "hotel rooftop branding",
+        "shopping bags"
+      ],
+      "mood": "high-rise night energy, cinematic city glamour, sweeping backdrop",
+      "risk_tags": [],
+      "prompt_fragment": "high-rise rooftop at night, full city panorama of glowing windows and lights, rooftop parapet edge, orange and white city light ambient, expansive cinematic night city backdrop",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r006",
+      "name": "Urban Rooftop Terrace — Night City Glow",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, terrace furniture and city behind",
+      "framing": "full-body with terrace context and city glow",
+      "lighting": "warm terrace overhead light, city glow from below as atmospheric fill",
+      "background_detail": "rooftop terrace with potted plants, terrace furniture in bokeh behind, city light glow below parapet edge",
+      "realism_details": "terrace tile or wood surface, potted plant silhouette, chair edge in bokeh, city light glow atmosphere",
+      "props_allowed": [
+        "potted plants",
+        "terrace chair edge in bokeh",
+        "city glow below parapet",
+        "terrace surface"
+      ],
+      "props_blocked": [
+        "alcohol on table",
+        "hotel branding",
+        "readable labels",
+        "shopping bags"
+      ],
+      "mood": "urban terrace night, sophisticated outdoor, city glow",
+      "risk_tags": [],
+      "prompt_fragment": "urban rooftop terrace at night, warm overhead light, city light glow atmospheric from below parapet, potted plant silhouette, terrace furniture bokeh, sophisticated night city",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r007",
+      "name": "Rooftop Pool Surround — Evening",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, pool context without water as focus",
+      "framing": "full-body with pool surround and city as context",
+      "lighting": "warm pool deck lights, city glow, evening twilight ambient",
+      "background_detail": "rooftop pool deck tiles, pool edge visible but not focus, city skyline beyond railing, warm deck light glow",
+      "realism_details": "pool deck tile texture, railing edge between deck and city, warm deck light reflection on tile, evening sky",
+      "props_allowed": [
+        "pool deck tile",
+        "pool edge",
+        "city skyline beyond railing",
+        "deck light glow"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable pool sign",
+        "hotel branding",
+        "swimwear context",
+        "shopping bags"
+      ],
+      "mood": "rooftop pool deck arrival, dressed-to-impress, city night",
+      "risk_tags": [],
+      "prompt_fragment": "rooftop pool deck at evening, pool edge visible to side, city skyline beyond railing, warm deck light glow on tiles, evening twilight sky, dressed-for-going-out energy",
+      "status": "untested",
+      "notes": "Not a swimwear scene. Subject is dressed and moving through space."
+    },
+    {
+      "environment_id": "env_r008",
+      "name": "Penthouse Terrace — City Skyline Dusk",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body or three-quarter, glass railing and skyline behind",
+      "framing": "full-body with glass balcony railing and city at dusk",
+      "lighting": "warm dusk ambient, city lights beginning to emerge, golden-to-blue sky transition",
+      "background_detail": "modern glass railing on terrace, city skyline with emerging building lights, dusk sky gradient from warm orange to deep blue above",
+      "realism_details": "glass railing transparency, terrace surface at feet, city building array beginning to light up, sky gradient dusk color",
+      "props_allowed": [
+        "glass railing",
+        "city skyline",
+        "dusk sky gradient",
+        "terrace surface"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "hotel terrace sign",
+        "readable city building names",
+        "shopping bags"
+      ],
+      "mood": "penthouse dusk, aspirational city glamour, transitional light",
+      "risk_tags": [],
+      "prompt_fragment": "penthouse terrace, modern glass railing, city skyline emerging at dusk, golden-to-blue sky gradient, city building lights beginning to appear, aspirational city glamour",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r009",
+      "name": "Elevated Building Edge — Dramatic Pre-Storm Sky",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out"
+      ],
+      "camera_position": "full-body at rooftop edge, dramatic sky behind",
+      "framing": "full-body with dramatic cloud sky as editorial backdrop",
+      "lighting": "directional dramatic light from breaking storm clouds, cool with warm break-through glow",
+      "background_detail": "rooftop parapet at edge, dramatic cloud formation behind, city rooftops below edge, silver-gray and warm break-through light",
+      "realism_details": "cloud formation texture in sky, rooftop parapet detail, city roofline below, dramatic silver-warm light break",
+      "props_allowed": [
+        "dramatic cloud sky",
+        "city roofline below",
+        "rooftop parapet",
+        "directional break-through light"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable signage",
+        "hotel branding",
+        "shopping bags"
+      ],
+      "mood": "dramatic editorial sky, fashion power moment, cinematic",
+      "risk_tags": [],
+      "prompt_fragment": "elevated rooftop edge, dramatic pre-storm cloud formation behind, cool silver and warm break-through light, city roofline below, rooftop parapet, cinematic editorial sky",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_r010",
+      "name": "Open Rooftop Platform — Clear Blue Sky Day",
+      "production_lane": "rooftop_night_city",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body or three-quarter, bright blue sky behind",
+      "framing": "full-body with open sky as clean background",
+      "lighting": "bright midday or afternoon sun, clean blue sky, strong overhead light",
+      "background_detail": "flat rooftop platform, clean blue sky above city, rooftop edge and city below visible, HVAC unit distant",
+      "realism_details": "rooftop surface texture, city seen below at parapet edge, strong overhead light with defined shadow on surface",
+      "props_allowed": [
+        "blue sky",
+        "city below at edge",
+        "rooftop surface",
+        "HVAC unit far in background"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable signage",
+        "hotel rooftop name",
+        "shopping bags"
+      ],
+      "mood": "bold daylight rooftop, clean fashion editorial, sky as hero",
+      "risk_tags": [],
+      "prompt_fragment": "open rooftop platform, bright clear blue sky, strong daylight overhead, city visible below at edge, clean rooftop surface, bold fashion editorial",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p001",
+      "name": "Parking Garage — Concrete Column, Hard Flash Editorial",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body or three-quarter against or near concrete column",
+      "framing": "full-body with garage depth receding behind",
+      "lighting": "hard flash from camera direction, deep shadow behind from concrete surfaces",
+      "background_detail": "concrete parking garage column, receding parking bays behind in shadow, painted aisle stripe on floor, dim overhead fluorescent in background distance",
+      "realism_details": "concrete column texture with paint chips, floor aisle stripe, ceiling pipe or sprinkler head visible above, painted directional arrow on floor",
+      "props_allowed": [
+        "concrete column",
+        "floor aisle stripe",
+        "parking bay depth in shadow",
+        "ceiling pipe or sprinkler"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable license plates",
+        "shopping carts",
+        "grocery store entrance"
+      ],
+      "mood": "hard flash editorial, industrial cool, high-fashion contrast",
+      "risk_tags": [],
+      "prompt_fragment": "parking garage interior, concrete column in foreground, hard flash lighting, deep shadow receding behind, painted aisle stripe on floor, industrial fashion editorial",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p002",
+      "name": "Parking Garage — Deep Blue Fluorescent Ambient",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body in open garage bay, fluorescent overhead",
+      "framing": "full-body with garage architecture above and behind",
+      "lighting": "blue-tinted fluorescent tube overhead ambient, cool and slightly harsh",
+      "background_detail": "open parking garage bay, cars parked in background in deep shadow, low ceiling with exposed fluorescent tubes, concrete floor",
+      "realism_details": "fluorescent tube fixture visible overhead, concrete floor expansion joints, cars partially visible in deep background shadow, painted parking number on floor",
+      "props_allowed": [
+        "fluorescent tube overhead",
+        "cars in deep shadow behind",
+        "painted parking number on floor",
+        "concrete ceiling"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable license plates",
+        "shopping carts",
+        "grocery entrance"
+      ],
+      "mood": "cool blue industrial, late-night editorial energy, moody fashion",
+      "risk_tags": [],
+      "prompt_fragment": "parking garage interior, blue-tinted fluorescent overhead ambient, concrete floor, cars in deep shadow behind, ceiling with exposed fluorescent tubes, cool industrial editorial",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p003",
+      "name": "Parking Garage — Ground Level Industrial",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body, ground level garage entrance or open bay",
+      "framing": "full-body with entrance light contrast or open bay framing",
+      "lighting": "ambient from entrance opening, mixed inside and outside light",
+      "background_detail": "ground-level garage with entrance visible, cars visible but blurred, painted floor markings, low concrete ceiling with support beams",
+      "realism_details": "entrance light spill on floor, concrete beam above, painted yellow parking stripe, car grill blurred in background",
+      "props_allowed": [
+        "entrance light spill",
+        "painted floor stripes",
+        "concrete beam overhead",
+        "car blur in background"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable signs",
+        "shopping carts",
+        "store entrance"
+      ],
+      "mood": "industrial contrast, entrance light drama, editorial ground level",
+      "risk_tags": [],
+      "prompt_fragment": "ground-level parking garage, entrance light spilling in from outside, concrete ceiling with beam, painted yellow floor stripe, car in deep background bokeh, industrial entrance contrast",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p004",
+      "name": "Multi-Level Parking Garage — Wide Concrete Expanse",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body, wide shot in open multi-level bay",
+      "framing": "full-body with wide concrete expanse as minimalist backdrop",
+      "lighting": "mixed overhead fluorescent and daylight from open sides, uneven",
+      "background_detail": "wide concrete bay, cars parked in loose grid behind, low ceiling with pipes, open side of garage letting in daylight",
+      "realism_details": "concrete floor span, pipe runs along ceiling, open garage side with daylight, parked cars in loose background grid",
+      "props_allowed": [
+        "wide floor expanse",
+        "pipe ceiling",
+        "open side daylight",
+        "cars in loose background grid"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable signs",
+        "shopping carts",
+        "store entrance"
+      ],
+      "mood": "wide open industrial, stark editorial, concrete minimalism",
+      "risk_tags": [],
+      "prompt_fragment": "multi-level parking garage, wide concrete expanse, mixed fluorescent and daylight from open sides, low ceiling with pipes, cars in background grid, stark industrial minimalism",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p005",
+      "name": "Open-Top Parking Structure — Daylight",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body, open-top level with sky visible above",
+      "framing": "full-body with open sky and city view as background",
+      "lighting": "bright natural daylight from above, open sky overhead",
+      "background_detail": "top-level open parking, concrete surface, city visible at edge, parapet low wall, sky above",
+      "realism_details": "concrete deck texture, low parapet wall, car rooftops in background, city skyline at edge, sky overhead",
+      "props_allowed": [
+        "concrete deck",
+        "low parapet",
+        "car rooftops in background",
+        "city visible at edge"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable signs",
+        "shopping carts",
+        "store entrance"
+      ],
+      "mood": "open daylight industrial, elevated parking editorial, rooftop-adjacent",
+      "risk_tags": [],
+      "prompt_fragment": "open-top parking structure, concrete deck under bright daylight, low parapet wall, car rooftops in background, city visible at edge, open sky above, industrial daylight editorial",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_p006",
+      "name": "Underground Parking Garage — Hard Flash, Shadow Behind",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body facing camera, flash from camera direction",
+      "framing": "full-body with hard flash shadow cast behind on floor and wall",
+      "lighting": "hard flash from camera, complete shadow drop behind subject",
+      "background_detail": "underground concrete wall behind, hard shadow on wall from flash, painted floor markings, dim ambient from distant fluorescent",
+      "realism_details": "flash shadow crisp on concrete wall, floor paint marking, concrete texture, distant fluorescent dim glow",
+      "props_allowed": [
+        "concrete wall behind",
+        "flash shadow on wall",
+        "floor paint marking",
+        "distant dim fluorescent"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "readable license plates",
+        "shopping carts",
+        "store entrance"
+      ],
+      "mood": "underground flash editorial, hard shadow graphic, bold fashion",
+      "risk_tags": [],
+      "prompt_fragment": "underground parking garage, hard flash from camera, crisp shadow dropping onto concrete wall behind, painted floor marking, distant dim fluorescent glow, bold flash editorial",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_e001",
+      "name": "Brushed Metal Elevator — Mirror Reflection Wall",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body or three-quarter in elevator, reflection visible",
+      "framing": "full-body with brushed metal walls and reflection as context",
+      "lighting": "overhead elevator light, warm or neutral, soft enclosed ambient",
+      "background_detail": "brushed stainless steel elevator walls, partial reflection in brushed surface, handrail along back wall, recessed overhead light",
+      "realism_details": "brushed metal grain texture, handrail detail, overhead light recess, partial body reflection in metal surface, elevator certificate sticker corner",
+      "props_allowed": [
+        "brushed metal wall",
+        "handrail",
+        "overhead light",
+        "partial reflection"
+      ],
+      "props_blocked": [
+        "readable floor display",
+        "alcohol",
+        "hotel elevator signage",
+        "grocery bags"
+      ],
+      "mood": "enclosed elevator glam, fashion interior, going-out capture",
+      "risk_tags": [],
+      "prompt_fragment": "brushed stainless steel elevator interior, overhead ambient light, handrail along back wall, partial reflection in brushed metal surface, enclosed fashion moment",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_e002",
+      "name": "Glass Elevator — City View Framing",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body or three-quarter, city visible through glass walls",
+      "framing": "full-body with city view through glass as dramatic background",
+      "lighting": "natural city ambient through glass, warm elevator interior light above",
+      "background_detail": "glass elevator walls showing city building view, city floors passing if in motion, elevator interior light above",
+      "realism_details": "glass panel frame edge, city building facades through glass, elevator mechanism visible at top",
+      "props_allowed": [
+        "city view through glass",
+        "glass panel frame",
+        "overhead light",
+        "elevator hardware top"
+      ],
+      "props_blocked": [
+        "readable building names through glass",
+        "alcohol",
+        "hotel elevator",
+        "grocery bags"
+      ],
+      "mood": "glass elevator city view, aspirational, cinematic",
+      "risk_tags": [],
+      "prompt_fragment": "glass elevator, city building view through glass walls, natural city ambient plus warm interior overhead, glass panel frame edges, city height visible, aspirational cinematic",
+      "status": "untested",
+      "notes": "No readable signage visible through glass."
+    },
+    {
+      "environment_id": "env_e003",
+      "name": "Dark Wood-Panel Elevator — Warm Amber Interior",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body or three-quarter inside elevator",
+      "framing": "full-body with warm wood panel context",
+      "lighting": "warm amber recessed overhead light, enclosed and intimate",
+      "background_detail": "dark wood panel walls with grain visible, brass handrail, warm amber ceiling recess, small mirror panel at back of elevator",
+      "realism_details": "wood grain texture, brass handrail detail, amber ceiling light warm pool, mirror panel back edge",
+      "props_allowed": [
+        "dark wood panel",
+        "brass handrail",
+        "amber overhead",
+        "mirror panel at back"
+      ],
+      "props_blocked": [
+        "readable floor display",
+        "alcohol",
+        "hotel elevator signage",
+        "grocery bags"
+      ],
+      "mood": "warm luxury elevator, intimate enclosed, polished going-out",
+      "risk_tags": [],
+      "prompt_fragment": "dark wood-panel elevator interior, warm amber recessed overhead light, brass handrail, wood grain wall texture, small mirror panel at back, warm enclosed luxury",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_e004",
+      "name": "Modern Building Elevator — Mirrored Ceiling",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body, mirrored ceiling creating reflected context",
+      "framing": "full-body with overhead mirror showing reflection above",
+      "lighting": "recessed overhead in mirrored ceiling, warm and even",
+      "background_detail": "white or light elevator interior, mirrored ceiling panel showing reflected image, recessed lights in ceiling, minimal handrail",
+      "realism_details": "mirrored ceiling showing overhead reflection, ceiling light fixture recess, handrail along wall, elevator door edge visible",
+      "props_allowed": [
+        "mirrored ceiling",
+        "overhead reflection",
+        "recessed ceiling light",
+        "minimal handrail"
+      ],
+      "props_blocked": [
+        "readable floor display",
+        "alcohol",
+        "hotel elevator signage",
+        "grocery bags"
+      ],
+      "mood": "modern elevated interior, mirror ceiling glamour, fashion moment",
+      "risk_tags": [],
+      "prompt_fragment": "modern elevator interior, mirrored ceiling panel with overhead reflection, recessed ceiling lights, clean light interior walls, handrail, modern mirror ceiling fashion",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_e005",
+      "name": "Industrial Freight Elevator — Editorial",
+      "production_lane": "editorial_flash",
+      "allowed_recipe_types": [
+        "street_outdoor_editorial"
+      ],
+      "camera_position": "full-body in large freight elevator cage or industrial lift",
+      "framing": "full-body with industrial cage or metal door as graphic element",
+      "lighting": "harsh overhead industrial or single hanging bulb, high contrast",
+      "background_detail": "metal mesh gate or cage door, concrete shaft wall visible, steel floor plate, industrial cable or chain mechanism visible",
+      "realism_details": "metal mesh texture, floor plate diamond pattern, concrete shaft wall texture, industrial bolt hardware visible",
+      "props_allowed": [
+        "metal mesh gate",
+        "steel floor plate",
+        "concrete shaft wall",
+        "cable or chain"
+      ],
+      "props_blocked": [
+        "readable company signage",
+        "grocery bags",
+        "shopping carts",
+        "hotel service elevator sign"
+      ],
+      "mood": "industrial editorial, high contrast, raw fashion",
+      "risk_tags": [],
+      "prompt_fragment": "industrial freight elevator, metal mesh gate, harsh overhead light, diamond-plate steel floor, concrete shaft wall, cable mechanism visible, raw industrial editorial fashion",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_e006",
+      "name": "Contemporary Elevator — Cool Neutral Interior",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body in clean contemporary elevator",
+      "framing": "full-body with clean contemporary interior",
+      "lighting": "cool neutral recessed overhead, clean and even",
+      "background_detail": "light gray or white elevator interior, minimal design, brushed silver or chrome trim, simple handrail, elevator door seam visible",
+      "realism_details": "surface texture of elevator wall, trim detail, elevator door seam, light switch or button panel corner",
+      "props_allowed": [
+        "light gray wall",
+        "brushed trim",
+        "simple handrail",
+        "elevator door seam"
+      ],
+      "props_blocked": [
+        "readable floor display",
+        "alcohol",
+        "hotel elevator signage",
+        "grocery bags"
+      ],
+      "mood": "clean modern interior, minimalist fashion, neutral context",
+      "risk_tags": [],
+      "prompt_fragment": "contemporary elevator interior, cool neutral recessed lighting, light gray walls, brushed silver trim, minimal handrail, clean modern fashion moment",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c001",
+      "name": "Parked Car — Driver Side, Window Light",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "car_elevator",
+        "social_going_out"
+      ],
+      "camera_position": "head-to-waist or three-quarter from passenger direction, window beside subject",
+      "framing": "close or medium with car interior as context",
+      "lighting": "natural window light from driver side window, soft and directional",
+      "background_detail": "car interior with steering wheel partially visible, dashboard, driver side window with outdoor scene blurred beyond",
+      "realism_details": "steering wheel leather or plastic detail, dashboard texture, window frame, blurred exterior beyond glass, visor visible above",
+      "props_allowed": [
+        "steering wheel",
+        "dashboard",
+        "window frame",
+        "blurred exterior beyond glass"
+      ],
+      "props_blocked": [
+        "alcohol in car",
+        "readable signage through window",
+        "phone in hand",
+        "grocery bags"
+      ],
+      "mood": "car selfie energy, candid driver seat, going-somewhere glam",
+      "risk_tags": [],
+      "prompt_fragment": "parked car interior, driver seat, natural window light from side, steering wheel visible, dashboard, blurred exterior beyond window glass, car selfie energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c002",
+      "name": "Parked Car — Passenger Side, Mirror Angle",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "car_elevator",
+        "social_going_out"
+      ],
+      "camera_position": "close to medium from driver direction, mirror or window angle",
+      "framing": "head-to-waist with passenger side context",
+      "lighting": "window light from passenger side, natural and clean",
+      "background_detail": "car passenger interior, seat belt partially visible, glove box panel, window frame, blurred parking lot or street beyond",
+      "realism_details": "seatbelt shoulder strap, glove box detail, car seat fabric or leather texture, window frame",
+      "props_allowed": [
+        "seatbelt strap",
+        "passenger window frame",
+        "blurred exterior",
+        "glove box panel"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "grocery bags",
+        "readable signs through window",
+        "phone visibly held up"
+      ],
+      "mood": "passenger seat vibe, pre-arrival calm, car selfie",
+      "risk_tags": [],
+      "prompt_fragment": "car passenger seat, natural window light, seatbelt strap visible, glove box panel, blurred parking exterior beyond window, pre-arrival calm",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c003",
+      "name": "Car Backseat — Night, City Lights Through Window",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "car_elevator",
+        "social_going_out"
+      ],
+      "camera_position": "close to medium portrait from front looking back, window beside",
+      "framing": "head-to-waist or three-quarter, city light bokeh visible through window",
+      "lighting": "city ambient through window as primary, warm dashboard reflection",
+      "background_detail": "car backseat, city lights streaking past window in bokeh, leather or fabric seat texture, headrest visible above",
+      "realism_details": "city light bokeh streaks through glass, car seat texture, headrest shape, ceiling grab handle edge",
+      "props_allowed": [
+        "window city light bokeh",
+        "car seat",
+        "headrest",
+        "ceiling grab handle"
+      ],
+      "props_blocked": [
+        "alcohol in car",
+        "readable text through window",
+        "phone in hand",
+        "grocery bags"
+      ],
+      "mood": "city night motion, backseat going-out energy, glam in transit",
+      "risk_tags": [],
+      "prompt_fragment": "car backseat at night, city lights streaking through window in bokeh, warm interior ambient, car seat texture, headrest visible, glam in transit",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c004",
+      "name": "Car Interior — Visor Mirror Check",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "car_elevator"
+      ],
+      "camera_position": "close portrait, visor mirror framing face or upper body",
+      "framing": "close portrait or waist-to-head in visor mirror context",
+      "lighting": "natural exterior light from windshield or windows, clean morning or afternoon",
+      "background_detail": "car interior behind, visor down with small mirror, windshield with blurred exterior beyond, dashboard in lower frame",
+      "realism_details": "visor mirror edge, dashboard texture below, windshield glare or frost edge, blurred exterior beyond glass",
+      "props_allowed": [
+        "visor mirror",
+        "dashboard edge",
+        "windshield with blurred exterior",
+        "sun glare edge"
+      ],
+      "props_blocked": [
+        "alcohol in car",
+        "grocery bags",
+        "phone visibly recording",
+        "readable signs through windshield"
+      ],
+      "mood": "car visor mirror check, getting-ready energy, candid beauty",
+      "risk_tags": [],
+      "prompt_fragment": "car interior visor mirror, natural window light, windshield with blurred exterior beyond, dashboard in lower frame, candid beauty visor check",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c005",
+      "name": "Parking Lot — Daytime Car Arrival Context",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "car_elevator",
+        "street_errands_outdoor"
+      ],
+      "camera_position": "full-body beside or near parked car, car door open or background",
+      "framing": "full-body with parked car and lot as context",
+      "lighting": "bright natural daylight, midday or afternoon",
+      "background_detail": "car beside subject, parking lot surface, other cars in distance in bokeh, overhead parking light pole",
+      "realism_details": "parking lot pavement texture and line stripe, car door detail, distant parked cars blurred, lot overhead light fixture",
+      "props_allowed": [
+        "car door beside",
+        "parking lot surface and stripe",
+        "distant cars in bokeh",
+        "lot light pole"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "shopping carts",
+        "grocery store entrance",
+        "readable car brand"
+      ],
+      "mood": "parking lot arrival energy, about to go somewhere, natural daylight",
+      "risk_tags": [],
+      "prompt_fragment": "daytime parking lot, parked car beside, bright natural daylight, parking lot stripe on surface, other cars blurred in background, arrival energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c006",
+      "name": "City Street — Night Car Departure Context",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "car_elevator",
+        "social_going_out"
+      ],
+      "camera_position": "full-body exiting or near car door, city street at night behind",
+      "framing": "full-body with night street and car as context",
+      "lighting": "city streetlight from overhead, car interior light spilling out from open door",
+      "background_detail": "city street at night, car door open beside, streetlight overhead, blurred city behind, car interior light glow",
+      "realism_details": "car door edge, city pavement, streetlight cone overhead, city blur in distance, car interior warm glow from open door",
+      "props_allowed": [
+        "car door open",
+        "city street behind",
+        "streetlight overhead",
+        "car interior light glow"
+      ],
+      "props_blocked": [
+        "alcohol in hand",
+        "grocery bags",
+        "readable street signs",
+        "shopping carts"
+      ],
+      "mood": "city night car departure, going-out arrival energy, streetlight glow",
+      "risk_tags": [],
+      "prompt_fragment": "city street at night, car door open beside, warm car interior glow, overhead streetlight, blurred city behind, night car departure going-out energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c007",
+      "name": "Car Interior — Warm Dashboard Instrument Glow",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "car_elevator"
+      ],
+      "camera_position": "close to medium, facing camera from seat, dashboard glow below",
+      "framing": "close portrait or head-to-chest, car seat and dashboard context",
+      "lighting": "warm dashboard instrument glow from below as creative accent, exterior ambient as fill",
+      "background_detail": "car interior, warm dashboard glow below frame, seat and door panel beside, dark exterior through windows",
+      "realism_details": "dashboard instrument cluster warm glow, gear shift console edge, door panel armrest, dark exterior beyond windows",
+      "props_allowed": [
+        "dashboard glow",
+        "gear shift console edge",
+        "door panel",
+        "dark exterior windows"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "grocery bags",
+        "readable dashboard text",
+        "phone recording"
+      ],
+      "mood": "warm dashboard glow, night driving aesthetic, candid car portrait",
+      "risk_tags": [],
+      "prompt_fragment": "car interior at night, warm dashboard instrument glow from below as accent, exterior dark through windows, seat and door panel, candid night car portrait",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_c008",
+      "name": "Venue Arrival — Evening Car Context",
+      "production_lane": "car_elevator",
+      "allowed_recipe_types": [
+        "social_going_out",
+        "car_elevator"
+      ],
+      "camera_position": "full-body stepping out or standing beside car, venue entrance behind",
+      "framing": "full-body with car and venue exterior as context",
+      "lighting": "warm venue entry light from ahead, car interior glow from beside, evening ambient",
+      "background_detail": "venue entrance warmly lit ahead, car door beside, pavement with venue step, evening sky above",
+      "realism_details": "car door edge, venue entry warm light pool on pavement, step at venue entrance, evening blue sky at edge",
+      "props_allowed": [
+        "car door beside",
+        "venue entry warm light",
+        "paved step at entrance",
+        "evening sky"
+      ],
+      "props_blocked": [
+        "alcohol in hand",
+        "readable venue name",
+        "hotel porte-cochere",
+        "grocery bags"
+      ],
+      "mood": "venue arrival, stepping out of car, event night energy",
+      "risk_tags": [],
+      "prompt_fragment": "evening venue arrival, car door beside, warm venue entry light ahead, paved step at entrance, evening sky, stepping-out-of-car night event energy",
+      "status": "untested",
+      "notes": "No readable venue name."
+    },
+    {
+      "environment_id": "env_v001",
+      "name": "Apartment Vanity Counter — Morning Natural Light",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "close to medium, vanity mirror framing from front",
+      "framing": "head-and-shoulders to mid-chest at vanity",
+      "lighting": "natural morning light from a nearby window, soft and even",
+      "background_detail": "vanity countertop with scattered skincare and makeup products, small brush holder, compact and lipstick arranged loosely, mirror reflection in background",
+      "realism_details": "product bottle and compact arranged naturally on counter, brush in holder, makeup scattered as if in mid-use, morning window light on counter surface",
+      "props_allowed": [
+        "skincare and makeup products on counter",
+        "brush holder",
+        "compact and lipstick",
+        "vanity mirror behind"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable product logos",
+        "studio backdrop",
+        "hotel bathroom"
+      ],
+      "mood": "morning beauty ritual, natural getting-ready, soft selfie energy",
+      "risk_tags": [],
+      "prompt_fragment": "apartment vanity counter, morning natural window light, skincare and makeup products scattered, brush holder, compact and lipstick visible, morning beauty ritual",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v002",
+      "name": "Bathroom Vanity — Night Glam Prep",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "close to medium, mirror framing with warm light",
+      "framing": "head-to-waist at bathroom vanity",
+      "lighting": "warm bathroom vanity sconces on both sides, warm and glamorous",
+      "background_detail": "bathroom vanity with mirror, warm wall sconces framing mirror, products arranged on counter, tiled or painted wall behind mirror",
+      "realism_details": "sconce fixture hardware, product bottles and palettes on counter, tile grout lines at edge, mirror frame detail",
+      "props_allowed": [
+        "warm wall sconces",
+        "product bottles and palettes",
+        "tile or painted wall",
+        "vanity mirror frame"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable product logos",
+        "ring light arm visible",
+        "hotel bathroom"
+      ],
+      "mood": "warm vanity glam, evening beauty prep, getting-ready energy",
+      "risk_tags": [],
+      "prompt_fragment": "bathroom vanity at night, warm wall sconces on both sides, product bottles and palettes on counter, tiled wall, warm glamorous getting-ready light",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v003",
+      "name": "Hollywood-Style Makeup Vanity — Warm Bulb Light",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity"
+      ],
+      "camera_position": "close to medium, mirror bulb lights framing face",
+      "framing": "head-to-chest, bulb-framed mirror visible at edges",
+      "lighting": "warm round bulb lights around mirror edges, warm and golden",
+      "background_detail": "Hollywood mirror with round bulbs at edges, vanity table with makeup spread — brushes, palettes, lipsticks — chair with fabric seat",
+      "realism_details": "round mirror bulb detail, makeup brush arrangement, palette open on table, lipstick bullet visible, chair upholstery edge",
+      "props_allowed": [
+        "Hollywood mirror bulbs",
+        "makeup palettes",
+        "brushes on table",
+        "lipstick open",
+        "chair edge"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable brand names on products",
+        "studio backdrop",
+        "hotel dressing room sign"
+      ],
+      "mood": "backstage glamour, creator vanity, pre-shoot warmth",
+      "risk_tags": [],
+      "prompt_fragment": "Hollywood makeup vanity, round bulb lights framing mirror, warm golden light, makeup palettes and brushes spread on table, lipstick open, backstage creator glamour",
+      "status": "untested",
+      "notes": "All product labels must be non-readable or turned away."
+    },
+    {
+      "environment_id": "env_v004",
+      "name": "Bathroom Counter — Post-Shower Natural Light",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity"
+      ],
+      "camera_position": "close portrait or head-and-shoulders at mirror",
+      "framing": "close portrait, mirror and counter as context",
+      "lighting": "clean natural light from bathroom window, soft and flattering post-shower",
+      "background_detail": "clean bathroom counter with one skincare product and towel, frosted window letting in soft light, minimal tile or wall",
+      "realism_details": "frosted window light diffusion, folded towel corner, one product bottle on counter, clean tile wall, slight mirror steam edge",
+      "props_allowed": [
+        "frosted window light",
+        "folded towel",
+        "one product bottle",
+        "clean tile",
+        "slight steam edge"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable product logo",
+        "ring light arm",
+        "hotel bathroom"
+      ],
+      "mood": "clean post-shower glow, skincare moment, fresh natural beauty",
+      "risk_tags": [],
+      "prompt_fragment": "bathroom counter after shower, soft natural light from frosted window, folded towel, one skincare product, clean tile, slight steam edge on mirror, fresh glow moment",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v005",
+      "name": "Bedroom Makeup Area — Natural Window Light",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "close to medium at mirror or desk, natural light from side window",
+      "framing": "head-to-chest at bedroom mirror or desk setup",
+      "lighting": "natural window light from side, soft and directional, apartment daytime",
+      "background_detail": "bedroom with small mirror on dresser or desk, products arranged on dresser surface, window visible at side letting light in, bed edge in background",
+      "realism_details": "dresser surface with products, window frame at side, bed edge blurred behind, curtain edge catching light",
+      "props_allowed": [
+        "dresser surface products",
+        "window light from side",
+        "bed edge in background",
+        "curtain edge"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable product labels",
+        "ring light arm",
+        "hotel room look"
+      ],
+      "mood": "bedroom getting-ready, natural beauty moment, daylight soft",
+      "risk_tags": [],
+      "prompt_fragment": "bedroom makeup area, natural window light from side, dresser with products arranged, window frame visible, bed edge blurred behind, daytime soft natural beauty",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v006",
+      "name": "Styled Apartment Bathroom — Artisan Tile Background",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity"
+      ],
+      "camera_position": "close to medium portrait at mirror",
+      "framing": "close portrait, artisan tile visible behind mirror or on wall",
+      "lighting": "warm sconce or overhead, artisan tile reflecting warm ambient",
+      "background_detail": "artisan tile wall — zellige, subway, or handmade — visible in mirror and around it, ceramic soap dish, one green plant on counter",
+      "realism_details": "tile pattern and grout visible, ceramic soap dish, plant on counter, slight tile imperfection of handmade tile",
+      "props_allowed": [
+        "artisan tile wall",
+        "ceramic soap dish",
+        "green plant on counter",
+        "sconce fixture"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable product logos",
+        "hotel bathroom",
+        "ring light arm"
+      ],
+      "mood": "aspirational bathroom aesthetic, styled beauty, artisan texture",
+      "risk_tags": [],
+      "prompt_fragment": "styled bathroom with artisan tile wall, warm sconce light, ceramic soap dish, green plant on counter, close beauty portrait, aspirational bathroom aesthetic",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v007",
+      "name": "Compact Vanity Corner — Minimal Modern Apartment",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "close to medium, compact vanity as context",
+      "framing": "head-to-chest at compact vanity mirror",
+      "lighting": "small desk lamp or overhead ambient, compact warm light",
+      "background_detail": "small vanity table with mirror, minimal products, desk lamp beside mirror, apartment wall behind in neutral color",
+      "realism_details": "small vanity table edge, compact mirror frame, one desk lamp detail, two or three products minimal arrangement, wall paint texture",
+      "props_allowed": [
+        "compact mirror",
+        "desk lamp",
+        "two-three products",
+        "apartment wall"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable labels",
+        "ring light arm",
+        "hotel room"
+      ],
+      "mood": "minimal apartment beauty corner, practical creator setup, clean",
+      "risk_tags": [],
+      "prompt_fragment": "compact bedroom vanity corner, small mirror, desk lamp beside, minimal two or three products, neutral apartment wall, clean minimal creator beauty setup",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_v008",
+      "name": "Getting-Ready Space — Mixed Light Sources",
+      "production_lane": "beauty_selfie_vanity",
+      "allowed_recipe_types": [
+        "beauty_selfie_vanity",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "medium to close, getting-ready context visible around",
+      "framing": "three-quarter or head-to-waist in context of getting-ready space",
+      "lighting": "mixed warm sources — desk lamp, window, overhead — creating layered warmth",
+      "background_detail": "getting-ready space with clothes on chair, shoes arranged near mirror, products on dresser or desk, multiple warm light sources",
+      "realism_details": "clothes draped on chair in background, shoes near mirror base, products on surface, mixed light warmth creating depth",
+      "props_allowed": [
+        "clothes on chair",
+        "shoes near mirror",
+        "products on dresser",
+        "multiple warm lights"
+      ],
+      "props_blocked": [
+        "alcohol",
+        "readable labels",
+        "ring light arm",
+        "hotel room",
+        "grocery bags"
+      ],
+      "mood": "lived-in getting-ready energy, creator prep, warm and intentional",
+      "risk_tags": [],
+      "prompt_fragment": "getting-ready space, clothes draped on chair behind, shoes near mirror, products arranged on dresser, mixed warm light sources — desk lamp and window — layered warmth",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_gym001",
+      "name": "Gym Window Wall — Natural Side Light Athletic",
+      "production_lane": "gym_glam",
+      "allowed_recipe_types": [
+        "fitness_glam_athletic"
+      ],
+      "camera_position": "full-body at window wall or near it, natural light from window side",
+      "framing": "full-body with gym window as primary light source",
+      "lighting": "natural side light from gym window wall, clean and directional",
+      "background_detail": "gym window wall letting in natural light, gym floor, equipment blurred behind, clean painted gym wall to side",
+      "realism_details": "window frame edge, gym floor rubber texture, equipment in background bokeh, natural light casting directional shadow",
+      "props_allowed": [
+        "gym window wall",
+        "gym floor",
+        "equipment in background bokeh",
+        "natural light shadow"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "studio backdrop",
+        "hotel fitness center sign",
+        "readable equipment brand"
+      ],
+      "mood": "gym glam natural light, athletic editorial, window-lit fitness",
+      "risk_tags": [
+        "gym_context_required"
+      ],
+      "prompt_fragment": "gym window wall, natural side light from large gym windows, rubber floor texture, gym equipment blurred in background bokeh, natural light shadow, athletic fitness editorial",
+      "status": "untested",
+      "notes": "Athletic outfits only."
+    },
+    {
+      "environment_id": "env_gym002",
+      "name": "Gym Painted Wall — Overhead Ambient Athletic",
+      "production_lane": "gym_glam",
+      "allowed_recipe_types": [
+        "fitness_glam_athletic"
+      ],
+      "camera_position": "full-body or three-quarter against painted gym wall",
+      "framing": "full-body with flat painted wall as clean backdrop",
+      "lighting": "overhead gym LED ambient, even and slightly cool",
+      "background_detail": "plain painted gym wall in muted color, gym floor at feet, slight LED overhead fixture visible above, clean and minimal",
+      "realism_details": "wall paint texture, floor mat edge, overhead LED strip visible at ceiling, slight corner detail",
+      "props_allowed": [
+        "painted gym wall",
+        "gym floor mat edge",
+        "overhead LED strip"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "studio backdrop",
+        "hotel fitness center",
+        "readable equipment brand"
+      ],
+      "mood": "clean athletic editorial, minimal gym backdrop, body as hero",
+      "risk_tags": [
+        "gym_context_required"
+      ],
+      "prompt_fragment": "gym plain painted wall, overhead LED ambient, gym floor mat edge, minimal clean athletic backdrop, even cool overhead light, fitness editorial",
+      "status": "untested",
+      "notes": "Athletic outfits only."
+    },
+    {
+      "environment_id": "env_gym003",
+      "name": "Open Gym Floor — Equipment Array Background",
+      "production_lane": "gym_glam",
+      "allowed_recipe_types": [
+        "fitness_glam_athletic"
+      ],
+      "camera_position": "full-body on open gym floor, equipment visible behind",
+      "framing": "full-body with gym equipment array as depth context",
+      "lighting": "overhead gym LED ambient, mixed with any window light available",
+      "background_detail": "open gym floor with rubber mat sections, free weight area in blurred background, equipment array — dumbbells, cables — visible in bokeh",
+      "realism_details": "rubber floor tile pattern, dumbbell rack in bokeh, cable machine silhouette, overhead light grid",
+      "props_allowed": [
+        "rubber floor",
+        "dumbbell rack in bokeh",
+        "cable machine silhouette",
+        "overhead light grid"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "studio backdrop",
+        "hotel fitness center",
+        "readable equipment brand"
+      ],
+      "mood": "in-the-gym confidence, athletic environment, post-set energy",
+      "risk_tags": [
+        "gym_context_required"
+      ],
+      "prompt_fragment": "open gym floor, rubber mat tiles, free weight equipment array in blurred background bokeh, overhead LED ambient, in-gym athletic confidence",
+      "status": "untested",
+      "notes": "Athletic outfits only."
+    },
+    {
+      "environment_id": "env_gym004",
+      "name": "Gym Exit Hallway — After-Session Context",
+      "production_lane": "gym_glam",
+      "allowed_recipe_types": [
+        "fitness_glam_athletic"
+      ],
+      "camera_position": "full-body in gym hallway or near exit, bag context allowed",
+      "framing": "full-body with hallway context",
+      "lighting": "overhead corridor ambient, exit sign light ambient",
+      "background_detail": "gym hallway with painted wall, exit door visible in background, gym bag on floor beside, bulletin board blurred at distance",
+      "realism_details": "painted hallway wall, exit door push bar visible, gym bag strap detail, bulletin board items blurred",
+      "props_allowed": [
+        "painted hallway",
+        "exit door background",
+        "gym bag on floor",
+        "bulletin board blurred"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "studio backdrop",
+        "hotel",
+        "readable bulletin board text"
+      ],
+      "mood": "post-workout glow, gym exit energy, after-session candid",
+      "risk_tags": [
+        "gym_context_required"
+      ],
+      "prompt_fragment": "gym exit hallway, overhead ambient, painted wall, exit door in background, gym bag on floor beside, post-workout glow energy",
+      "status": "untested",
+      "notes": "Athletic outfits only."
+    },
+    {
+      "environment_id": "env_a001",
+      "name": "Apartment Living Room — Natural Window Light",
+      "production_lane": "apartment_elevated",
+      "allowed_recipe_types": [
+        "apartment_home_routines",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "full-body or three-quarter in living room, window light from side",
+      "framing": "full-body with living room context",
+      "lighting": "natural window light from side, afternoon ambient, warm fill from lamp if evening",
+      "background_detail": "apartment living room with couch, throw, one floor plant, window visible at side, bookshelf or art on wall blurred",
+      "realism_details": "couch texture, throw blanket fold, floor plant in pot, window frame, bookshelf spines blurred, rug edge at floor",
+      "props_allowed": [
+        "couch",
+        "throw blanket",
+        "floor plant",
+        "window frame",
+        "rug"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "alcohol on table",
+        "hotel room look",
+        "studio backdrop"
+      ],
+      "mood": "elevated home, stylish apartment living, home content creator",
+      "risk_tags": [],
+      "prompt_fragment": "apartment living room, natural window light from side, couch with throw blanket, floor plant, rug texture, blurred bookshelf behind, elevated home creator energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_a002",
+      "name": "Apartment Kitchen Counter — Morning Aesthetic",
+      "production_lane": "apartment_elevated",
+      "allowed_recipe_types": [
+        "apartment_home_routines"
+      ],
+      "camera_position": "full-body or three-quarter at kitchen counter or island",
+      "framing": "full-body or three-quarter with kitchen as warm context",
+      "lighting": "morning natural light from kitchen window, clean and bright",
+      "background_detail": "apartment kitchen counter or island, countertop with coffee mug and one food item, kitchen cabinets behind, window over sink letting light in",
+      "realism_details": "countertop material texture, coffee mug, one piece of fruit or plant, cabinet door detail, window frame over sink, light on counter surface",
+      "props_allowed": [
+        "coffee mug",
+        "small plant or one piece of fruit",
+        "cabinet detail",
+        "window over sink",
+        "clean counter"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "produce aisle context",
+        "shopping bags",
+        "alcohol",
+        "readable brand labels"
+      ],
+      "mood": "morning apartment aesthetic, styled at-home energy, warm kitchen creator",
+      "risk_tags": [],
+      "prompt_fragment": "apartment kitchen counter, morning natural window light, coffee mug, small plant or fruit, clean countertop surface, cabinets behind, warm morning kitchen aesthetic",
+      "status": "untested",
+      "notes": "Single fruit item for aesthetic only, not grocery/errand context."
+    },
+    {
+      "environment_id": "env_a003",
+      "name": "Apartment Bedroom — Soft Lamp Evening",
+      "production_lane": "apartment_elevated",
+      "allowed_recipe_types": [
+        "apartment_home_routines",
+        "fit_check_mirror_getting_ready"
+      ],
+      "camera_position": "full-body or three-quarter in bedroom, lamp as primary light",
+      "framing": "full-body with bedroom warmth context",
+      "lighting": "warm bedside or floor lamp as primary, soft ambient fill",
+      "background_detail": "apartment bedroom with bed made, lamp on nightstand or floor, one small plant, window with curtain drawn at edge",
+      "realism_details": "bed linen detail, lamp warm circle on wall, plant pot on nightstand, curtain edge, baseboard visible at floor",
+      "props_allowed": [
+        "made bed",
+        "bedside lamp",
+        "small plant",
+        "curtain edge",
+        "rug at floor"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "alcohol",
+        "hotel room look",
+        "studio backdrop"
+      ],
+      "mood": "warm evening apartment, at-home creator warmth, bedroom aesthetic",
+      "risk_tags": [],
+      "prompt_fragment": "apartment bedroom evening, warm bedside lamp light, made bed with linen detail, small plant, curtain edge, warm cozy elevated apartment energy",
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "environment_id": "env_a004",
+      "name": "Apartment Building Exterior Doorway — Leaving Energy",
+      "production_lane": "apartment_elevated",
+      "allowed_recipe_types": [
+        "fit_check_mirror_getting_ready",
+        "social_going_out"
+      ],
+      "camera_position": "full-body in building doorway or on front step, outside street visible",
+      "framing": "full-body with building exterior doorway as frame",
+      "lighting": "natural exterior daylight from front, warm interior lobby light from behind",
+      "background_detail": "building exterior door frame, lobby warmth spilling out from behind, sidewalk at step, building facade brick or stone visible at sides",
+      "realism_details": "door frame detail, building material texture, sidewalk at bottom step, lobby warm glow behind, city visible in far distance",
+      "props_allowed": [
+        "door frame",
+        "building facade material",
+        "sidewalk at step",
+        "lobby glow behind"
+      ],
+      "props_blocked": [
+        "grocery bags",
+        "hotel entrance signage",
+        "shopping carts",
+        "readable building number"
+      ],
+      "mood": "leaving home energy, building doorway fashion, confident exit",
+      "risk_tags": [],
+      "prompt_fragment": "apartment building exterior doorway, natural daylight from outside, warm lobby glow from behind, building facade at sides, sidewalk at step, leaving-home confident energy",
+      "status": "untested",
+      "notes": ""
+    }
+  ]
+}
