@@ -76,6 +76,9 @@ MASTER_IDENTITY_CHECKS = [
     "petite",
     "hourglass",
     "proportions may not",
+    "athletic-curvy",
+    "narrow-hipped",
+    "defined waist without shrinking",
 ]
 
 # ── Paths ──────────────────────────────────────────────────────────────
