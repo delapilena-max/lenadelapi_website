@@ -26,12 +26,16 @@ IDENTITY_ANCHOR = (
 )
 
 LENA_MASTER_IDENTITY = (
-    "Identity fixed: preserve her approved face and body proportions "
-    "across every outfit, pose, scene, and camera angle. "
+    "Identity fixed: preserve Lena's approved adult athletic-curvy "
+    "hourglass body across every outfit, pose, scene, and camera angle. "
+    "Fuller bust, defined waist without shrinking her frame, "
+    "visibly wider hips, fuller thighs, soft realistic hip curve, "
+    "and balanced curvy proportions. "
     "Do not reinterpret her as a different person. "
-    "Do not slim her down or make her petite. "
-    "Fuller bust, small defined waist, wider hips, fuller thighs, "
-    "rounded hip/glute curve, athletic-curvy hourglass silhouette. "
+    "Do not slim her down, make her petite, narrow-hipped, "
+    "thin-legged, runway-model, or waif-like. "
+    "Wardrobe must fit over her existing curvy proportions "
+    "and must not reshape her into a thinner body. "
     "Outfit, pose, lighting, and action may change; "
     "face and body proportions may not."
 )
@@ -39,8 +43,11 @@ LENA_MASTER_IDENTITY = (
 SKIN_REALISM = (
     "natural skin texture, visible pores, subtle redness around nose and cheeks, "
     "mild real-world skin imperfections, realistic facial texture with natural asymmetry, "
-    "healthy skin glow, not plastic, not waxy, not over-smoothed, "
-    "no beauty-filter skin, no airbrushed mannequin skin"
+    "healthy skin glow, preserve Lena's reference-accurate beauty marks only, "
+    "not plastic, not waxy, not over-smoothed, "
+    "no beauty-filter skin, no airbrushed mannequin skin, "
+    "no random added freckles, no extra freckle-like speckles, "
+    "no new mole placements, no heavy freckle clusters"
 )
 
 MAIN_REFERENCE_POLICY = (
@@ -49,18 +56,35 @@ MAIN_REFERENCE_POLICY = (
 )
 
 LENA_BODY_DESCRIPTOR = (
-    "Lena has a realistic, highly photogenic feminine silhouette with a slim defined waist, wide-set hips, fuller thighs, "
-    "a rounded lower-body shape, long toned legs, graceful shoulders, natural balanced curves, and a fit healthy build. "
-    "Her proportions should look attractive, consistent, realistic, fully clothed, and editorial: elegant hourglass outline, "
-    "clear waist-to-hip shape, natural posture, believable hands and legs, no exaggerated cartoon proportions."
+    "Lena has a realistic, highly photogenic athletic-curvy feminine silhouette: "
+    "fuller bust, defined waist without shrinking her frame, "
+    "visibly wider hips, fuller thighs, soft rounded hip curve, "
+    "long toned legs, graceful shoulders, and balanced curvy proportions. "
+    "Her proportions should look attractive, consistent, realistic, "
+    "fully clothed, and editorial: clear hourglass waist-to-hip shape, "
+    "natural posture, believable hands and legs, "
+    "no exaggerated cartoon proportions, not slim, not petite."
 )
 
 NEGATIVE_PROMPT = (
-    "low quality, blurry, distorted face, changed face, identity drift, unrealistic body proportions, deformed hands, extra fingers, missing fingers, fused fingers, "
-    "bad anatomy, crossed eyes, harsh face distortion, waxy skin, plastic skin, over-smoothed skin, "
+    "low quality, blurry, distorted face, changed face, identity drift, "
+    "unrealistic body proportions, deformed hands, extra fingers, "
+    "missing fingers, fused fingers, bad anatomy, crossed eyes, "
+    "harsh face distortion, waxy skin, plastic skin, over-smoothed skin, "
     "airbrushed skin, beauty filter skin, mannequin skin, poreless face, "
-    "bra as outerwear, lingerie in public, bikini top as streetwear, underwear visible as clothing in outdoor or street settings, "
-    "uncanny expression, cartoon, anime, doll-like, watermark, text overlay, logo, duplicate person, extra limbs"
+    "random added freckles, extra freckle-like speckles, "
+    "new non-reference mole placements, heavy freckle clusters, "
+    "skinny body, petite frame, narrow hips, thin thighs, "
+    "slim runway model proportions, wasp waist, "
+    "belly button piercing, navel jewelry, navel ring, "
+    "bike shorts, compression shorts, hot pants, underwear-like shorts, "
+    "bra as outerwear, lingerie in public, bikini top as streetwear, "
+    "underwear visible as clothing in outdoor or street settings, "
+    "uncanny expression, cartoon, anime, doll-like, "
+    "watermark, text overlay, logo, duplicate person, extra limbs, "
+    "exposed belly button, visible navel, bare navel, midriff gap, "
+    "hoodie floating above waistband, ultra-cropped hoodie, "
+    "bikini-like crop top, navel piercing, belly button jewelry"
 )
 
 PUBLIC_WARDROBE_RULE = (
@@ -165,8 +189,27 @@ STYLE_BANK = [
     },
     {
         "category": "cozy",
-        "outfit": "a white cropped zip-up hoodie and matching white high-waist mini shorts in cotton fleece",
-        "hair": "voluminous curled half-down, a few pieces pulled back loosely",
+        "outfit": (
+            "a fitted white zip-up hoodie in medium-weight cotton "
+            "French terry sweatshirt fabric, flat non-quilted fabric surface, "
+            "hem meeting or slightly overlapping the high waistband "
+            "with no bare navel visible, softly shaped at the waist "
+            "without squeezing it, paired with matching high-waist fitted "
+            "white French terry joggers with a visible waistband, "
+            "tapered leg, side seams, soft fabric drape, natural wrinkles, "
+            "and a close but not skintight fit; "
+            "clean white sneakers, small gold bracelet; "
+            "not shorts, not hot pants, not leggings, not underwear, "
+            "not puffer, not bulky outerwear, "
+            "no exposed belly button, no visible navel"
+        ),
+        "hair": (
+            "Lena's signature rich dark auburn-brown hair, "
+            "long voluminous loose curls falling over her shoulders "
+            "and chest, a few front pieces softly pinned back, "
+            "hair visibly down, no blonde hair, no bleached highlights, "
+            "no bun, no messy updo, no ponytail"
+        ),
         "makeup": "soft natural makeup, peachy gloss",
         "accessories": "small gold chain bracelet",
     },
@@ -1337,8 +1380,12 @@ REFERENCE_MODE_POLICIES = {
         "Use body proportions naturally without forcing a full-body pose."
     ),
     "full_body": (
-        "Reference mode: full-body fashion/lifestyle. Preserve Lena's facial identity plus her full-body proportions, slim waist, wide-set hips, fuller thighs, rounded lower-body silhouette, long legs, hands, feet, posture, and clothing fit from the uploaded reference imagery. "
-        "Keep her body proportions consistent, attractive, realistic, fully clothed, and editorial."
+        "Reference mode: full-body fashion/lifestyle. Preserve Lena's facial identity "
+        "plus her full-body proportions, defined waist without shrinking her frame, "
+        "visibly wider hips, fuller thighs, rounded lower-body silhouette, "
+        "long legs, hands, feet, posture, and clothing fit from the uploaded reference imagery. "
+        "Keep her athletic-curvy proportions consistent, attractive, realistic, "
+        "fully clothed, and editorial. Do not slim her down."
     ),
     "video_body": (
         "Reference mode: video continuity. Preserve Lena's facial identity, body proportions, posture, hands, legs, clothing fit, and silhouette from the uploaded reference imagery so the seed image can animate naturally. "
