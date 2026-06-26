@@ -1258,6 +1258,1936 @@
       ],
       "status": "untested",
       "notes": "Single-piece. Mock-neck and midi length give full coverage. Versatile scene coverage."
+    },
+    {
+      "outfit_id": "wc_p001",
+      "name": "Champagne Satin Cowl-Neck Midi Slip Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "champagne satin bias-cut midi slip dress with a draped cowl neckline, thin straps, and a clean flowing hem; strappy heeled sandals, layered gold chains",
+      "avoid_terms": [
+        "bralette",
+        "bikini top",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p002",
+      "name": "Black Mini Blazer Dress + Gold Chain Belt",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "structured black double-breasted mini blazer dress, fitted at the waist with a thin gold chain belt; strappy heeled mules",
+      "avoid_terms": [
+        "bralette",
+        "shorts",
+        "crop",
+        "bodycon"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p003",
+      "name": "Burgundy Silk-Look Wrap Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "rich burgundy silk-look wrap mini dress with a plunging V-neckline and a self-tie at the waist; strappy heeled sandals, small gold hoop earrings",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts",
+        "crop"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p004",
+      "name": "Deep Emerald Off-Shoulder Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "deep emerald fitted off-shoulder mini dress in stretch fabric with a straight neckline and short hem; delicate drop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini top",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p005",
+      "name": "Dusty Rose Lace-Trim Midi Slip Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "blush dusty rose satin midi slip dress with delicate lace-trim at the hem and neckline; small pearl earrings, nude kitten heels",
+      "avoid_terms": [
+        "bralette",
+        "bikini top",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p006",
+      "name": "White Asymmetric One-Shoulder Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "sleek ivory white one-shoulder mini dress in smooth jersey with an asymmetric neckline; gold statement earring on the exposed shoulder side, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini top",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p007",
+      "name": "Black Faux-Leather Mini Skirt + Black Turtleneck",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social",
+        "street"
+      ],
+      "season": "cool",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black faux-leather high-waist mini skirt; fitted black ribbed long-sleeve turtleneck tucked in; gold chain necklace, black pointed heeled boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts",
+        "crop"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p008",
+      "name": "Cobalt Blue Satin Bias-Cut Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "cobalt blue satin bias-cut mini dress with a V-neckline and thin adjustable straps; gold hoop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini top",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p009",
+      "name": "Caramel Velvet Fitted Midi Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "cool",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "caramel brown velvet fitted midi dress with a square neckline and a subtle side slit; gold stacked rings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p010",
+      "name": "Hot Pink Fitted Ribbed Knit Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "bright fuchsia pink fitted ribbed knit mini dress with a scoop neckline and slight stretch; small gold hoops, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p011",
+      "name": "Bronze Metallic Fitted Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "bronze gold metallic fitted mini dress in a stretch sequin-like fabric with a square neckline; gold drop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "bodycon",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p012",
+      "name": "Navy + Ivory Color-Block Satin Midi Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "color-block midi satin dress split between deep navy and ivory, fitted through the bodice with a clean draped hem; pearl drop earrings, kitten heels",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p013",
+      "name": "Forest Green Velvet Off-Shoulder Midi Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "cool",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "forest green velvet off-shoulder midi dress, fitted bodice with a clean straight hem at mid-calf; diamond-look drop earrings, strappy heeled mules",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "shorts",
+        "crop"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p014",
+      "name": "Nude Caramel Fitted Mock-Neck Knit Midi Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "nude caramel fitted mock-neck knit midi dress in soft ribbed fabric with a clean hem; delicate gold chain bracelet, pointed-toe heeled boots",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p015",
+      "name": "Black Asymmetric Wrap Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "black asymmetric wrap mini dress with one shoulder and a draped side; gold statement drop earring, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p016",
+      "name": "Royal Blue Fitted Square-Neck Knit Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "royal cobalt fitted square-neck knit mini dress in a medium stretch; stacked gold rings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p017",
+      "name": "Deep Plum Satin Slip Skirt + Black Scoop Top",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "cool",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "deep plum satin midi slip skirt with a bias cut; fitted black scoop-neck long-sleeve top tucked in; gold layered necklaces, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p018",
+      "name": "Emerald Blazer Co-Ord + Tailored Wide-Leg Shorts",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "emerald green structured fitted blazer and matching tailored high-waist wide-leg shorts in the same fabric; thin gold chain, pointed-toe heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "biker shorts",
+        "crop",
+        "bikini"
+      ],
+      "status": "untested",
+      "notes": "Wide-leg shorts, not biker shorts or bike shorts."
+    },
+    {
+      "outfit_id": "wc_p019",
+      "name": "Silver Metallic Mini Skirt + Black Fitted Long-Sleeve",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "silver metallic high-waist mini skirt; fitted black scoop-neck long-sleeve top; gold hoop earrings, black strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts",
+        "crop"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p020",
+      "name": "Cherry Red Square-Neck Fitted Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "cherry red fitted square-neckline mini dress in smooth stretch fabric; gold hoop earrings, strappy nude heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bodycon",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p021",
+      "name": "Oversized Brown Faux-Leather Blazer + Black Mini Skirt",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out",
+        "editorial"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "oversized chocolate brown faux-leather structured blazer worn open; high-waist black fitted mini skirt; thin gold chain necklace, strappy heeled mules",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p022",
+      "name": "All-Black Turtleneck + Wide-Leg Faux-Leather Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "editorial",
+        "night_out"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted black ribbed turtleneck; high-waist wide-leg faux-leather trousers in matte black; sleek pointed-toe ankle boots, gold rings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p023",
+      "name": "White Linen Wide-Leg Suit + Black Scoop Tank",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "coffee_shop"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "white tailored wide-leg linen trousers with a light crease; matching relaxed white linen blazer worn open over a fitted black scoop-neck tank; minimalist gold studs, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p024",
+      "name": "Camel Belted Trench Coat + Black Fitted Mini Skirt",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "editorial"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "long belted camel trench coat, double-breasted front; black fitted mini skirt visible below the coat hem; pointed heeled boots, small shoulder bag",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p025",
+      "name": "Black Blazer Vest + High-Waist Cream Wide-Leg Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "structured black double-breasted blazer vest, fitted; high-waist cream tailored wide-leg trousers; small gold hoop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p026",
+      "name": "Burgundy Faux-Leather Moto Jacket + High-Rise Dark Jeans",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "editorial"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted burgundy faux-leather moto jacket with silver zipper detail; high-rise dark-wash straight-leg jeans; black pointed ankle boots, small hoop earrings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p027",
+      "name": "Yellow Tailored Blazer Co-Ord + Wide-Leg Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "butter yellow tailored blazer and matching wide-leg trousers co-ord; fitted white ribbed tank underneath the open blazer; gold chain, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p028",
+      "name": "High-Gloss Black Vinyl Trousers + White Fitted Tee",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "editorial"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "high-waist high-gloss black vinyl straight-leg trousers; fitted plain white short-sleeve crew-neck tee tucked in; black pointed-toe ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p029",
+      "name": "Sage Green Satin Midi Skirt + White Fitted Long-Sleeve",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "coffee_shop",
+        "going_out"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "sage green satin midi slip skirt at mid-calf; fitted white ribbed long-sleeve scoop-neck top tucked in; delicate gold chain, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p030",
+      "name": "Denim Mini Skirt + Black Crop Top + Open Black Blazer",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "crop_risk"
+      ],
+      "prompt": "dark-wash fitted denim mini skirt; fitted black ribbed short-sleeve crop top; oversized black blazer worn open over; small gold hoops, chunky black boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": "Crop top risk at waist. Blazer must render open and visible."
+    },
+    {
+      "outfit_id": "wc_p031",
+      "name": "Caramel Faux-Leather Wide-Leg + Cream Ribbed Fitted Top",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "caramel brown faux-leather wide-leg trousers; fitted cream ribbed scoop-neck long-sleeve top tucked in; gold hoop earrings, chunky heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p032",
+      "name": "Dark Plum Wide-Leg Trousers + Ivory Mock-Neck Knit",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "rich dark plum tailored wide-leg trousers; fitted ivory mock-neck ribbed knit top; gold layered chains, block-heel loafers",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p033",
+      "name": "Black Mini Skirt + Sheer Black Top Over Black Cami",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "all",
+      "occasion": "going_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black high-waist fitted mini skirt; fitted black sheer long-sleeve button-front top worn over a fitted black cami underneath; gold chain, pointed-toe heeled boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": "Sheer top requires cami underneath to be visible."
+    },
+    {
+      "outfit_id": "wc_p034",
+      "name": "White Faux-Leather Mini Skirt + Black Ribbed Crop Top",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "crop_risk"
+      ],
+      "prompt": "white faux-leather high-waist mini skirt; fitted black ribbed scoop-neck crop top; small gold hoops, black pointed heeled boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": "Crop top with high-waist skirt. Waist gap risk."
+    },
+    {
+      "outfit_id": "wc_p035",
+      "name": "Pleated Brown Mini Skirt + Black Turtleneck",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "going_out",
+        "editorial"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "pleated chocolate brown mini skirt in a smooth fabric; fitted black ribbed turtleneck tucked in; gold stacked rings, pointed heeled ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p036",
+      "name": "Cream Silk-Look Fitted Midi Dress — Apartment Elegant",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "apartment",
+        "dinner_social"
+      ],
+      "season": "all",
+      "occasion": "dinner_social",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "cream silk-look fitted midi dress with thin straps and a subtle V-neckline; gold hoop earrings, delicate bracelet",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p037",
+      "name": "Terracotta Wide-Leg + Black Ribbed Crop Top — Fit Check",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "street",
+        "apartment"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "crop_risk"
+      ],
+      "prompt": "terracotta wide-leg tailored trousers with a natural drape; fitted black ribbed scoop-neck crop top; small gold hoops",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": "Crop top with wide-leg. Waist gap risk on mirror frame."
+    },
+    {
+      "outfit_id": "wc_p038",
+      "name": "Blush Pink Satin Slip Mini Dress — Pre-Going-Out Mirror",
+      "style_lane": "going_out",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "apartment",
+        "night_out"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "blush pink satin slip mini dress with thin straps and a simple bias-cut silhouette; small pearl earrings",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p039",
+      "name": "Stone Gray Tailored Midi Skirt + Black V-Neck Knit",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "street",
+        "apartment"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "stone-gray tailored midi skirt with a clean hem; fitted black V-neck ribbed knit top tucked in; small gold hoops",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p040",
+      "name": "Black Fitted Ribbed Long-Sleeve + Cream Wide-Leg Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "street",
+        "apartment"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted black ribbed scoop-neck long-sleeve top; high-waist cream tailored wide-leg trousers; gold chain, small hoop earrings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p041",
+      "name": "Cream Lace-Inset Midi Slip Dress — Apartment Mirror",
+      "style_lane": "going_out",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "apartment",
+        "night_out"
+      ],
+      "season": "warm",
+      "occasion": "dinner_social",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "cream satin midi slip dress with delicate lace-inset detail at the hem and neckline; small gold studs, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p042",
+      "name": "Chocolate Knit Fitted Midi Skirt + Caramel Ribbed Top",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "apartment",
+        "dinner_social"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "chocolate brown fitted knit midi skirt with a subtle pencil silhouette; caramel fitted ribbed scoop-neck top tucked in; thin gold chain",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p043",
+      "name": "Black Faux-Leather Mini Skirt + Black Crew-Neck Long-Sleeve",
+      "style_lane": "street",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "street",
+        "going_out"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black faux-leather high-waist mini skirt; fitted plain black crew-neck long-sleeve top; gold hoop earrings, pointed-toe ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p044",
+      "name": "Dusty Olive Midi Slip Skirt + White Scoop Tee",
+      "style_lane": "elevated_casual",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "street",
+        "apartment"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "dusty olive satin midi slip skirt at calf length; simple fitted white scoop-neck tee tucked in; small gold studs, flat strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p045",
+      "name": "Fitted White Ribbed Mini Dress — Minimal Clean",
+      "style_lane": "going_out",
+      "production_lane": "mirror_fitcheck",
+      "scene_fit": [
+        "mirror_fitcheck",
+        "apartment",
+        "going_out"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "fitted white ribbed stretch mini dress with a scoop neckline and clean hemline; small gold hoop earrings, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p046",
+      "name": "Blush Satin Robe Worn Closed — Apartment Vanity",
+      "style_lane": "creator",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "apartment",
+        "skincare"
+      ],
+      "season": "all",
+      "occasion": "apartment",
+      "coverage_level": "full",
+      "body_visibility": "waist_to_head",
+      "risk_tags": [
+        "public_context_risk"
+      ],
+      "prompt": "soft blush satin robe worn belted and fully closed at the waist, mid-thigh length; thin gold ring, bare feet",
+      "avoid_terms": [
+        "open",
+        "lingerie",
+        "underwear",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Apartment and vanity scenes only. Must render as belted and fully closed."
+    },
+    {
+      "outfit_id": "wc_p047",
+      "name": "Sage Green Ribbed Tank + High-Waist Linen Wide-Leg",
+      "style_lane": "elevated_casual",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "street",
+        "apartment"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted sage green ribbed scoop-neck tank top; high-waist wide-leg cream linen trousers; small gold hoops, white clean sneakers",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p048",
+      "name": "Oversized White Button-Down Open + White Cami + Straight Jeans",
+      "style_lane": "creator",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "apartment",
+        "getting_ready"
+      ],
+      "season": "all",
+      "occasion": "apartment",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "oversized white cotton button-down shirt worn open and loose over a fitted white cami; mid-wash straight-leg jeans; small gold studs",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p049",
+      "name": "Ivory Ribbed Mock-Neck Sweater + White Wide-Leg Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "street",
+        "apartment"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted ivory ribbed mock-neck sweater; high-waist clean white wide-leg tailored trousers; gold chain bracelet, minimalist earrings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p050",
+      "name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
+      "style_lane": "elevated_casual",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "mirror_fitcheck",
+        "apartment"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted dusty rose soft-knit off-shoulder top; stone-wash straight-leg jeans; thin gold chain necklace",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p051",
+      "name": "All-White Ribbed Mini Dress — Vanity Mirror Selfie",
+      "style_lane": "going_out",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "mirror_fitcheck",
+        "apartment"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "all-white fitted ribbed mini dress with a crew neckline; layered thin gold chains; strappy white heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p052",
+      "name": "Pearl-White Ribbed Tank + Charcoal Tailored Wide-Leg",
+      "style_lane": "elevated_casual",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "street",
+        "apartment"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted pearl-white ribbed scoop-neck tank top; charcoal gray high-waist wide-leg tailored trousers; gold ring stack, small hoop earrings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p053",
+      "name": "Blush Satin Cami + Open Cream Cardigan + Wide-Leg Shorts",
+      "style_lane": "creator",
+      "production_lane": "beauty_selfie_vanity",
+      "scene_fit": [
+        "beauty_selfie",
+        "apartment",
+        "getting_ready"
+      ],
+      "season": "warm",
+      "occasion": "apartment",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "public_context_risk"
+      ],
+      "prompt": "blush satin cami top with adjustable straps; cream fine-knit open cardigan draped over as outer layer; matching blush wide-leg linen shorts; small gold studs, bare feet",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "lingerie",
+        "underwear"
+      ],
+      "status": "untested",
+      "notes": "Apartment and getting-ready scenes only. Cardigan provides coverage as outer layer."
+    },
+    {
+      "outfit_id": "wc_p054",
+      "name": "Black Faux-Leather Moto Jacket + Black Fitted Midi Dress",
+      "style_lane": "street",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street",
+        "parking_garage"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "structured black faux-leather moto jacket over a fitted black jersey midi dress; gold chain necklace, heeled ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p055",
+      "name": "Chrome Metallic Mini Skirt + Black Scoop Fitted Tee",
+      "style_lane": "street",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street",
+        "going_out"
+      ],
+      "season": "all",
+      "occasion": "going_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "chrome silver metallic high-waist mini skirt; plain fitted black scoop-neck tee tucked in; black pointed heeled boots, gold hoop earrings",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p056",
+      "name": "Long Camel Structured Coat + Black Mini Skirt Visible Below",
+      "style_lane": "elevated_casual",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "long oversized structured camel coat with a wide lapel, worn open; black high-waist fitted mini skirt visible below the coat hem; pointed heeled boots, small shoulder bag",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "biker shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p057",
+      "name": "White + Black Color-Block Blazer + Wide-Leg Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street",
+        "going_out"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "structured white blazer with black panel detailing at collar and lapel; matching white wide-leg tailored trousers; fitted white cami underneath; minimal gold jewelry",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p058",
+      "name": "Red Faux-Leather Moto Jacket + Black Skinny Trousers",
+      "style_lane": "street",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted cherry red faux-leather moto jacket with silver zipper detail; high-waist black slim straight-leg trousers; black pointed-toe heeled boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p059",
+      "name": "Black Moto Jacket Open Over White Fitted Mini Dress",
+      "style_lane": "street",
+      "production_lane": "editorial_flash",
+      "scene_fit": [
+        "editorial",
+        "street",
+        "going_out"
+      ],
+      "season": "all",
+      "occasion": "going_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "fitted white stretch mini dress; black faux-leather moto jacket worn open over it; gold chain, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p060",
+      "name": "Deep Teal Off-Shoulder Satin Mini Dress — Rooftop Evening",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "deep teal satin off-shoulder mini dress with a clean fitted silhouette; statement gold drop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p061",
+      "name": "All-Black Mock-Neck Mini Dress + Statement Gold Chain",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "night_out"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "fitted all-black mock-neck mini dress in smooth jersey; bold layered gold chain necklace; strappy black heeled sandals, gold hoops",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p062",
+      "name": "Copper Metallic Halter Midi Dress — City Night",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "night_out"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "copper bronze metallic fitted midi dress with a halter neckline; gold drop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p063",
+      "name": "Ivory Halter-Neck Mini Dress — Rooftop Summer",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "night_out",
+        "dinner_social"
+      ],
+      "season": "warm",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "ivory white halter-neck mini dress in a smooth lightweight fabric; delicate gold layered necklaces, strappy flat sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p064",
+      "name": "Midnight Blue Sequin-Look Mini Dress",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "night_out"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "midnight blue sequin-finish mini dress with a V-neckline and fitted silhouette; small gold hoops, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p065",
+      "name": "Cream Silk Cowl-Neck Midi Dress + Layered Gold Necklaces",
+      "style_lane": "going_out",
+      "production_lane": "rooftop_night_city",
+      "scene_fit": [
+        "rooftop",
+        "dinner_social",
+        "night_out"
+      ],
+      "season": "warm",
+      "occasion": "dinner_social",
+      "coverage_level": "full",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "cream silk-look draped cowl-neck midi dress with a clean hem; layered delicate gold chain necklaces; strappy gold sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p066",
+      "name": "Black V-Neck Ribbed Sweater + High-Waist Straight Trousers",
+      "style_lane": "elevated_casual",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "street"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted black V-neck ribbed sweater; high-waist straight-cut charcoal trousers; small gold hoops, minimal gold ring",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p067",
+      "name": "Cream Ribbed Fitted Sweater + Wide-Leg Medium-Wash Jeans",
+      "style_lane": "elevated_casual",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "street",
+        "apartment"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted cream ribbed scoop-neck sweater; medium-wash wide-leg straight-cut jeans; white clean loafers",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p068",
+      "name": "Caramel Faux-Leather Midi Skirt + Black Fitted Long-Sleeve",
+      "style_lane": "elevated_casual",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "street",
+        "going_out"
+      ],
+      "season": "cool",
+      "occasion": "going_out",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "caramel faux-leather fitted midi skirt with a subtle slit; fitted plain black long-sleeve top tucked in; gold hoop earrings, heeled ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p069",
+      "name": "Dark Navy Wide-Leg Trousers + White Loosely Tied Button-Down",
+      "style_lane": "elevated_casual",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "street"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "dark navy high-waist tailored wide-leg trousers; crisp white button-down shirt, front-tied loosely at the waist; small gold hoops, strappy sandals",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "bikini",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p070",
+      "name": "Deep Berry Satin Mini Dress — Car Arrival Shot",
+      "style_lane": "going_out",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "night_out"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "deep berry wine satin mini dress with thin straps and a subtle cowl drape; small gold hoop earrings, strappy heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "crop",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p071",
+      "name": "Charcoal Faux-Leather Jacket + Black High-Rise Straight Jeans",
+      "style_lane": "street",
+      "production_lane": "car_elevator",
+      "scene_fit": [
+        "car_elevator",
+        "street",
+        "editorial"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "fitted charcoal faux-leather structured jacket; black high-waist straight-leg jeans; black pointed ankle boots, small gold hoop",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p072",
+      "name": "Burgundy Ribbed High-Neck Sports Bra + Flare Leggings",
+      "style_lane": "fitness",
+      "production_lane": "gym_glam",
+      "scene_fit": [
+        "gym"
+      ],
+      "season": "all",
+      "occasion": "gym",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [
+        "gymwear_drift_risk",
+        "lingerie_risk",
+        "public_context_risk"
+      ],
+      "prompt": "wine burgundy ribbed high-neck sports bra and matching high-waist flare leggings in a matte stretch fabric; white athletic sneakers",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "lingerie",
+        "underwear"
+      ],
+      "status": "untested",
+      "notes": "Gym scene only. Flare leggings reduce silhouette drift. High-neck reduces lingerie read."
+    },
+    {
+      "outfit_id": "wc_p073",
+      "name": "Mint Green Athletic Set — Strappy Sports Bra + High-Waist Leggings",
+      "style_lane": "fitness",
+      "production_lane": "gym_glam",
+      "scene_fit": [
+        "gym"
+      ],
+      "season": "all",
+      "occasion": "gym",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [
+        "gymwear_drift_risk",
+        "lingerie_risk",
+        "public_context_risk"
+      ],
+      "prompt": "mint green matching athletic set: strappy back sports bra and matching high-waist full-length leggings in a four-way stretch; white running shoes",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "lingerie",
+        "underwear"
+      ],
+      "status": "untested",
+      "notes": "Gym scene only. Strappy back reads athletic in gym context."
+    },
+    {
+      "outfit_id": "wc_p074",
+      "name": "Champagne Nude Seamless Set — High-Neck + Full-Length Leggings",
+      "style_lane": "fitness",
+      "production_lane": "gym_glam",
+      "scene_fit": [
+        "gym"
+      ],
+      "season": "all",
+      "occasion": "gym",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [
+        "gymwear_drift_risk",
+        "public_context_risk"
+      ],
+      "prompt": "champagne nude seamless high-neck sports bra and matching high-waist full-length leggings in smooth compression fabric; white minimalist sneakers",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "lingerie",
+        "underwear"
+      ],
+      "status": "untested",
+      "notes": "Gym scene only. Nude tone may drift toward bare-look outside gym context."
+    },
+    {
+      "outfit_id": "wc_p075",
+      "name": "All-White Athletic Set — High-Neck Sports Bra + Leggings",
+      "style_lane": "fitness",
+      "production_lane": "gym_glam",
+      "scene_fit": [
+        "gym"
+      ],
+      "season": "all",
+      "occasion": "gym",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [
+        "gymwear_drift_risk",
+        "lingerie_risk",
+        "public_context_risk"
+      ],
+      "prompt": "all-white fitted high-neck sports bra and matching high-waist full-length leggings in a clean nylon blend; white athletic sneakers",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "lingerie",
+        "underwear"
+      ],
+      "status": "untested",
+      "notes": "Gym scene only. White gym set requires careful context."
+    },
+    {
+      "outfit_id": "wc_p076",
+      "name": "Light Blue Denim Jacket + Cream Wide-Leg + White Ribbed Tank",
+      "style_lane": "elevated_casual",
+      "production_lane": "cafe_styled",
+      "scene_fit": [
+        "cafe_study",
+        "street"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "oversized light blue denim jacket worn open; cream wide-leg tailored trousers; fitted white ribbed tank underneath; small gold hoop earrings, white sneakers",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p077",
+      "name": "Caramel Knit Fitted Turtleneck + Dark-Wash Straight Jeans",
+      "style_lane": "elevated_casual",
+      "production_lane": "cafe_styled",
+      "scene_fit": [
+        "cafe_study",
+        "campus",
+        "street"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "caramel brown fitted knit turtleneck in a soft ribbed fabric; high-waist dark-wash straight-leg jeans; small gold hoop earrings, tan ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
+    },
+    {
+      "outfit_id": "wc_p078",
+      "name": "Black Oversized Blazer + Cream Wide-Leg + White Fitted Tee",
+      "style_lane": "elevated_casual",
+      "production_lane": "cafe_styled",
+      "scene_fit": [
+        "cafe_study",
+        "campus",
+        "street"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "full",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black oversized structured blazer; cream high-waist ribbed wide-leg trousers; simple white fitted crew-neck tee underneath; small gold studs",
+      "avoid_terms": [
+        "bralette",
+        "crop",
+        "shorts",
+        "navel"
+      ],
+      "status": "untested",
+      "notes": ""
     }
   ]
 }
