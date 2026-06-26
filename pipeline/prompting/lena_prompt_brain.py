@@ -25,6 +25,17 @@ IDENTITY_ANCHOR = (
     "Keep face and body faithful to the approved reference element."
 )
 
+LENA_MASTER_IDENTITY = (
+    "Identity fixed: preserve her approved face and body proportions "
+    "across every outfit, pose, scene, and camera angle. "
+    "Do not reinterpret her as a different person. "
+    "Do not slim her down or make her petite. "
+    "Fuller bust, small defined waist, wider hips, fuller thighs, "
+    "rounded hip/glute curve, athletic-curvy hourglass silhouette. "
+    "Outfit, pose, lighting, and action may change; "
+    "face and body proportions may not."
+)
+
 SKIN_REALISM = (
     "natural skin texture, visible pores, subtle redness around nose and cheeks, "
     "mild real-world skin imperfections, realistic facial texture with natural asymmetry, "
@@ -1434,7 +1445,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     reference_mode = choose_reference_mode(media_type, scene)
     reference_policy = reference_policy_for_mode(reference_mode)
     framing_policy = framing_policy_for_mode(reference_mode)
-    body_descriptor = ""
+    body_descriptor = LENA_MASTER_IDENTITY
 
     image_prompt = (
         f"{IDENTITY_ANCHOR} {reference_policy} {body_descriptor} {framing_policy} "

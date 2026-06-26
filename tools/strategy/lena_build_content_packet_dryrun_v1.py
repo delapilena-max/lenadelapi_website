@@ -32,11 +32,17 @@ OUTPUT_BASE = os.path.join(
 )
 
 LENA_IDENTITY_BRIEF = (
-    "Lena (Magdalena Delapi): luxury lifestyle and high-end fashion "
-    "fit-check influencer, soft-glam beauty maintenance and "
-    "fitness-glam aesthetic. Same face, same hairstyle, same outfit "
-    "across all images. Natural skin texture, visible pores, realistic "
-    "detail. Real candid energy -- not a brand shoot. "
+    "Lena (Magdalena Delapi): luxury lifestyle and fit-check influencer, "
+    "soft-glam aesthetic, real candid energy -- not a brand shoot. "
+    "Natural skin texture, visible pores, realistic detail. "
+    "Identity is fixed: preserve her approved face and body proportions "
+    "across every outfit, pose, scene, and camera angle. "
+    "Do not reinterpret her as a different person. "
+    "Do not slim her down or make her petite. "
+    "Preserve fuller bust, small defined waist, wider hips, fuller thighs, "
+    "natural rounded hip/glute curve, athletic-curvy hourglass silhouette. "
+    "Outfit, setting, pose, lighting, and action may change; "
+    "face and body proportions may not. "
 )
 
 AI_TERMS = re.compile(
