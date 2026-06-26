@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from pipeline.prompting.lena_prompt_brain import (
     NEGATIVE_PROMPT,
+    format_catalog_wardrobe_override,
     format_style_override,
     pick_style,
 )
@@ -84,6 +85,10 @@ MASTER_IDENTITY_CHECKS = [
 # ── Paths ──────────────────────────────────────────────────────────────
 PACKET_BASE = ROOT / "pipeline/strategy/lena/content_packets"
 OUTPUT_BASE = ROOT / "pipeline/strategy/lena/kling_payloads"
+WARDROBE_CATALOG = (
+    ROOT
+    / "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json"
+)
 
 
 def locate_packet(recipe_id: str, date: str) -> Path:
@@ -127,6 +132,39 @@ def rng_for_packet(date: str, recipe_id: str) -> random.Random:
         hashlib.sha256(seed_str.encode()).hexdigest()[:8], 16
     )
     return random.Random(seed_int)
+
+
+def load_catalog() -> dict:
+    with open(WARDROBE_CATALOG, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def select_catalog_outfit(
+    catalog: dict, outfit_id: str, allow_high_risk: bool
+) -> dict:
+    outfit = next(
+        (o for o in catalog["outfits"] if o["outfit_id"] == outfit_id),
+        None,
+    )
+    if outfit is None:
+        raise SystemExit(
+            f"[ABORT] wardrobe_outfit_id '{outfit_id}' not in catalog"
+        )
+    if outfit["status"] == "rejected":
+        raise SystemExit(
+            f"[ABORT] outfit '{outfit_id}' status=rejected — cannot use"
+        )
+    if outfit["status"] == "high_risk" and not allow_high_risk:
+        raise SystemExit(
+            f"[ABORT] outfit '{outfit_id}' is high_risk but "
+            "wardrobe_allow_high_risk is false"
+        )
+    if outfit["status"] == "untested":
+        raise SystemExit(
+            f"[ABORT] outfit '{outfit_id}' status=untested — "
+            "only approved outfits allowed in v1"
+        )
+    return outfit
 
 
 def build_final_prompt(
@@ -195,13 +233,25 @@ def build_envelope(
         "source_recipe_id": packet["recipe_id"],
         "generated_date": packet["generated_date"],
         "prompt_chars": len(payload["prompt"]),
-        "wardrobe_style_used": {
-            "category": style["category"],
-            "outfit": style["outfit"],
-            "hair": style["hair"],
-            "makeup": style["makeup"],
-            "accessories": style["accessories"],
-        },
+        "wardrobe_style_used": (
+            {
+                "source": "catalog_v1",
+                "outfit_id": style["outfit_id"],
+                "name": style["name"],
+                "status": style["status"],
+                "risk_tags": style["risk_tags"],
+                "style_lane": style["style_lane"],
+            }
+            if style.get("_source") == "catalog_v1"
+            else {
+                "source": "style_bank",
+                "category": style["category"],
+                "outfit": style["outfit"],
+                "hair": style["hair"],
+                "makeup": style["makeup"],
+                "accessories": style["accessories"],
+            }
+        ),
         "negative_prompt_present": bool(
             payload.get("negative_prompt")
         ),
@@ -265,11 +315,19 @@ def print_summary(
     print(f"  prompt chars    : {chars}")
     print(f"  under 2500      : {chars < 2500}")
     print()
-    print(f"  wardrobe        : {style['category']}")
-    print(f"  outfit          : {style['outfit']}")
-    print(f"  hair            : {style['hair']}")
-    print(f"  makeup          : {style['makeup']}")
-    print(f"  accessories     : {style['accessories']}")
+    if style.get("source") == "catalog_v1":
+        print(f"  wardrobe source : catalog_v1")
+        print(f"  outfit_id       : {style['outfit_id']}")
+        print(f"  outfit name     : {style['name']}")
+        print(f"  status          : {style['status']}")
+        print(f"  risk_tags       : {style['risk_tags']}")
+        print(f"  style_lane      : {style['style_lane']}")
+    else:
+        print(f"  wardrobe        : {style['category']}")
+        print(f"  outfit          : {style['outfit']}")
+        print(f"  hair            : {style['hair']}")
+        print(f"  makeup          : {style['makeup']}")
+        print(f"  accessories     : {style['accessories']}")
     print()
     print(f"  fromElementId   : {masked}")
     print(f"  elementVersion  : {envelope['element_version_present']}")
@@ -329,11 +387,34 @@ def main() -> int:
     recipe_id = packet["recipe_id"]
     date = packet["generated_date"]
 
-    rng = rng_for_packet(date, recipe_id)
-    style = pick_style(rng)
-    final_prompt, _ = build_final_prompt(
-        packet["compact_kling_prompt_preview"], style
-    )
+    outfit_id = packet.get("wardrobe_outfit_id")
+    allow_hr = packet.get("wardrobe_allow_high_risk", False)
+
+    if outfit_id:
+        catalog = load_catalog()
+        catalog_outfit = select_catalog_outfit(
+            catalog, outfit_id, allow_hr
+        )
+        wardrobe_text = format_catalog_wardrobe_override(catalog_outfit)
+        base = packet["compact_kling_prompt_preview"]
+        combined = f"{base} {wardrobe_text}".strip()
+        if len(combined) > 2499:
+            combined = combined[:2499]
+        final_prompt = combined
+        style = {
+            "_source": "catalog_v1",
+            "outfit_id": catalog_outfit["outfit_id"],
+            "name": catalog_outfit["name"],
+            "status": catalog_outfit["status"],
+            "risk_tags": catalog_outfit["risk_tags"],
+            "style_lane": catalog_outfit["style_lane"],
+        }
+    else:
+        rng = rng_for_packet(date, recipe_id)
+        style = pick_style(rng)
+        final_prompt, _ = build_final_prompt(
+            packet["compact_kling_prompt_preview"], style
+        )
 
     if not check_master_identity(final_prompt):
         raise SystemExit(
