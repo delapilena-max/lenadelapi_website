@@ -34,3 +34,4 @@ _secret_backups/
 envbackup*.txt
 *envbackup*.txt
 *env*backup*.txt
+pipeline/strategy/lena/kling_payloads/
