@@ -186,6 +186,7 @@ def build_envelope(
         "provider_call_enabled": False,
         "generation_call_performed": False,
         "api_call_made": False,
+        "publishing_approval": "not_approved",
         "source_packet_path": str(source_path),
         "source_packet_id": packet["packet_id"],
         "source_recipe_id": packet["recipe_id"],
