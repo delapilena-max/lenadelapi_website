@@ -722,6 +722,23 @@ def format_style_override(entry: dict) -> str:
         "not the reference image clothing."
     )
 
+
+def format_catalog_wardrobe_override(entry: dict) -> str:
+    """Clothes-only wardrobe override for catalog entries.
+
+    Catalog entries have no hair or makeup fields by design.
+    Identity, face, hair, body, and skin tone come from the
+    approved character element and reference images only.
+    """
+    return (
+        "Wardrobe override — use this catalog outfit for clothing only: "
+        f"{entry['prompt']}. "
+        "Lena's face, hair, body, skin tone, and identity come from "
+        "the approved character element/reference images, "
+        "not the outfit text."
+    )
+
+
 PHOTO_SCENES = [
     {"lane":"morning apartment","action":"standing barefoot in her kitchen while pouring coffee into a ceramic mug, glancing toward the window like she is still waking up","environment":"a lived-in apartment kitchen with warm wood shelves, a half-open linen curtain, a small bowl of oranges, and morning light sliding across the counter","details":"steam from the coffee, one loose strand of hair near her cheek, a phone face-down on the counter, soft shadows on the wall","camera":"candid editorial lifestyle photo, 50mm lens, shallow depth of field, waist-up composition","lighting":"early morning natural window light, warm highlights, gentle contrast","caption":"coffee first, personality later"},
     {"lane":"apartment doorway","action":"leaving through the apartment doorway, looking back over her shoulder with a half-smile like she almost forgot something but went anyway","environment":"a lived-in apartment entryway with a coat rack hung with jackets in the foreground, a small entry table with keys and mail, a potted plant near the door, warm interior light spilling into the hallway in the background","details":"tote bag over her shoulder, keys in one hand, a jacket draped over her arm, soft shadow from the doorframe","camera":"full-body candid lifestyle portrait, 35mm lens, natural candid framing from just outside the door","lighting":"warm apartment interior light mixing with cool hallway light, soft natural split on her face","caption":"leaving on the first try today"},

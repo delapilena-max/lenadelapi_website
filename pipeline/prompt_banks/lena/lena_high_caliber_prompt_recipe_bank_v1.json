@@ -109,7 +109,10 @@
       "provider_rendering_notes": {
         "kling_omni": "Produce aisle, 3/4 angle to shelving. One hand selects one berry clamshell; other holds a low nearly-empty basket with 2-3 mixed items only, never full of oranges. Natural closed-mouth smirk, caught mid-errand. Real phone-photo face with pores/asymmetry, not CGI/doll. Blank signs only; no readable logos, prices, labels. Soft crates, misted produce, fridge reflections, uneven grocery light. Body visible; props do not block body.",
         "openart": "Grocery store interior, produce section background, warm ambient. Negative: readable labels, price tags, aisle signs, product brands, studio background."
-      }
+      },
+      "wardrobe_outfit_id": "wc_e001",
+      "wardrobe_allow_high_risk": false,
+      "wardrobe_notes": "QA-confirmed white French terry hoodie set. task 899503921557798966."
     },
     {
       "id": "hcr_004",
