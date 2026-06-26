@@ -184,6 +184,18 @@ def main():
 
     for recipe_id in recipe_ids:
         recipe = select_recipe(recipe_bank, recipe_id)
+
+        if (
+            recipe.get("production_status") == "test_only"
+            and args.recipes is None
+        ):
+            print(
+                f"[SKIP] {recipe_id}: production_status=test_only"
+                f" -- excluded from default batch"
+                f" (use --recipes {recipe_id} to force)"
+            )
+            continue
+
         linked_cats = recipe.get("linked_hook_categories", [])
 
         hook, cat_used, reason = select_hook_no_repeat(

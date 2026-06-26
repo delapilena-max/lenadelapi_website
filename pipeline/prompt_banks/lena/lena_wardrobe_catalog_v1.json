@@ -58,8 +58,8 @@
         "navel",
         "biker shorts"
       ],
-      "status": "approved",
-      "notes": "QA-confirmed 2026-06-26, task 899503921557798966. Body lock held; no navel gap. Hoodie+jogger class is risky in other combos — only this specific white French terry variant is approved."
+      "status": "rejected",
+      "notes": "Live proof 2026-06-26 rejected by Nicolas. Hoodie/jogger set is not aligned with Lena production fashion direction and rendered cropped/midriff despite full-hem wording. Keep as historical technical test artifact only. Do not use for production."
     },
     {
       "outfit_id": "wc_e002",

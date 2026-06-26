@@ -39,6 +39,7 @@ load_catalog = _builder.load_catalog
 from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
     pick_style,
+    pick_style_production,
 )
 
 # ── Synthetic catalog for rejected-outfit test (no real rejected exists) ──
@@ -50,6 +51,20 @@ SYNTHETIC_CATALOG = {
             "status": "rejected",
             "risk_tags": [],
             "prompt": "synthetic test outfit — must not reach generation",
+            "avoid_terms": [],
+        }
+    ]
+}
+
+SYNTHETIC_CATALOG_APPROVED = {
+    "outfits": [
+        {
+            "outfit_id": "wc_syn_approved",
+            "name": "Synthetic Approved — test only, never use",
+            "status": "approved",
+            "risk_tags": [],
+            "style_lane": "test",
+            "prompt": "synthetic approved test outfit — gate testing only",
             "avoid_terms": [],
         }
     ]
@@ -103,103 +118,174 @@ def run(label: str, fn) -> None:
 # ── Load real catalog once ─────────────────────────────────────────────────
 real_catalog = load_catalog()
 
-# ── Test cases ────────────────────────────────────────────────────────────
+# ── Test cases ────────────────────────────────────────────────────────────────
 print("=" * 64)
 print("  Lena Wardrobe Catalog Guardrail Validation v1")
 print("=" * 64)
 
-# TC01: approved / wc_e001 / allow_high_risk=False
+# TC01: wc_e001 now rejected in real catalog — abort unconditionally
 def tc_01():
-    outfit = select_catalog_outfit(real_catalog, "wc_e001", False)
-    assert outfit["status"] == "approved", f"status={outfit['status']!r}"
-    assert outfit["outfit_id"] == "wc_e001"
+    with expect_abort("status=rejected"):
+        select_catalog_outfit(real_catalog, "wc_e001", False)
 
-run("TC01  approved / wc_e001 / allow_hr=False", tc_01)
+run(
+    "TC01  wc_e001 rejected / allow_hr=False"
+    " => ABORT 'status=rejected'",
+    tc_01,
+)
 
-# TC02: approved / wc_e001 / allow_high_risk=True (flag must not break it)
+# TC02: wc_e001 rejected — allow_hr=True does not override rejected
 def tc_02():
-    outfit = select_catalog_outfit(real_catalog, "wc_e001", True)
-    assert outfit["status"] == "approved", f"status={outfit['status']!r}"
-    assert outfit["outfit_id"] == "wc_e001"
+    with expect_abort("status=rejected"):
+        select_catalog_outfit(real_catalog, "wc_e001", True)
 
-run("TC02  approved / wc_e001 / allow_hr=True", tc_02)
+run(
+    "TC02  wc_e001 rejected / allow_hr=True"
+    " => ABORT 'status=rejected'",
+    tc_02,
+)
 
-# TC03: nonexistent outfit_id => ABORT
+# TC03: synthetic approved outfit => PASS (no real approved in catalog)
 def tc_03():
-    with expect_abort("not in catalog"):
-        select_catalog_outfit(real_catalog, "wc_BOGUS_999", False)
+    outfit = select_catalog_outfit(
+        SYNTHETIC_CATALOG_APPROVED, "wc_syn_approved", False
+    )
+    assert outfit["status"] == "approved", (
+        f"status={outfit['status']!r}"
+    )
+    assert outfit["outfit_id"] == "wc_syn_approved"
 
-run("TC03  nonexistent outfit_id => ABORT 'not in catalog'", tc_03)
+run("TC03  synthetic approved / allow_hr=False => PASS", tc_03)
 
-# TC04: rejected outfit (synthetic catalog) => ABORT
+# TC04: synthetic rejected outfit => ABORT (gate isolation test)
 def tc_04():
     with expect_abort("status=rejected"):
         select_catalog_outfit(SYNTHETIC_CATALOG, "wc_syn_rejected", False)
 
-run("TC04  rejected outfit (synthetic) => ABORT 'status=rejected'", tc_04)
+run("TC04  synthetic rejected => ABORT 'status=rejected'", tc_04)
 
-# TC05: untested / wc_e002 / allow_hr=False => ABORT
+# TC05: nonexistent outfit_id => ABORT
 def tc_05():
+    with expect_abort("not in catalog"):
+        select_catalog_outfit(real_catalog, "wc_BOGUS_999", False)
+
+run("TC05  nonexistent outfit_id => ABORT 'not in catalog'", tc_05)
+
+# TC06: untested / wc_e002 / allow_hr=False => ABORT
+def tc_06():
     with expect_abort("status=untested"):
         select_catalog_outfit(real_catalog, "wc_e002", False)
 
-run("TC05  untested / wc_e002 / allow_hr=False => ABORT 'status=untested'", tc_05)
+run(
+    "TC06  untested / wc_e002 / allow_hr=False"
+    " => ABORT 'status=untested'",
+    tc_06,
+)
 
-# TC06: untested / wc_e002 / allow_hr=True => ABORT (no allow flag for untested)
-def tc_06():
+# TC07: untested / wc_e002 / allow_hr=True => ABORT (no allow for untested)
+def tc_07():
     with expect_abort("status=untested"):
         select_catalog_outfit(real_catalog, "wc_e002", True)
 
-run("TC06  untested / wc_e002 / allow_hr=True => ABORT 'status=untested'", tc_06)
+run(
+    "TC07  untested / wc_e002 / allow_hr=True"
+    " => ABORT 'status=untested'",
+    tc_07,
+)
 
-# TC07: high_risk / wc_a001 / allow_hr=False => ABORT
-def tc_07():
+# TC08: high_risk / wc_a001 / allow_hr=False => ABORT
+def tc_08():
     with expect_abort("high_risk"):
         select_catalog_outfit(real_catalog, "wc_a001", False)
 
-run("TC07  high_risk / wc_a001 / allow_hr=False => ABORT 'high_risk'", tc_07)
+run(
+    "TC08  high_risk / wc_a001 / allow_hr=False => ABORT 'high_risk'",
+    tc_08,
+)
 
-# TC08: high_risk / wc_a001 / allow_hr=True => PASS (dry-run gate only)
-def tc_08():
+# TC09: high_risk / wc_a001 / allow_hr=True => PASS (dry-run gate only)
+def tc_09():
     outfit = select_catalog_outfit(real_catalog, "wc_a001", True)
-    assert outfit["status"] == "high_risk", f"status={outfit['status']!r}"
+    assert outfit["status"] == "high_risk", (
+        f"status={outfit['status']!r}"
+    )
     assert len(outfit["risk_tags"]) > 0, "risk_tags must be non-empty"
 
-run("TC08  high_risk / wc_a001 / allow_hr=True => PASS (dry-run only)", tc_08)
+run(
+    "TC09  high_risk / wc_a001 / allow_hr=True => PASS (dry-run only)",
+    tc_09,
+)
 
-# TC09: no wardrobe_outfit_id in packet => STYLE_BANK fallback preserved
-def tc_09():
-    synthetic_packet = {"recipe_id": "hcr_001", "compact_kling_prompt_preview": "x"}
+# TC10: no wardrobe_outfit_id => pick_style() STYLE_BANK fallback preserved
+def tc_10():
+    synthetic_packet = {
+        "recipe_id": "hcr_001",
+        "compact_kling_prompt_preview": "x",
+    }
     outfit_id = synthetic_packet.get("wardrobe_outfit_id")
     assert not outfit_id, f"Expected falsy outfit_id, got: {outfit_id!r}"
     style = pick_style(random.Random(42))
     for key in ("category", "outfit", "hair", "makeup", "accessories"):
         assert key in style, f"STYLE_BANK entry missing '{key}'"
-    assert "_source" not in style, "STYLE_BANK entry must not have '_source'"
+    assert "_source" not in style, (
+        "STYLE_BANK entry must not have '_source'"
+    )
 
-run("TC09  no wardrobe_outfit_id => STYLE_BANK fallback preserved", tc_09)
+run("TC10  no wardrobe_outfit_id => STYLE_BANK fallback preserved", tc_10)
 
-# TC10: format_catalog_wardrobe_override is clothes-only; no avoid_terms injected
-def tc_10():
+# TC11: pick_style_production excludes cozy, fitness, and blocked terms
+def tc_11():
+    blocked_terms = [
+        "hoodie", "jogger", "joggers", "sweatpants",
+        "pajama", "pajamas", "biker shorts", "bike shorts",
+        "bralette", "bodysuit", "jumpsuit",
+    ]
+    for seed in range(30):
+        style = pick_style_production(random.Random(seed))
+        cat = style.get("category")
+        assert cat not in ("cozy", "fitness"), (
+            f"seed={seed}: excluded category '{cat}'"
+            f" in production pool: {style['outfit']!r}"
+        )
+        outfit_lower = style.get("outfit", "").lower()
+        for term in blocked_terms:
+            assert term.lower() not in outfit_lower, (
+                f"seed={seed}: blocked term '{term}'"
+                f" in: {style['outfit']!r}"
+            )
+
+run(
+    "TC11  pick_style_production excludes cozy + blocked terms (30 seeds)",
+    tc_11,
+)
+
+# TC12: format_catalog_wardrobe_override clothes-only; no avoid_terms injected
+def tc_12():
     wc_e001 = next(
         o for o in real_catalog["outfits"] if o["outfit_id"] == "wc_e001"
     )
     output = format_catalog_wardrobe_override(wc_e001)
     assert "clothing only" in output, "Output missing 'clothing only'"
-    assert "approved character element/reference images" in output, \
+    assert "approved character element/reference images" in output, (
         "Output missing identity disclaimer"
-    assert "not the outfit text" in output, "Output missing 'not the outfit text'"
+    )
+    assert "not the outfit text" in output, (
+        "Output missing 'not the outfit text'"
+    )
     assert wc_e001["prompt"] in output, "Output must include entry['prompt']"
     for term in wc_e001["avoid_terms"]:
         assert term not in output, (
             f"avoid_term '{term}' found in output — must not be injected"
         )
 
-run("TC10  format_catalog_wardrobe_override: clothes-only, no avoid_terms", tc_10)
+run(
+    "TC12  format_catalog_wardrobe_override: clothes-only, no avoid_terms",
+    tc_12,
+)
 
-# ── Summary ───────────────────────────────────────────────────────────────
+# ── Summary ───────────────────────────────────────────────────────────────────
 print("=" * 64)
-print(f"  Results: {_passed} passed  /  {_failed} failed  /  10 total")
+print(f"  Results: {_passed} passed  /  {_failed} failed  /  12 total")
 print("=" * 64)
 print()
 if _failed:

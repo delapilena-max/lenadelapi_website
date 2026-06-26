@@ -705,6 +705,37 @@ def pick_style(rng=None) -> dict:
     return _rng.choice(STYLE_BANK)
 
 
+_PRODUCTION_EXCLUDE_CATEGORIES = {"cozy", "fitness"}
+_PRODUCTION_BLOCKED_TERMS = [
+    "hoodie", "jogger", "joggers", "sweatpants",
+    "pajama", "pajamas", "biker shorts", "bike shorts",
+    "bralette", "bodysuit", "jumpsuit",
+]
+
+
+def pick_style_production(rng=None) -> dict:
+    """Production-safe STYLE_BANK draw.
+
+    Excludes cozy/fitness categories and outfits with blocked terms.
+    Target categories: elevated_casual, street, going_out, creator.
+    """
+    _rng = rng if rng is not None else random.Random()
+    pool = [
+        s for s in STYLE_BANK
+        if s.get("category") not in _PRODUCTION_EXCLUDE_CATEGORIES
+        and not any(
+            term.lower() in s.get("outfit", "").lower()
+            for term in _PRODUCTION_BLOCKED_TERMS
+        )
+    ]
+    if not pool:
+        raise SystemExit(
+            "[ABORT] pick_style_production: filtered pool is empty -- "
+            "no production-safe STYLE_BANK entries remain"
+        )
+    return _rng.choice(pool)
+
+
 def format_style_override(entry: dict) -> str:
     """Return wardrobe-override prompt line for BodyLock generation.
 
