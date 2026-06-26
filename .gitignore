@@ -35,3 +35,4 @@ envbackup*.txt
 *envbackup*.txt
 *env*backup*.txt
 pipeline/strategy/lena/kling_payloads/
+pipeline/strategy/lena/kling_results/
