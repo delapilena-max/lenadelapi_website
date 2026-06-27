@@ -30,6 +30,14 @@ HOOK_BANK = os.path.join(
 OUTPUT_BASE = os.path.join(
     ROOT, "pipeline", "strategy", "lena", "content_packets"
 )
+WARDROBE_CATALOG = os.path.join(
+    ROOT, "pipeline", "prompt_banks", "lena",
+    "lena_wardrobe_catalog_v1.json"
+)
+ENV_CATALOG = os.path.join(
+    ROOT, "pipeline", "prompt_banks", "lena",
+    "lena_environment_catalog_v1.json"
+)
 
 LENA_IDENTITY_BRIEF = (
     "Lena (Magdalena Delapi): luxury lifestyle and fit-check influencer, "
@@ -264,6 +272,9 @@ def build_packet(recipe, hook, hook_reason, run_date):
         "cta_recommendation": derive_cta(recipe),
         "metrics_hypothesis": derive_metrics_hypothesis(recipe),
         "scene_logic_contract": recipe.get("scene_logic_contract", {}),
+        "production_proof_mode": recipe.get("production_proof_mode", False),
+        "environment_id": recipe.get("environment_id"),
+        "environment_context": recipe.get("environment_context", ""),
         "safety_flags": {},
     }
 
@@ -407,6 +418,22 @@ def main():
         "--date", default=None,
         help="Override date (YYYY-MM-DD). Defaults to today UTC."
     )
+    parser.add_argument(
+        "--outfit-id", default=None, dest="outfit_id",
+        help=(
+            "Production-proof outfit override (e.g. wc_p045). "
+            "Rejected hard-aborts. Untested allowed in dry-run "
+            "proof only. High-risk requires recipe "
+            "wardrobe_allow_high_risk."
+        ),
+    )
+    parser.add_argument(
+        "--env-id", default=None, dest="env_id",
+        help=(
+            "Production-proof environment overlay (e.g. env_m012). "
+            "Must exist in catalog and allow the recipe scene_type."
+        ),
+    )
     args = parser.parse_args()
 
     run_date = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -431,7 +458,71 @@ def main():
     print("[lena_build_content_packet_dryrun_v1] Loading hook bank...")
     hook_bank = load_json(HOOK_BANK)
 
-    recipe = select_recipe(recipe_bank, args.recipe)
+    recipe = dict(select_recipe(recipe_bank, args.recipe))
+
+    if args.outfit_id:
+        wf_data = load_json(WARDROBE_CATALOG)
+        wf_entry = next(
+            (o for o in wf_data["outfits"]
+             if o["outfit_id"] == args.outfit_id),
+            None,
+        )
+        if wf_entry is None:
+            raise SystemExit(
+                f"[ABORT] --outfit-id '{args.outfit_id}' "
+                "not found in wardrobe catalog"
+            )
+        if wf_entry["status"] == "rejected":
+            raise SystemExit(
+                f"[ABORT] --outfit-id '{args.outfit_id}' "
+                "status=rejected -- hard blocked"
+            )
+        if (
+            wf_entry["status"] == "high_risk"
+            and not recipe.get("wardrobe_allow_high_risk")
+        ):
+            raise SystemExit(
+                f"[ABORT] --outfit-id '{args.outfit_id}' "
+                "status=high_risk but recipe "
+                "wardrobe_allow_high_risk is false -- "
+                "set it explicitly to allow"
+            )
+        recipe["wardrobe_outfit_id"] = args.outfit_id
+        recipe["production_proof_mode"] = True
+        print(
+            f"[lena_build_content_packet_dryrun_v1] "
+            f"production-proof outfit: {args.outfit_id} "
+            f"(status={wf_entry['status']})"
+        )
+
+    if args.env_id:
+        env_data = load_json(ENV_CATALOG)
+        env_entry = next(
+            (e for e in env_data["environments"]
+             if e["environment_id"] == args.env_id),
+            None,
+        )
+        if env_entry is None:
+            raise SystemExit(
+                f"[ABORT] --env-id '{args.env_id}' "
+                "not found in environment catalog"
+            )
+        if recipe["scene_type"] not in env_entry.get(
+            "allowed_recipe_types", []
+        ):
+            raise SystemExit(
+                f"[ABORT] --env-id '{args.env_id}' does not "
+                f"permit scene_type '{recipe['scene_type']}'"
+            )
+        recipe["environment_id"] = args.env_id
+        recipe["environment_context"] = (
+            f"Environment: {env_entry['prompt_fragment']} "
+        )
+        print(
+            f"[lena_build_content_packet_dryrun_v1] "
+            f"production-proof env: {args.env_id}"
+        )
+
     linked_cats = recipe.get("linked_hook_categories", [])
     print(
         f"[lena_build_content_packet_dryrun_v1] "

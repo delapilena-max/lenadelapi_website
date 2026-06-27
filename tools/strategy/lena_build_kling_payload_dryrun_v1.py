@@ -141,7 +141,10 @@ def load_catalog() -> dict:
 
 
 def select_catalog_outfit(
-    catalog: dict, outfit_id: str, allow_high_risk: bool
+    catalog: dict,
+    outfit_id: str,
+    allow_high_risk: bool,
+    is_proof: bool = False,
 ) -> dict:
     outfit = next(
         (o for o in catalog["outfits"] if o["outfit_id"] == outfit_id),
@@ -161,9 +164,15 @@ def select_catalog_outfit(
             "wardrobe_allow_high_risk is false"
         )
     if outfit["status"] == "untested":
-        raise SystemExit(
-            f"[ABORT] outfit '{outfit_id}' status=untested — "
-            "only approved outfits allowed in v1"
+        if not is_proof:
+            raise SystemExit(
+                f"[ABORT] outfit '{outfit_id}' status=untested -- "
+                "only approved outfits allowed in v1"
+            )
+        print(
+            f"[PRODUCTION-PROOF] untested gate bypassed for "
+            f"'{outfit_id}' -- dry-run proof mode; "
+            "catalog status unchanged"
         )
     return outfit
 
@@ -272,6 +281,11 @@ def build_envelope(
         "scene_logic_contract_present": bool(
             packet.get("scene_logic_contract")
         ),
+        "production_proof_mode": packet.get(
+            "production_proof_mode", False
+        ),
+        "environment_id_used": packet.get("environment_id"),
+        "wardrobe_outfit_id_used": packet.get("wardrobe_outfit_id"),
         "payload": payload,
     }
 
@@ -348,6 +362,18 @@ def print_summary(
         "  scene contract  : "
         f"{envelope.get('scene_logic_contract_present', False)}"
     )
+    print(
+        "  proof mode      : "
+        f"{envelope.get('production_proof_mode', False)}"
+    )
+    print(
+        "  outfit used     : "
+        f"{envelope.get('wardrobe_outfit_id_used', 'style_bank')}"
+    )
+    print(
+        "  env used        : "
+        f"{envelope.get('environment_id_used', 'none')}"
+    )
     print()
     print(f"  VALIDATION      : {'PASSED' if all_ok else 'FAILED'}")
     print()
@@ -397,15 +423,24 @@ def main() -> int:
 
     outfit_id = packet.get("wardrobe_outfit_id")
     allow_hr = packet.get("wardrobe_allow_high_risk", False)
+    is_proof = (
+        packet.get("production_proof_mode", False)
+        and packet.get("dry_run") is True
+        and packet.get("provider_call_enabled") is False
+    )
 
     if outfit_id:
         catalog = load_catalog()
         catalog_outfit = select_catalog_outfit(
-            catalog, outfit_id, allow_hr
+            catalog, outfit_id, allow_hr, is_proof=is_proof
         )
         wardrobe_text = format_catalog_wardrobe_override(catalog_outfit)
         base = packet["compact_kling_prompt_preview"]
-        combined = f"{base} {wardrobe_text}".strip()
+        env_ctx = packet.get("environment_context", "")
+        if env_ctx:
+            combined = f"{base} {env_ctx}{wardrobe_text}".strip()
+        else:
+            combined = f"{base} {wardrobe_text}".strip()
         if len(combined) > 2499:
             combined = combined[:2499]
         final_prompt = combined
