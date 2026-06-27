@@ -48,6 +48,14 @@ LENA_IDENTITY_BRIEF = (
     "face and body proportions may not. "
 )
 
+SKIN_REALISM_COMPACT = (
+    "Skin realism: preserve Lena's reference-accurate beauty marks only. "
+    "Natural pores, subtle redness, realistic asymmetry. "
+    "No random added freckles, no freckle scatter, "
+    "no new mole placements, no heavy freckle clusters. "
+    "Not airbrushed, not poreless, not plastic. "
+)
+
 AI_TERMS = re.compile(
     r"\b(ai|bot|virtual|synthetic|fake|generated|prompt|algorithm|"
     r"chatgpt|claude|kling|chatbot|tool|llm)\b",
@@ -133,7 +141,10 @@ def build_compact_kling_prompt(recipe):
     kling_notes = (
         recipe.get("provider_rendering_notes", {}).get("kling_omni", "")
     )
-    prompt = LENA_IDENTITY_BRIEF + scene_prefix + kling_notes
+    prompt = (
+        LENA_IDENTITY_BRIEF + SKIN_REALISM_COMPACT
+        + scene_prefix + kling_notes
+    )
     return prompt[:2499]
 
 
@@ -252,6 +263,7 @@ def build_packet(recipe, hook, hook_reason, run_date):
         ),
         "cta_recommendation": derive_cta(recipe),
         "metrics_hypothesis": derive_metrics_hypothesis(recipe),
+        "scene_logic_contract": recipe.get("scene_logic_contract", {}),
         "safety_flags": {},
     }
 
