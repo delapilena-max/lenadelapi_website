@@ -2350,12 +2350,13 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "fitted white ribbed stretch mini dress with a scoop neckline and clean hemline; small gold hoop earrings, strappy sandals",
+      "prompt": "fitted white ribbed stretch mini dress with a visible scoop neckline (not strapless) and clean hemline; small gold hoop earrings, strappy sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
         "crop",
-        "shorts"
+        "shorts",
+        "strapless"
       ],
       "status": "untested",
       "notes": ""

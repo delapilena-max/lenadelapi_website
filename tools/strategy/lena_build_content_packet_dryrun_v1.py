@@ -59,7 +59,7 @@ LENA_IDENTITY_BRIEF = (
 SKIN_REALISM_COMPACT = (
     "Skin realism: preserve Lena's reference-accurate beauty marks only. "
     "Natural pores, subtle redness, realistic asymmetry. "
-    "No random added freckles, no freckle scatter, "
+    "No random added freckles, no new freckle scatter on face or cheeks, "
     "no new mole placements, no heavy freckle clusters. "
     "Not airbrushed, not poreless, not plastic. "
 )

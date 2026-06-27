@@ -393,13 +393,16 @@
         "ring light",
         "alcohol",
         "hotel-style headboard",
-        "readable text"
+        "readable text",
+        "bulb-frame mirror",
+        "Hollywood vanity mirror",
+        "vanity lights on mirror"
       ],
       "mood": "evening contrast, cinematic, stylish going-out prep",
       "risk_tags": [],
-      "prompt_fragment": "bedroom, tall frameless full-length mirror, cool blue-hour window light from one side, warm bedside lamp from the other, neutral wall, soft shadow gradient, cinematic evening contrast",
+      "prompt_fragment": "bedroom, tall frameless full-length mirror (no bulb frame, no Hollywood vanity mirror, no vanity lights), cool blue-hour window light from one side, warm bedside lamp from the other, neutral wall, soft shadow gradient, cinematic evening contrast",
       "status": "untested",
-      "notes": ""
+      "notes": "Mirror drift observed 2026-06-27: model generated Hollywood vanity bulb frame instead of tall frameless mirror. Mirror exclusions added to props_blocked and prompt_fragment."
     },
     {
       "environment_id": "env_g001",
