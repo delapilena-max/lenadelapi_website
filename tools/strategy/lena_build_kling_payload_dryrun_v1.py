@@ -269,6 +269,9 @@ def build_envelope(
         "image_list_count": len(payload.get("image_list", [])),
         "blocked_terms_absent": len(blocked) == 0,
         "blocked_terms_found": blocked,
+        "scene_logic_contract_present": bool(
+            packet.get("scene_logic_contract")
+        ),
         "payload": payload,
     }
 
@@ -341,6 +344,10 @@ def print_summary(
     print(f"  blocked absent  : {envelope['blocked_terms_absent']}")
     if blocked:
         print(f"  BLOCKED FOUND   : {blocked}")
+    print(
+        "  scene contract  : "
+        f"{envelope.get('scene_logic_contract_present', False)}"
+    )
     print()
     print(f"  VALIDATION      : {'PASSED' if all_ok else 'FAILED'}")
     print()

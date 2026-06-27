@@ -45,8 +45,35 @@
       "caption_angle": "Playful self-aware -- she checked, the mirror agreed, she posted. Short, present-tense, quiet punchline.",
       "caption_draft": "the mirror said yes first",
       "provider_rendering_notes": {
-        "kling_omni": "Body at 35 degrees toward mirror, eyes at reflection not lens. Window plus warm lamp fill. No phone or arm in mirror. Under 2500 chars.",
+        "kling_omni": "Body at 35 degrees toward mirror, eyes at reflection not lens. Window plus warm lamp fill. No phone or arm in mirror. Mirror has slight smudge marks; blurred bed edge with folded throw and small plant in background bokeh; warm neutral wall. Scene-motivated light only, no ring light, no beauty-dish fill. Real candid social-media feel, not a sterile studio shoot. Under 2500 chars.",
         "openart": "Lead: natural window light, apartment bedroom, three-quarter mirror angle, candid adjustment. Negative: ring light, phone in reflection, frontal pose, white background."
+      },
+      "scene_logic_contract": {
+        "caption_intent": "Candid pre-leaving fit check \u2014 mirror agreed, she posted; self-aware and unhurried",
+        "required_visual_evidence": [
+          "full-length mirror visible in frame",
+          "body or outfit readable in mirror reflection",
+          "apartment interior environment (wall, lamp, or furniture detail)",
+          "candid adjustment gesture or natural body angle toward mirror"
+        ],
+        "forbidden_contradictions": [
+          "outdoor or street setting",
+          "hotel room or showroom environment",
+          "phone or camera arm visible in mirror reflection",
+          "ring light visible in mirror reflection",
+          "dead-on frontal pose with no mirror angle",
+          "blank white or studio background"
+        ],
+        "environment_realism_notes": "Mirror has slight smudge marks. Warm neutral wall (off-white, greige, or terracotta). Blurred bed edge or folded throw in background bokeh. Small plant partially visible. Warm floor lamp glow. Room reads lived-in and elevated \u2014 not staged or sterile.",
+        "candid_lighting_requirement": "Soft natural window light from one side, warm floor lamp fill from behind. Scene-motivated light only. No ring light. No beauty-dish fill. No artificial setup. Dual ambient sources only.",
+        "qa_rejection_criteria": [
+          "no mirror visible in frame",
+          "no apartment or bedroom environment",
+          "phone or ring light reflection in mirror",
+          "dead-on frontal with no mirror angle or reflection",
+          "sterile showroom or hotel room setting",
+          "outdoor or public location"
+        ]
       }
     },
     {
@@ -175,8 +202,36 @@
       "caption_angle": "Ready-to-leave self-awareness -- the outfit is better than the destination warrants. Short, dry.",
       "caption_draft": "the door was the only thing between this and the street.",
       "provider_rendering_notes": {
-        "kling_omni": "Apartment doorway threshold, 3/4 angle, one foot in doorframe. Warm indoor ambient behind, natural light from front. No door numbers. Full-body visible. Under 2500 chars.",
+        "kling_omni": "Apartment doorway threshold, 3/4 angle, one foot in doorframe. Coat rack with worn jacket in foreground; small entry table with keys and mail; potted plant near door; hallway blurred beyond threshold. Warm indoor ambient behind, natural outdoor daylight fill from front \u2014 no ring light, no artificial fill. Real candid social-media feel, not a sterile studio shoot. No door numbers or address. Full-body visible. Under 2500 chars.",
         "openart": "Doorway lifestyle portrait, dual ambient and natural light. Negative: mirror, door numbers, address, lobby signage, dead-center symmetrical pose."
+      },
+      "scene_logic_contract": {
+        "caption_intent": "Confident leaving-the-apartment moment \u2014 doorframe caught the full outfit before the street did",
+        "required_visual_evidence": [
+          "doorframe or threshold clearly visible",
+          "full body or head-to-thigh framing through doorway",
+          "keys or bag visible \u2014 exit props present",
+          "warm apartment interior light behind her",
+          "apartment entryway detail (coat rack, entry table, or plant)"
+        ],
+        "forbidden_contradictions": [
+          "mid-room apartment with no doorframe",
+          "mirror in scene (different recipe)",
+          "outdoor street without apartment door",
+          "apartment number or address visible on door",
+          "lobby signage in background",
+          "no exit prop or bag"
+        ],
+        "environment_realism_notes": "Coat rack with worn jacket in foreground. Small entry table with keys and mail. Potted plant near door. Warm lamp light spilling from apartment interior. Hallway or exterior blurred naturally beyond the threshold. Door is plain painted wood \u2014 no number plate.",
+        "candid_lighting_requirement": "Warm indoor apartment ambient behind, natural outdoor daylight fill from front. Dual-source available light only. No ring light. No artificial fill. The warm-to-cool light split is the defining visual quality of this recipe.",
+        "qa_rejection_criteria": [
+          "no doorframe or threshold in frame",
+          "no exit prop, bag, or keys visible",
+          "apartment number or building address visible",
+          "lobby or hallway signage in background",
+          "mirror present (different recipe)",
+          "no warm interior light behind her"
+        ]
       }
     },
     {
@@ -205,8 +260,36 @@
       "caption_angle": "Dry self-aware -- what was she doing here and why did she look like this? No explanation offered.",
       "caption_draft": "the parking garage was not the plan. the photo was.",
       "provider_rendering_notes": {
-        "kling_omni": "Parking garage, concrete column, hard direct flash, cool blue-gray palette, high contrast, underexposed background. No readable signage. 3/4 angle. Under 2500 chars.",
+        "kling_omni": "Parking garage, concrete column beside her, structural ceiling beams overhead. Hard direct on-camera flash \u2014 strong foreground exposure, sharp falloff behind. Cool fluorescent ambient receding into shadow in background. Concrete floor texture underfoot. High contrast, cool blue-gray palette, analog grain. No readable signage, no license plates, no level numbers. 3/4 angle, direct confident gaze. Real flash editorial, not studio-lit. Under 2500 chars.",
         "openart": "Hard flash parking garage editorial portrait, concrete interior, cool fluorescent ambient. Negative: studio background, golden hour, license plates, floor numbering, exit sign glow."
+      },
+      "scene_logic_contract": {
+        "caption_intent": "She was in a parking garage. The flash fired. The concrete became a frame. No explanation.",
+        "required_visual_evidence": [
+          "parking garage structure (concrete columns, ceiling beams, or floor texture)",
+          "hard direct on-camera flash: strong foreground exposure, sharp falloff behind",
+          "cool blue-gray underexposed background",
+          "concrete or industrial architectural detail in frame",
+          "elevated outfit incongruous with the industrial setting"
+        ],
+        "forbidden_contradictions": [
+          "soft studio lighting or golden-hour warmth",
+          "outdoor street without garage structure",
+          "readable floor level numbers, exit signs, or license plates",
+          "car-hood posing or vehicle as prop",
+          "warm ambient color cast inconsistent with cool fluorescent garage",
+          "CGI-clean or over-rendered concrete"
+        ],
+        "environment_realism_notes": "Concrete column beside her. Structural ceiling beams overhead. More columns receding into shadow in background. Cool fluorescent ambient light in distance. Concrete floor texture underfoot. Analog grain across full frame. Not cleaned up \u2014 industrial and real.",
+        "candid_lighting_requirement": "Hard direct on-camera flash as the primary light. Cool fluorescent ambient recedes into shadow. High contrast: flash-lit warmth on skin and fabric against underexposed blue-gray concrete background. No ring light. No beauty-dish. No studio softbox. No golden-hour warmth.",
+        "qa_rejection_criteria": [
+          "no parking garage or concrete structure visible",
+          "no flash-lit high contrast look",
+          "warm lighting inconsistent with garage industrial palette",
+          "readable signage, level numbers, exit arrows, or license plates",
+          "outdoor or studio setting",
+          "car-hood pose or vehicle prop"
+        ]
       }
     },
     {
@@ -267,8 +350,36 @@
       "caption_angle": "Present in the moment -- the city was the backdrop, the outfit was just there. Short and confident.",
       "caption_draft": "the city does not care. I dressed up anyway.",
       "provider_rendering_notes": {
-        "kling_omni": "Rooftop, golden hour or blue hour, city skyline in soft focus behind, natural side raking light. Subtle wind movement in hair. No building names readable. Under 2500 chars.",
+        "kling_omni": "Rooftop, concrete or gravel texture underfoot, weathered concrete planters at edges. Golden hour warm orange-pink side raking light, or deep blue-hour with warm building windows in background bokeh. City skyline in natural soft focus \u2014 no readable building names or rooftop bar signage. Subtle wind movement in hair. Real sky color only, no HDR or oversaturated filter. Scene-motivated light only, no ring light, no artificial fill. Real candid social-media feel. Under 2500 chars.",
         "openart": "Rooftop lifestyle editorial portrait, golden hour or blue-hour sky, city skyline bokeh. Negative: building names, rooftop bar signage, HDR sky, ring light."
+      },
+      "scene_logic_contract": {
+        "caption_intent": "She went up to the roof. The city and sky were doing exactly that. She dressed up anyway.",
+        "required_visual_evidence": [
+          "rooftop environment (concrete, gravel, or deck surface underfoot)",
+          "city skyline or urban view in background soft focus",
+          "golden hour warm raking side light OR deep blue-hour ambient with warm building windows",
+          "outdoor elevated location feel \u2014 not street level",
+          "evening going-out outfit"
+        ],
+        "forbidden_contradictions": [
+          "apartment interior",
+          "street level without rooftop elevation",
+          "overcast flat gray sky without golden or blue-hour quality",
+          "readable building names, rooftop bar logos, or iconic recognizable landmarks",
+          "HDR or oversaturated sky processing",
+          "ring light or artificial warm-up filter"
+        ],
+        "environment_realism_notes": "Concrete or gravel rooftop texture underfoot. Weathered concrete planters at edges. City skyline in natural soft focus \u2014 building tops, distant tree lines, water tower silhouettes in bokeh. Warm orange-pink to purple gradient (golden hour) or deep blue-hour with warm lit building windows. No landmark-specific silhouettes.",
+        "candid_lighting_requirement": "Natural golden hour raking side light, or deep blue-hour ambient with warm rim on hair and shoulder. Real sky color only. No ring light. No artificial warm-up. No HDR processing. No manufactured sunset grade. Scene-motivated outdoor light only.",
+        "qa_rejection_criteria": [
+          "no rooftop or elevated outdoor environment",
+          "no golden hour or blue-hour light quality",
+          "readable building names or rooftop bar signage",
+          "apartment interior setting",
+          "HDR or oversaturated sky",
+          "flat overcast gray without golden or blue-hour character"
+        ]
       }
     },
     {
@@ -297,8 +408,36 @@
       "caption_angle": "Going-out energy -- composed and in the moment. Not explaining where or why. Short.",
       "caption_draft": "running late. still showing up like this.",
       "provider_rendering_notes": {
-        "kling_omni": "Interior staircase, warm sconce ambient light only, no flash, mid-step motion, 3/4 angle, tungsten warm palette. Under 2500 chars.",
+        "kling_omni": "Interior staircase with carved or painted banister, carpeted or stone steps. Warm sconce fixtures mounted on staircase wall \u2014 available light only, no direct flash. Pools of tungsten warm light on face and upper body; deep shadow fills corners. More steps receding into shadow in background. Mid-step motion, 3/4 angle, composed chin-up expression. No event signage, no venue branding, no other guests. Real candid social-media feel, not a staged fashion shoot. Under 2500 chars.",
         "openart": "Interior staircase cinematic ambient portrait, warm sconce light, available light only. Negative: direct flash, event signage, fire stairwell, cold fluorescent."
+      },
+      "scene_logic_contract": {
+        "caption_intent": "Running late, showing up like this anyway \u2014 mid-step on a dramatic staircase, full going-out look, composed and unhurried",
+        "required_visual_evidence": [
+          "interior staircase with architectural character (carved or painted banister, carpeted or stone steps)",
+          "warm sconce or pendant wall fixtures visible on staircase wall",
+          "mid-step motion implied \u2014 one foot raised or weight clearly on planted foot",
+          "full going-out outfit: fitted mini or midi dress, heeled shoes, statement jewelry",
+          "pools of warm tungsten light on face and upper body; deep shadow in corners"
+        ],
+        "forbidden_contradictions": [
+          "direct flash \u2014 this recipe uses available sconce light only",
+          "fire escape or utilitarian stairwell without architectural character",
+          "event signage, venue name, or branding in frame",
+          "other guests or figures visible in frame",
+          "cold fluorescent overhead light",
+          "casual daytime outfit"
+        ],
+        "environment_realism_notes": "Interior staircase \u2014 carved or painted banister, carpeted or stone steps. Warm sconce fixtures mounted on wall surface beside or above her. More steps receding into shadow in background. Warm landing partially visible at far edge of frame. No event signage, no branding, no fire-exit-style stairwell. Architectural and intentional.",
+        "candid_lighting_requirement": "Warm ambient sconce light from wall fixtures only. No direct flash. Tungsten-warm motivated pools of light on face and body. Deep shadow fills corners and space above and below. Available light only \u2014 cinematic contrast earned from environment, not manufactured. No ring light. No beauty-dish.",
+        "qa_rejection_criteria": [
+          "no staircase visible or utilitarian fire-escape stairwell",
+          "no warm sconce or ambient lighting \u2014 cold or flat light",
+          "direct flash used (violates this recipe's available-light rule)",
+          "event signage or venue branding visible",
+          "casual or daytime outfit inconsistent with going-out caption",
+          "other guests or figures in frame"
+        ]
       }
     },
     {
