@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "description": "Lena hot creator/model environment catalog — production scene settings",
-  "environment_rule": "All environments are used as prompt context for scene/setting only. No environment ID is wired into generation yet. All entries default to status=untested. Do not use any environment with status != approved in live generation.",
+  "environment_rule": "All environments are used as prompt context for scene/setting only. No environment ID is wired into generation yet. All entries default to status=untested. Do not use any environment with status != approved in live generation. Every environment should include context-appropriate realism cues so it does not read sterile, blank, or bland. Home and daily-life lanes should feel lived-in; glam, nightlife, rooftop, elevator, and model-facing lanes may be polished, but they still need believable texture, objects, wear, lighting behavior, or situational evidence so they do not read like a showroom or empty render.",
   "status_values": {
     "untested": "Not yet run through generation; cannot be used in production",
     "approved": "QA-confirmed; safe for production use",
@@ -382,8 +382,8 @@
       "camera_position": "20-degree angle, full-body, mirror top just cropped",
       "framing": "full-body, frameless mirror with room visible on both sides",
       "lighting": "cool blue-hour window light from one side, warm bedside lamp contrasting from other side",
-      "background_detail": "neutral bedroom wall, blurred bedside lamp glow, small side table with one object, plant silhouette",
-      "realism_details": "cool blue exterior visible at window edge, warm lamp circle on wall, soft room shadow gradient",
+      "background_detail": "neutral bedroom wall, blurred ordinary lamp glow, small side table with one object, plant silhouette, bed edge with slight bedding wrinkles",
+      "realism_details": "cool blue exterior visible at window edge, warm lamp circle on wall, soft room shadow gradient, simple apartment furniture edges, no luxury suite styling",
       "props_allowed": [
         "bedside lamp",
         "small side table",
@@ -393,16 +393,19 @@
         "ring light",
         "alcohol",
         "hotel-style headboard",
+        "upholstered luxury headboard",
+        "nightstand telephone",
+        "hospitality room decor",
         "readable text",
         "bulb-frame mirror",
         "Hollywood vanity mirror",
         "vanity lights on mirror"
       ],
-      "mood": "evening contrast, cinematic, stylish going-out prep",
+      "mood": "believable evening apartment fit-check, candid going-out prep",
       "risk_tags": [],
-      "prompt_fragment": "bedroom, tall frameless full-length mirror (no bulb frame, no Hollywood vanity mirror, no vanity lights), cool blue-hour window light from one side, warm bedside lamp from the other, neutral wall, soft shadow gradient, cinematic evening contrast",
+      "prompt_fragment": "apartment bedroom, tall frameless full-length mirror (no bulb frame, no Hollywood vanity mirror, no vanity lights), cool blue-hour window light from one side, warm ordinary bedside lamp from the other, neutral wall, soft shadow gradient, slight bedding wrinkles, simple apartment furniture edges, candid evening fit-check, not hotel, not suite, not showroom",
       "status": "untested",
-      "notes": "Mirror drift observed 2026-06-27: model generated Hollywood vanity bulb frame instead of tall frameless mirror. Mirror exclusions added to props_blocked and prompt_fragment."
+      "notes": "Mirror drift observed 2026-06-27: model generated Hollywood vanity bulb frame instead of tall frameless mirror. Mirror exclusions added to props_blocked and prompt_fragment. Hotel/suite drift observed 2026-06-28 and apartment cues were strengthened."
     },
     {
       "environment_id": "env_g001",
@@ -711,7 +714,9 @@
       "production_lane": "street_glam",
       "allowed_recipe_types": [
         "street_errands_outdoor",
-        "street_outdoor_editorial"
+        "street_outdoor_editorial",
+        "coffee_run_street",
+        "casual_street_walk"
       ],
       "camera_position": "full-body or three-quarter, sidewalk extending behind",
       "framing": "full-body with urban sidewalk context, building facades behind",
@@ -891,7 +896,9 @@
       "production_lane": "street_glam",
       "allowed_recipe_types": [
         "street_errands_outdoor",
-        "street_outdoor_editorial"
+        "street_outdoor_editorial",
+        "coffee_run_street",
+        "casual_street_walk"
       ],
       "camera_position": "full-body walking or posed, tree canopy overhead",
       "framing": "full-body with tree canopy framing",
@@ -983,7 +990,8 @@
       "production_lane": "street_glam",
       "allowed_recipe_types": [
         "street_errands_outdoor",
-        "street_outdoor_editorial"
+        "street_outdoor_editorial",
+        "coffee_run_street"
       ],
       "camera_position": "full-body on sidewalk, storefronts behind in bokeh",
       "framing": "full-body with commercial street blur as background",
@@ -1073,7 +1081,8 @@
       "name": "Concrete Rooftop — Golden Hour Sky",
       "production_lane": "rooftop_night_city",
       "allowed_recipe_types": [
-        "social_going_out"
+        "social_going_out",
+        "rooftop_evening"
       ],
       "camera_position": "full-body or three-quarter, city or sky behind",
       "framing": "full-body with rooftop and sky context",
@@ -1103,7 +1112,8 @@
       "name": "Rooftop Deck — Blue Hour City Skyline",
       "production_lane": "rooftop_night_city",
       "allowed_recipe_types": [
-        "social_going_out"
+        "social_going_out",
+        "rooftop_evening"
       ],
       "camera_position": "full-body, city skyline behind at distance",
       "framing": "full-body with city skyline as backdrop at blue hour",
@@ -2395,13 +2405,14 @@
       "name": "Apartment Kitchen Counter — Morning Aesthetic",
       "production_lane": "apartment_elevated",
       "allowed_recipe_types": [
-        "apartment_home_routines"
+        "apartment_home_routines",
+        "home_kitchen_candid"
       ],
       "camera_position": "full-body or three-quarter at kitchen counter or island",
       "framing": "full-body or three-quarter with kitchen as warm context",
       "lighting": "morning natural light from kitchen window, clean and bright",
-      "background_detail": "apartment kitchen counter or island, countertop with coffee mug and one food item, kitchen cabinets behind, window over sink letting light in",
-      "realism_details": "countertop material texture, coffee mug, one piece of fruit or plant, cabinet door detail, window frame over sink, light on counter surface",
+      "background_detail": "apartment kitchen counter or island, countertop with coffee mug, one small food item or plant, kitchen cabinets behind, window over sink letting light in, dish towel or small everyday item left out naturally",
+      "realism_details": "countertop material texture, coffee mug, one piece of fruit or plant, cabinet door detail with slight wear, window frame over sink, light on counter surface, one subtle lived-in imperfection such as a folded dish towel, faint water spot near sink, or ordinary utensil crock",
       "props_allowed": [
         "coffee mug",
         "small plant or one piece of fruit",
@@ -2418,7 +2429,7 @@
       ],
       "mood": "morning apartment aesthetic, styled at-home energy, warm kitchen creator",
       "risk_tags": [],
-      "prompt_fragment": "apartment kitchen counter, morning natural window light, coffee mug, small plant or fruit, clean countertop surface, cabinets behind, warm morning kitchen aesthetic",
+      "prompt_fragment": "ordinary apartment kitchen counter, morning natural window light, coffee mug, small plant or fruit, lived-in counter surface, cabinets behind with slight real-world wear, dish towel or utensil crock, warm morning home kitchen realism",
       "status": "untested",
       "notes": "Single fruit item for aesthetic only, not grocery/errand context."
     },
@@ -2460,7 +2471,8 @@
       "production_lane": "apartment_elevated",
       "allowed_recipe_types": [
         "fit_check_mirror_getting_ready",
-        "social_going_out"
+        "social_going_out",
+        "doorway_fitcheck"
       ],
       "camera_position": "full-body in building doorway or on front step, outside street visible",
       "framing": "full-body with building exterior doorway as frame",

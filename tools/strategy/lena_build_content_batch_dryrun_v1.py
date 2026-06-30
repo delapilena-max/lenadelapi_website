@@ -19,11 +19,16 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 from lena_build_content_packet_dryrun_v1 import (
+    compute_proof_prompt_budget,
     load_json,
     select_recipe,
+    select_environment_entry_for_recipe,
+    select_wardrobe_entry,
     build_packet,
     validate_packet,
     save_packet,
+    WARDROBE_CATALOG,
+    ENV_CATALOG,
     RECIPE_BANK,
     HOOK_BANK,
     OUTPUT_BASE,
@@ -34,6 +39,28 @@ MANIFEST_PREFIX = "lena_content_packet_batch_manifest_dryrun_"
 
 def all_recipe_ids(recipe_bank):
     return [r["id"] for r in recipe_bank["recipes"]]
+
+
+def default_recipe_ids(recipe_bank):
+    active_recipes = [
+        r for r in recipe_bank["recipes"]
+        if r.get("production_status") != "test_only"
+    ]
+    missing = [
+        r["id"] for r in active_recipes
+        if r.get("proof_priority") is None
+    ]
+    if missing:
+        raise ValueError(
+            "Active recipes missing proof_priority: "
+            + ", ".join(sorted(missing))
+        )
+
+    ordered = sorted(
+        active_recipes,
+        key=lambda r: (r["proof_priority"], r["id"]),
+    )
+    return [r["id"] for r in ordered]
 
 
 def select_hook_no_repeat(hook_bank, linked_cats, used_hook_ids):
@@ -88,6 +115,31 @@ def build_manifest(
         "used_hook_ids": list(used_hook_ids),
         "packets": entries,
     }
+
+
+def compute_recipe_prompt_budget(recipe, wardrobe_catalog, env_catalog):
+    outfit_id = recipe.get("wardrobe_outfit_id")
+    env_id = recipe.get("environment_id")
+    if not outfit_id:
+        return None
+
+    wardrobe_entry = select_wardrobe_entry(
+        wardrobe_catalog,
+        outfit_id,
+        recipe.get("wardrobe_allow_high_risk", False),
+        blocked_terms=recipe.get("wardrobe_blocked_terms", []),
+    )
+    env_entry = None
+    if env_id:
+        env_entry = select_environment_entry_for_recipe(
+            env_catalog,
+            env_id,
+            recipe,
+        )
+    return compute_proof_prompt_budget(
+        wardrobe_entry=wardrobe_entry,
+        env_entry=env_entry,
+    )
 
 
 def save_manifest(manifest, run_date):
@@ -148,7 +200,7 @@ def main():
         default=None,
         help=(
             "Comma-separated recipe IDs (e.g. hcr_001,hcr_002). "
-            "Defaults to all recipes in the bank."
+            "Defaults to active recipes ordered by proof_priority."
         ),
     )
     parser.add_argument(
@@ -166,11 +218,13 @@ def main():
 
     recipe_bank = load_json(RECIPE_BANK)
     hook_bank = load_json(HOOK_BANK)
+    wardrobe_catalog = load_json(WARDROBE_CATALOG)
+    env_catalog = load_json(ENV_CATALOG)
 
     if args.recipes:
         recipe_ids = [r.strip() for r in args.recipes.split(",") if r.strip()]
     else:
-        recipe_ids = all_recipe_ids(recipe_bank)
+        recipe_ids = default_recipe_ids(recipe_bank)
 
     total_requested = len(recipe_ids)
     print(
@@ -209,7 +263,18 @@ def main():
             )
             continue
 
-        packet = build_packet(recipe, hook, reason, run_date)
+        prompt_budget = compute_recipe_prompt_budget(
+            recipe,
+            wardrobe_catalog,
+            env_catalog,
+        )
+        packet = build_packet(
+            recipe,
+            hook,
+            reason,
+            run_date,
+            prompt_budget=prompt_budget,
+        )
         filepath = save_packet(packet, run_date, recipe_id)
         flags, errors = validate_packet(packet, filepath)
         packet["safety_flags"] = flags

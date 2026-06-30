@@ -8,9 +8,10 @@ NODE = ROOT / "pipeline" / "influencer_nodes" / "lena"
 
 QUEUE_FIELDS = [
     "queue_id","date","created_at","slot_id","platform","media_type","lane","asset_status","asset_path",
-    "caption","short_caption","pinned_comment","story_prompt","post_poll","keyword_notes",
+    "growth_bucket","hook_category","audio_name",
+    "caption","short_caption","pinned_comment","story_prompt","story_poll","post_poll","keyword_notes",
     "public_text_score","public_text_decision","publish_state","publish_mode","connector_path",
-    "post_url","posted_at","failure_reason","notes"
+    "post_url","posted_at","failure_reason","attempt_count","notes"
 ]
 
 def load_policy():
@@ -262,7 +263,8 @@ def main():
                 continue
 
             post_poll = poll_text(bf.get("post_poll")) or poll_text(p.get("post_poll"))
-            story_prompt = poll_text(bf.get("story_poll")) or poll_text(p.get("story_prompt"))
+            story_poll = poll_text(bf.get("story_poll")) or poll_text(p.get("story_poll"))
+            story_prompt = story_poll or poll_text(p.get("story_prompt"))
 
             rows.append({
                 "queue_id": qid,
@@ -274,10 +276,14 @@ def main():
                 "lane": p.get("resolved_lane_key") or p.get("lane", ""),
                 "asset_status": p.get("asset_status", ""),
                 "asset_path": p.get("asset_path", ""),
+                "growth_bucket": p.get("growth_bucket", ""),
+                "hook_category": p.get("hook_category", ""),
+                "audio_name": p.get("audio_name", ""),
                 "caption": p.get("caption", ""),
                 "short_caption": p.get("short_caption", ""),
                 "pinned_comment": p.get("pinned_comment", ""),
                 "story_prompt": story_prompt,
+                "story_poll": story_poll,
                 "post_poll": post_poll,
                 "keyword_notes": ", ".join(p.get("hashtags_keywords", []) or []),
                 "public_text_score": p.get("public_text_score", {}).get("score", ""),
@@ -288,6 +294,7 @@ def main():
                 "post_url": old.get("post_url", ""),
                 "posted_at": old.get("posted_at", ""),
                 "failure_reason": "",
+                "attempt_count": old.get("attempt_count", "0"),
                 "notes": "Approved queue item. Public posting allowed only through platform connector. No replies, DMs, or outreach."
             })
 

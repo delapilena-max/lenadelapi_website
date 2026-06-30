@@ -150,10 +150,13 @@ def tc13():
     bad = []
     for o in new_outfits:
         s = o.get("status","")
-        if s not in ("untested","high_risk"):
-            bad.append(f"{o['outfit_id']}: status={s!r} (must be untested or high_risk)")
+        if s not in ("untested","high_risk","rejected"):
+            bad.append(
+                f"{o['outfit_id']}: status={s!r} "
+                "(must be untested, high_risk, or rejected)"
+            )
     assert not bad, "New outfits with invalid status:\n  " + "\n  ".join(bad)
-run("TC13  all new outfit entries are untested or high_risk (not approved)", tc13)
+run("TC13  all new outfit entries are untested/high_risk/rejected (not approved)", tc13)
 
 def tc14():
     bad = []

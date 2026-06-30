@@ -2056,7 +2056,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "black high-waist fitted mini skirt; fitted black sheer long-sleeve button-front top worn over a fitted black cami underneath; gold chain, pointed-toe heeled boots",
+      "prompt": "black high-waist fitted mini skirt; fitted black sheer long-sleeve button-front top worn over an opaque fitted black cami underneath (the cami is a real full tank that fully covers the chest and torso to the waistband, never a bra, bralette, bikini, or triangle top; no exposed bra under the sheer layer); gold chain, pointed-toe heeled boots",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2064,7 +2064,9 @@
         "navel"
       ],
       "status": "untested",
-      "notes": "Sheer top requires cami underneath to be visible."
+      "notes": "Cami-lock added 2026-06-30 after the sheer top drifted the base cami into an exposed bra on a public street lane; base must read as a full opaque tank.",
+      "daypart": "night_only",
+      "context_note": "Sheer-over-base look reads as bra-as-outerwear and reliably drifts on daytime public lanes; reserve for night / going-out lanes only."
     },
     {
       "outfit_id": "wc_p034",

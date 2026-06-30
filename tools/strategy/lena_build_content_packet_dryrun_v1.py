@@ -19,6 +19,13 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, ROOT)
+
+from pipeline.prompting.lena_prompt_brain import (
+    format_catalog_wardrobe_override,
+    max_production_style_override_len,
+)
+
 RECIPE_BANK = os.path.join(
     ROOT, "pipeline", "prompt_banks", "lena",
     "lena_high_caliber_prompt_recipe_bank_v1.json"
@@ -43,26 +50,128 @@ LENA_IDENTITY_BRIEF = (
     "Lena (Magdalena Delapi): luxury lifestyle and fit-check influencer, "
     "soft-glam aesthetic, real candid energy -- not a brand shoot. "
     "Natural skin texture, visible pores, realistic detail. "
-    "Identity is fixed: preserve Lena's approved adult athletic-curvy "
-    "hourglass body: fuller bust, defined waist without shrinking her frame, "
-    "visibly wider hips, fuller thighs, soft realistic hip curve, "
+    "Hair must stay identity-consistent across generations: reference-true warm medium-brown base "
+    "with clearly visible honey/caramel highlights and lighter face-framing pieces as seen in the approved reference photos. "
+    "Hair should read dimensional, softly sunlit, and warm -- not flat dark brunette, not one-tone brown, not black-brown, "
+    "not platinum or fully blonde, and not copper/auburn reinterpretation. "
+    "Identity is fixed: preserve Lena's approved adult slim-thick "
+    "hourglass body: full natural lifted bust with clear upper fullness consistent with the approved references, "
+    "small defined waist without shrinking her frame, "
+    "visibly wide hips, toned upper thighs, soft realistic hip curve, consistent "
+    "slightly wide pelvis breadth, a slightly wider-set hip span from the front and 3/4 view, "
+    "a touch more lateral hip breadth, and a slightly fuller outer-thigh and upper-glute read, "
     "and balanced curvy proportions. "
     "Do not reinterpret her as a different person. "
     "Do not slim her down, make her petite, narrow-hipped, "
-    "thin-legged, runway-model, or waif-like. "
+    "thin-legged, straight-hipped, runway-model, or waif-like. "
+    "Do not narrow her pelvis, collapse her hip width, pull her hip points inward, or taper her lower "
+    "body into a slimmer silhouette in side angles or standing poses. "
+    "A slight natural inner-thigh separation is acceptable in neutral standing poses "
+    "when the stance supports it, but never as an anatomical distortion. "
+    "Do not flatten, minimize, or reduce her bust into a smaller-chested fashion-model read. "
+    "Do not over-thicken her hips, thighs, or torso beyond her approved "
+    "reference proportions either. Keep her body attractive, toned, curvy, "
+    "and realistic -- never shrunken, never exaggerated, never bulky. "
     "Wardrobe must fit over her existing curvy proportions "
     "and must not reshape her into a thinner body. "
     "Outfit, setting, pose, lighting, and action may change; "
     "face and body proportions may not. "
 )
 
-SKIN_REALISM_COMPACT = (
-    "Skin realism: preserve Lena's reference-accurate beauty marks only. "
-    "Natural pores, subtle redness, realistic asymmetry. "
-    "No random added freckles, no new freckle scatter on face or cheeks, "
-    "no new mole placements, no heavy freckle clusters. "
-    "Not airbrushed, not poreless, not plastic. "
+PROOF_MODE_IDENTITY_BRIEF = (
+    "Lena (Magdalena Delapi): luxury lifestyle and fit-check influencer, "
+    "soft-glam aesthetic, real candid energy -- not a brand shoot. "
+    "Hair must stay identity-consistent across generations: reference-true warm medium-brown base "
+    "with clearly visible honey/caramel highlights and lighter face-framing pieces as seen in the approved reference photos. "
+    "Hair should read dimensional, softly sunlit, and warm -- not flat dark brunette, not one-tone brown, not black-brown, "
+    "not platinum or fully blonde, and not copper/auburn reinterpretation. "
+    "Identity is fixed: preserve Lena's approved adult slim-thick hourglass body "
+    "and approved reference face exactly consistently: full natural lifted bust with visible upper fullness, small "
+    "defined waist without shrinking her frame, visibly wide hips, toned upper thighs, "
+    "balanced curvy proportions, and realistic limbs and hands. "
+    "Do not reinterpret her as a different person. Do not slim her down into petite, "
+    "narrow-hipped, thin-legged, runway-model proportions, and do not exaggerate her "
+    "lower body into cartoon curves. Do not flatten, minimize, or reduce her bust into a smaller-chested read. "
+    "Outfit, setting, pose, lighting, and action may change; "
+    "face and body proportions may not. "
 )
+
+FACE_LIGHT_REALISM_PRIORITY = (
+    "Face must read naturally lit, not cosmetically lit: imperfect cheek-to-jaw shadow falloff, "
+    "slight under-eye shadow retention, subtle forehead tone variation, and non-uniform skin sheen. "
+    "No evenly front-lit beauty-mask face. "
+)
+
+FACE_PRIORITY_FRAMING = (
+    "Face-priority framing only: waist-up or chest-up mirror save, never full-body mirror pose, "
+    "never full legs, and never the full dress hemline in frame. "
+)
+
+DRESS_CONTINUITY_PRIORITY = (
+    "If the intended look is a dress, keep it as one continuous dress with no exposed midriff "
+    "and never split it into a separate top and skirt. "
+)
+
+SKIN_REALISM_COMPACT = (
+    "Unretouched phone-camera skin: visible pores on cheeks, nose, and forehead, "
+    "fine facial texture, faint under-eye/lower-lid lines, slight redness, tiny tone unevenness, "
+    "tiny forehead texture, soft natural under-eye darkness, small natural nose shine, "
+    "real skin oil balance, normal asymmetry, and one or two tiny natural blemish-scale imperfections. "
+    "No skin blur, no denoised skin, no softened pore detail. Micro details: peach-fuzz edge light, "
+    "individual brow hairs, real lashes with tiny shadows, imperfect lip texture, "
+    "a slight crease at mouth corners, faint smile-line softness, normal eyelid fold depth, "
+    "subtle tear-trough transition, natural philtrum and lip-edge definition, "
+    "stray hair strands, uneven catchlights, room-shadow falloff on skin. "
+    "Preserve reference beauty marks only, in the same fixed positions, same side of the face, "
+    "and roughly the same size and count as the reference. "
+    "Treat those marks as exact identity anchors tied to the same relative locations around the "
+    "eyes, nose, mouth, cheeks, and lower face as in the reference. "
+    "If her reference beauty marks are subtle, keep them subtle and sparse. "
+    "Do not move them, mirror them, multiply them, or enlarge them. "
+    "If facial marks appear, they should stay faithful to the reference image rather than being restyled. "
+    "No new non-reference freckle clusters, no decorative freckle mask, "
+    "no beauty-filter speckling, no new moles, no beauty filter, no CGI face, "
+    "not airbrushed, not poreless, not plastic or glossy. "
+    "No polished beauty-campaign finish, no commercial skin retouch look, no foundation-ad finish. "
+    "No baby-face stylization, no oversized irises, no porcelain doll facial finish, "
+    "and no smoothed influencer-face retouch geometry. "
+)
+
+HAND_REALISM_COMPACT = (
+    "Hands must look human and relaxed: five fingers on each hand, "
+    "natural finger length, clean thumb placement, visible knuckle structure, "
+    "real nail scale, relaxed wrist angles, no fused fingers, no melted hand overlap, "
+    "no twisted wrists, no mannequin hands. Prefer one simple candid hand action only; "
+    "avoid clasped hands or complex interlocked fingers. "
+)
+
+STRUCTURED_SUBJECT_BRIEF = (
+    "Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult "
+    "slim-thick hourglass body and face. Do not reinterpret her as a different "
+    "person. Do not slim her into petite, narrow-hipped proportions. Keep full "
+    "natural lifted bust, defined waist, and wide hips. Hair stays reference-true "
+    "warm medium-brown with visible honey/caramel highlights and lighter face-framing pieces."
+)
+
+STRUCTURED_TECHNICAL_REALISM = (
+    "Photorealistic high-resolution image with visible pores, fine facial texture, "
+    "natural under-eye retention, imperfect lip texture, tiny tone variation, "
+    "stray hair strands, realistic catchlights, and scene-true shadow falloff. "
+    "Preserve only Lena's exact subtle reference beauty marks in the same locations. "
+    "Hands remain anatomically correct with five fingers, believable knuckles, "
+    "clean thumb placement, and relaxed wrists. Avoid plastic skin, beauty-filter "
+    "speckling, poreless retouching, deformed hands, identity drift, body-slimming drift, "
+    "or environment/wardrobe contradictions."
+)
+
+STRUCTURED_SECTION_MAX = {
+    "[Subject]": 430,
+    "[Action]": 250,
+    "[Environment]": 260,
+    "[Cinematography]": 170,
+    "[Lighting/Style]": 210,
+    "[Technical]": 210,
+}
 
 AI_TERMS = re.compile(
     r"\b(ai|bot|virtual|synthetic|fake|generated|prompt|algorithm|"
@@ -95,6 +204,142 @@ def load_json(path):
         return json.load(f)
 
 
+def fit_prompt_sentences(parts, max_chars):
+    chosen = []
+    current = ""
+    for raw_part in parts:
+        part = (raw_part or "").strip()
+        if not part:
+            continue
+        sentences = re.split(r"(?<=[.!?])\s+", part)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            candidate = (
+                f"{current} {sentence}".strip()
+                if current else sentence
+            )
+            if len(candidate) <= max_chars:
+                chosen.append(sentence)
+                current = candidate
+    return current
+
+
+def clean_fragment(text):
+    return re.sub(r"\s+", " ", (text or "")).strip()
+
+
+def trim_fragment_to_chars(text, max_chars):
+    text = clean_fragment(text)
+    if len(text) <= max_chars:
+        return text
+    clipped = text[:max_chars].rsplit(" ", 1)[0].rstrip(",;: ")
+    return clipped or text[:max_chars].rstrip(",;: ")
+
+
+def build_structured_prompt_sections(recipe):
+    subject_parts = [STRUCTURED_SUBJECT_BRIEF]
+    fashion = clean_fragment(recipe.get("fashion_accessories", ""))
+    if fashion:
+        subject_parts.append(f"Wardrobe and accessories: {fashion}")
+    subject = clean_fragment(" ".join(subject_parts))
+    action = clean_fragment(recipe.get("subject_pose", ""))
+    environment_note = recipe.get("scene_logic_contract", {}).get(
+        "environment_realism_notes", ""
+    )
+    environment_parts = [recipe.get("setting_background", "")]
+    if environment_note:
+        environment_parts.append(f"Realism cues: {environment_note}")
+    environment = clean_fragment(" ".join(part for part in environment_parts if part))
+    cinematography = clean_fragment(recipe.get("technical_keywords", ""))
+    lighting = clean_fragment(recipe.get("style_lighting", ""))
+    technical_parts = [
+        STRUCTURED_TECHNICAL_REALISM,
+        recipe.get("negative_constraints", ""),
+    ]
+    technical = clean_fragment(" ".join(part for part in technical_parts if part))
+    return [
+        ("[Subject]", subject),
+        ("[Action]", action),
+        ("[Environment]", environment),
+        ("[Cinematography]", cinematography),
+        ("[Lighting/Style]", lighting),
+        ("[Technical]", technical),
+    ]
+
+
+def build_structured_kling_prompt(recipe, max_chars=2499):
+    sections = build_structured_prompt_sections(recipe)
+    built = []
+    current = ""
+
+    for label, body in sections:
+        if not body:
+            continue
+        prefix = f"{label}: "
+        remaining = max_chars - len(current) - (1 if current else 0) - len(prefix)
+        if remaining <= 0:
+            break
+        section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
+        trimmed = fit_prompt_sentences([body], min(remaining, section_cap))
+        if not trimmed:
+            trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
+        if not trimmed:
+            continue
+        chunk = f"{prefix}{trimmed}".strip()
+        candidate = f"{current} {chunk}".strip() if current else chunk
+        if len(candidate) <= max_chars:
+            built.append(chunk)
+            current = candidate
+
+    return " ".join(built).strip()
+
+
+def compute_proof_prompt_budget(
+    wardrobe_entry=None,
+    env_entry=None,
+    max_chars=2499,
+):
+    reserved = 0
+    appended_parts = 0
+
+    if wardrobe_entry:
+        reserved += len(
+            format_catalog_wardrobe_override(wardrobe_entry).strip()
+        )
+        appended_parts += 1
+    if env_entry:
+        reserved += len(
+            f"Environment: {env_entry['prompt_fragment']}".strip()
+        )
+        appended_parts += 1
+
+    if appended_parts:
+        reserved += appended_parts
+
+    budget = max_chars - reserved - 70
+    if budget < 1200:
+        raise SystemExit(
+            "[ABORT] proof-mode locked wardrobe/environment text leaves "
+            f"too little room for the base Kling prompt ({budget} chars). "
+            "Shorten the overlay text before live use."
+        )
+    return budget
+
+
+def compute_style_bank_prompt_budget(max_chars=2499):
+    reserved = max_production_style_override_len() + 24
+    budget = max_chars - reserved
+    if budget < 1700:
+        raise SystemExit(
+            "[ABORT] style-bank reserved headroom leaves too little room "
+            f"for the base Kling prompt ({budget} chars). "
+            "Shorten the style-bank wardrobe override text before live use."
+        )
+    return budget
+
+
 def select_recipe(bank, recipe_id):
     match = next((r for r in bank["recipes"] if r["id"] == recipe_id), None)
     if not match:
@@ -105,7 +350,196 @@ def select_recipe(bank, recipe_id):
     return match
 
 
-def select_hook(hook_bank, linked_cats, hook_category):
+def select_wardrobe_entry(
+    catalog, outfit_id, allow_high_risk, blocked_terms=None
+):
+    entry = next(
+        (o for o in catalog["outfits"] if o["outfit_id"] == outfit_id),
+        None,
+    )
+    if entry is None:
+        raise SystemExit(
+            f"[ABORT] wardrobe outfit '{outfit_id}' not found "
+            "in wardrobe catalog"
+        )
+    if entry["status"] == "rejected":
+        raise SystemExit(
+            f"[ABORT] wardrobe outfit '{outfit_id}' "
+            "status=rejected -- hard blocked"
+        )
+    if entry["status"] == "high_risk" and not allow_high_risk:
+        raise SystemExit(
+            f"[ABORT] wardrobe outfit '{outfit_id}' "
+            "status=high_risk but recipe wardrobe_allow_high_risk "
+            "is false -- set it explicitly to allow"
+        )
+    lowered = " ".join(
+        [
+            str(entry.get("name") or ""),
+            str(entry.get("prompt") or ""),
+        ]
+    ).lower()
+    blocked_terms = [t.lower() for t in (blocked_terms or []) if t]
+    blocked_hit = next((t for t in blocked_terms if t in lowered), None)
+    if blocked_hit:
+        raise SystemExit(
+            f"[ABORT] wardrobe outfit '{outfit_id}' contains blocked "
+            f"recipe term '{blocked_hit}' -- choose a different outfit for "
+            "this lane"
+        )
+    return entry
+
+
+def select_environment_entry(env_catalog, env_id, scene_type):
+    entry = next(
+        (e for e in env_catalog["environments"]
+         if e["environment_id"] == env_id),
+        None,
+    )
+    if entry is None:
+        raise SystemExit(
+            f"[ABORT] environment '{env_id}' not found "
+            "in environment catalog"
+        )
+    if scene_type not in entry.get("allowed_recipe_types", []):
+        raise SystemExit(
+            f"[ABORT] environment '{env_id}' does not "
+            f"permit scene_type '{scene_type}'"
+        )
+    return entry
+
+
+def select_environment_entry_for_recipe(env_catalog, env_id, recipe):
+    scene_type = recipe.get("scene_type")
+    content_pillar = recipe.get("content_pillar")
+    entry = next(
+        (e for e in env_catalog["environments"]
+         if e["environment_id"] == env_id),
+        None,
+    )
+    if entry is None:
+        raise SystemExit(
+            f"[ABORT] environment '{env_id}' not found "
+            "in environment catalog"
+        )
+
+    allowed = set(entry.get("allowed_recipe_types", []))
+    if scene_type in allowed or content_pillar in allowed:
+        return entry
+
+    raise SystemExit(
+        f"[ABORT] environment '{env_id}' does not permit "
+        f"scene_type '{scene_type}' or content_pillar '{content_pillar}'"
+    )
+
+
+def build_safe_expansion_matrix(
+    recipe,
+    recipe_bank,
+    wardrobe_catalog,
+    env_catalog,
+):
+    lane_specs = recipe.get("safe_expansion_lanes", [])
+    if not lane_specs:
+        return []
+
+    recipe_lookup = {
+        r["id"]: r for r in recipe_bank.get("recipes", [])
+    }
+    matrix = []
+
+    for spec in lane_specs:
+        target_recipe = recipe_lookup.get(spec.get("recipe_id"))
+        if target_recipe is None:
+            raise SystemExit(
+                f"[ABORT] expansion lane '{spec.get('lane_id')}' references "
+                f"unknown recipe '{spec.get('recipe_id')}'"
+            )
+
+        env_options = []
+        for env_id in spec.get("environment_ids", []):
+            env_entry = select_environment_entry_for_recipe(
+                env_catalog, env_id, target_recipe
+            )
+            env_options.append(
+                {
+                    "environment_id": env_entry["environment_id"],
+                    "name": env_entry.get("name", ""),
+                    "prompt_fragment": env_entry.get("prompt_fragment", ""),
+                }
+            )
+
+        outfit_options = []
+        for outfit_id in spec.get("outfit_ids", []):
+            outfit_entry = select_wardrobe_entry(
+                wardrobe_catalog,
+                outfit_id,
+                target_recipe.get("wardrobe_allow_high_risk", False),
+                blocked_terms=target_recipe.get("wardrobe_blocked_terms", []),
+            )
+            outfit_options.append(
+                {
+                    "outfit_id": outfit_entry["outfit_id"],
+                    "name": outfit_entry.get("name", ""),
+                    "style_lane": outfit_entry.get("style_lane", ""),
+                    "status": outfit_entry.get("status", ""),
+                    "prompt": outfit_entry.get("prompt", ""),
+                    "notes": outfit_entry.get("notes", ""),
+                }
+            )
+
+        matrix.append(
+            {
+                "lane_id": spec.get("lane_id", ""),
+                "priority": spec.get("priority"),
+                "lane_family": spec.get("lane_family", ""),
+                "lane_role": spec.get("lane_role", ""),
+                "goal": spec.get("goal", ""),
+                "guardrails": spec.get("guardrails", ""),
+                "target_recipe": {
+                    "recipe_id": target_recipe["id"],
+                    "title": target_recipe.get("title", ""),
+                    "scene_type": target_recipe.get("scene_type", ""),
+                    "content_pillar": target_recipe.get("content_pillar", ""),
+                },
+                "environment_options": env_options,
+                "outfit_options": outfit_options,
+            }
+        )
+
+    return sorted(
+        matrix,
+        key=lambda lane: (
+            lane.get("priority") is None,
+            lane.get("priority", 999),
+            lane.get("lane_id", ""),
+        ),
+    )
+
+
+def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
+    if hook_id:
+        hook = next(
+            (h for h in hook_bank["hooks"] if h.get("id") == hook_id),
+            None,
+        )
+        if not hook:
+            print(f"[ERROR] Hook '{hook_id}' not found.")
+            sys.exit(1)
+        if hook.get("category") not in linked_cats:
+            print(
+                f"[ERROR] --hook-id '{hook_id}' category "
+                f"'{hook.get('category')}' is not in recipe's "
+                f"linked_hook_categories: {linked_cats}"
+            )
+            sys.exit(1)
+        score = hook["scores"]["total_score"]
+        reason = (
+            f"explicit hook_id '{hook_id}' selected "
+            f"(category '{hook.get('category')}', score {score})"
+        )
+        return hook, reason
+
     if hook_category:
         if hook_category not in linked_cats:
             print(
@@ -140,7 +574,11 @@ def select_hook(hook_bank, linked_cats, hook_category):
     return hook, reason
 
 
-def build_compact_kling_prompt(recipe):
+def build_compact_kling_prompt(recipe, max_chars=2499):
+    structured = build_structured_kling_prompt(recipe, max_chars=max_chars)
+    if structured:
+        return structured
+
     scene_label = recipe["scene_type"].replace("_", " ")
     pillar_label = recipe["content_pillar"].replace("_", " ")
     scene_prefix = (
@@ -149,11 +587,27 @@ def build_compact_kling_prompt(recipe):
     kling_notes = (
         recipe.get("provider_rendering_notes", {}).get("kling_omni", "")
     )
-    prompt = (
-        LENA_IDENTITY_BRIEF + SKIN_REALISM_COMPACT
-        + scene_prefix + kling_notes
+    proof_mode = recipe.get("production_proof_mode", False)
+    identity_brief = (
+        PROOF_MODE_IDENTITY_BRIEF if proof_mode else LENA_IDENTITY_BRIEF
     )
-    return prompt[:2499]
+    return fit_prompt_sentences(
+        [
+            identity_brief,
+            FACE_LIGHT_REALISM_PRIORITY if proof_mode else "",
+            (
+                FACE_PRIORITY_FRAMING
+                if recipe.get("content_pillar") == "face_priority_getting_ready"
+                else ""
+            ),
+            DRESS_CONTINUITY_PRIORITY if proof_mode else "",
+            SKIN_REALISM_COMPACT,
+            scene_prefix,
+            kling_notes,
+            HAND_REALISM_COMPACT,
+        ],
+        max_chars=max_chars,
+    )
 
 
 def derive_cta(recipe):
@@ -223,10 +677,77 @@ def derive_metrics_hypothesis(recipe):
     }
 
 
-def build_packet(recipe, hook, hook_reason, run_date):
+def build_packet(
+    recipe,
+    hook,
+    hook_reason,
+    run_date,
+    prompt_budget=None,
+    expansion_matrix=None,
+):
     recipe_id = recipe["id"]
     packet_id = f"cpkt_{run_date.replace('-', '')}_{recipe_id}"
-    kling_prompt = build_compact_kling_prompt(recipe)
+    proof_mode = recipe.get("production_proof_mode", False)
+    outfit_id = recipe.get("wardrobe_outfit_id")
+    environment_id = recipe.get("environment_id")
+    if prompt_budget is None:
+        prompt_budget = 2499
+        if proof_mode and outfit_id:
+            prompt_budget = 1780 if environment_id else 1940
+        elif not outfit_id:
+            prompt_budget = compute_style_bank_prompt_budget()
+    kling_prompt = build_compact_kling_prompt(
+        recipe, max_chars=prompt_budget
+    )
+
+    locked_scene_context = recipe.get("scene_type", "scene_context")
+    realism_iteration_plan = {
+        "mode": (
+            "locked_lane_skin_realism_iteration"
+            if proof_mode and outfit_id and environment_id
+            else "standard_dry_run_packet"
+        ),
+        "goal": (
+            "Hold the active recipe/outfit/environment lane stable and refine only "
+            "face and skin realism."
+            if proof_mode and outfit_id and environment_id
+            else "Build a safe dry-run packet for review."
+        ),
+        "locked_variables": (
+            [
+                "identity",
+                "body proportions",
+                "recipe_id",
+                "scene_type",
+                "wardrobe_outfit_id",
+                "environment_id",
+                locked_scene_context,
+            ]
+            if proof_mode and outfit_id and environment_id
+            else []
+        ),
+        "allowed_refinements": (
+            [
+                "visible pores and fine facial texture",
+                "lower-lid and under-eye realism",
+                "lip texture and normal asymmetry",
+                "flyaway hair strands and brow/lash separation",
+                "uneven natural catchlights and room-shadow falloff",
+            ]
+            if proof_mode and outfit_id and environment_id
+            else []
+        ),
+        "do_not_change_next": (
+            [
+                "body shape emphasis",
+                "garment construction",
+                "environment lane",
+                "camera framing logic",
+            ]
+            if proof_mode and outfit_id and environment_id
+            else []
+        ),
+    }
 
     return {
         "packet_id": packet_id,
@@ -254,8 +775,10 @@ def build_packet(recipe, hook, hook_reason, run_date):
             "technical_keywords": recipe.get("technical_keywords", ""),
             "negative_constraints": recipe.get("negative_constraints", ""),
         },
+        "prompt_structure_standard": "subject_action_environment_cinematography_lighting_technical_v1",
         "compact_kling_prompt_preview": kling_prompt,
         "compact_kling_prompt_chars": len(kling_prompt),
+        "compact_kling_prompt_budget": prompt_budget,
         "strong_hook_id": hook["id"],
         "strong_hook_category": hook["category"],
         "hook_text": hook.get("hook_text", ""),
@@ -275,6 +798,9 @@ def build_packet(recipe, hook, hook_reason, run_date):
         "production_proof_mode": recipe.get("production_proof_mode", False),
         "environment_id": recipe.get("environment_id"),
         "environment_context": recipe.get("environment_context", ""),
+        "proof_control_role": recipe.get("proof_control_role", ""),
+        "safe_expansion_lanes": expansion_matrix or [],
+        "realism_iteration_plan": realism_iteration_plan,
         "safety_flags": {},
     }
 
@@ -374,6 +900,19 @@ def print_summary(packet, filepath, flags, errors):
     print(f"  Primary metric       : "
           f"{packet['metrics_hypothesis']['primary_metric']}")
     print()
+    if packet.get("proof_control_role"):
+        print(f"  Proof control role   : {packet['proof_control_role']}")
+    if packet.get("safe_expansion_lanes"):
+        print(f"  Expansion lanes      : {len(packet['safe_expansion_lanes'])}")
+        for lane in packet["safe_expansion_lanes"]:
+            print(
+                "    - "
+                f"{lane['lane_id']} -> "
+                f"{lane['target_recipe']['recipe_id']} "
+                f"({len(lane['environment_options'])} env / "
+                f"{len(lane['outfit_options'])} outfits)"
+            )
+        print()
     print(f"  Kling prompt chars   : {packet['compact_kling_prompt_chars']}")
     print(f"  Kling under 2500     : "
           f"{flags.get('kling_prompt_under_2500')}")
@@ -415,6 +954,13 @@ def main():
         )
     )
     parser.add_argument(
+        "--hook-id", default=None,
+        help=(
+            "Exact hook ID from strong_hook_bank_v1.json "
+            "(must belong to one of the recipe's linked_hook_categories)"
+        )
+    )
+    parser.add_argument(
         "--date", default=None,
         help="Override date (YYYY-MM-DD). Defaults to today UTC."
     )
@@ -434,6 +980,16 @@ def main():
             "Must exist in catalog and allow the recipe scene_type."
         ),
     )
+    parser.add_argument(
+        "--allow-style-bank-fallback",
+        action="store_true",
+        help=(
+            "Legacy escape hatch. Allows recipes without a catalog outfit "
+            "and environment lock to fall back to STYLE_BANK behavior. "
+            "Disabled by default because it causes repetitive wardrobe and "
+            "setting drift."
+        ),
+    )
     args = parser.parse_args()
 
     run_date = args.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -451,6 +1007,11 @@ def main():
             f"[lena_build_content_packet_dryrun_v1] "
             f"hook-category : {args.hook_category}"
         )
+    if args.hook_id:
+        print(
+            f"[lena_build_content_packet_dryrun_v1] "
+            f"hook-id : {args.hook_id}"
+        )
 
     print("[lena_build_content_packet_dryrun_v1] Loading recipe bank...")
     recipe_bank = load_json(RECIPE_BANK)
@@ -458,69 +1019,80 @@ def main():
     print("[lena_build_content_packet_dryrun_v1] Loading hook bank...")
     hook_bank = load_json(HOOK_BANK)
 
+    print("[lena_build_content_packet_dryrun_v1] Loading wardrobe catalog...")
+    wardrobe_catalog = load_json(WARDROBE_CATALOG)
+
+    print("[lena_build_content_packet_dryrun_v1] Loading environment catalog...")
+    env_catalog = load_json(ENV_CATALOG)
+
     recipe = dict(select_recipe(recipe_bank, args.recipe))
+    wf_entry = None
+    env_entry = None
 
-    if args.outfit_id:
-        wf_data = load_json(WARDROBE_CATALOG)
-        wf_entry = next(
-            (o for o in wf_data["outfits"]
-             if o["outfit_id"] == args.outfit_id),
-            None,
+    chosen_outfit_id = args.outfit_id or recipe.get("wardrobe_outfit_id")
+    if chosen_outfit_id:
+        wf_entry = select_wardrobe_entry(
+            wardrobe_catalog,
+            chosen_outfit_id,
+            recipe.get("wardrobe_allow_high_risk", False),
+            blocked_terms=recipe.get("wardrobe_blocked_terms", []),
         )
-        if wf_entry is None:
-            raise SystemExit(
-                f"[ABORT] --outfit-id '{args.outfit_id}' "
-                "not found in wardrobe catalog"
+        recipe["wardrobe_outfit_id"] = chosen_outfit_id
+        if args.outfit_id:
+            recipe["production_proof_mode"] = True
+            print(
+                f"[lena_build_content_packet_dryrun_v1] "
+                f"production-proof outfit override: {chosen_outfit_id} "
+                f"(status={wf_entry['status']})"
             )
-        if wf_entry["status"] == "rejected":
-            raise SystemExit(
-                f"[ABORT] --outfit-id '{args.outfit_id}' "
-                "status=rejected -- hard blocked"
+        else:
+            print(
+                f"[lena_build_content_packet_dryrun_v1] "
+                f"recipe-locked outfit: {chosen_outfit_id} "
+                f"(status={wf_entry['status']})"
             )
-        if (
-            wf_entry["status"] == "high_risk"
-            and not recipe.get("wardrobe_allow_high_risk")
-        ):
-            raise SystemExit(
-                f"[ABORT] --outfit-id '{args.outfit_id}' "
-                "status=high_risk but recipe "
-                "wardrobe_allow_high_risk is false -- "
-                "set it explicitly to allow"
-            )
-        recipe["wardrobe_outfit_id"] = args.outfit_id
-        recipe["production_proof_mode"] = True
-        print(
-            f"[lena_build_content_packet_dryrun_v1] "
-            f"production-proof outfit: {args.outfit_id} "
-            f"(status={wf_entry['status']})"
-        )
 
-    if args.env_id:
-        env_data = load_json(ENV_CATALOG)
-        env_entry = next(
-            (e for e in env_data["environments"]
-             if e["environment_id"] == args.env_id),
-            None,
+    chosen_env_id = args.env_id or recipe.get("environment_id")
+    if chosen_env_id:
+        env_entry = select_environment_entry_for_recipe(
+            env_catalog, chosen_env_id, recipe
         )
-        if env_entry is None:
-            raise SystemExit(
-                f"[ABORT] --env-id '{args.env_id}' "
-                "not found in environment catalog"
+        recipe["environment_id"] = chosen_env_id
+        if args.env_id or not recipe.get("environment_context"):
+            recipe["environment_context"] = (
+                f"Environment: {env_entry['prompt_fragment']} "
             )
-        if recipe["scene_type"] not in env_entry.get(
-            "allowed_recipe_types", []
-        ):
-            raise SystemExit(
-                f"[ABORT] --env-id '{args.env_id}' does not "
-                f"permit scene_type '{recipe['scene_type']}'"
+        if args.env_id:
+            print(
+                f"[lena_build_content_packet_dryrun_v1] "
+                f"production-proof env override: {chosen_env_id}"
             )
-        recipe["environment_id"] = args.env_id
-        recipe["environment_context"] = (
-            f"Environment: {env_entry['prompt_fragment']} "
-        )
+        else:
+            print(
+                f"[lena_build_content_packet_dryrun_v1] "
+                f"recipe-locked env: {chosen_env_id}"
+            )
+
+    if not args.allow_style_bank_fallback:
+        missing_locks = []
+        if not chosen_outfit_id:
+            missing_locks.append("wardrobe_outfit_id")
+        if not chosen_env_id:
+            missing_locks.append("environment_id")
+        if missing_locks:
+            raise SystemExit(
+                "[ABORT] STYLE_BANK fallback is blocked by default for this "
+                f"builder. Recipe '{recipe['id']}' is missing: "
+                f"{', '.join(missing_locks)}. "
+                "Wire catalog locks into the recipe or pass explicit "
+                "--outfit-id/--env-id for dry-run proof work. "
+                "Use --allow-style-bank-fallback only as a legacy escape hatch."
+            )
+    else:
         print(
-            f"[lena_build_content_packet_dryrun_v1] "
-            f"production-proof env: {args.env_id}"
+            "[lena_build_content_packet_dryrun_v1] WARNING: using legacy "
+            "STYLE_BANK fallback path because "
+            "--allow-style-bank-fallback was supplied."
         )
 
     linked_cats = recipe.get("linked_hook_categories", [])
@@ -534,15 +1106,36 @@ def main():
     )
 
     hook, hook_reason = select_hook(
-        hook_bank, linked_cats, args.hook_category
+        hook_bank, linked_cats, args.hook_category, args.hook_id
     )
+    prompt_budget_override = None
+    if wf_entry:
+        prompt_budget_override = compute_proof_prompt_budget(
+            wardrobe_entry=wf_entry,
+            env_entry=env_entry,
+        )
+
+    expansion_matrix = build_safe_expansion_matrix(
+        recipe,
+        recipe_bank,
+        wardrobe_catalog,
+        env_catalog,
+    )
+
     print(
         f"[lena_build_content_packet_dryrun_v1] "
         f"Hook: {hook['id']} (score {hook['scores']['total_score']})"
     )
 
     print("[lena_build_content_packet_dryrun_v1] Building packet...")
-    packet = build_packet(recipe, hook, hook_reason, run_date)
+    packet = build_packet(
+        recipe,
+        hook,
+        hook_reason,
+        run_date,
+        prompt_budget=prompt_budget_override,
+        expansion_matrix=expansion_matrix,
+    )
 
     print("[lena_build_content_packet_dryrun_v1] Saving...")
     filepath = save_packet(packet, run_date, args.recipe)

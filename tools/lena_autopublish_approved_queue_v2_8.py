@@ -5,9 +5,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
+SYNC_POSTED = ROOT / "tools" / "lena_sync_posted_queue_to_post_log_v1.py"
 QUEUE_FIELDS = [
     "queue_id","date","created_at","slot_id","platform","media_type","lane","asset_status","asset_path",
-    "caption","short_caption","pinned_comment","story_prompt","post_poll","keyword_notes",
+    "growth_bucket","hook_category","audio_name",
+    "caption","short_caption","pinned_comment","story_prompt","story_poll","post_poll","keyword_notes",
     "public_text_score","public_text_decision","publish_state","publish_mode","connector_path",
     "post_url","posted_at","failure_reason","attempt_count","notes"
 ]
@@ -64,6 +66,35 @@ def _parse_connector_stdout(raw: str) -> dict | None:
         pass
     return None
 
+def sync_posted_queue_items(day: str, queue_ids: list[str], queue_limit: int) -> dict:
+    if not queue_ids:
+        return {"ok": True, "skipped": True, "reason": "no_posted_queue_ids"}
+    proc = subprocess.run(
+        [
+            PY,
+            str(SYNC_POSTED),
+            "--date",
+            day,
+            "--queue-ids",
+            ",".join(queue_ids),
+            "--queue-limit",
+            str(queue_limit),
+        ],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    parsed = _parse_connector_stdout(proc.stdout)
+    return {
+        "ok": proc.returncode == 0,
+        "returncode": proc.returncode,
+        "summary": parsed,
+        "stdout_tail": proc.stdout.splitlines()[-12:],
+        "stderr_tail": proc.stderr.splitlines()[-12:],
+    }
+
 
 def run_connector(row, dry_run=False):
     connector = row.get("connector_path") or ""
@@ -101,10 +132,30 @@ def main():
     ap.add_argument("--date", default=date.today().isoformat())
     ap.add_argument("--platforms", default="")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--live", action="store_true")
+    ap.add_argument(
+        "--i-understand-this-can-publish",
+        action="store_true",
+        dest="ack_publish_risk",
+    )
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--slot-keyword", default="", dest="slot_keyword")
     ap.add_argument("--max-attempts", type=int, default=3, dest="max_attempts")
+    ap.add_argument("--feedback-queue-limit", type=int, default=6)
     args = ap.parse_args()
+
+    if not args.dry_run and not (args.live and args.ack_publish_risk):
+        print(json.dumps({
+            "ok": False,
+            "version": "v2.8.2",
+            "error": "live_publish_blocked_missing_explicit_approval_flags",
+            "required_for_live": [
+                "--live",
+                "--i-understand-this-can-publish"
+            ],
+            "safe_preview": "rerun with --dry-run"
+        }, indent=2, ensure_ascii=False))
+        return 2
 
     path, rows = read_queue(args.date)
     if not rows:
@@ -114,6 +165,7 @@ def main():
     platform_filter = set(p.strip().lower() for p in args.platforms.replace(";", ",").split(",") if p.strip())
     results, processed = [], 0
     writable_rows = [dict(r) for r in rows]
+    posted_queue_ids: list[str] = []
 
     for row in writable_rows:
         if row.get("publish_state") == "posted":
@@ -142,6 +194,7 @@ def main():
             row["attempt_count"] = "0"
             if result.get("post_id"):
                 row["notes"] = f"post_id:{result['post_id']}"
+            posted_queue_ids.append(row.get("queue_id", ""))
         else:
             reason = result.get("reason", "connector_failed_or_not_configured")
             attempts = int(row.get("attempt_count") or 0) + 1
@@ -159,6 +212,10 @@ def main():
     if not args.dry_run:
         write_queue(path, writable_rows)
 
+    queue_sync = None
+    if not args.dry_run and posted_queue_ids:
+        queue_sync = sync_posted_queue_items(args.date, posted_queue_ids, args.feedback_queue_limit)
+
     outdir = ROOT / "pipeline" / "publishing" / "lena" / "dispatch_reports" / args.date
     outdir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -172,6 +229,7 @@ def main():
         "ready_for_connector_count": sum(1 for r in results if r["state_after"] == "ready_for_connector"),
         "failed_count": sum(1 for r in results if r["state_after"] == "failed"),
         "queue_csv": str(path),
+        "queue_sync": queue_sync,
         "results": results
     }
     report_path = outdir / f"approved_queue_autopublish_report_{datetime.now().strftime('%H%M%S')}_v2_8_1.json"

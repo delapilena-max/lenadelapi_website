@@ -118,6 +118,13 @@ def credential_status() -> dict:
     return {"kling_ak_present": ak_ok, "kling_sk_present": sk_ok}
 
 
+def credential_status_not_checked() -> dict:
+    return {
+        "kling_ak_present": "not_checked_dry_run_no_env_read",
+        "kling_sk_present": "not_checked_dry_run_no_env_read",
+    }
+
+
 # ── JWT ───────────────────────────────────────────────────────────────────────
 
 def _b64url(data: bytes) -> str:
@@ -318,7 +325,9 @@ def results_dir(date: str) -> Path:
     return RESULTS_BASE / date
 
 
-def manifest_path(date: str, recipe_id: str) -> Path:
+def manifest_path(date: str, recipe_id: str, task_id: str | None = None) -> Path:
+    if task_id:
+        return results_dir(date) / f"kling_result_{date}_{recipe_id}_{task_id}.json"
     return results_dir(date) / f"kling_result_{date}_{recipe_id}.json"
 
 
@@ -415,8 +424,7 @@ def main() -> int:
     with payload_path.open(encoding="utf-8") as f:
         envelope = json.load(f)
 
-    load_env()
-    creds = credential_status()
+    creds = credential_status_not_checked()
 
     failures = validate_envelope(envelope)
 
@@ -453,6 +461,8 @@ def main() -> int:
 
     # ── Live path ────────────────────────────────────────────────────────────
     print("[lena_submit_kling_payload_v1] Live mode. Credentials never printed.")
+    load_env()
+    creds = credential_status()
     ak, sk = require_credentials()
     jwt_token = build_jwt(ak, sk)
     del ak, sk
@@ -499,7 +509,10 @@ def main() -> int:
                     if not url:
                         continue
                     suf = suffixes[idx] if idx < len(suffixes) else f"_{idx}"
-                    dest = out_dir / f"lena_{recipe_id}_{date}{suf}.jpg"
+                    if task_id:
+                        dest = out_dir / f"lena_{recipe_id}_{date}_{task_id}{suf}.jpg"
+                    else:
+                        dest = out_dir / f"lena_{recipe_id}_{date}{suf}.jpg"
                     saved = download_image(url, dest)
                     print(f"  saved -> {saved}")
                     saved_paths.append(str(saved))
@@ -520,7 +533,7 @@ def main() -> int:
         saved_paths=saved_paths,
         error=error,
     )
-    mf_path = manifest_path(date, recipe_id)
+    mf_path = manifest_path(date, recipe_id, mf.get("task_id"))
     save_json(mf_path, mf)
     print(f"[lena_submit_kling_payload_v1] Manifest saved: {mf_path}")
 

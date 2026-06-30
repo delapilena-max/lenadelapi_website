@@ -45,6 +45,70 @@ def lane_key(*vals) -> str:
         return "stretch"
     return "default"
 
+def source_meta(src: dict) -> dict:
+    meta = src.get("metadata")
+    return meta if isinstance(meta, dict) else {}
+
+def first_nonblank(*values):
+    for value in values:
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+def infer_growth_bucket(src: dict, lane_resolved_key: str, media_type_value: str) -> str:
+    meta = source_meta(src)
+    value = first_nonblank(
+        src.get("growth_bucket"),
+        src.get("bucket"),
+        src.get("content_bucket"),
+        meta.get("growth_bucket"),
+        meta.get("bucket"),
+    )
+    if value:
+        return value
+    if lane_resolved_key in {"fitness", "stretch"}:
+        return "bond_funnel"
+    if lane_resolved_key in {"coffee", "outfit", "humor", "dinner"}:
+        return "engagement"
+    if media_type_value == "video":
+        return "bond_funnel"
+    return ""
+
+def infer_hook_category(src: dict, lane_resolved_key: str) -> str:
+    meta = source_meta(src)
+    overlay = src.get("overlay_brief") if isinstance(src.get("overlay_brief"), dict) else {}
+    value = first_nonblank(
+        src.get("hook_category"),
+        src.get("hook_group"),
+        src.get("overlay_hook_category"),
+        overlay.get("hook_category"),
+        meta.get("hook_category"),
+        meta.get("hook_group"),
+    )
+    if value:
+        return value
+    mapping = {
+        "fitness": "low_energy_workout",
+        "stretch": "morning_reset",
+        "coffee": "coffee_walk",
+        "outfit": "outfit_check",
+        "humor": "playful_hook",
+        "dinner": "night_routine",
+    }
+    return mapping.get(lane_resolved_key, "")
+
+def infer_audio_name(src: dict) -> str:
+    meta = source_meta(src)
+    return first_nonblank(
+        src.get("audio_name"),
+        src.get("selected_audio_name"),
+        meta.get("audio_name"),
+        meta.get("selected_audio_name"),
+    )
+
 def media_type(src: dict) -> str:
     t = str(src.get("media_type") or src.get("workorder_type") or src.get("type") or "").lower()
     return "video" if ("video" in t or "reel" in t) else "photo"
@@ -134,7 +198,13 @@ def source_rows(day: str):
 
     # Then asset memory directly.
     if memory_rows:
-        usable = [r for r in memory_rows if (r.get("status","").lower() in {"approved","reviewed","imported","unused","posted"})]
+        usable = [
+            r for r in memory_rows
+            if (r.get("status", "").lower() in {"approved", "reviewed", "imported", "unused", "posted"})
+        ]
+        usable_today = [r for r in usable if (r.get("date") or "") == day]
+        if usable_today:
+            return "asset_memory", usable_today
         if usable:
             return "asset_memory", usable
 
@@ -160,6 +230,9 @@ def make_packet(src: dict, day: str, source_type: str, policy: dict) -> dict:
     key = lane_key(lane, pillar, pose_motion, mood, slot)
     tpl = policy["lane_templates"].get(key, policy["lane_templates"]["default"])
     mt = media_type(src)
+    growth_bucket = infer_growth_bucket(src, key, mt)
+    hook_category = infer_hook_category(src, key)
+    audio_name = infer_audio_name(src)
 
     public_text = "\n".join([tpl["caption"], tpl["short_caption"], tpl["pinned_comment"], tpl["story_prompt"]])
     score = score_public_text(public_text, policy["blocked_public_terms"])
@@ -188,6 +261,9 @@ def make_packet(src: dict, day: str, source_type: str, policy: dict) -> dict:
         "provider": src.get("provider", ""),
         "lane": lane or key,
         "resolved_lane_key": key,
+        "growth_bucket": growth_bucket,
+        "hook_category": hook_category,
+        "audio_name": audio_name,
         "pillar": pillar,
         "caption": tpl["caption"],
         "short_caption": tpl["short_caption"],

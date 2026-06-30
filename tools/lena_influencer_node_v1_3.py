@@ -2709,9 +2709,12 @@ def upgrade_manifest(path: Path) -> dict[str, Any]:
             meta["video_prompt"] = video_prompt
             meta["music_required_before_publish"] = True
             meta["silent_auto_publish_allowed"] = False
-            meta["motion_control_requested"] = False
-            meta["motion_control_policy"] = "manual approval only; normal VIDEO 3.0 is default because Motion Control costs more"
-            meta["kling_route"] = "VIDEO 3.0 normal video unless manually upgraded to Motion Control"
+            meta["motion_control_requested"] = True
+            meta["motion_control_policy"] = (
+                "required by Lena Kling contract; live spend still requires "
+                "manual approval"
+            )
+            meta["kling_route"] = "Kling VIDEO 3.0 with Motion Control"
         else:
             image_prompt = build_photo_prompt(recipe, node)
             slot["image_prompt"] = image_prompt
@@ -2804,7 +2807,7 @@ def upgrade_manifest(path: Path) -> dict[str, Any]:
         "kling_budget_aware": True,
         "text_hooks_post_production_only": True,
         "manual_review_required": True,
-        "motion_control_manual_only": True,
+        "motion_control_required_for_video": True,
     }
     data["node_updated_at_utc"] = datetime.now(timezone.utc).isoformat()
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

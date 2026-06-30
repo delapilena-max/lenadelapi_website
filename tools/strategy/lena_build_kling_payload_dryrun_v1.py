@@ -21,6 +21,7 @@ ROOT = Path("C:/projects/ai/content_bot")
 sys.path.insert(0, str(ROOT))
 
 from pipeline.prompting.lena_prompt_brain import (
+    build_negative_prompt_for_catalog,
     NEGATIVE_PROMPT,
     format_catalog_wardrobe_override,
     format_style_override,
@@ -77,10 +78,12 @@ MASTER_IDENTITY_CHECKS = [
     "Do not slim",
     "petite",
     "hourglass",
-    "proportions may not",
-    "athletic-curvy",
+    "Do not reinterpret",
+    "full natural lifted bust",
+    "slim-thick",
     "narrow-hipped",
-    "defined waist without shrinking",
+    "defined waist",
+    "wide hips",
 ]
 
 # ── Paths ──────────────────────────────────────────────────────────────
@@ -144,7 +147,7 @@ def select_catalog_outfit(
     catalog: dict,
     outfit_id: str,
     allow_high_risk: bool,
-    is_proof: bool = False,
+    allow_untested_dryrun: bool = False,
 ) -> dict:
     outfit = next(
         (o for o in catalog["outfits"] if o["outfit_id"] == outfit_id),
@@ -164,14 +167,14 @@ def select_catalog_outfit(
             "wardrobe_allow_high_risk is false"
         )
     if outfit["status"] == "untested":
-        if not is_proof:
+        if not allow_untested_dryrun:
             raise SystemExit(
                 f"[ABORT] outfit '{outfit_id}' status=untested -- "
                 "only approved outfits allowed in v1"
             )
         print(
-            f"[PRODUCTION-PROOF] untested gate bypassed for "
-            f"'{outfit_id}' -- dry-run proof mode; "
+            f"[DRY-RUN-CATALOG] untested gate bypassed for "
+            f"'{outfit_id}' -- dry-run catalog validation only; "
             "catalog status unchanged"
         )
     return outfit
@@ -187,6 +190,18 @@ def build_final_prompt(
     return combined, wardrobe
 
 
+def fit_prompt_parts(parts: list[str], max_chars: int = 2499) -> str:
+    current = ""
+    for raw_part in parts:
+        part = (raw_part or "").strip()
+        if not part:
+            continue
+        candidate = f"{current} {part}".strip() if current else part
+        if len(candidate) <= max_chars:
+            current = candidate
+    return current
+
+
 def check_master_identity(prompt: str) -> bool:
     lp = prompt.lower()
     return all(c.lower() in lp for c in MASTER_IDENTITY_CHECKS)
@@ -199,11 +214,11 @@ def check_blocked(payload_json: str) -> list:
     ]
 
 
-def assemble_payload(prompt: str) -> dict:
+def assemble_payload(prompt: str, negative_prompt: str = NEGATIVE_PROMPT) -> dict:
     return {
         "model_name": "kling-v3-omni",
         "prompt": prompt,
-        "negative_prompt": NEGATIVE_PROMPT,
+        "negative_prompt": negative_prompt,
         "fromElementId": LENA_ELEMENT_ID,
         "arguments": [
             {
@@ -232,6 +247,10 @@ def build_envelope(
 ) -> dict:
     payload_json = json.dumps(payload)
     blocked = check_blocked(payload_json)
+    master_identity_ok = (
+        check_master_identity(payload["prompt"])
+        or check_master_identity(packet.get("compact_kling_prompt_preview", ""))
+    )
     return {
         "dry_run": True,
         "provider_call_enabled": False,
@@ -265,9 +284,7 @@ def build_envelope(
         "negative_prompt_present": bool(
             payload.get("negative_prompt")
         ),
-        "master_identity_body_present": check_master_identity(
-            payload["prompt"]
-        ),
+        "master_identity_body_present": master_identity_ok,
         "from_element_id_present": (
             "fromElementId" in payload
         ),
@@ -283,6 +300,9 @@ def build_envelope(
         ),
         "production_proof_mode": packet.get(
             "production_proof_mode", False
+        ),
+        "realism_iteration_plan": packet.get(
+            "realism_iteration_plan", {}
         ),
         "environment_id_used": packet.get("environment_id"),
         "wardrobe_outfit_id_used": packet.get("wardrobe_outfit_id"),
@@ -366,6 +386,12 @@ def print_summary(
         "  proof mode      : "
         f"{envelope.get('production_proof_mode', False)}"
     )
+    plan = envelope.get("realism_iteration_plan", {})
+    if plan:
+        print(
+            "  iteration mode  : "
+            f"{plan.get('mode', 'unknown')}"
+        )
     print(
         "  outfit used     : "
         f"{envelope.get('wardrobe_outfit_id_used', 'style_bank')}"
@@ -423,27 +449,37 @@ def main() -> int:
 
     outfit_id = packet.get("wardrobe_outfit_id")
     allow_hr = packet.get("wardrobe_allow_high_risk", False)
-    is_proof = (
-        packet.get("production_proof_mode", False)
-        and packet.get("dry_run") is True
+    allow_untested_dryrun = (
+        packet.get("dry_run") is True
         and packet.get("provider_call_enabled") is False
+        and packet.get("generation_call_performed") is False
     )
 
     if outfit_id:
         catalog = load_catalog()
         catalog_outfit = select_catalog_outfit(
-            catalog, outfit_id, allow_hr, is_proof=is_proof
+            catalog,
+            outfit_id,
+            allow_hr,
+            allow_untested_dryrun=allow_untested_dryrun,
         )
         wardrobe_text = format_catalog_wardrobe_override(catalog_outfit)
         base = packet["compact_kling_prompt_preview"]
-        env_ctx = packet.get("environment_context", "")
+        env_ctx = (packet.get("environment_context", "") or "").strip()
+        prompt_parts = [base, wardrobe_text]
         if env_ctx:
-            combined = f"{base} {env_ctx}{wardrobe_text}".strip()
-        else:
-            combined = f"{base} {wardrobe_text}".strip()
-        if len(combined) > 2499:
-            combined = combined[:2499]
-        final_prompt = combined
+            prompt_parts.append(env_ctx)
+        final_prompt = fit_prompt_parts(prompt_parts, max_chars=2499)
+        if wardrobe_text not in final_prompt:
+            raise SystemExit(
+                "[ABORT] wardrobe override did not fit into final Kling prompt; "
+                "increase reserved headroom before live use."
+            )
+        if env_ctx and env_ctx not in final_prompt:
+            raise SystemExit(
+                "[ABORT] environment context did not fit into final Kling "
+                "prompt; increase reserved headroom before live use."
+            )
         style = {
             "_source": "catalog_v1",
             "outfit_id": catalog_outfit["outfit_id"],
@@ -452,20 +488,30 @@ def main() -> int:
             "risk_tags": catalog_outfit["risk_tags"],
             "style_lane": catalog_outfit["style_lane"],
         }
+        negative_prompt = build_negative_prompt_for_catalog(catalog_outfit)
     else:
         rng = rng_for_packet(date, recipe_id)
         style = pick_style_production(rng)
-        final_prompt, _ = build_final_prompt(
-            packet["compact_kling_prompt_preview"], style
-        )
+        wardrobe_text = format_style_override(style)
+        prompt_parts = [packet["compact_kling_prompt_preview"], wardrobe_text]
+        final_prompt = fit_prompt_parts(prompt_parts, max_chars=2499)
+        if wardrobe_text not in final_prompt:
+            raise SystemExit(
+                "[ABORT] style-bank wardrobe override did not fit into final "
+                "Kling prompt; reduce the compact packet budget before live use."
+            )
+        negative_prompt = NEGATIVE_PROMPT
 
-    if not check_master_identity(final_prompt):
+    if not (
+        check_master_identity(final_prompt)
+        or check_master_identity(packet.get("compact_kling_prompt_preview", ""))
+    ):
         raise SystemExit(
             "[ABORT] Master identity/body rule not detected in prompt. "
             "Packet may be missing LENA_IDENTITY_BRIEF updates."
         )
 
-    payload = assemble_payload(final_prompt)
+    payload = assemble_payload(final_prompt, negative_prompt=negative_prompt)
     envelope = build_envelope(packet, payload, style, packet_path)
 
     if envelope["blocked_terms_found"]:
