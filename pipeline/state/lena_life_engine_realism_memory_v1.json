@@ -1,7 +1,7 @@
 {
   "version": "v1.0.0",
   "policy_name": "Lena Life Engine Realism Memory Policy",
-  "updated_at": "2026-06-30T20:55:07+00:00",
+  "updated_at": "2026-06-30T22:10:16+00:00",
   "entries": [
     {
       "task_id": "899994882323513422",
@@ -1152,18 +1152,228 @@
         "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_010_2026-06-30_901038300788555853_a.jpg"
       ],
       "logged_at": "2026-06-30T20:55:07+00:00"
+    },
+    {
+      "task_id": "901043794915754039",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_008",
+      "outfit_id": "wc_p062",
+      "environment_id": "env_r001",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p062."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_r001 in scene rooftop_evening."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_008_901043794915754039.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_008_2026-06-30_901043794915754039_a.jpg"
+      ],
+      "logged_at": "2026-06-30T21:17:53+00:00"
+    },
+    {
+      "task_id": "901044525479628896",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_008",
+      "outfit_id": "wc_p062",
+      "environment_id": "env_r001",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "Cosmetic spec drift only: midi -> mini and rooftop -> coastal. NOT a guideline issue -- cleavage/plunge are acceptable per operator; it stayed a dress, never underwear."
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p062."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_r001 in scene rooftop_evening."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_008_901044525479628896.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_008_2026-06-30_901044525479628896_a.jpg"
+      ],
+      "logged_at": "2026-06-30T21:20:43+00:00"
+    },
+    {
+      "task_id": "901046883438305323",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_008",
+      "outfit_id": "wc_p062",
+      "environment_id": "env_r001",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p062."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_r001 in scene rooftop_evening."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_008_901046883438305323.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_008_2026-06-30_901046883438305323_a.jpg"
+      ],
+      "logged_at": "2026-06-30T21:29:40+00:00"
+    },
+    {
+      "task_id": "901047490513477707",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_008",
+      "outfit_id": "wc_p062",
+      "environment_id": "env_r001",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p062."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_r001 in scene rooftop_evening."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_008_901047490513477707.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_008_2026-06-30_901047490513477707_a.jpg"
+      ],
+      "logged_at": "2026-06-30T21:32:28+00:00"
+    },
+    {
+      "task_id": "901056917185888263",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_002",
+      "outfit_id": "wc_p030",
+      "environment_id": "env_s001",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p030."
+      ],
+      "wardrobe_construction_notes": [
+        "Garment continuity failed; dress split into separate top/skirt."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_s001 in scene coffee_run_street."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [
+        "fragile dress construction wording",
+        "unplanned exposed midriff"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_002_901056917185888263.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_002_2026-06-30_901056917185888263_a.jpg"
+      ],
+      "logged_at": "2026-06-30T22:10:16+00:00"
     }
   ],
   "summary": {
-    "entry_count": 24,
+    "entry_count": 29,
     "qa_status_counts": {
-      "rejected": 12,
+      "rejected": 13,
       "strong_candidate_needs_skin_realism_review": 5,
-      "publishable_quality": 6,
+      "publishable_quality": 10,
       "not_approved": 1
     },
     "provider_counts": {
-      "kling": 24
+      "kling": 29
     },
     "outfit_counts": {
       "wc_n004": 1,
@@ -1171,7 +1381,9 @@
       "wc_p050": 6,
       "wc_p033": 2,
       "wc_p031": 2,
-      "wc_p028": 1
+      "wc_p028": 1,
+      "wc_p062": 4,
+      "wc_p030": 1
     }
   }
 }

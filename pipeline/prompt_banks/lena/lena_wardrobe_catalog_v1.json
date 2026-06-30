@@ -1984,7 +1984,7 @@
       "risk_tags": [
         "crop_risk"
       ],
-      "prompt": "dark-wash fitted denim mini skirt; fitted black ribbed short-sleeve crop top; oversized black blazer worn open over; small gold hoops, chunky black boots",
+      "prompt": "dark-wash fitted denim mini skirt; fitted black ribbed short-sleeve crop top; oversized black blazer worn open over; small gold hoops, chunky black boots The mini skirt is short, ending high on the mid-thigh, with bare legs fully visible and on display (leggy); never long pants, jeans, trousers, leggings, or covered legs.",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -1992,7 +1992,7 @@
         "navel"
       ],
       "status": "untested",
-      "notes": "Crop top risk at waist. Blazer must render open and visible."
+      "notes": "Leg-lock added 2026-06-30: mini skirts drift to jeans/pants and hide the legs; force bare legs on display. Lena is leggy."
     },
     {
       "outfit_id": "wc_p031",
@@ -2084,7 +2084,7 @@
       "risk_tags": [
         "crop_risk"
       ],
-      "prompt": "white faux-leather high-waist mini skirt; fitted black ribbed scoop-neck crop top; small gold hoops, black pointed heeled boots",
+      "prompt": "white faux-leather high-waist mini skirt; fitted black ribbed scoop-neck crop top; small gold hoops, black pointed heeled boots The mini skirt is short, ending high on the mid-thigh, with bare legs fully visible and on display (leggy); never long pants, jeans, trousers, leggings, or covered legs.",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2092,7 +2092,7 @@
         "navel"
       ],
       "status": "untested",
-      "notes": "Crop top with high-waist skirt. Waist gap risk."
+      "notes": "Leg-lock added 2026-06-30: mini skirts drift to jeans/pants and hide the legs; force bare legs on display. Lena is leggy."
     },
     {
       "outfit_id": "wc_p035",
@@ -2795,15 +2795,16 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "copper bronze metallic fitted midi dress with a halter neckline; gold drop earrings, strappy heeled sandals",
+      "prompt": "copper bronze metallic fitted midi dress with a halter neckline; an actual dress garment only -- cleavage and a plunge neckline are fine, but it must never be a bra, bralette, lingerie, or underwear worn as the outfit; gold drop earrings, strappy heeled sandals",
       "avoid_terms": [
+        "bra",
         "bralette",
-        "bikini",
-        "crop",
-        "shorts"
+        "lingerie",
+        "underwear",
+        "bikini"
       ],
       "status": "untested",
-      "notes": ""
+      "notes": "2026-06-30: operator confirmed cleavage/plunge are fine; the only hard line is no underwear/lingerie as outfit (IG flags underwear as under-18/sexualization). Relaxed from an earlier over-tight no-cleavage lock."
     },
     {
       "outfit_id": "wc_p063",
