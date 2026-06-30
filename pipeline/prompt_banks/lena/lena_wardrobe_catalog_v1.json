@@ -1,7 +1,7 @@
 {
   "schema_version": "1",
   "description": "Lena Wardrobe Catalog v1 — repo-native, clothes-only, no third-party tools",
-  "wardrobe_rule": "Wardrobe may style Lena but must not redefine her face, hair, body, skin tone, or proportions. Lena's identity comes from the approved character element and reference images. Outfit prompt text describes clothes only. Body preservation belongs to the master identity brief and character element — not outfit strings.",
+  "wardrobe_rule": "Wardrobe may style Lena but must not redefine her face, hair, body, skin tone, or proportions. Lena's identity comes from the approved character element and reference images. Outfit prompt text describes clothes only. Body preservation belongs to the master identity brief and character element — not outfit strings. Wardrobe should default to modern, sexy, attractive, and believable for Lena unless the real-world situation, platform safety, or garment stability makes that specific outfit inappropriate for the lane.",
   "avoid_terms_policy": "avoid_terms are QA and filtering metadata only. They are never injected into provider prompts.",
   "omitted_fields": {
     "hair": "Intentionally absent. Lena's hair comes from the approved character element and reference images.",
@@ -993,10 +993,14 @@
         "bralette",
         "bikini top",
         "crop",
-        "shorts"
+        "shorts",
+        "two-piece set",
+        "separate skirt",
+        "exposed midriff",
+        "navel"
       ],
-      "status": "untested",
-      "notes": "Warm color; single-piece; scoop neckline. Low drift risk."
+      "status": "rejected",
+      "notes": "Rejected after live Kling proof task 899994882323513422. Rendered as a two-piece cropped knit top plus mini skirt with exposed midriff/navel instead of a single continuous mini dress. Face/skin also rendered too airbrushed/plastic. Do not use wc_n004 for future generation without redesigning as a stricter one-piece garment."
     },
     {
       "outfit_id": "wc_n005",
@@ -1125,12 +1129,17 @@
       "coverage_level": "full",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "chocolate brown fitted knit midi dress with a slight flare at the hem and a subtle V-neck; small gold hoops, layered gold chain",
+      "prompt": "chocolate brown fitted knit midi dress with long fitted sleeves, a slight flare at the hem, and a subtle shallow V-neckline; small gold hoops, layered gold chain",
       "avoid_terms": [
         "crop",
         "bralette",
         "shorts",
-        "bodycon"
+        "bodycon",
+        "plunge neckline",
+        "deep v-neck",
+        "halter",
+        "sleeveless",
+        "cutout"
       ],
       "status": "untested",
       "notes": "Single-piece. Midi length. Flare hem avoids bodycon risk."
@@ -2350,16 +2359,20 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "fitted white ribbed stretch mini dress with a visible scoop neckline (not strapless) and clean hemline; small gold hoop earrings, strappy sandals",
+      "prompt": "one-piece fitted white ribbed stretch mini dress with a visible scoop neckline (not strapless), continuous white ribbed fabric from scoop neckline to mini hem, clean single-garment construction, and clean hemline; not a crop top, not a two-piece set, not separate skirt-and-top construction, no unintended exposed midriff or navel for this dress; small gold hoop earrings, strappy sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
         "crop",
         "shorts",
-        "strapless"
+        "strapless",
+        "two-piece",
+        "separate skirt",
+        "bare midriff",
+        "navel"
       ],
-      "status": "untested",
-      "notes": ""
+      "status": "rejected",
+      "notes": "Rejected after repeated live proof failures. Task 899916664497242158 rendered wc_p045 as a two-piece crop top + skirt with exposed midriff/navel. Task 899977838852440077 repeated the two-piece crop/skirt failure, exposed midriff/navel, added heavy freckle scatter, and was too portrait-forward. Do not use wc_p045 for future generation."
     },
     {
       "outfit_id": "wc_p046",
@@ -2393,14 +2406,16 @@
       "outfit_id": "wc_p047",
       "name": "Sage Green Ribbed Tank + High-Waist Linen Wide-Leg",
       "style_lane": "elevated_casual",
-      "production_lane": "beauty_selfie_vanity",
+      "production_lane": "apartment_elevated",
       "scene_fit": [
         "beauty_selfie",
         "street",
-        "apartment"
+        "apartment",
+        "home_kitchen_candid",
+        "apartment_home_routines"
       ],
       "season": "warm",
-      "occasion": "street",
+      "occasion": "daily",
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
@@ -2412,11 +2427,11 @@
         "navel"
       ],
       "status": "untested",
-      "notes": ""
+      "notes": "Apartment/home casual-sexy lane. Suitable for believable kitchen, home-routine, and apartment lifestyle scenes when kept structurally stable."
     },
     {
       "outfit_id": "wc_p048",
-      "name": "Oversized White Button-Down Open + White Cami + Straight Jeans",
+      "name": "Oversized White Button-Down Open + White Ribbed Tank + High-Waist Straight Jeans",
       "style_lane": "creator",
       "production_lane": "beauty_selfie_vanity",
       "scene_fit": [
@@ -2429,7 +2444,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "oversized white cotton button-down shirt worn open and loose over a fitted white cami; mid-wash straight-leg jeans; small gold studs",
+      "prompt": "oversized white cotton button-down shirt worn open and loose over a full-length fitted white ribbed tank top tucked into high-waist mid-wash straight-leg jeans; small gold studs",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2480,7 +2495,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "fitted dusty rose soft-knit off-shoulder top; stone-wash straight-leg jeans; thin gold chain necklace",
+      "prompt": "fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -2488,7 +2503,7 @@
         "navel"
       ],
       "status": "untested",
-      "notes": ""
+      "notes": "Color/construction lock added 2026-06-30 after shot 3 drifted to a purple strapless tube; dusty rose mauve off-shoulder knit with sleeves."
     },
     {
       "outfit_id": "wc_p051",

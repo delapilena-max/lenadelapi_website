@@ -1,0 +1,862 @@
+{
+  "version": "v1.0.0",
+  "policy_name": "Lena Life Engine Realism Memory Policy",
+  "updated_at": "2026-06-30T17:05:56+00:00",
+  "entries": [
+    {
+      "task_id": "899994882323513422",
+      "date": "2026-06-27",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_n004",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "wc_n004 rendered as a two-piece cropped knit top plus mini skirt instead of one continuous mini dress",
+        "visible midriff/navel",
+        "face/skin too airbrushed, plastic, and beauty-filtered"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin finish drifted too polished; needs stronger phone-camera texture."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_n004."
+      ],
+      "wardrobe_construction_notes": [
+        "Garment continuity failed; dress split into separate top/skirt."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_m012 in scene apartment_mirror_fitcheck."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Need pores, lower-lid texture, lip texture, flyaways, and uneven catchlights visible."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "beauty-filter face finish",
+        "fragile dress construction wording",
+        "unplanned exposed midriff"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-27\\kling_result_2026-06-27_hcr_001.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-27\\lena_hcr_001_2026-06-27_a.jpg"
+      ],
+      "logged_at": "2026-06-28T03:51:20+00:00"
+    },
+    {
+      "task_id": "900048714176270418",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "strong_candidate_needs_skin_realism_review",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin finish drifted too polished; needs stronger phone-camera texture.",
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Curvy body read held in a believable way."
+      ],
+      "wardrobe_construction_notes": [
+        "Dress continuity held as a single garment."
+      ],
+      "environment_realism_notes": [
+        "Mirror/room context felt believable and usable."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "This lane feels like a real woman's account, not a random glam render.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Need pores, lower-lid texture, lip texture, flyaways, and uneven catchlights visible."
+      ],
+      "prompt_clues_that_helped": [
+        "same outfit/environment lane held stable",
+        "simple one-piece mini-dress construction",
+        "mirror fit-check context",
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "beauty-filter face finish"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_001.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_001_2026-06-28_a.jpg"
+      ],
+      "logged_at": "2026-06-28T03:51:29+00:00"
+    },
+    {
+      "task_id": "900058966498746386",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "face and skin are still too glossy, airbrushed, and plastic instead of natural phone-camera texture",
+        "environment drifted toward hotel-room polish instead of the intended believable apartment mirror lane",
+        "body proportions pushed too exaggerated in the rear/hip read to feel like a real social-account photo"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin finish drifted too polished; needs stronger phone-camera texture."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_m012 in scene apartment_mirror_fitcheck."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Need pores, lower-lid texture, lip texture, flyaways, and uneven catchlights visible."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "beauty-filter face finish"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_001_900058966498746386.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_001_2026-06-28_a.jpg"
+      ],
+      "logged_at": "2026-06-28T04:04:22+00:00"
+    },
+    {
+      "task_id": "900061568753340470",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "face and skin still read too smooth and beauty-polished instead of true phone-camera micro texture",
+        "extra freckle-like speckling appeared on the face instead of clean reference-accurate skin detail",
+        "body rear/hip emphasis still feels too exaggerated for a believable real-account candid mirror photo"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Body read drifted too exaggerated to feel like a believable candid social photo."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_m012 in scene apartment_mirror_fitcheck."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "exaggerated body shaping"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_001_900061568753340470.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_001_2026-06-28_900061568753340470_a.jpg"
+      ],
+      "logged_at": "2026-06-28T04:14:11+00:00"
+    },
+    {
+      "task_id": "900062912252485646",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "missing or malformed arm anatomy breaks the image even though the face improved",
+        "wardrobe drifted completely away from the intended red mini-dress lane into white bikini/lingerie-like clothing",
+        "mirror composition drifted into an obvious phone selfie with the phone visible instead of the intended candid fit-check proof framing",
+        "body shape drifted too narrow-waisted and too exaggerated in the lower body to feel believable"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin realism crossed into believable territory and should be preserved.",
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Body read drifted too exaggerated to feel like a believable candid social photo.",
+        "Body shape narrowed too much at the waist and stopped feeling reference-consistent.",
+        "Arm anatomy failed and broke the image despite better face realism."
+      ],
+      "wardrobe_construction_notes": [
+        "Wardrobe identity drifted away from the intended outfit into bikini/lingerie-like clothing."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_m012 in scene apartment_mirror_fitcheck."
+      ],
+      "camera_realism_notes": [
+        "Composition drifted into obvious phone/selfie visibility instead of the intended candid proof framing.",
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Wrong-clothing drift makes the post feel like generator chaos instead of a coherent real account.",
+        "Visible phone/selfie drift can make the lane feel more synthetic when the framing contract called for a different capture logic.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "believable face-skin realism",
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "exaggerated body shaping",
+        "body slimming drift",
+        "missing arm anatomy",
+        "wardrobe identity drift",
+        "phone-visible mirror selfie drift"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_001_900062912252485646.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_001_2026-06-28_900062912252485646_a.jpg"
+      ],
+      "logged_at": "2026-06-28T04:22:52+00:00"
+    },
+    {
+      "task_id": "900068007467819044",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_001",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "scene contract drifted away from the candid mirror fit-check lane into a polished frontal fashion pose",
+        "mirror is present but the outfit is not meaningfully readable in reflection, so the core mirror-proof logic did not land",
+        "room still reads too polished and suite-like rather than clearly lived-in apartment reality",
+        "face is good but still a bit smoother and less micro-real than the best recent face benchmark"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "Dress continuity held as a single garment."
+      ],
+      "environment_realism_notes": [
+        "Environment drifted toward hotel/showroom polish instead of a lived-in apartment lane."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Hotel-like polish weakens the feeling of a real ongoing camera-roll account.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "single-garment dress continuity",
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "hotel-room environment drift"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_001_900068007467819044.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_001_2026-06-28_900068007467819044_a.jpg"
+      ],
+      "logged_at": "2026-06-28T04:40:40+00:00"
+    },
+    {
+      "task_id": "900073275354251350",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_m012",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "the room still reads like a polished hotel mirror setup instead of a lived-in apartment bedroom or getting-ready corner",
+        "the image still needs stronger real-home cues around the mirror such as dresser surface, products, clothes chair, or shoes near frame",
+        "the red-dress lane stayed visually attractive, but the environment still breaks the real-account illusion"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_m012 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Composition drifted into obvious phone/selfie visibility instead of the intended candid proof framing.",
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Visible phone/selfie drift can make the lane feel more synthetic when the framing contract called for a different capture logic.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block",
+        "simple apartment blue-hour lighting"
+      ],
+      "prompt_clues_that_hurt": [
+        "phone-visible mirror selfie drift"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_011_900073275354251350.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_011_2026-06-28_900073275354251350_a.jpg"
+      ],
+      "logged_at": "2026-06-28T05:04:06+00:00"
+    },
+    {
+      "task_id": "900074910339432497",
+      "date": "2026-06-28",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Mirror-selfie phone visibility can be acceptable when the face stays readable and the room still reads like a real home space.",
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-28\\kling_result_2026-06-28_hcr_011_900074910339432497.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-28\\lena_hcr_011_2026-06-28_900074910339432497_a.jpg"
+      ],
+      "logged_at": "2026-06-28T05:09:58+00:00"
+    },
+    {
+      "task_id": "900582741757001752",
+      "date": "2026-06-29",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "strong_candidate_needs_skin_realism_review",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Skin detail drifted into fake freckle-like speckling instead of reference-accurate texture.",
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "Dress continuity held as a single garment."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Composition drifted into obvious phone/selfie visibility instead of the intended candid proof framing.",
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Visible phone/selfie drift can make the lane feel more synthetic when the framing contract called for a different capture logic.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Preserve only reference beauty marks; do not invent freckles or speckled skin texture."
+      ],
+      "prompt_clues_that_helped": [
+        "single-garment dress continuity",
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [
+        "fake freckle speckling",
+        "phone-visible mirror selfie drift"
+      ],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\kling_result_2026-06-29_hcr_011_900582741757001752.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\lena_hcr_011_2026-06-29_900582741757001752_a.jpg"
+      ],
+      "logged_at": "2026-06-29T14:46:52+00:00"
+    },
+    {
+      "task_id": "900590882503262222",
+      "date": "2026-06-29",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "full-body mirror pose returned instead of the intended face-priority upper-half proof framing",
+        "phone-visible full-body selfie drift weakened the controlled mirror-save lane",
+        "face light behavior improved slightly but the face still does not fully clear the last synthetic polish/speckling gap"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Skin detail drifted into fake freckle-like speckling instead of reference-accurate texture."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "Dress continuity held as a single garment."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Composition drifted into obvious phone/selfie visibility instead of the intended candid proof framing.",
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Visible phone/selfie drift can make the lane feel more synthetic when the framing contract called for a different capture logic.",
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Preserve only reference beauty marks; do not invent freckles or speckled skin texture."
+      ],
+      "prompt_clues_that_helped": [
+        "single-garment dress continuity",
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [
+        "fake freckle speckling",
+        "phone-visible mirror selfie drift"
+      ],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\kling_result_2026-06-29_hcr_011_900590882503262222.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\lena_hcr_011_2026-06-29_900590882503262222_a.jpg"
+      ],
+      "logged_at": "2026-06-29T15:19:31+00:00"
+    },
+    {
+      "task_id": "900604271984115800",
+      "date": "2026-06-29",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "not_approved",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\kling_result_2026-06-29_hcr_011_900604271984115800.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\lena_hcr_011_2026-06-29_900604271984115800_a.jpg"
+      ],
+      "logged_at": "2026-06-29T16:12:00+00:00"
+    },
+    {
+      "task_id": "900632233902473234",
+      "date": "2026-06-29",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "garment continuity failed and the red dress split into a separate top and skirt read with exposed midriff",
+        "face-priority framing improved, but the lane still did not produce the intended single-garment red mini-dress proof image",
+        "face realism is closer, but the result cannot count as the missing win while wardrobe construction is wrong"
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "Garment continuity failed; dress split into separate top/skirt."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [
+        "fragile dress construction wording",
+        "unplanned exposed midriff"
+      ],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\kling_result_2026-06-29_hcr_011_900632233902473234.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\lena_hcr_011_2026-06-29_900632233902473234_a.jpg"
+      ],
+      "logged_at": "2026-06-29T18:03:06+00:00"
+    },
+    {
+      "task_id": "900633767852384322",
+      "date": "2026-06-29",
+      "recipe_id": "hcr_011",
+      "outfit_id": "wc_p020",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "strong_candidate_needs_skin_realism_review",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Skin detail drifted into fake freckle-like speckling instead of reference-accurate texture.",
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p020."
+      ],
+      "wardrobe_construction_notes": [
+        "Dress continuity held as a single garment."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Preserve only reference beauty marks; do not invent freckles or speckled skin texture."
+      ],
+      "prompt_clues_that_helped": [
+        "single-garment dress continuity",
+        "micro skin realism block"
+      ],
+      "prompt_clues_that_hurt": [
+        "fake freckle speckling"
+      ],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\kling_result_2026-06-29_hcr_011_900633767852384322.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-29\\lena_hcr_011_2026-06-29_900633767852384322_a.jpg"
+      ],
+      "logged_at": "2026-06-29T18:09:13+00:00"
+    },
+    {
+      "task_id": "900938782977949747",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_012",
+      "outfit_id": "wc_p050",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "strong_candidate_needs_skin_realism_review",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin realism crossed into believable territory and should be preserved.",
+        "Skin detail drifted into fake freckle-like speckling instead of reference-accurate texture."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p050."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "Preserve only reference beauty marks; do not invent freckles or speckled skin texture."
+      ],
+      "prompt_clues_that_helped": [
+        "believable face-skin realism"
+      ],
+      "prompt_clues_that_hurt": [
+        "fake freckle speckling"
+      ],
+      "source_manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_012_900938782977949747.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_012_2026-06-30_900938782977949747_a.jpg"
+      ],
+      "logged_at": "2026-06-30T14:33:39+00:00"
+    },
+    {
+      "task_id": "900966203676561435",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_012",
+      "outfit_id": "wc_p050",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Face/skin realism crossed into believable territory and should be preserved.",
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p050."
+      ],
+      "wardrobe_construction_notes": [
+        "No special wardrobe note recorded yet."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "No special camera note recorded yet."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [
+        "believable face-skin realism"
+      ],
+      "prompt_clues_that_hurt": [],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_012_900966203676561435.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_012_2026-06-30_900966203676561435_a.jpg"
+      ],
+      "logged_at": "2026-06-30T16:14:48+00:00"
+    },
+    {
+      "task_id": "900973746256355413",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_012",
+      "outfit_id": "wc_p050",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "rejected",
+      "qa_rejection_reasons": [
+        "Wardrobe drifted: dusty rose off-shoulder knit rendered as a purple strapless tube-band crop; wrong color and forbidden bandeau/micro-crop construction.",
+        "Framing drifted: face-priority chest-up mirror save became a low-cropped full-midriff body shot with exposed navel and no phone/mirror."
+      ],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "No special face/skin note recorded yet."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p050."
+      ],
+      "wardrobe_construction_notes": [
+        "Garment continuity failed; dress split into separate top/skirt."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [
+        "fragile dress construction wording",
+        "unplanned exposed midriff"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_012_900973746256355413.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_012_2026-06-30_900973746256355413_a.jpg"
+      ],
+      "logged_at": "2026-06-30T16:49:45+00:00"
+    },
+    {
+      "task_id": "900980123968217167",
+      "date": "2026-06-30",
+      "recipe_id": "hcr_012",
+      "outfit_id": "wc_p050",
+      "environment_id": "env_v008",
+      "provider": "kling",
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
+      "identity_consistency_notes": [
+        "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
+      ],
+      "skin_face_realism_notes": [
+        "Skin realism is the remaining gap, not body or garment structure."
+      ],
+      "body_proportion_notes": [
+        "Review tied to outfit wc_p050."
+      ],
+      "wardrobe_construction_notes": [
+        "Garment continuity failed; dress split into separate top/skirt."
+      ],
+      "environment_realism_notes": [
+        "Review tied to environment env_v008 in scene fit_check_mirror_getting_ready."
+      ],
+      "camera_realism_notes": [
+        "Mirror framing is a core realism lane and should be tracked as repeatable proof context."
+      ],
+      "social_account_believability_notes": [
+        "Judge whether this image could sit naturally in Lena's ongoing camera-roll life arc."
+      ],
+      "micro_detail_notes": [
+        "No micro-detail note recorded yet."
+      ],
+      "prompt_clues_that_helped": [],
+      "prompt_clues_that_hurt": [
+        "fragile dress construction wording",
+        "unplanned exposed midriff"
+      ],
+      "source_manifest_path": "pipeline\\strategy\\lena\\kling_results\\2026-06-30\\kling_result_2026-06-30_hcr_012_900980123968217167.json",
+      "source_image_paths": [
+        "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_012_2026-06-30_900980123968217167_a.jpg"
+      ],
+      "logged_at": "2026-06-30T17:05:56+00:00"
+    }
+  ],
+  "summary": {
+    "entry_count": 17,
+    "qa_status_counts": {
+      "rejected": 9,
+      "strong_candidate_needs_skin_realism_review": 4,
+      "publishable_quality": 3,
+      "not_approved": 1
+    },
+    "provider_counts": {
+      "kling": 17
+    },
+    "outfit_counts": {
+      "wc_n004": 1,
+      "wc_p020": 12,
+      "wc_p050": 4
+    }
+  }
+}

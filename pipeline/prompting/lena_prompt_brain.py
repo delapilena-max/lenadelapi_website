@@ -26,14 +26,23 @@ IDENTITY_ANCHOR = (
 )
 
 LENA_MASTER_IDENTITY = (
-    "Identity fixed: preserve Lena's approved adult athletic-curvy "
+    "Identity fixed: preserve Lena's approved adult slim-thick "
     "hourglass body across every outfit, pose, scene, and camera angle. "
-    "Fuller bust, defined waist without shrinking her frame, "
-    "visibly wider hips, fuller thighs, soft realistic hip curve, "
+    "Full natural bust, small defined waist without shrinking her frame, "
+    "visibly wide hips, toned upper thighs, soft realistic hip curve, "
+    "consistent slightly wide pelvis breadth, a slightly wider-set hip span from the front and 3/4 view, "
+    "a touch more lateral hip breadth, a slightly fuller outer-thigh and upper-glute read, "
     "and balanced curvy proportions. "
     "Do not reinterpret her as a different person. "
     "Do not slim her down, make her petite, narrow-hipped, "
-    "thin-legged, runway-model, or waif-like. "
+    "thin-legged, straight-hipped, runway-model, or waif-like. "
+    "Do not narrow her pelvis, collapse her hip width, pull her hip points inward, or taper her lower "
+    "body into a slimmer silhouette in side angles or standing poses. "
+    "A slight natural inner-thigh separation is acceptable in neutral standing poses "
+    "when the stance supports it, but never as an anatomical distortion. "
+    "Do not over-thicken her hips, thighs, or torso beyond the approved "
+    "reference proportions either. Keep her attractive, toned, curvy, "
+    "and realistic -- never shrunken, never exaggerated, never bulky. "
     "Wardrobe must fit over her existing curvy proportions "
     "and must not reshape her into a thinner body. "
     "Outfit, pose, lighting, and action may change; "
@@ -41,13 +50,39 @@ LENA_MASTER_IDENTITY = (
 )
 
 SKIN_REALISM = (
-    "natural skin texture, visible pores, subtle redness around nose and cheeks, "
-    "mild real-world skin imperfections, realistic facial texture with natural asymmetry, "
-    "healthy skin glow, preserve Lena's reference-accurate beauty marks only, "
-    "not plastic, not waxy, not over-smoothed, "
-    "no beauty-filter skin, no airbrushed mannequin skin, "
-    "no random added freckles, no extra freckle-like speckles, "
-    "no new mole placements, no heavy freckle clusters"
+    "unretouched phone-camera skin with visible pores on cheeks, nose, and forehead, "
+    "fine facial texture, faint lower-lid and under-eye texture, subtle redness, "
+    "tiny tone variation, tiny forehead texture, soft natural under-eye darkness, "
+    "small natural nose shine, realistic skin oil balance, natural asymmetry, "
+    "and one or two tiny natural blemish-scale imperfections. "
+    "No skin blur, no denoised skin, and no softened pore detail. "
+    "Micro detail: tiny peach-fuzz edge highlights, individual brow hairs, "
+    "real eyelashes with small shadows, imperfect lip texture, a few stray hair strands, "
+    "slight mouth-corner creasing, faint smile-line softness, normal eyelid fold depth, "
+    "subtle tear-trough transition, natural philtrum and lip-edge definition, "
+    "uneven natural catchlights, and scene-light falloff across the face. "
+    "Preserve Lena's reference-accurate facial beauty marks only, in the same fixed positions, "
+    "same side of the face, and roughly the same size and count as the reference. "
+    "Treat those marks as exact identity anchors tied to the same relative locations around the "
+    "eyes, nose, mouth, cheeks, and lower face as in the reference. "
+    "If the reference beauty marks are subtle, keep them subtle and sparse. "
+    "Do not move them, mirror them, multiply them, enlarge them, or turn them into a different pattern than the reference. "
+    "If facial marks appear, they should stay faithful to the reference image rather than being restyled. "
+    "Not plastic, not waxy, not over-smoothed, not CGI, not glossy doll skin. "
+    "No beauty-filter skin, no airbrushed mannequin skin, "
+    "no polished beauty-campaign finish, no commercial skin retouch look, "
+    "no foundation-ad finish, no new non-reference freckle clusters, "
+    "no new mole placements, and no decorative beauty-filter speckling that changes her identity. "
+    "No baby-face stylization, no oversized irises, no porcelain doll facial finish, "
+    "and no smoothed influencer-face retouch geometry."
+)
+
+HAND_REALISM = (
+    "Hands should read as natural human hands with five fingers on each hand, "
+    "correct thumb placement, believable knuckle joints, realistic nail scale, "
+    "relaxed wrists, and simple candid hand posing. "
+    "Avoid complex interlocked fingers, overlapping hand tangles, mannequin hands, "
+    "melted fingers, fused fingers, twisted wrists, or broken-looking joints."
 )
 
 MAIN_REFERENCE_POLICY = (
@@ -56,36 +91,93 @@ MAIN_REFERENCE_POLICY = (
 )
 
 LENA_BODY_DESCRIPTOR = (
-    "Lena has a realistic, highly photogenic athletic-curvy feminine silhouette: "
-    "fuller bust, defined waist without shrinking her frame, "
-    "visibly wider hips, fuller thighs, soft rounded hip curve, "
-    "long toned legs, graceful shoulders, and balanced curvy proportions. "
+    "Lena has a realistic, highly photogenic slim-thick feminine silhouette: "
+    "full natural bust, small defined waist without shrinking her frame, "
+    "visibly wide hips, toned upper thighs, soft rounded hip curve, "
+    "consistent slightly wide pelvis breadth, slightly wider-set hip points, a touch more lateral hip width, "
+    "and a slightly fuller outer-thigh and upper-glute read, long toned legs, graceful shoulders, "
+    "and balanced curvy proportions. "
+    "A slight natural inner-thigh separation can appear in neutral standing poses "
+    "when anatomically plausible. "
     "Her proportions should look attractive, consistent, realistic, "
     "fully clothed, and editorial: clear hourglass waist-to-hip shape, "
     "natural posture, believable hands and legs, "
-    "no exaggerated cartoon proportions, not slim, not petite."
+    "no exaggerated cartoon proportions, not slim, not petite, not bulky."
 )
 
 NEGATIVE_PROMPT = (
     "low quality, blurry, distorted face, changed face, identity drift, "
     "unrealistic body proportions, deformed hands, extra fingers, "
-    "missing fingers, fused fingers, bad anatomy, crossed eyes, "
+    "missing fingers, fused fingers, melted fingers, tangled fingers, "
+    "broken knuckles, twisted wrists, bad thumb placement, mannequin hands, "
+    "bad anatomy, crossed eyes, "
+    "unnaturally long fingers, elongated slender fingers, "
+    "glossy plastic fake nails, uniform white press-on nails, "
+    "overly manicured nails, doll-like fingers, rubbery fingers, "
+    "stiff posed fingers, airbrushed hand skin, "
     "harsh face distortion, waxy skin, plastic skin, over-smoothed skin, "
     "airbrushed skin, beauty filter skin, mannequin skin, poreless face, "
+    "CGI face, 3D-rendered face, glossy doll skin, synthetic smooth face, "
+    "skin blur, denoised skin, softened pore detail, blurred skin texture, "
+    "beauty-retouched face, foundation-ad skin, "
+    "porcelain doll face, baby-face stylization, oversized irises, inflated lips, "
+    "over-clean facial geometry, glam retouch face, "
     "random added freckles, extra freckle-like speckles, "
-    "new non-reference mole placements, heavy freckle clusters, "
-    "skinny body, petite frame, narrow hips, thin thighs, "
-    "slim runway model proportions, wasp waist, "
+    "decorative freckle mask, beauty-filter speckling, moved beauty marks, mirrored beauty marks, "
+    "multiplied beauty marks, enlarged beauty marks, new non-reference mole placements, "
+    "new non-reference heavy freckle clusters, "
+    "skinny body, petite frame, narrow hips, inward-pulled hip points, narrow pelvis, thin thighs, "
+    "slim runway model proportions, wasp waist, bulky thighs, thickened torso, "
+    "exaggerated heavy lower body, flat chest, "
     "belly button piercing, navel jewelry, navel ring, "
     "bike shorts, compression shorts, hot pants, underwear-like shorts, "
     "bra as outerwear, lingerie in public, bikini top as streetwear, "
     "underwear visible as clothing in outdoor or street settings, "
     "uncanny expression, cartoon, anime, doll-like, "
+    "hotel room, luxury suite, hospitality decor, showroom interior, "
+    "upholstered hotel headboard, nightstand hotel telephone, commercial beauty ad lighting, "
+    "editorial glam campaign lighting, polished resort room, overly glossy specular skin, "
     "watermark, text overlay, logo, duplicate person, extra limbs, "
-    "exposed belly button, visible navel, bare navel, midriff gap, "
-    "hoodie floating above waistband, ultra-cropped hoodie, "
-    "bikini-like crop top, navel piercing, belly button jewelry"
+    "navel piercing, belly button jewelry"
 )
+
+MIDRIFF_COVERAGE_NEGATIVE_SUFFIX = (
+    "exposed belly button, visible navel, bare navel, midriff gap, "
+    "gap between top hem and waistband, visible stomach with full-length top, "
+    "hoodie floating above waistband, ultra-cropped hoodie, cropped quarter-zip, "
+    "cropped pullover, cropped sweater, cropped long-sleeve top, "
+    "bikini-like crop top, bra top under open shirt, bralette substituted for "
+    "tank top, bandeau under open button-down, micro-cami ending above waistband"
+)
+
+
+def catalog_outfit_midriff_must_stay_covered(entry: dict | None) -> bool:
+    if not entry:
+        return False
+    prompt = (entry.get("prompt") or "").lower()
+    if any(
+        token in prompt
+        for token in ["crop", "cropped", "bralette", "bikini"]
+    ):
+        return False
+    if "dress" in prompt:
+        return True
+    return any(
+        token in prompt
+        for token in [
+            "top", "tee", "tank", "turtleneck", "pullover",
+            "quarter-zip", "shirt", "blouse", "sweater",
+            "long-sleeve", "long sleeve", "cami",
+            "mock-neck", "mock neck", "bodysuit",
+        ]
+    )
+
+
+def build_negative_prompt_for_catalog(entry: dict | None) -> str:
+    negative = NEGATIVE_PROMPT
+    if catalog_outfit_midriff_must_stay_covered(entry):
+        negative = f"{negative}, {MIDRIFF_COVERAGE_NEGATIVE_SUFFIX}"
+    return negative
 
 PUBLIC_WARDROBE_RULE = (
     "Wardrobe for public and street settings must read as real outerwear: "
@@ -710,6 +802,8 @@ _PRODUCTION_BLOCKED_TERMS = [
     "hoodie", "jogger", "joggers", "sweatpants",
     "pajama", "pajamas", "biker shorts", "bike shorts",
     "bralette", "bodysuit", "jumpsuit",
+    "quarter-zip", "turtleneck", "mock-neck", "mock neck",
+    "puffer vest",
 ]
 
 
@@ -736,6 +830,27 @@ def pick_style_production(rng=None) -> dict:
     return _rng.choice(pool)
 
 
+def get_production_style_pool() -> list[dict]:
+    return [
+        s for s in STYLE_BANK
+        if s.get("category") not in _PRODUCTION_EXCLUDE_CATEGORIES
+        and not any(
+            term.lower() in s.get("outfit", "").lower()
+            for term in _PRODUCTION_BLOCKED_TERMS
+        )
+    ]
+
+
+def max_production_style_override_len() -> int:
+    pool = get_production_style_pool()
+    if not pool:
+        raise SystemExit(
+            "[ABORT] max_production_style_override_len: "
+            "no production-safe STYLE_BANK entries remain"
+        )
+    return max(len(format_style_override(entry)) for entry in pool)
+
+
 def format_style_override(entry: dict) -> str:
     """Return wardrobe-override prompt line for BodyLock generation.
 
@@ -754,7 +869,7 @@ def format_style_override(entry: dict) -> str:
     )
 
 
-def format_catalog_wardrobe_override(entry: dict) -> str:
+def _format_catalog_wardrobe_override_legacy(entry: dict) -> str:
     """Clothes-only wardrobe override for catalog entries.
 
     Catalog entries have no hair or makeup fields by design.
@@ -764,9 +879,90 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
     return (
         "Wardrobe override — use this catalog outfit for clothing only: "
         f"{entry['prompt']}. "
+        "If the outfit is a dress, it must render as one continuous "
+        "one-piece dress from neckline to hem, not a separate top, "
+        "not a separate skirt, with the waist area fully covered. "
         "Lena's face, hair, body, skin tone, and identity come from "
         "the approved character element/reference images, "
         "not the outfit text."
+    )
+
+
+def format_catalog_wardrobe_override(entry: dict) -> str:
+    """Clothes-only wardrobe override for catalog entries.
+
+    Catalog entries have no hair or makeup fields by design.
+    Identity, face, hair, body, and skin tone come from the
+    approved character element and reference images only.
+    """
+    prompt = entry["prompt"]
+    lower = prompt.lower()
+    fit_guard = ""
+    layered_guard = ""
+    has_base_layer = any(
+        token in lower
+        for token in [
+            "cami", "tank", "tank top", "tee", "t-shirt", "tshirt",
+        ]
+    )
+    has_open_layer = any(
+        token in lower
+        for token in [
+            "worn open", "layered over", "open over", "open button-down",
+            "open button down", "open shirt", "open blouse",
+            "field jacket over", "jacket over", "blazer over",
+            "cardigan over", "draped loosely over",
+        ]
+    )
+    if "dress" in lower:
+        fit_guard = (
+            "If the outfit is a dress, keep it as one continuous dress from "
+            "neckline to hem, never a separated top/skirt or lingerie drift. "
+        )
+        if "subtle v-neck" in lower or "shallow v-neck" in lower:
+            fit_guard += (
+                "Keep the neckline as a modest shallow V, not a plunge, not a bra-like split, "
+                "and not an exaggerated low-cut opening. "
+            )
+        if "long fitted sleeves" in lower or "long-sleeve" in lower or "long sleeve" in lower:
+            fit_guard += (
+                "Preserve the named long sleeves as actual sleeves on both arms. "
+                "Do not convert the dress into halter, sleeveless, strappy, or shoulder-bare construction. "
+            )
+    elif (
+        any(
+            token in lower
+            for token in [
+                "top", "tee", "tank", "turtleneck", "pullover",
+                "quarter-zip", "shirt", "blouse", "sweater",
+                "long-sleeve", "long sleeve", "cami",
+            ]
+        )
+        and "crop" not in lower
+        and "cropped" not in lower
+    ):
+        fit_guard = (
+            "Keep the named top's intended construction and overall coverage. "
+            "Do not reinterpret it as a bra top, sports-bra-like top, "
+            "bikini-like top, or underwear-like garment. A slight natural "
+            "waistband reveal is acceptable if the pose or styling makes it "
+            "plausible, but do not shrink a normal top into an extreme "
+            "micro-crop or bra-band-only drift. "
+        )
+    if has_base_layer and has_open_layer:
+        layered_guard = (
+            "If an open overshirt or jacket is layered over a cami, tank, or "
+            "tee, the base layer must stay a real everyday top with normal "
+            "side coverage and waistband-length coverage, not a bralette, "
+            "bandeau, bikini top, sports bra, triangle bra, or micro-crop. "
+        )
+    return (
+        "Wardrobe override — use this catalog outfit for clothing only: "
+        f"{prompt}. "
+        f"{fit_guard}"
+        f"{layered_guard}"
+        "Lena's face, hair, body, skin tone, and identity come from the "
+        "approved character element/reference images, not the outfit text."
     )
 
 
@@ -1551,6 +1747,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         f"Camera and composition: {scene['camera']}, {camera_extra}. "
         f"Lighting: {scene['lighting']}. "
         f"Face and skin: {SKIN_REALISM}. "
+        f"Hands: {HAND_REALISM}. "
         f"Keep her identity consistent, make the moment feel specific, lived-in, candid, and emotionally believable."
     )
 
