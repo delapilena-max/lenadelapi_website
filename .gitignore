@@ -16,6 +16,12 @@ pipeline/strategy/lena/content_packets/
 *.env
 *.env.*
 
+# Platform session / login state files -- never commit live credentials
+.ig_session.json
+.instagram_session.json
+*session*.json
+*.session
+
 # Named credential dumps found in repo history
 googlesecret.txt
 VAL TOKEN AND UPLOAD.txt
