@@ -1764,7 +1764,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "oversized chocolate brown faux-leather structured blazer worn open; high-waist black fitted mini skirt; thin gold chain necklace, strappy heeled mules",
+      "prompt": "oversized chocolate brown faux-leather structured blazer worn open; high-waist black fitted mini skirt; thin gold chain necklace, strappy heeled mules The black mini skirt is short, ending high on the mid-thigh with bare legs fully visible (leggy); keep it a real mini SKIRT, never long pants or jeans, and never tight underwear-like short-shorts. Classy and Instagram-safe: no underwear, no rendering the bottoms as briefs or booty-shorts.",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -1772,7 +1772,7 @@
         "navel"
       ],
       "status": "untested",
-      "notes": ""
+      "notes": "Safe leg-lock 2026-06-30: legs out via a real black mini skirt; non-white, not tight underwear-like shorts. IG-safe."
     },
     {
       "outfit_id": "wc_p022",
