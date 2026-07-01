@@ -1,7 +1,7 @@
 {
   "version": "v1.0.0",
   "policy_name": "Lena Life Engine Realism Memory Policy",
-  "updated_at": "2026-07-01T03:33:06+00:00",
+  "updated_at": "2026-07-01T04:00:06+00:00",
   "entries": [
     {
       "task_id": "899994882323513422",
@@ -1367,13 +1367,11 @@
       "task_id": "901135184010682446",
       "date": "2026-07-01",
       "recipe_id": "hcr_010",
-      "outfit_id": "wc_p034",
+      "outfit_id": "wc_p021",
       "environment_id": "env_s007",
       "provider": "kling",
-      "qa_status": "rejected",
-      "qa_rejection_reasons": [
-        "IG-safety drift: white faux-leather mini skirt rendered as very tight white short-shorts in a rear butt-focused pose. Tight WHITE bottoms from behind read underwear-ambiguous, and butt-emphasis posing risks IG sexual-content limits. Leggy is fine; this specific combo (tight-white + rear-butt-focus) is over the safe line."
-      ],
+      "qa_status": "publishable_quality",
+      "qa_rejection_reasons": [],
       "identity_consistency_notes": [
         "Identity remains anchored to Kling Character/Element Lena; do not change face/body identity."
       ],
@@ -1381,7 +1379,7 @@
         "No special face/skin note recorded yet."
       ],
       "body_proportion_notes": [
-        "Review tied to outfit wc_p034."
+        "Review tied to outfit wc_p021."
       ],
       "wardrobe_construction_notes": [
         "No special wardrobe note recorded yet."
@@ -1404,7 +1402,7 @@
       "source_image_paths": [
         "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\kling_results\\2026-06-30\\lena_hcr_010_2026-06-30_901135184010682446_a.jpg"
       ],
-      "logged_at": "2026-07-01T03:21:37+00:00"
+      "logged_at": "2026-07-01T04:00:06+00:00"
     },
     {
       "task_id": "901136312382656597",
@@ -1451,9 +1449,9 @@
   "summary": {
     "entry_count": 31,
     "qa_status_counts": {
-      "rejected": 14,
+      "rejected": 13,
       "strong_candidate_needs_skin_realism_review": 5,
-      "publishable_quality": 11,
+      "publishable_quality": 12,
       "not_approved": 1
     },
     "provider_counts": {
@@ -1468,8 +1466,7 @@
       "wc_p028": 1,
       "wc_p062": 4,
       "wc_p030": 1,
-      "wc_p034": 1,
-      "wc_p021": 1
+      "wc_p021": 2
     }
   }
 }
