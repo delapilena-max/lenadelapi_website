@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-# Lena publish-packet builder -- Batch 2 (Markdown packet assembly + non-clobber write).
+# Lena publish-packet builder -- Batch 3 (optional queue-draft JSON emission).
 #
 # Design doc: pipeline/agents/lena/90_content_packet/{AGENT,RULES,INPUTS,OUTPUTS}.md.
-# Batch 1 (resolver + hard-fail checks) is unchanged below. Batch 2 adds: assembling
-# the 10-section publish-packet Markdown documented in OUTPUTS.md, and writing it to
-# disk with a non-clobber default (--force required to overwrite an existing packet
-# file, and only that exact file, never a directory).
+# Batches 1 (read-only resolver) and 2 (Markdown packet writing, non-clobber) are
+# unchanged below. Batch 3 adds: an OPTIONAL --queue-draft flag that, only when
+# passed, also writes a queue-shaped JSON draft alongside the Markdown packet --
+# never to pipeline/queue/, always with approved_for_live_publish: false, always
+# with a placeholder caption (never an auto-selected one).
 #
-# Still does NOT write a queue draft, does NOT touch pipeline/queue/, and has no
-# --live/--approve/--queue flag of any kind -- packet writing is the only file-write
-# capability this script has. See RULES.md's "must never do" list.
+# Still has no --live/--approve flag of any kind. --queue-draft only ever writes a
+# draft file under the packet output directory (default pipeline/publish_packets/
+# lena/), never the live queue directory that tools/process_queue.py/
+# pipeline/posting_manager.py actually scan. A hard guard (_assert_not_inside_live_queue)
+# resolves the intended queue-draft path and aborts -- writing NOTHING, including the
+# Markdown packet -- if that path would land inside or equal pipeline/queue/, catching
+# --out-dir pipeline/queue, --out-dir pipeline/queue/anything, and equivalent relative
+# paths. See RULES.md's "must never do" list and "what must hard-fail" list.
 #
 # Deliberately does NOT reuse tools/lena_review_proof_render_v1.py's
 # build_review_bundle(), because that function calls
@@ -46,8 +52,13 @@ from pipeline.qa import lena_photo_qa  # noqa: E402
 WORKORDER_ROOT = ROOT / "pipeline" / "kling_workorders"
 APILENA_DEBUG_ROOT = ROOT / "pipeline" / "kling_debug" / "apilena_api"
 DEFAULT_PUBLISH_PACKET_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
+LIVE_QUEUE_ROOT = ROOT / "pipeline" / "queue"
 
 MAX_HASHTAGS_PER_CAPTION = 3
+QUEUE_DRAFT_CAPTION_PLACEHOLDER = (
+    "<PLACEHOLDER -- operator must choose a final caption from the publish "
+    "packet before moving this into the live queue>"
+)
 
 
 class ResolveError(Exception):
@@ -60,6 +71,19 @@ class PacketWriteError(Exception):
     """Raised for a hard-fail condition when writing the packet (e.g. the
     packet already exists and --force was not supplied). No file is written
     when this is raised."""
+
+
+class QueueDraftGuardError(Exception):
+    """Raised if the resolved queue-draft output path would land inside (or
+    equal) the live pipeline/queue/ directory. Checked BEFORE any file is
+    written this run -- including the Markdown packet -- so a bad --out-dir
+    aborts the whole run with zero writes, not just the queue-draft part."""
+
+
+class QueueDraftWriteError(Exception):
+    """Raised for a hard-fail condition when writing the queue draft (e.g.
+    it already exists and --force was not supplied). No file is written when
+    this is raised."""
 
 
 # --- Batch 1: read-only resolution (unchanged) ------------------------------
@@ -420,12 +444,92 @@ def write_packet(resolved: Dict[str, Any], out_dir: Optional[Path], force: bool)
     return output_path
 
 
+# --- Batch 3: optional queue-draft JSON emission -----------------------------
+
+def resolve_queue_draft_output_path(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Path:
+    base = out_dir if out_dir is not None else DEFAULT_PUBLISH_PACKET_ROOT
+    return base / date_str / f"{slot_id}_queue_draft.json"
+
+
+def _assert_not_inside_live_queue(path: Path) -> None:
+    """Hard guard: refuse to proceed if the resolved path is the live
+    pipeline/queue/ directory itself or anything inside it. Catches
+    --out-dir pipeline/queue, --out-dir pipeline/queue/anything, and
+    equivalent relative paths, by resolving both sides to absolute paths
+    before comparing. Raises before any file is written."""
+    resolved_target = path.resolve()
+    live_queue = LIVE_QUEUE_ROOT.resolve()
+    if resolved_target == live_queue or live_queue in resolved_target.parents:
+        raise QueueDraftGuardError(
+            f"refusing to proceed: resolved path {resolved_target} is inside or equal to "
+            f"the live queue directory {live_queue}. This tool must never write into "
+            "pipeline/queue/ -- choose a different --out-dir."
+        )
+
+
+def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dict[str, Any]:
+    """Pure function, no I/O. Builds the queue-shaped draft dict. Always
+    approved_for_live_publish: false, always a placeholder caption -- never
+    an auto-selected one (RULES.md: never auto-select a caption)."""
+    debug_artifacts = resolved.get("debug_artifacts") or {}
+    metadata: Dict[str, Any] = {
+        "publish_packet_path": str(packet_output_path),
+        "qa_path": resolved.get("qa_path"),
+        "qa_overall": resolved.get("qa_overall"),
+        "source_date": resolved.get("date"),
+        "source_slot_id": resolved.get("slot_id"),
+        "generated_by": "tools/lena_build_publish_packet_v1.py",
+        "queue_draft_only": True,
+    }
+    if debug_artifacts.get("result_manifest_task_id"):
+        metadata["source_task_id"] = debug_artifacts["result_manifest_task_id"]
+    if resolved.get("wardrobe_outfit_id"):
+        metadata["wardrobe_outfit_id"] = resolved["wardrobe_outfit_id"]
+    if resolved.get("reference_binding_mode"):
+        metadata["reference_binding_mode"] = resolved["reference_binding_mode"]
+
+    return {
+        "post_id": resolved["slot_id"],
+        "media_path": resolved["image_path"],
+        "media_type": "photo",
+        "platforms": ["instagram"],
+        "caption": QUEUE_DRAFT_CAPTION_PLACEHOLDER,
+        "approved_for_live_publish": False,
+        "operator_review_required": True,
+        "metadata": metadata,
+    }
+
+
+def write_queue_draft(
+    resolved: Dict[str, Any],
+    packet_output_path: Path,
+    out_dir: Optional[Path],
+    force: bool,
+) -> Path:
+    output_path = resolve_queue_draft_output_path(resolved["date"], resolved["slot_id"], out_dir)
+    _assert_not_inside_live_queue(output_path)
+
+    if output_path.exists() and not force:
+        raise QueueDraftWriteError(
+            f"queue draft already exists at {output_path} -- pass --force to overwrite "
+            "this exact file (non-clobber default)"
+        )
+    if output_path.exists() and output_path.is_dir():
+        raise QueueDraftWriteError(f"refusing to write: {output_path} is a directory, not a file")
+
+    draft = build_queue_draft(resolved, packet_output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(draft, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Batch 2: resolve a Lena slot's real artifacts and write the "
-            "publish-packet Markdown draft. Never writes a queue draft, never "
-            "sets any approval/publish state, never calls Kling/any API."
+            "Batch 3: resolve a Lena slot's real artifacts and write the "
+            "publish-packet Markdown draft, and optionally a queue-draft JSON. "
+            "Never writes to pipeline/queue/, never sets any approval/publish "
+            "state, never calls Kling/any API."
         )
     )
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
@@ -438,7 +542,16 @@ def main() -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Allow overwriting an existing packet file at the exact resolved output path. Never touches a directory.",
+        help="Allow overwriting an existing packet/queue-draft file at its exact resolved output path. Never touches a directory.",
+    )
+    parser.add_argument(
+        "--queue-draft",
+        action="store_true",
+        help=(
+            "Also write a queue-shaped draft JSON alongside the Markdown packet. "
+            "Never written to pipeline/queue/; placeholder caption; "
+            "approved_for_live_publish always false."
+        ),
     )
     args = parser.parse_args()
 
@@ -446,6 +559,18 @@ def main() -> int:
     if args.out_dir:
         candidate = Path(args.out_dir)
         out_dir = candidate if candidate.is_absolute() else (ROOT / candidate)
+
+    # Guard check happens BEFORE any write this run (including the Markdown
+    # packet) whenever --queue-draft is requested, so a bad --out-dir aborts
+    # the whole run with zero files written anywhere, not just the queue-draft
+    # part.
+    if args.queue_draft:
+        intended_queue_draft_path = resolve_queue_draft_output_path(args.date, args.slot_id, out_dir)
+        try:
+            _assert_not_inside_live_queue(intended_queue_draft_path)
+        except QueueDraftGuardError as exc:
+            print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
+            return 1
 
     try:
         resolved = resolve_packet_inputs(args.date, args.slot_id, out_dir)
@@ -459,7 +584,27 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
         return 1
 
-    resolved["files_written_this_run"] = [str(output_path)]
+    files_written = [str(output_path)]
+
+    if args.queue_draft:
+        try:
+            queue_draft_path = write_queue_draft(resolved, output_path, out_dir, args.force)
+        except (QueueDraftGuardError, QueueDraftWriteError) as exc:
+            resolved["files_written_this_run"] = files_written
+            print(json.dumps(
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "date": args.date,
+                    "slot_id": args.slot_id,
+                    "resolved": resolved,
+                },
+                indent=2,
+            ))
+            return 1
+        files_written.append(str(queue_draft_path))
+
+    resolved["files_written_this_run"] = files_written
     print(json.dumps({"ok": True, "resolved": resolved}, indent=2))
     return 0
 
