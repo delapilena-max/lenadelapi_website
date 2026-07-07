@@ -235,6 +235,48 @@
 > needing its own explicit approval. Video API work, the studio element,
 > and `business_media`/sales/outreach remain out of scope.
 
+> ## ✅ `95_publish_gate/` FIRST REAL TOOL BUILT, TWO BATCHES (2026-07-07, commits `bd4b6135` + `68bba745`)
+> **`95_publish_gate/` now has its first real tool:
+> `tools/lena_record_publish_approval_v1.py`.** With this, the full Lena
+> photo chain is now: **photo render → QA pass → publish packet → queue
+> draft → approval record.** The remaining final live step — actually
+> promoting a queue draft into `pipeline/queue/` and running
+> `tools/process_queue.py --live` — **stays manual, not automated**, exactly
+> as `95_publish_gate/RULES.md` requires.
+>
+> **Batch 1 (`bd4b6135`): read-only approval checker.** Validates the
+> publish packet exists, validates the queue draft exists and carries
+> `metadata.queue_draft_only: true`, re-validates QA `overall == "pass"`
+> (never trusted from a cached claim), validates the final approved caption
+> (not the queue-draft placeholder, ≤3 hashtags), validates `--approved-by`
+> is non-empty, and validates `--confirm` exactly matches the required
+> phrase. **Writes nothing.**
+>
+> **Batch 2 (`68bba745`): `--record` and `--force`.** `--record` writes a
+> durable approval artifact to
+> `<out-dir>/<date>/<slot_id>_approval.json` — default location under
+> `pipeline/publish_packets/lena/`, **never `pipeline/queue/`.**
+> Non-clobber by default; `--force` overwrites only the exact resolved
+> approval-artifact file, never a directory. The approval artifact records:
+> post id, source date, publish packet path, queue draft path, QA path/QA
+> overall, the final approved caption, hashtag count, platform(s),
+> approved-by, the approval statement, a timestamp,
+> `manual_one_off_confirmed: true`, and `promotion_status:
+> "not_yet_promoted"`.
+>
+> **Still true of the whole tool, both batches:** never modifies the queue
+> draft it reads; never moves, copies, or writes anything into
+> `pipeline/queue/`; never calls `tools/process_queue.py` or
+> `posting_manager.py`; never publishes; no `--live`, `--publish`,
+> `--approve-and-publish`, or queue-promotion flag exists anywhere; no code
+> path calls Kling, renders, publishes, uploads to R2, or reads/edits
+> `.env`. `pipeline/publish_packets/lena/` and `pipeline/queue/` remain
+> untracked, pre-existing artifact directories — not staged, not committed.
+>
+> **A further Kling reliability check remains a separate, unrelated track
+> needing its own explicit approval. Video API work, the studio element, and
+> `business_media`/sales/outreach remain out of scope.**
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username

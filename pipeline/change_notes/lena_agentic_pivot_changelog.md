@@ -4493,3 +4493,107 @@ writes into `pipeline/queue/`, ever, in any form. No Kling call, no render,
 no publish, no R2 upload, no `.env` edit, no secrets printed, no video API
 work, no studio-element use, no `business_media`/sales/outreach work, no
 broad repo cleanup.
+
+## 2026-07-07 (continued) — Approval record checker/writer -- Batches 1+2
+
+### Direction
+Following the `95_publish_gate/` docs-only slice creation, a read-only
+scoping pass defined the future approval-record checker/builder. Approved
+to implement it in two batches: Batch 1 (read-only checker, all hard-fail
+rules) first, then Batch 2 (`--record`/`--force` writing) as a separate
+approval.
+
+### A. What changed
+1. **Batch 1 (`bd4b6135`) -- created `tools/lena_record_publish_approval_v1.py`,
+   read-only checker.** Reuses (imports, does not duplicate)
+   `tools/lena_build_publish_packet_v1.py`'s `resolve_packet_inputs()`,
+   `resolve_packet_output_path()`, `resolve_queue_draft_output_path()`,
+   `QUEUE_DRAFT_CAPTION_PLACEHOLDER`, and `LIVE_QUEUE_ROOT` -- so the
+   placeholder string and the live-queue guard can never drift out of sync
+   between the two tools. Validates: publish packet exists; QA re-validated
+   to `overall == "pass"` (never trusted from a cached claim); queue draft
+   exists and carries `metadata.queue_draft_only: true`; queue-draft path
+   is not inside `pipeline/queue/`; approved caption is not the placeholder
+   and has <=3 hashtags; `--approved-by` is non-empty; `--confirm` exactly
+   matches the required phrase `"I approve this for live publish"`. Prints
+   a dry-run JSON summary including the future approval record and
+   human-readable promotion instructions. Writes nothing. Validated:
+   `py_compile` clean; a real run against the actual `2026-07-07-03-photo`
+   slot correctly hit the missing-queue-draft hard-fail (none exists
+   non-live); a scratch queue draft was generated via the already-committed
+   packet builder to exercise the full positive path and all other
+   hard-fails (placeholder caption, >3 hashtags, wrong confirm phrase,
+   queue draft inside `pipeline/queue/`, empty `--approved-by`) -- all
+   behaved as designed, `files_written_this_run: []` in every case,
+   `pipeline/queue/` confirmed untouched via mtime check.
+2. **Batch 2 (`68bba745`) -- extended the same file with `--record` and
+   `--force`.** Adds `write_approval_record()`: writes the approval
+   artifact to `<out-dir>/<date>/<slot_id>_approval.json` (default
+   `pipeline/publish_packets/lena/`), guarded against
+   `pipeline/queue/` via `_assert_not_inside_live_queue()` (reused), non-
+   clobber by default (`ApprovalWriteError` unless `--force`), `--force`
+   overwrites only the exact resolved file with an explicit directory
+   guard. No `--live`/`--publish`/`--approve-and-publish`/queue-promotion
+   flag added. Validated: `py_compile` clean; a positive `--record` test
+   against a scratch packet+draft wrote exactly one file, inspected and
+   matched the exact 14-field schema; a non-clobber retry (no `--force`)
+   aborted cleanly; a `--force` retry overwrote the exact scratch file with
+   updated content; two live-queue-guard tests (`--out-dir pipeline/queue`
+   and `--out-dir pipeline/queue/something`, both with `--record`) aborted
+   before any write (caught by the earlier missing-packet check in this
+   particular CLI path; the dedicated live-queue guard function was
+   additionally unit-tested directly in isolation and confirmed to
+   independently block both cases); all three re-tested hard-fails
+   (placeholder caption, >3 hashtags, wrong confirm phrase) still aborted
+   cleanly with `--record` present; `pipeline/queue/` and the real existing
+   publish packet confirmed untouched via mtime checks throughout; scratch
+   output inspected then deleted.
+
+### B. Files changed (committed)
+`tools/lena_record_publish_approval_v1.py` -- created read-only (`bd4b6135`),
+extended with `--record`/`--force` writing (`68bba745`).
+
+### C. Validations run
+`py_compile` on both commits. Real-artifact tests against the actual
+`2026-07-07-03-photo` slot (missing-queue-draft hard-fail confirmed).
+Scratch-directory positive/negative tests for every hard-fail rule across
+both batches. Non-clobber and `--force` write tests against a scratch
+approval artifact. Live-queue-guard tests (CLI-level and direct unit-level).
+`pipeline/queue/` and the real publish packet confirmed untouched via mtime
+checks after every test. Exact-staged-set checks before each commit. Manual
+review of both cached diffs confirming no imports of `pipeline.
+posting_manager`, `tools.process_queue`, `pipeline.kling_apilena_api_executor`,
+`pipeline.env_loader`, `requests`, or `urllib`.
+
+### D. Decisions made
+- Split into two commits (checker, then writer) matching the two explicitly
+  approved batches.
+- Reuse (import) the packet builder's placeholder constant and live-queue
+  guard concept rather than re-typing them, to eliminate drift risk between
+  the two tools.
+- Guard the approval-artifact output path independently in
+  `write_approval_record()`, on top of the queue-draft path's own guard in
+  the Batch 1 checker -- defense-in-depth even though the current check
+  ordering means the packet-existence check is what actually fires first
+  for a `pipeline/queue`-pointed `--out-dir`.
+- Require an exact-match confirm phrase (not a general truthy flag) as a
+  deliberate typo/accident guard before recording any approval.
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose`, video API work, and the
+studio element remain untouched/paused per standing direction.
+
+### F. Next approved step
+Not yet decided. The full Lena photo chain (render -> QA -> packet -> queue
+draft -> approval record) is now built and documented; the final live step
+(manual promotion into `pipeline/queue/` + `tools/process_queue.py --live`)
+remains manual by design, not automated, and no change to that boundary is
+proposed. A further Kling reliability check remains a separate, unrelated,
+alternative track.
+
+### G. What must not be done
+No queue-promotion code without separate explicit approval and design
+review far beyond this session's scope. No writes to `pipeline/queue/`. No
+Kling call, no render, no publish, no R2 upload, no `.env` edit, no secrets
+printed, no video API work, no studio-element use, no
+`business_media`/sales/outreach work, no broad repo cleanup.

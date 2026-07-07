@@ -123,6 +123,34 @@
 > §14 changelog entry dated 2026-07-07 ("95_publish_gate slice checkpoint")
 > and the matching banner in `NEXT_SESSION_START.md`.
 
+> **`95_publish_gate/` FIRST REAL TOOL, TWO BATCHES (2026-07-07, commits
+> `bd4b6135` + `68bba745`):** `tools/lena_record_publish_approval_v1.py`
+> now exists. **The full Lena photo chain is now: photo render -> QA pass
+> -> publish packet -> queue draft -> approval record**, with the final live
+> step (manual promotion into `pipeline/queue/` + `tools/process_queue.py
+> --live`) staying manual, not automated. **Batch 1** (`bd4b6135`) is a
+> read-only checker: validates the packet exists, the queue draft exists
+> with `metadata.queue_draft_only: true`, re-validates QA `overall ==
+> "pass"`, validates the approved caption (not the placeholder, <=3
+> hashtags), validates `--approved-by` non-empty and `--confirm` matches
+> the required exact phrase -- writes nothing. **Batch 2** (`68bba745`)
+> adds `--record`/`--force`: writes a durable approval artifact to
+> `<out-dir>/<date>/<slot_id>_approval.json` (default under `pipeline/
+> publish_packets/lena/`, never `pipeline/queue/`), non-clobber by default,
+> recording post id/date/packet path/queue-draft path/QA path+overall/
+> approved caption/hashtag count/platforms/approved-by/approval statement/
+> timestamp/`manual_one_off_confirmed: true`/`promotion_status:
+> "not_yet_promoted"`. **Never modifies the queue draft, never writes into
+> `pipeline/queue/`, never calls `tools/process_queue.py` or
+> `posting_manager.py`, never publishes; no `--live`/`--publish`/
+> `--approve-and-publish`/queue-promotion flag exists.** `pipeline/
+> publish_packets/lena/` and `pipeline/queue/` remain untracked,
+> pre-existing, untouched. A further Kling reliability check remains a
+> separate, unrelated track. Video API, the studio element, and
+> `business_media`/sales/outreach remain out of scope. Full detail: the
+> §14 changelog entry dated 2026-07-07 ("Approval record checker/writer --
+> Batches 1+2") and the matching banner in `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor
