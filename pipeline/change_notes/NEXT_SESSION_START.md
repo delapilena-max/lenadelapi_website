@@ -174,6 +174,40 @@
 > until the packet/queue-draft behavior is settled. Video API work, the
 > studio element, and `business_media`/sales/outreach remain out of scope.
 
+> ## ✅ `90_content_packet/` BATCH 3 COMMITTED -- ALL THREE BATCHES NOW COMPLETE (2026-07-07, commit `e9edb3d9`)
+> **Batch 3 is committed.** `tools/lena_build_publish_packet_v1.py` now
+> supports an optional `--queue-draft` flag. When passed, it writes a
+> queue-shaped draft JSON to
+> `<out-dir>/<date>/<slot_id>_queue_draft.json` alongside the Markdown
+> packet — **default location is under `pipeline/publish_packets/lena/`,
+> never `pipeline/queue/`.**
+>
+> **Hard guard, checked before any write this run when `--queue-draft` is
+> passed:** `_assert_not_inside_live_queue()` resolves the intended
+> queue-draft path and aborts the entire run — including the Markdown
+> packet, zero files written — if that path is inside or equal to
+> `pipeline/queue/`. Confirmed to reject both `--out-dir pipeline/queue`
+> and `--out-dir pipeline/queue/something`.
+>
+> **Queue draft fields are intentionally safe:**
+> `approved_for_live_publish: false` (hardcoded), `operator_review_required:
+> true` (hardcoded), `metadata.queue_draft_only: true` (hardcoded), caption
+> is a placeholder string only (never auto-selected), and
+> `metadata.publish_packet_path` points back to the Markdown packet.
+>
+> **Still true of the whole tool, all three batches:** no `--live`,
+> `--approve`, or any publish flag exists; no import of `posting_manager`,
+> `process_queue`, any publisher/API module, the Kling executor, `requests`,
+> `urllib`, or `pipeline.env_loader`; no code path can call Kling, render,
+> publish, upload to R2, or read/edit `.env`.
+> `pipeline/publish_packets/lena/` and `pipeline/queue/` remain untracked,
+> pre-existing artifact directories — not staged, not committed.
+>
+> **`95_publish_gate/` is now the next reasonable docs-only design
+> target** — the packet/queue-draft behavior this slice depends on is
+> settled (all three batches committed). Video API work, the studio
+> element, and `business_media`/sales/outreach remain out of scope.
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username

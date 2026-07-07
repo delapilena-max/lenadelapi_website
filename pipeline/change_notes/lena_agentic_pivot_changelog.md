@@ -4322,3 +4322,91 @@ separate explicit approval and design review. No Kling call, no render, no
 publish, no R2 upload, no `.env` edit, no secrets printed, no video API
 work, no studio-element use, no `business_media`/sales/outreach work, no
 broad repo cleanup.
+
+## 2026-07-07 (continued) — Publish packet builder -- Batch 3
+
+### Direction
+Following a read-only scoping pass for the Batch 3 `--queue-draft` design
+(schema, safety fields, output path, guard requirements), approved to
+implement it in `tools/lena_build_publish_packet_v1.py` -- the last of the
+three originally-scoped batches.
+
+### A. What changed
+1. **Committed as `e9edb3d9`** "feat: add Lena queue draft output" --
+   added an optional `--queue-draft` CLI flag to the existing resolver +
+   Markdown-writer script. No other file touched.
+2. **Queue-draft output path:** `<out-dir>/<date>/<slot_id>_queue_draft.json`
+   via `resolve_queue_draft_output_path()`, default out-dir
+   `pipeline/publish_packets/lena/` (same base as the Markdown packet) --
+   **never `pipeline/queue/`**.
+3. **Hard guard added:** `_assert_not_inside_live_queue()` resolves the
+   intended queue-draft path and the live `pipeline/queue/` root to
+   absolute paths and raises `QueueDraftGuardError` if the target equals or
+   is nested under the live queue directory. **Wired to run in `main()`
+   before any write this run** (including the Markdown packet) whenever
+   `--queue-draft` is passed -- a bad `--out-dir` aborts the whole run with
+   zero files written, not just the queue-draft part.
+4. **Queue-draft content** (`build_queue_draft()`, pure function, no I/O):
+   `post_id`, `media_path`, `media_type: "photo"`, `platforms: ["instagram"]`,
+   `caption` (hardcoded placeholder string, never auto-selected -- RULES.md),
+   `approved_for_live_publish: false` (hardcoded), `operator_review_required:
+   true` (hardcoded), and a `metadata` block with `publish_packet_path`
+   (pointer back to the Markdown packet), `qa_path`, `qa_overall`,
+   `source_date`, `source_slot_id`, `generated_by`, `queue_draft_only: true`
+   (hardcoded), plus `source_task_id`/`wardrobe_outfit_id`/
+   `reference_binding_mode` when available.
+5. **Non-clobber write** (`write_queue_draft()`): same pattern as the
+   Markdown packet -- aborts unless `--force`, `--force` overwrites only the
+   exact resolved file, explicit directory guard.
+6. **Validated:** `py_compile` clean; positive test (`--out-dir scratch/
+   lena_packet_builder_validation --queue-draft`) wrote both files, contents
+   inspected (`approved_for_live_publish: false`, `operator_review_required:
+   true`, `metadata.queue_draft_only: true`, placeholder caption present,
+   `metadata.publish_packet_path` correctly points at the Markdown packet);
+   two guard tests (`--out-dir pipeline/queue --queue-draft` and `--out-dir
+   pipeline/queue/something --queue-draft`) both aborted cleanly, exit 1,
+   zero files written; `find pipeline/queue -newermt "10 minutes ago" -type
+   f` empty across every test; real existing hand-built packet confirmed
+   untouched via mtime check; scratch output inspected then deleted.
+
+### B. Files changed (committed)
+`tools/lena_build_publish_packet_v1.py` -- extended with `--queue-draft`
+support (`e9edb3d9`).
+
+### C. Validations run
+`py_compile`. Real positive write test to an isolated scratch directory
+(both packet and queue draft written, inspected, deleted). Two real guard
+tests proving `--out-dir pipeline/queue` and a subdirectory variant both
+abort before any write. `pipeline/queue/` and the real existing publish
+packet confirmed untouched via mtime checks across every test. Exact-
+staged-set check before commit. Manual review of the cached diff confirming
+no new imports beyond what Batches 1-2 already used.
+
+### D. Decisions made
+- Run the live-queue guard before the Markdown packet write (not just
+  before the queue-draft write) whenever `--queue-draft` is requested, so a
+  misconfigured `--out-dir` can never produce a partial write.
+- Hardcode all four safety fields (`approved_for_live_publish`,
+  `operator_review_required`, `queue_draft_only`, the placeholder caption)
+  in code rather than exposing any of them as CLI-settable.
+- Default the queue-draft location to the same base directory as the
+  Markdown packet (`pipeline/publish_packets/lena/`) rather than inventing a
+  third artifact location.
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose`, video API work, and the
+studio element remain untouched/paused per standing direction.
+
+### F. Next approved step
+Not yet decided. All three originally-scoped batches for
+`tools/lena_build_publish_packet_v1.py` are now complete. `95_publish_gate/`
+is the next reasonable docs-only design target (the packet/queue-draft
+behavior it would gate is now settled), but building it needs its own
+separate approval, same as every other slice this session.
+
+### G. What must not be done
+No `--live`/`--approve`/publish flag added without separate explicit
+approval and design review. No writes to `pipeline/queue/`. No Kling call,
+no render, no publish, no R2 upload, no `.env` edit, no secrets printed, no
+video API work, no studio-element use, no `business_media`/sales/outreach
+work, no broad repo cleanup.

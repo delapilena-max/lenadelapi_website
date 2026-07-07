@@ -79,6 +79,28 @@
 > packet builder -- Batches 1+2") and the matching banner in
 > `NEXT_SESSION_START.md`.
 
+> **`90_content_packet/` BATCH 3 COMMITTED, ALL THREE BATCHES COMPLETE
+> (2026-07-07, commit `e9edb3d9`):** `tools/lena_build_publish_packet_v1.py`
+> now supports optional `--queue-draft`, writing to
+> `<out-dir>/<date>/<slot_id>_queue_draft.json` (default under
+> `pipeline/publish_packets/lena/`, never `pipeline/queue/`). A hard guard
+> (`_assert_not_inside_live_queue()`) runs before any write this run when
+> `--queue-draft` is passed and rejects `--out-dir pipeline/queue` and
+> `--out-dir pipeline/queue/something` -- confirmed by test. Queue-draft
+> fields are hardcoded safe: `approved_for_live_publish: false`,
+> `operator_review_required: true`, `metadata.queue_draft_only: true`,
+> placeholder-only caption, pointer back to the Markdown packet. Still no
+> `--live`/`--approve`/publish flag, still no
+> `posting_manager`/`process_queue`/publisher-API/Kling-executor/
+> `requests`/`urllib`/`env_loader` import anywhere in the tool. `pipeline/
+> publish_packets/lena/` and `pipeline/queue/` remain untracked,
+> pre-existing, untouched. **`95_publish_gate/` is now the next reasonable
+> docs-only design target** -- the packet/queue-draft behavior it would gate
+> is settled. Video API, the studio element, and `business_media`/sales/
+> outreach remain out of scope. Full detail: the §14 changelog entry dated
+> 2026-07-07 ("Publish packet builder -- Batch 3") and the matching banner
+> in `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor
