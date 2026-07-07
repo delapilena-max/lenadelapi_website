@@ -1,15 +1,25 @@
 from __future__ import annotations
 
-# Lena publish-approval checker -- Batch 1 (read-only checker, no writes).
+# Lena publish-approval checker -- Batch 2 (approval-artifact writing, non-clobber).
 #
 # Design doc: pipeline/agents/lena/95_publish_gate/{AGENT,RULES,INPUTS,OUTPUTS}.md.
-# This is Batch 1 only, per that folder's RULES.md and the approved scoping pass:
-# resolve a slot's real packet/queue-draft/QA artifacts, run every hard-fail check
-# from RULES.md, and print a JSON dry-run summary of the approval record that WOULD
-# be written later. This batch writes nothing -- no approval artifact, no queue
-# draft edit, no queue-directory write. --record and --force are NOT implemented in
-# this batch (see RULES.md "Human approval required" -- writing the actual approval
-# artifact is a separate, later, explicitly-approved step).
+# Batch 1 (read-only checker, all hard-fail rules) is unchanged below -- every check
+# still runs exactly as before, writing nothing, on every invocation regardless of
+# --record. Batch 2 adds: an OPTIONAL --record flag that, only when passed and only
+# after every Batch 1 check has already passed, writes the approval-decision
+# artifact to pipeline/publish_packets/lena/<date>/<slot_id>_approval.json (or under
+# --out-dir), non-clobber by default (--force required to overwrite that exact
+# file, never a directory).
+#
+# Still has no --live/--publish/--approve-and-publish/queue-promotion flag of any
+# kind. --record only ever writes the one approval-artifact file under the packet
+# output directory (default pipeline/publish_packets/lena/), never
+# pipeline/queue/. A hard guard (_assert_not_inside_live_queue, reused from Batch 1)
+# is applied to the approval-artifact output path itself before any write, catching
+# --out-dir pipeline/queue and --out-dir pipeline/queue/anything -- on top of the
+# Batch 1 guard already applied to the queue-draft path, which independently aborts
+# the whole check (before write_approval_record is ever called) under the same
+# --out-dir conditions.
 #
 # Never writes into pipeline/queue/, never moves or copies anything there, never
 # edits the queue draft it reads. Never imports pipeline.posting_manager,
@@ -51,7 +61,15 @@ REQUIRED_CONFIRM_PHRASE = "I approve this for live publish"
 class ApprovalCheckError(Exception):
     """Raised for any hard-fail condition in approval-record resolution/
     validation. Never caught silently -- main() reports it and exits
-    non-zero. Batch 1 never writes any file, on success or failure."""
+    non-zero. Batch 1's checks never write any file, on success or
+    failure -- only write_approval_record() (Batch 2) ever writes, and only
+    after every one of these checks has already passed."""
+
+
+class ApprovalWriteError(Exception):
+    """Raised for a hard-fail condition when writing the approval artifact
+    (already exists without --force, output path inside pipeline/queue/, or
+    a directory at that path). No file is written when this is raised."""
 
 
 def resolve_approval_output_path(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Path:
@@ -224,15 +242,43 @@ def check_publish_approval(
     }
 
 
+def write_approval_record(checked: Dict[str, Any], force: bool) -> Path:
+    """Writes the approval artifact ONLY -- never the queue draft, never
+    anything under pipeline/queue/. Only called from main() when --record is
+    passed, and only after check_publish_approval() has already succeeded
+    (every Batch 1 hard-fail rule already passed)."""
+    output_path = Path(checked["future_approval_output_path"])
+
+    try:
+        _assert_not_inside_live_queue(output_path)
+    except ApprovalCheckError as exc:
+        raise ApprovalWriteError(str(exc)) from exc
+
+    if output_path.exists() and not force:
+        raise ApprovalWriteError(
+            f"approval artifact already exists at {output_path} -- pass --force to "
+            "overwrite this exact file (non-clobber default)"
+        )
+    if output_path.exists() and output_path.is_dir():
+        raise ApprovalWriteError(f"refusing to write: {output_path} is a directory, not a file")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(checked["future_approval_record"], indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return output_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Batch 1: read-only checker for a future Lena publish-approval "
+            "Batch 2: checker + optional writer for a Lena publish-approval "
             "record. Resolves and validates a slot's real packet/queue-draft/QA "
-            "artifacts, runs every hard-fail rule, and prints a dry-run summary "
-            "of the approval record that would be written later. Writes nothing "
-            "-- no approval artifact, no queue-draft edit, no pipeline/queue/ "
-            "write. --record/--force are not implemented in this batch."
+            "artifacts, runs every hard-fail rule, and prints a summary of the "
+            "approval record. Without --record, writes nothing (dry-run only). "
+            "With --record, writes the approval artifact ONLY -- never the queue "
+            "draft, never anything under pipeline/queue/."
         )
     )
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
@@ -243,6 +289,16 @@ def main() -> int:
     parser.add_argument("--platform", action="append", dest="platforms", default=None, help="repeatable; default instagram")
     parser.add_argument("--queue-draft-path", default=None, dest="queue_draft_path")
     parser.add_argument("--out-dir", default=None, help="Override the packet/queue-draft/approval output base directory.")
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Write the approval artifact. Without this flag, only a dry-run summary is printed; nothing is written.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow overwriting an existing approval artifact at its exact resolved path. Never touches a directory. Only meaningful with --record.",
+    )
     args = parser.parse_args()
 
     out_dir: Optional[Path] = None
@@ -270,7 +326,28 @@ def main() -> int:
         ))
         return 1
 
-    print(json.dumps({"ok": True, "dry_run": True, "checked": summary}, indent=2))
+    if not args.record:
+        print(json.dumps({"ok": True, "dry_run": True, "checked": summary}, indent=2))
+        return 0
+
+    try:
+        approval_path = write_approval_record(summary, args.force)
+    except ApprovalWriteError as exc:
+        summary["files_written_this_run"] = []
+        print(json.dumps(
+            {
+                "ok": False,
+                "error": str(exc),
+                "date": args.date,
+                "slot_id": args.slot_id,
+                "checked": summary,
+            },
+            indent=2,
+        ))
+        return 1
+
+    summary["files_written_this_run"] = [str(approval_path)]
+    print(json.dumps({"ok": True, "dry_run": False, "checked": summary}, indent=2))
     return 0
 
 
