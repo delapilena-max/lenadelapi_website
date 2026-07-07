@@ -22,6 +22,22 @@
 > accurate and in force for her lane. See the new §14 entry dated 2026-07-07
 > ("Strategic pivot recorded") for the full cross-reference.
 
+> **LIVE CHAIN GIT-DURABLE + INFO-HIERARCHY CORRECTED (2026-07-07):** the
+> entire proven Lena photo chain
+> (`lena_prompt_brain.py -> kling_apilena_api_executor.py -> lena_photo_qa.py
+> -> publish packet/queue -> posting_manager.py -> instagram_graph_adapter.py`)
+> is now tracked in git across four commits (`3bf932ab` execution core,
+> `2c49b348` queue/scheduling glue, `81056cb3` prompt brain + photo-first
+> contract, `a0407bc2` information-hierarchy correction), on top of the
+> already-committed publisher (`8870a82b`). No code behavior changed by this
+> checkpoint. Video stays disabled (photo lane first);
+> `tools/strategy/lena_build_content_packet_dryrun_v1.py` is documented as
+> ideation-only, not the live packet builder; the next build target, if
+> pursued, is `90_content_packet/`, with `95_publish_gate/` deferred until a
+> real packet artifact exists to gate. Full detail: the §14 changelog entry
+> dated 2026-07-07 ("Git-durability + info-hierarchy checkpoint") and the
+> matching banner in `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor

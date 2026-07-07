@@ -4023,3 +4023,119 @@ backs it). Re-verified only `pipeline/posting_manager.py` and
 **Next approved step:** none pending on this thread — it's closed. Lena
 render/publish threads remain in their last recorded state (render freeze
 narrowed but in force; no further publish without explicit approval).
+
+## 2026-07-07 (continued) — Git-durability + info-hierarchy checkpoint
+
+### Direction
+Priority explicitly set to Lena autonomy (photo lane first, video later), not
+`business_media`. A read-only audit found the entire proven Lena photo chain
+(executor, identity, QA, production job, preflight, scheduler/env/queue glue,
+prompt brain repairs, Kling contract) existed only on local disk — never
+committed to git, in any commit, ever (`git log --all` empty for those paths)
+— a durability risk given how much of this session's work depends on it. A
+second audit then found `information_hierarchy/Projects/Lena Influencer
+Node/Instructions/Instructions.md` was stale: it named the retired
+`hcr_001`/`wc_p045`/BODYLOCK-era scripts as the "official" pipeline, two of
+which are already deleted from the working tree.
+
+### A. What changed
+1. **Audited candidate live-path files** (read-only): confirmed 9 of 11 were
+   untracked (`pipeline/kling_apilena_api_executor.py`, `pipeline/identity/
+   lena_identity.py`, `pipeline/qa/lena_photo_qa.py`, `pipeline/
+   lena_production_job.py`, `tools/lena_preflight.py`, `pipeline/scheduler.py`,
+   `pipeline/scheduler_jobs.py`, `pipeline/env_loader.py`, `tools/
+   process_queue.py`), and 2 were tracked-but-modified (`pipeline/prompting/
+   lena_prompt_brain.py`, `pipeline/config/lena_kling_contract.json`). Ran a
+   masked secret-pattern scan on all candidates plus every later cached diff
+   before each commit — zero hardcoded secrets found; only env-var *names*
+   (`KLING_AK`/`KLING_SK`/`KLING_WEB_TOKEN`) read via `os.environ.get(...)`,
+   the expected pattern.
+2. **Batch A committed (`3bf932ab`):** `pipeline/identity/lena_identity.py`,
+   `pipeline/qa/lena_photo_qa.py`, `pipeline/kling_apilena_api_executor.py`,
+   `pipeline/lena_production_job.py`, `tools/lena_preflight.py` — tracked
+   byte-for-byte as-is, `py_compile` clean, no behavior change.
+3. **Batch B committed (`2c49b348`):** `pipeline/scheduler.py`, `pipeline/
+   scheduler_jobs.py`, `pipeline/env_loader.py`, `tools/process_queue.py` —
+   same treatment, `py_compile` clean, no behavior change.
+4. **Batch C reviewed then committed (`81056cb3`):** the pending diffs on
+   `pipeline/prompting/lena_prompt_brain.py` (the already-implemented
+   negative-prompt tiering repair, identity/skin-realism language, and
+   catalog-driven scene/wardrobe/environment selection replacing old
+   `random.choice` calls) and `pipeline/config/lena_kling_contract.json`
+   (video-count fields all set to `0`, `photos_per_day` 2->3, schedule slot
+   swapped from video to photo) were reviewed in full, `py_compile`/JSON-valid
+   confirmed, secret-scanned clean, and confirmed to contain only the
+   documented repairs with no unrelated content before committing.
+5. **Content-packet builder wiring audited** (read-only, no edits): confirmed
+   `tools/strategy/lena_build_content_packet_dryrun_v1.py` is tracked/modified
+   (small, cosmetic wording diff, left uncommitted/untouched), reads a
+   separate recipe/hook/wardrobe/environment catalog system, writes to
+   `pipeline/strategy/lena/content_packets/` (last real output 2026-07-01,
+   predating the reference-by-URL breakthrough) using its own prompt schema,
+   and never reads rendered images, QA schema v2, reference-by-URL artifacts,
+   queue files, or publish receipts. Confirmed via direct comparison against a
+   real 2026-07-07 workorder that the two prompt schemas are structurally
+   unrelated. Conclusion: this script is an upstream ideation/planning aid,
+   not the live publish-packet builder; the real gap is a not-yet-built
+   `90_content_packet/` slice.
+6. **Information-hierarchy correction committed (`a0407bc2`):** rewrote the
+   "Current Production-Proof Loop" section of `information_hierarchy/
+   Projects/Lena Influencer Node/Instructions/Instructions.md` to state the
+   real live chain, label the content-packet builder as ideation-only, note
+   the `90_content_packet/` gap (with `95_publish_gate/` explicitly deferred
+   until a real packet artifact exists), note video is disabled/photo-first,
+   and note the studio element is reserved for a later out-of-scope video
+   lane. Relabeled the old `hcr_001`/`wc_p045` "Known result status" bullets
+   as superseded historical record rather than current guidance. Secret-scanned
+   clean; only this one file staged and committed (the rest of
+   `information_hierarchy/` remains untracked, deliberately not staged).
+
+### B. Files changed (committed)
+`pipeline/identity/lena_identity.py`, `pipeline/qa/lena_photo_qa.py`,
+`pipeline/kling_apilena_api_executor.py`, `pipeline/lena_production_job.py`,
+`tools/lena_preflight.py` (`3bf932ab`); `pipeline/scheduler.py`, `pipeline/
+scheduler_jobs.py`, `pipeline/env_loader.py`, `tools/process_queue.py`
+(`2c49b348`); `pipeline/prompting/lena_prompt_brain.py`, `pipeline/config/
+lena_kling_contract.json` (`81056cb3`); `information_hierarchy/Projects/Lena
+Influencer Node/Instructions/Instructions.md` (`a0407bc2`).
+
+### C. Validations run
+`py_compile` on every `.py` file before each commit; JSON-load validation on
+`lena_kling_contract.json`; masked secret-pattern scan (token/secret/
+password/bearer/authorization/access_token/api_key/META_INSTAGRAM_
+ACCESS_TOKEN/KLING_*KEY/R2_*) against every cached diff before each commit —
+zero hardcoded secrets found in any batch; exact-staged-set checks
+(`git diff --cached --name-status`) before every commit.
+
+### D. Decisions made
+- Split the git-durability work into three approval-gated batches (core
+  execution / queue+scheduling glue / prompt+contract) rather than one large
+  commit, so each diff stayed reviewable.
+- Track the untracked files exactly as-is, no opportunistic cleanup or
+  refactor bundled in.
+- Correct only the one stale information-hierarchy file, not the whole
+  `information_hierarchy/` tree, and stage only that one file, not the
+  directory.
+- Leave `tools/strategy/lena_build_content_packet_dryrun_v1.py` itself
+  untouched — it's harmless, dry-run-only, and any redesign is a separate,
+  future, explicitly-approved decision.
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose` remains explicitly paused per
+direction ("priority is Lena, not business_media, sales, or outreach right
+now") — not touched this checkpoint.
+
+### F. Next approved step
+None yet decided. Two candidates discussed, neither started: (1) design
+(docs-only) a `90_content_packet/` folder-native slice — a real tool that
+builds a publish packet from an actual QA-passed render, the confirmed next
+build target ahead of `95_publish_gate/`; (2) a further reliability check on
+the reference-by-URL photo path (currently 4-for-4, still a small sample) —
+this one would call Kling and needs explicit per-render approval. Neither is
+authorized yet.
+
+### G. What must not be done
+No code edits to the executor, identity, QA, prompt brain, or content-packet
+builder beyond what's already committed above. No Kling call, no render, no
+publish, no R2 upload, no `.env` edit, no video API work, no studio-element
+use, no `business_media`/sales/outreach work, no broad repo cleanup.

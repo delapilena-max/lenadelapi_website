@@ -59,6 +59,56 @@
 > omni-image image_list-only case; sending it remains optional (field-doc /
 > multi-image / URL-sourcing clarity only).
 
+> ## ✅ LENA LIVE CHAIN NOW GIT-DURABLE + INFO-HIERARCHY CORRECTED (2026-07-07)
+> **The proven Lena photo path is now durable in git — it previously existed
+> only on local disk.** Four checkpoint commits, in order: `3bf932ab` (tracked
+> the live execution core: `pipeline/kling_apilena_api_executor.py`,
+> `pipeline/identity/lena_identity.py`, `pipeline/qa/lena_photo_qa.py`,
+> `pipeline/lena_production_job.py`, `tools/lena_preflight.py`), `2c49b348`
+> (tracked the queue/scheduling glue: `pipeline/scheduler.py`,
+> `pipeline/scheduler_jobs.py`, `pipeline/env_loader.py`,
+> `tools/process_queue.py`), `81056cb3` (committed the already-implemented
+> negative-prompt tiering repair in `pipeline/prompting/lena_prompt_brain.py`
+> plus the photo-first `pipeline/config/lena_kling_contract.json`), and
+> `a0407bc2` (corrected a stale source-of-truth conflict in
+> `information_hierarchy/Projects/Lena Influencer Node/Instructions/
+> Instructions.md`, which previously named the retired `hcr_001`/`wc_p045`/
+> BODYLOCK-era scripts as "official"). Combined with the already-committed
+> `posting_manager.py` + `instagram_graph_adapter.py` (`8870a82b`), **every
+> file in the live chain
+> `lena_prompt_brain.py -> kling_apilena_api_executor.py -> lena_photo_qa.py
+> -> publish packet/queue -> posting_manager.py -> instagram_graph_adapter.py`
+> is now tracked in git with zero working-tree drift from HEAD.**
+>
+> **Video remains disabled; photo lane first, unchanged.** `lena_kling_
+> contract.json`'s video-count fields (`videos_per_day`, `videos_per_day_max`,
+> `video_generation_target_per_day`, `max_posts_video_day`) are all `0`; a
+> studio Kling element exists for a later, separate video/studio lane but is
+> out of scope until that lane is explicitly started.
+>
+> **`tools/strategy/lena_build_content_packet_dryrun_v1.py` is ideation/
+> planning only, not the live publish-packet builder.** It doesn't read
+> rendered images, QA schema v2, reference-by-URL render artifacts, queue
+> files, or publish receipts, and writes to a different location using a
+> different prompt schema than the live chain. Corrected in the
+> information-hierarchy doc above; the script itself was not touched.
+>
+> **Next build target, if pursued: `90_content_packet/`, not
+> `95_publish_gate/` yet** — a real, owned tool that builds a publish packet
+> from an actual QA-passed render (the way the one successful 2026-07-07
+> packet was built by hand). `95_publish_gate/` (a formal approval-gate
+> artifact) comes *after* a real packet artifact exists to gate — building it
+> first would have nothing real to gate. Neither is built yet; building
+> either needs its own separate approval, one slice at a time, per this
+> file's existing folder-native-slice discipline.
+>
+> **Do not work on `business_media`/`podcast_repurpose`, sales, or outreach
+> from this thread** — that lane is explicitly paused; Lena is the current
+> priority. No code was changed by this checkpoint — all four commits above
+> either tracked existing on-disk files as-is or corrected documentation;
+> nothing was patched, no render/Kling call/publish/R2 upload/`.env` edit
+> occurred.
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username
