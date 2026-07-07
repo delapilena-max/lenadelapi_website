@@ -177,11 +177,12 @@ client exists, would be over-engineering ahead of revenue.
 ## 10. 7-day build plan (MVP, docs → first pilot)
 
 - **Day 1 (today):** this memo + node doc scaffolding (done this turn). No code.
-- **Day 2 (done, 2026-07-07, docs-only):** finalized the offer/package wording and a
-  pricing hypothesis in `pipeline/nodes/business_media/podcast_repurpose/OFFER.md`
-  (anchor $997/month, explicitly unvalidated), and drafted a short outbound pitch
-  script in the same folder's new `PITCH_SCRIPT.md`. Both are draft/unsent/untested —
-  see that folder's `CURRENT_STATE.md` for status.
+- **Day 2 (done, 2026-07-07, docs-only, committed as `fe1c5ce4`):** finalized the
+  offer/package wording and a pricing hypothesis in
+  `pipeline/nodes/business_media/podcast_repurpose/OFFER.md` (anchor $997/month,
+  explicitly unvalidated), and drafted a short outbound pitch script in the same
+  folder's new `PITCH_SCRIPT.md`. Both are draft/unsent/untested — see that folder's
+  `CURRENT_STATE.md` for status.
 - **Day 3–4:** manual outreach to identify first 3 pilot prospects (see §12 below).
   Zero code — this is relationship/sales work.
 - **Day 5:** run the MVP workflow **by hand** (no code) on one real or sample piece of

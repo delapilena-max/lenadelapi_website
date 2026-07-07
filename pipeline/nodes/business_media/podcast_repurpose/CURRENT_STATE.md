@@ -18,10 +18,11 @@ integration.
   `OFFER.md`, `PITCH_SCRIPT.md`, `CURRENT_STATE.md`).
 - The pivot memo (`pipeline/change_notes/business_media_node_pivot_plan.md`), which is
   the fuller strategic and planning context behind this node.
-- **Day 2 of the pivot memo's 7-day plan (§10) done, docs-only, 2026-07-07:**
-  `OFFER.md` now carries a pricing hypothesis (anchor $997/month, unvalidated) and
-  `PITCH_SCRIPT.md` is a draft outbound message for the first warm-outreach
-  conversations. Neither has been shown to a real prospect.
+- **Day 2 of the pivot memo's 7-day plan (§10) done, docs-only, 2026-07-07,
+  committed as `fe1c5ce4`:** `OFFER.md` now carries a pricing hypothesis
+  (anchor $997/month, unvalidated) and `PITCH_SCRIPT.md` is a draft outbound
+  message for the first warm-outreach conversations. Neither has been shown to
+  a real prospect.
 
 ## What does NOT exist yet
 

@@ -21,6 +21,16 @@
 > than it is — it's a docs-only MVP plan, one manual pilot pass away from its
 > first real validation.
 >
+> **Day 2 of the 7-day plan done and committed (2026-07-07, commit `fe1c5ce4`,
+> docs-only):** `pipeline/nodes/business_media/podcast_repurpose/OFFER.md` now
+> carries a pricing hypothesis (anchor $997/month, explicitly unvalidated —
+> "pricing commitment" above still means no *validated/final* price, not that
+> a number hasn't been written down as a starting guess), and a new
+> `PITCH_SCRIPT.md` in the same folder drafts the outbound warm-outreach
+> message. Neither has been shown to a real prospect or sent to anyone. Next:
+> Days 3–4, manual outreach (outside this repo) — see that folder's
+> `CURRENT_STATE.md` for exact status.
+>
 > ## 🛑 RENDER FREEZE (2026-07-07) — narrowed after the reference-by-URL breakthrough
 > **UPDATE 2026-07-07:** the cartoon/identity blocker is **SOLVED IN PRINCIPLE.**
 > An approved single `n=1` live test with a pure `image_list`-only payload
