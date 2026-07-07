@@ -4410,3 +4410,86 @@ approval and design review. No writes to `pipeline/queue/`. No Kling call,
 no render, no publish, no R2 upload, no `.env` edit, no secrets printed, no
 video API work, no studio-element use, no `business_media`/sales/outreach
 work, no broad repo cleanup.
+
+## 2026-07-07 (continued) — 95_publish_gate slice checkpoint
+
+### Direction
+Following completion of all three batches of `tools/lena_build_publish_
+packet_v1.py`, a read-only scoping pass defined the future `95_publish_
+gate/` slice -- the durable human approval decision record sitting between
+`90_content_packet/` and live publish. Approved to create it docs-only,
+matching every prior slice's genesis.
+
+### A. What changed
+1. **`pipeline/agents/lena/95_publish_gate/` created**, docs-only, with the
+   standard five files:
+   - `AGENT.md` -- role, no-code-owner status, sequencing rationale
+     (this slice needed `90_content_packet/`'s real packet/queue-draft
+     artifact to exist first, per that slice's own RULES.md).
+   - `RULES.md` -- Rule zero (records decisions, never makes them),
+     required-inputs list, seven hard blocks (placeholder caption, >3
+     hashtags, QA not `pass`, missing packet, missing expected queue draft,
+     missing/false `metadata.queue_draft_only`, unclear operator approval),
+     safe handling of the queue draft's three existing safety fields (all
+     stay untouched forever -- approval recorded as a separate artifact,
+     with the explicit note that `posting_manager.py` doesn't even read
+     `approved_for_live_publish` as a code-level gate), a "must never do"
+     list (no `pipeline/queue/` writes, no `process_queue.py`/
+     `posting_manager.py` calls), and a human-approval-required list.
+   - `INPUTS.md` -- the five required inputs (packet, QA-verdict-via-
+     pointer, queue draft when expected, final chosen caption, operator
+     approval statement) and what it explicitly does not read.
+   - `OUTPUTS.md` -- two unbuilt output concepts (a future approval-
+     decision artifact, format undecided; human-readable manual promotion
+     instructions only, never an automated file move) and an explicit gap
+     statement that nothing is built.
+   - `CURRENT_STATE.md` -- dated status: docs-only, no code, explicit list
+     of what does not exist (no artifact builder/reader, no queue promotion
+     tool, no publish automation added), and the two next-step candidates.
+2. **Committed as `3a4c1412`** "docs: add Lena publish gate agent slice" --
+   staged-set verified exact (five files, all `A`), cached diff reviewed in
+   full before commit, masked secret scan clean (zero hits).
+
+### B. Files changed (committed)
+`pipeline/agents/lena/95_publish_gate/AGENT.md`, `RULES.md`, `INPUTS.md`,
+`OUTPUTS.md`, `CURRENT_STATE.md` (`3a4c1412`).
+
+### C. Validations run
+Exact-staged-set check (`git diff --cached --name-status`) before commit;
+masked secret-pattern scan against the cached diff (zero hits); manual
+cross-check of every documented rule/field against the real
+`tools/lena_build_publish_packet_v1.py` code (confirmed
+`posting_manager.py` does not read `approved_for_live_publish` as a gate,
+grounding this slice's "separate artifact, not a mutated flag" design
+decision).
+
+### D. Decisions made
+- Design this slice as pure documentation, matching the established
+  six-slice pattern exactly, rather than writing any approval-artifact code
+  in the same pass.
+- Explicitly forbid this slice, now or ever, from writing into
+  `pipeline/queue/` -- a stronger, more permanent prohibition than
+  `90_content_packet/`'s own (which only forbids it for that slice's
+  current scope); `95_publish_gate/RULES.md` states this boundary stays a
+  human, manual action indefinitely.
+- Record any future approval decision as a separate artifact rather than
+  mutating the queue draft's own safety fields, since
+  `posting_manager.py` doesn't enforce those fields anyway -- the real
+  safety value is the durable record, not a flag flip.
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose`, video API work, and the
+studio element remain untouched/paused per standing direction.
+
+### F. Next approved step
+Not yet decided. Read-only scoping for a future approval-record
+checker/builder remains the named next candidate, still requiring separate
+explicit approval before any code is written. A further Kling reliability
+check remains a separate, unrelated, alternative track.
+
+### G. What must not be done
+No approval-artifact code without separate explicit approval. No code that
+writes into `pipeline/queue/`, ever, in any form. No Kling call, no render,
+no publish, no R2 upload, no `.env` edit, no secrets printed, no video API
+work, no studio-element use, no `business_media`/sales/outreach work, no
+broad repo cleanup.

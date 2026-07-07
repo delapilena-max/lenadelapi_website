@@ -208,6 +208,33 @@
 > settled (all three batches committed). Video API work, the studio
 > element, and `business_media`/sales/outreach remain out of scope.
 
+> ## ✅ `95_publish_gate/` DOCS-ONLY SLICE CREATED (2026-07-07, commit `3a4c1412`)
+> **`pipeline/agents/lena/95_publish_gate/` now exists**, following the
+> standard five-file slice pattern (`AGENT.md`, `RULES.md`, `INPUTS.md`,
+> `OUTPUTS.md`, `CURRENT_STATE.md`). **Docs-only — no code/tool exists
+> yet.** It owns the *future* durable human approval decision record,
+> sitting between `90_content_packet/` and the live publish flow. It does
+> not build packets, does not build queue drafts, does not QA images, does
+> not move/copy files into `pipeline/queue/`, does not run
+> `tools/process_queue.py`, does not call `posting_manager.py`, does not
+> publish, and does not auto-approve.
+>
+> **Preserves the safety doctrine as hard blocks (once any code exists):**
+> a placeholder caption, more than 3 hashtags, QA not `pass`, a missing
+> packet, a missing expected queue draft, or a missing/false
+> `metadata.queue_draft_only` all block recording approval; so does unclear
+> operator approval. **Queue-draft fields stay untouched forever** —
+> `approved_for_live_publish: false`, `operator_review_required: true`, and
+> `metadata.queue_draft_only: true` are never mutated by this slice; any
+> future approval decision would be recorded as a *separate* artifact, not
+> an edit to the draft.
+>
+> **Next safe task: read-only scoping for a future approval-record
+> checker/builder** — still no code without separate explicit approval. A
+> further Kling reliability check remains a separate, unrelated track
+> needing its own explicit approval. Video API work, the studio element,
+> and `business_media`/sales/outreach remain out of scope.
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username

@@ -101,6 +101,28 @@
 > 2026-07-07 ("Publish packet builder -- Batch 3") and the matching banner
 > in `NEXT_SESSION_START.md`.
 
+> **`95_publish_gate/` DOCS-ONLY SLICE CREATED (2026-07-07, commit
+> `3a4c1412`):** `pipeline/agents/lena/95_publish_gate/` now exists,
+> following the standard five-file pattern. **Docs-only -- no code/tool
+> exists yet.** Owns the future durable human approval decision record,
+> sitting between `90_content_packet/` and live publish; does not build
+> packets or queue drafts, does not QA images, does not move/copy files
+> into `pipeline/queue/`, does not run `tools/process_queue.py`, does not
+> call `posting_manager.py`, does not publish or auto-approve. Preserves
+> the safety doctrine as hard blocks (once any code exists): placeholder
+> caption, >3 hashtags, QA not `pass`, missing packet, missing expected
+> queue draft, missing/false `metadata.queue_draft_only`, or unclear
+> operator approval. Queue-draft fields (`approved_for_live_publish:
+> false`, `operator_review_required: true`, `metadata.queue_draft_only:
+> true`) stay permanently untouched -- any future approval is a *separate*
+> artifact, never a mutation of the draft. **Next safe task: read-only
+> scoping for a future approval-record checker/builder**, still needing
+> separate explicit approval. A further Kling reliability check remains a
+> separate, unrelated track. Video API, the studio element, and
+> `business_media`/sales/outreach remain out of scope. Full detail: the
+> §14 changelog entry dated 2026-07-07 ("95_publish_gate slice checkpoint")
+> and the matching banner in `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor
