@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-# Lena publish-packet builder -- Batch 1 (read-only resolver + hard-fail checks).
+# Lena publish-packet builder -- Batch 2 (Markdown packet assembly + non-clobber write).
 #
 # Design doc: pipeline/agents/lena/90_content_packet/{AGENT,RULES,INPUTS,OUTPUTS}.md.
-# This is Batch 1 only, per that folder's RULES.md and the approved scoping pass:
-# resolve a slot's real artifacts (workorder, rendered image, QA verdict, optional
-# debug/result manifest) and hard-fail cleanly if anything required is missing or
-# not QA-passed. It creates NO output files -- no publish packet, no queue draft,
-# nothing under pipeline/publish_packets/ or pipeline/queue/. Packet writing is a
-# separate, later, explicitly-approved batch.
+# Batch 1 (resolver + hard-fail checks) is unchanged below. Batch 2 adds: assembling
+# the 10-section publish-packet Markdown documented in OUTPUTS.md, and writing it to
+# disk with a non-clobber default (--force required to overwrite an existing packet
+# file, and only that exact file, never a directory).
+#
+# Still does NOT write a queue draft, does NOT touch pipeline/queue/, and has no
+# --live/--approve/--queue flag of any kind -- packet writing is the only file-write
+# capability this script has. See RULES.md's "must never do" list.
 #
 # Deliberately does NOT reuse tools/lena_review_proof_render_v1.py's
 # build_review_bundle(), because that function calls
@@ -23,7 +25,7 @@ from __future__ import annotations
 # pipeline.qa.lena_photo_qa.load_qa_result() (pure read, returns None if missing) and
 # validate_qa_result() (pure function, no I/O) -- never save_qa_template().
 #
-# Read-only. Never imports pipeline.env_loader (does not read .env). Never imports
+# Never imports pipeline.env_loader (does not read .env). Never imports
 # pipeline.posting_manager, tools.process_queue, pipeline.kling_apilena_api_executor,
 # requests, or urllib -- this module cannot publish, queue, or call any network/API
 # surface, by construction, not just by convention.
@@ -31,8 +33,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -42,7 +45,9 @@ from pipeline.qa import lena_photo_qa  # noqa: E402
 
 WORKORDER_ROOT = ROOT / "pipeline" / "kling_workorders"
 APILENA_DEBUG_ROOT = ROOT / "pipeline" / "kling_debug" / "apilena_api"
-PUBLISH_PACKET_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
+DEFAULT_PUBLISH_PACKET_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
+
+MAX_HASHTAGS_PER_CAPTION = 3
 
 
 class ResolveError(Exception):
@@ -50,6 +55,14 @@ class ResolveError(Exception):
     silently -- main() reports it and exits non-zero. No file is ever written
     before or after this is raised."""
 
+
+class PacketWriteError(Exception):
+    """Raised for a hard-fail condition when writing the packet (e.g. the
+    packet already exists and --force was not supplied). No file is written
+    when this is raised."""
+
+
+# --- Batch 1: read-only resolution (unchanged) ------------------------------
 
 def _load_daily_manifest(date_str: str) -> Dict[str, Any]:
     path = WORKORDER_ROOT / date_str / "daily_workorders.json"
@@ -131,7 +144,12 @@ def _resolve_optional_debug_artifacts(date_str: str, slot_id: str) -> Dict[str, 
     }
 
 
-def resolve_packet_inputs(date_str: str, slot_id: str) -> Dict[str, Any]:
+def resolve_packet_output_path(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Path:
+    base = out_dir if out_dir is not None else DEFAULT_PUBLISH_PACKET_ROOT
+    return base / date_str / f"LENA_PUBLISH_PACKET_{slot_id}.md"
+
+
+def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Dict[str, Any]:
     """Read-only. Raises ResolveError on any hard-fail condition. Writes nothing,
     ever -- no QA scaffold, no packet, no queue draft."""
     manifest = _load_daily_manifest(date_str)
@@ -141,7 +159,8 @@ def resolve_packet_inputs(date_str: str, slot_id: str) -> Dict[str, Any]:
     debug_artifacts = _resolve_optional_debug_artifacts(date_str, slot_id)
 
     metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
-    intended_packet_path = PUBLISH_PACKET_ROOT / date_str / f"LENA_PUBLISH_PACKET_{slot_id}.md"
+    production_scoring = qa_result.get("production_scoring") or {}
+    intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
 
     return {
         "date": date_str,
@@ -149,16 +168,18 @@ def resolve_packet_inputs(date_str: str, slot_id: str) -> Dict[str, Any]:
         "image_path": str(image_path),
         "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
         "qa_overall": qa_result.get("overall"),
-        "qa_hook_strength": (qa_result.get("production_scoring") or {}).get("hook_strength", {}).get("score"),
-        "qa_styling_sexy_platform_safe": (qa_result.get("production_scoring") or {})
-        .get("styling_sexy_platform_safe", {})
-        .get("status"),
+        "qa_publish_ready": qa_result.get("publish_ready"),
+        "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),
+        "qa_hook_strength": production_scoring.get("hook_strength", {}).get("score"),
+        "qa_styling_sexy_platform_safe": production_scoring.get("styling_sexy_platform_safe", {}).get("status"),
         "workorder_caption": slot.get("caption"),
         "wardrobe_outfit_id": metadata.get("wardrobe_outfit_id"),
         "wardrobe_outfit_name": metadata.get("wardrobe_outfit_name"),
         "environment_id": metadata.get("environment_id"),
         "environment_name": metadata.get("environment_name"),
         "lane": metadata.get("lane"),
+        "activity": slot.get("activity") or metadata.get("activity"),
+        "pose": slot.get("pose") or metadata.get("pose"),
         "reference_binding_mode": metadata.get("reference_binding_mode"),
         "debug_artifacts": debug_artifacts,
         "intended_packet_output_path": str(intended_packet_path),
@@ -167,25 +188,279 @@ def resolve_packet_inputs(date_str: str, slot_id: str) -> Dict[str, Any]:
     }
 
 
+# --- Batch 2: caption-option assembly ----------------------------------------
+
+def _split_workorder_caption(raw_caption: Optional[str]) -> Tuple[str, List[str]]:
+    """Split a workorder caption (e.g. 'text\\n\\n#a #b #c') into (base_text,
+    hashtags). Hashtags are capped at MAX_HASHTAGS_PER_CAPTION. Pure function,
+    no I/O."""
+    if not raw_caption:
+        return "", []
+    lines = str(raw_caption).splitlines()
+    hashtags: List[str] = []
+    body_lines: List[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        tokens = stripped.split()
+        if all(tok.startswith("#") for tok in tokens):
+            hashtags.extend(tok for tok in tokens if tok.startswith("#"))
+        else:
+            body_lines.append(stripped)
+    return " ".join(body_lines).strip(), hashtags[:MAX_HASHTAGS_PER_CAPTION]
+
+
+def _format_caption(base_text: str, hashtags: List[str]) -> str:
+    tags = " ".join(hashtags[:MAX_HASHTAGS_PER_CAPTION])
+    if tags:
+        return f"{base_text}\n\n{tags}" if base_text else tags
+    return base_text
+
+
+def build_caption_options(resolved: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Deterministic, mechanical caption-option drafts grounded in the
+    workorder's own caption and scene metadata. These are NOT creative
+    copywriting -- no LLM/generation call is made here. Always label them as
+    drafts the operator must review/edit, per RULES.md (never auto-select a
+    caption). Returns 3-5 (label, text) pairs, each <=3 hashtags."""
+    base_text, hashtags = _split_workorder_caption(resolved.get("workorder_caption"))
+    lane = resolved.get("lane")
+    wardrobe_name = resolved.get("wardrobe_outfit_name")
+    environment_name = resolved.get("environment_name")
+
+    options: List[Tuple[str, str]] = [
+        ("Option A (workorder original)", _format_caption(base_text, hashtags)),
+    ]
+
+    if base_text and "." in base_text:
+        shortened = base_text.split(".")[0].strip()
+        if shortened and shortened != base_text:
+            options.append(("Option B (shortened)", _format_caption(shortened, hashtags)))
+
+    if lane:
+        lane_text = f"{base_text} ({lane})" if base_text else str(lane)
+        options.append(("Option C (lane-anchored)", _format_caption(lane_text, hashtags)))
+
+    if wardrobe_name:
+        wardrobe_text = f"{base_text} -- wearing {wardrobe_name}" if base_text else f"wearing {wardrobe_name}"
+        options.append(("Option D (wardrobe-anchored)", _format_caption(wardrobe_text, hashtags)))
+
+    if environment_name:
+        env_text = f"{environment_name}. {base_text}" if base_text else str(environment_name)
+        options.append(("Option E (scene-anchored)", _format_caption(env_text, hashtags)))
+
+    while len(options) < 3:
+        filler_label = f"Option {chr(65 + len(options))} (base)"
+        options.append((filler_label, _format_caption(base_text, hashtags)))
+
+    return options[:5]
+
+
+# --- Batch 2: Markdown packet assembly ---------------------------------------
+
+def build_packet_markdown(resolved: Dict[str, Any]) -> str:
+    date_str = resolved["date"]
+    slot_id = resolved["slot_id"]
+    caption_options = build_caption_options(resolved)
+
+    lines: List[str] = []
+
+    # 1. Header
+    lines.append(f"# Lena Publish Packet -- {slot_id}")
+    lines.append("")
+    lines.append(
+        "**Status:** DRAFT / operator review required. **This packet does not "
+        "approve or publish anything.** Nothing has been posted, scheduled, or "
+        "queued. Manual approval only -- no auto-posting."
+    )
+    lines.append(
+        f"**Prepared:** {datetime.now(timezone.utc).strftime('%Y-%m-%d')} "
+        f"(auto-generated draft via `tools/lena_build_publish_packet_v1.py` -- "
+        "caption/CTA/poll/pin text below are mechanical drafts, not final "
+        "copy; review and edit before use)."
+    )
+    lines.append(
+        f"**Slot:** `{slot_id}` -- **Date:** `{date_str}`."
+    )
+    lines.append("")
+
+    # 2. Image
+    lines.append("## 1. Image")
+    lines.append("")
+    lines.append(f"- **Path:** `{resolved['image_path']}`")
+    lines.append(f"- **Lane / scene:** {resolved.get('lane') or 'unknown'}")
+    if resolved.get("activity"):
+        lines.append(f"- **Activity:** {resolved['activity']}")
+    if resolved.get("pose"):
+        lines.append(f"- **Pose:** {resolved['pose']}")
+    if resolved.get("wardrobe_outfit_name") or resolved.get("wardrobe_outfit_id"):
+        lines.append(
+            f"- **Wardrobe:** {resolved.get('wardrobe_outfit_name') or 'unknown'} "
+            f"(`{resolved.get('wardrobe_outfit_id') or 'unknown'}`)"
+        )
+    if resolved.get("environment_name") or resolved.get("environment_id"):
+        lines.append(
+            f"- **Environment:** {resolved.get('environment_name') or 'unknown'} "
+            f"(`{resolved.get('environment_id') or 'unknown'}`)"
+        )
+    debug = resolved.get("debug_artifacts") or {}
+    if debug.get("result_manifest_task_id"):
+        lines.append(f"- **Source Kling task id:** `{debug['result_manifest_task_id']}`")
+    if resolved.get("reference_binding_mode"):
+        lines.append(f"- **Reference binding mode:** `{resolved['reference_binding_mode']}`")
+    lines.append("")
+
+    # 3. QA summary
+    lines.append("## 2. QA summary")
+    lines.append("")
+    lines.append(f"- **Source:** `{resolved['qa_path']}`")
+    lines.append(f"- **QA overall:** `{resolved.get('qa_overall')}`")
+    lines.append(f"- **Hook strength:** `{resolved.get('qa_hook_strength')}`")
+    lines.append(
+        f"- **Styling sexy/platform-safe:** `{resolved.get('qa_styling_sexy_platform_safe')}`"
+    )
+    lines.append(f"- **QA `publish_ready`:** `{resolved.get('qa_publish_ready')}`")
+    if resolved.get("qa_publish_ready_reason"):
+        lines.append(f"- **`publish_ready_reason`:** {resolved['qa_publish_ready_reason']}")
+    lines.append(
+        "- **`publish_ready` in QA is a quality verdict, NOT a publish "
+        "authorization.** Publishing still needs explicit operator sign-off "
+        "(image + caption)."
+    )
+    lines.append("")
+
+    # 4. Caption options
+    lines.append(f"## 3. Caption options (auto-drafted, pick one; each <= {MAX_HASHTAGS_PER_CAPTION} hashtags)")
+    lines.append("")
+    for label, text in caption_options:
+        lines.append(f"**{label}**")
+        for text_line in text.splitlines():
+            lines.append(f"> {text_line}" if text_line else ">")
+        lines.append("")
+
+    # 5. Soft CTA
+    lines.append("## 4. Soft CTA (draft -- edit before use)")
+    lines.append("")
+    lines.append("> tell me what you think 👀")
+    lines.append("")
+
+    # 6. Story poll idea (optional)
+    lines.append("## 5. Story poll idea (optional, draft)")
+    lines.append("")
+    lines.append('> Sticker poll over the image: **"love this or not?"**')
+    lines.append("> Options: `🔥 love it` / `🤔 not sure`")
+    lines.append("")
+
+    # 7. Pinned comment idea (optional)
+    lines.append("## 6. Pinned comment idea (optional, draft)")
+    lines.append("")
+    lines.append('> "okay this one might be my favorite 👀"')
+    lines.append("")
+
+    # 8. Platform notes
+    lines.append("## 7. Platform notes")
+    lines.append("")
+    lines.append("**Instagram (primary)**")
+    lines.append("- Crop as needed for feed vs. Reels/Story.")
+    lines.append(f"- Hashtags kept to {MAX_HASHTAGS_PER_CAPTION}, in-caption or first comment.")
+    lines.append("")
+    lines.append("**Other platforms**")
+    lines.append("- Review and adapt caption tone per platform before posting elsewhere.")
+    lines.append("")
+
+    # 9. Final operator approval checklist
+    lines.append("## 8. Final operator approval checklist")
+    lines.append("")
+    lines.append("Nothing publishes until every box is deliberately checked by the operator:")
+    lines.append("")
+    lines.append("- [ ] Image approved -- identity + quality acceptable to post.")
+    lines.append("- [ ] Platform-safety confirmed against the real QA verdict above.")
+    lines.append("- [ ] Caption chosen and edited (auto-drafts above are starting points, not final copy).")
+    lines.append(f"- [ ] Hashtags reviewed (<= {MAX_HASHTAGS_PER_CAPTION}, on-brand).")
+    lines.append("- [ ] CTA / Story poll / pinned comment chosen or edited.")
+    lines.append("- [ ] Platform(s) + crop chosen.")
+    lines.append("- [ ] Post time chosen.")
+    lines.append("- [ ] **Explicit \"approved to publish\" given by the operator.**")
+    lines.append("- [ ] Confirmed this is a manual, one-off controlled post -- not batch, not scheduled, not auto.")
+    lines.append("")
+
+    # 10. Notes
+    lines.append("## Notes")
+    lines.append("")
+    lines.append(
+        "- This packet was auto-generated by `tools/lena_build_publish_packet_v1.py` "
+        "from the real workorder and QA artifacts for this slot. Caption/CTA/poll/pin "
+        "text are mechanical drafts, not creative copywriting -- review and rewrite "
+        "before use."
+    )
+    lines.append(
+        "- This packet does not set any queue or publish state. No `.env`, no "
+        "scheduler, no batch, no auto-approve, no network/API call was involved in "
+        "producing this file."
+    )
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def write_packet(resolved: Dict[str, Any], out_dir: Optional[Path], force: bool) -> Path:
+    output_path = resolve_packet_output_path(resolved["date"], resolved["slot_id"], out_dir)
+    if output_path.exists() and not force:
+        raise PacketWriteError(
+            f"packet already exists at {output_path} -- pass --force to overwrite "
+            "this exact file (non-clobber default)"
+        )
+    if output_path.exists() and output_path.is_dir():
+        raise PacketWriteError(f"refusing to write: {output_path} is a directory, not a file")
+
+    markdown = build_packet_markdown(resolved)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(markdown, encoding="utf-8")
+    return output_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Batch 1: read-only resolver for the future Lena publish-packet "
-            "builder. Resolves and validates a slot's real artifacts. Writes "
-            "nothing -- no packet, no queue draft, no QA scaffold."
+            "Batch 2: resolve a Lena slot's real artifacts and write the "
+            "publish-packet Markdown draft. Never writes a queue draft, never "
+            "sets any approval/publish state, never calls Kling/any API."
         )
     )
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="Override the publish-packet output base directory (default: pipeline/publish_packets/lena).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow overwriting an existing packet file at the exact resolved output path. Never touches a directory.",
+    )
     args = parser.parse_args()
 
+    out_dir: Optional[Path] = None
+    if args.out_dir:
+        candidate = Path(args.out_dir)
+        out_dir = candidate if candidate.is_absolute() else (ROOT / candidate)
+
     try:
-        summary = resolve_packet_inputs(args.date, args.slot_id)
+        resolved = resolve_packet_inputs(args.date, args.slot_id, out_dir)
     except ResolveError as exc:
         print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
         return 1
 
-    print(json.dumps({"ok": True, "resolved": summary}, indent=2))
+    try:
+        output_path = write_packet(resolved, out_dir, args.force)
+    except PacketWriteError as exc:
+        print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
+        return 1
+
+    resolved["files_written_this_run"] = [str(output_path)]
+    print(json.dumps({"ok": True, "resolved": resolved}, indent=2))
     return 0
 
 
