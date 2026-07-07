@@ -4139,3 +4139,86 @@ No code edits to the executor, identity, QA, prompt brain, or content-packet
 builder beyond what's already committed above. No Kling call, no render, no
 publish, no R2 upload, no `.env` edit, no video API work, no studio-element
 use, no `business_media`/sales/outreach work, no broad repo cleanup.
+
+## 2026-07-07 (continued) — 90_content_packet slice checkpoint
+
+### Direction
+Following the git-durability checkpoint, a read-only audit of `tools/
+strategy/lena_build_content_packet_dryrun_v1.py`'s wiring (recorded in the
+prior changelog entries) found it disconnected from the real live chain and
+recommended a real, future `90_content_packet/` folder-native slice as the
+next build target ahead of `95_publish_gate/`. Approved to design (docs-only)
+that slice.
+
+### A. What changed
+1. **Read-only design pass** grounded in the existing five-slice pattern
+   (`40_identity_continuity/` through `80_repair/`) and the one real,
+   hand-built precedent on disk
+   (`pipeline/publish_packets/lena/2026-07-07/
+   LENA_PUBLISH_PACKET_2026-07-07-03-photo.md`), traced end to end against
+   real artifacts: the workorder JSON, the QA JSON (schema v2), the queue
+   item that was actually processed, and its publish receipt.
+2. **`pipeline/agents/lena/90_content_packet/` created**, docs-only, with
+   the standard five files:
+   - `AGENT.md` -- role, no-code-owner status, how a future session should
+     use the folder.
+   - `RULES.md` -- Rule zero (no QA pass, no packet), a must-never-do list
+     (no Kling/render/publish/R2/`.env`, never auto-approve or set
+     `approved_for_live_publish: true`, never treat the old dry-run builder
+     as an input, never write directly into live `pipeline/queue/`), a
+     human-approval-required list, and why this slice precedes
+     `95_publish_gate/`.
+   - `INPUTS.md` -- exact required/optional artifacts (workorder JSON,
+     rendered image path, QA JSON with `production_scoring`, optional Kling
+     result manifest/prompt receipt) and what it explicitly does not read.
+   - `OUTPUTS.md` -- the intended publish-packet Markdown structure (10
+     sections, mirrored from the real precedent), an intended optional
+     queue-JSON draft shape, and an explicit "no builder code exists yet"
+     gap statement.
+   - `CURRENT_STATE.md` -- dated status: docs/design only, the one real
+     precedent named explicitly, what doesn't exist yet, what's not
+     currently proven.
+3. **Committed as `61ae69b3`** "docs: add Lena content packet agent slice" --
+   staged-set verified exact (five files, all `A`), cached diff reviewed in
+   full before commit, masked secret scan clean (only generic policy-sentence
+   hits on "authorization"/"secrets", no credential values).
+
+### B. Files changed (committed)
+`pipeline/agents/lena/90_content_packet/AGENT.md`, `RULES.md`, `INPUTS.md`,
+`OUTPUTS.md`, `CURRENT_STATE.md` (`61ae69b3`).
+
+### C. Validations run
+Exact-staged-set check (`git diff --cached --name-status`) before commit;
+masked secret-pattern scan against the cached diff (zero hardcoded secrets);
+manual cross-check of every documented input/output path against the real
+2026-07-07-03-photo artifacts (workorder, QA JSON, queue item, receipt) to
+ground the design in what actually happened, not assumption.
+
+### D. Decisions made
+- Design the slice as pure documentation, matching the established
+  five-slice pattern exactly, rather than writing any packet-builder code in
+  the same pass.
+- Leave `tools/strategy/lena_build_content_packet_dryrun_v1.py` completely
+  untouched -- documented as ideation-only, not repurposed or edited.
+- Explicitly sequence `90_content_packet/` ahead of a future
+  `95_publish_gate/`, since the gate needs a real packet artifact to gate
+  and none exists yet from tooling (only the one hand-built example).
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose`, video API work, and the
+studio element remain untouched/paused per standing direction.
+
+### F. Next approved step
+Not yet decided. Two candidates named, neither started: (1) a read-only
+scoping pass for what real `90_content_packet` packet-builder code would
+need -- still requires separate explicit approval before any code is
+written; (2) a further, explicitly-approved Kling reliability check on the
+reference-by-URL photo path (would call Kling, needs per-render approval).
+`95_publish_gate/` remains explicitly deferred.
+
+### G. What must not be done
+No packet-builder code without separate explicit approval. No edits to
+`tools/strategy/lena_build_content_packet_dryrun_v1.py`. No Kling call, no
+render, no publish, no R2 upload, no `.env` edit, no secrets printed, no
+video API work, no studio-element use, no `business_media`/sales/outreach
+work, no broad repo cleanup.

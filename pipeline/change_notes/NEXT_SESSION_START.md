@@ -109,6 +109,33 @@
 > nothing was patched, no render/Kling call/publish/R2 upload/`.env` edit
 > occurred.
 
+> ## ✅ `90_content_packet/` SLICE CREATED, DOCS-ONLY (2026-07-07, commit `61ae69b3`)
+> **`pipeline/agents/lena/90_content_packet/` now exists**, following the
+> established five-file Lena agent-slice pattern (`AGENT.md`, `RULES.md`,
+> `INPUTS.md`, `OUTPUTS.md`, `CURRENT_STATE.md`) already used by
+> `40_identity_continuity/` through `80_repair/`. **Docs/design only — no
+> packet-builder code exists yet.** It owns the *intended* real publish-
+> packet artifact built from an actual QA-passed render (the target shape is
+> grounded in the one real hand-built precedent,
+> `pipeline/publish_packets/lena/2026-07-07/
+> LENA_PUBLISH_PACKET_2026-07-07-03-photo.md`) — not a claim that any tool
+> produces this automatically today. Per its own `RULES.md`: it does not
+> call Kling, render, publish, upload to R2, edit `.env`, auto-approve a
+> post, or ever set `approved_for_live_publish: true`.
+> `tools/strategy/lena_build_content_packet_dryrun_v1.py` **remains ideation/
+> planning only** — untouched, not repurposed, not treated as this slice's
+> input.
+>
+> **Next safe task, either:** (1) a read-only scoping pass for what real
+> `90_content_packet` packet-builder code would need (still no code written
+> without separate explicit approval), or (2) a further, explicitly-approved
+> Kling reliability check on the reference-by-URL photo path. **Do not start
+> `95_publish_gate/` yet** — it comes only after a real packet
+> artifact/tool exists to gate. **Do not start video API work or use the
+> studio element yet. Do not work on `business_media`/sales/outreach.** No
+> code, Kling call, render, publish, R2 upload, or `.env` edit occurred in
+> this checkpoint.
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username

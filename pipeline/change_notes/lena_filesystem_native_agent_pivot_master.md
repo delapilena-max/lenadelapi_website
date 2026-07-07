@@ -38,6 +38,26 @@
 > dated 2026-07-07 ("Git-durability + info-hierarchy checkpoint") and the
 > matching banner in `NEXT_SESSION_START.md`.
 
+> **`90_content_packet/` SLICE CREATED, DOCS-ONLY (2026-07-07, commit
+> `61ae69b3`):** `pipeline/agents/lena/90_content_packet/` now exists,
+> following the same five-file pattern (`AGENT.md`/`RULES.md`/`INPUTS.md`/
+> `OUTPUTS.md`/`CURRENT_STATE.md`) as the five prior slices. **Docs/design
+> only — no packet-builder code exists.** It owns the intended real
+> publish-packet artifact built from an actual QA-passed render (grounded in
+> the one real hand-built precedent,
+> `LENA_PUBLISH_PACKET_2026-07-07-03-photo.md`); per its `RULES.md`, it never
+> calls Kling, renders, publishes, uploads to R2, edits `.env`, or
+> auto-approves (`approved_for_live_publish` stays `false` always).
+> `tools/strategy/lena_build_content_packet_dryrun_v1.py` remains ideation/
+> planning only, untouched. Next safe task: either a read-only scoping pass
+> for the real packet-builder code (still requiring separate approval before
+> writing any), or a further explicitly-approved Kling reliability check.
+> `95_publish_gate/` stays deferred until a real packet artifact/tool exists.
+> No video API work, no studio-element use, no `business_media`/sales/
+> outreach. Full detail: the §14 changelog entry dated 2026-07-07
+> ("90_content_packet slice checkpoint") and the matching banner in
+> `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor
