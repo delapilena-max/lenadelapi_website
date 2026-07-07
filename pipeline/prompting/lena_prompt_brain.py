@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 import hashlib
+import json
+import os
 import random
 import re
+from pathlib import Path
 from typing import Any, Dict
 
 BANNED_PUBLIC_TERMS = [
@@ -20,9 +23,12 @@ BANNED_PUBLIC_TERMS = [
 ]
 
 IDENTITY_ANCHOR = (
-    "Lena Delapi with consistent approved reference identity, natural skin texture, "
-    "soft flyaway hair, expressive candid face, and a balanced curvy silhouette. "
-    "Keep face and body faithful to the approved reference element."
+    "Lena Delapi, using the current approved Lena character element as the only identity source of truth. "
+    "Match the current Lena element exactly for face, eyes, brows, mouth, jawline, skin tone, hair color, hairline, "
+    "hairstyle family, and overall adult facial geometry. "
+    "Her eyes must stay deep dark brown exactly like the current approved close-up reference, never hazel, never amber, never green-gray, and never lightened. "
+    "Do not reinterpret her into a rounder, thinner, younger, wider-smiling, more generic, or more glam substitute face. "
+    "Do not beautify away her actual likeness. Keep the same recognizable woman from the current Lena element."
 )
 
 LENA_MASTER_IDENTITY = (
@@ -37,7 +43,9 @@ LENA_MASTER_IDENTITY = (
     "Do not slim her down, make her petite, narrow-hipped, "
     "thin-legged, straight-hipped, runway-model, or waif-like. "
     "Do not narrow her pelvis, collapse her hip width, pull her hip points inward, or taper her lower "
-    "body into a slimmer silhouette in side angles or standing poses. "
+    "body into a slimmer silhouette in side angles, standing poses, or seated poses. "
+    "Her lower body should still read full through the outer hips and upper thighs even under jeans, skirts, and dresses; "
+    "do not straighten her into a narrow column from waist to hem. "
     "A slight natural inner-thigh separation is acceptable in neutral standing poses "
     "when the stance supports it, but never as an anatomical distortion. "
     "Do not over-thicken her hips, thighs, or torso beyond the approved "
@@ -50,31 +58,62 @@ LENA_MASTER_IDENTITY = (
 )
 
 SKIN_REALISM = (
-    "unretouched phone-camera skin with visible pores on cheeks, nose, and forehead, "
-    "fine facial texture, faint lower-lid and under-eye texture, subtle redness, "
-    "tiny tone variation, tiny forehead texture, soft natural under-eye darkness, "
-    "small natural nose shine, realistic skin oil balance, natural asymmetry, "
-    "and one or two tiny natural blemish-scale imperfections. "
-    "No skin blur, no denoised skin, and no softened pore detail. "
+    "unretouched phone-camera skin with subtle real texture, clear natural complexion, "
+    "faint lower-lid and under-eye detail, soft natural tone variation, gentle natural asymmetry, "
+    "and believable skin depth without decorative texture artifacts. "
+    "No skin blur, no denoised skin, no softened pore detail, and no pore-dot pattern. "
     "Micro detail: tiny peach-fuzz edge highlights, individual brow hairs, "
     "real eyelashes with small shadows, imperfect lip texture, a few stray hair strands, "
     "slight mouth-corner creasing, faint smile-line softness, normal eyelid fold depth, "
     "subtle tear-trough transition, natural philtrum and lip-edge definition, "
     "uneven natural catchlights, and scene-light falloff across the face. "
-    "Preserve Lena's reference-accurate facial beauty marks only, in the same fixed positions, "
-    "same side of the face, and roughly the same size and count as the reference. "
-    "Treat those marks as exact identity anchors tied to the same relative locations around the "
-    "eyes, nose, mouth, cheeks, and lower face as in the reference. "
-    "If the reference beauty marks are subtle, keep them subtle and sparse. "
-    "Do not move them, mirror them, multiply them, enlarge them, or turn them into a different pattern than the reference. "
-    "If facial marks appear, they should stay faithful to the reference image rather than being restyled. "
+    "Face detail comes from the current Lena character element; keep the facial surface faithful to that element. "
+    "Preserve only the exact tiny beauty marks and natural skin details already visible in the current Lena element, with no increase in count or density. "
+    "Do not invent freckles, any visible freckle field, dotted cheek speckling, nose-bridge speckles, fake pore dots, or new mole placements. "
+    "Keep her eye color exactly as it appears in the current Lena element: deep dark brown irises, not hazel, not amber, not green-gray, and not lightened. "
     "Not plastic, not waxy, not over-smoothed, not CGI, not glossy doll skin. "
     "No beauty-filter skin, no airbrushed mannequin skin, "
     "no polished beauty-campaign finish, no commercial skin retouch look, "
-    "no foundation-ad finish, no new non-reference freckle clusters, "
-    "no new mole placements, and no decorative beauty-filter speckling that changes her identity. "
+    "no foundation-ad finish, and no decorative beauty-filter surface pattern that changes her identity. "
     "No baby-face stylization, no oversized irises, no porcelain doll facial finish, "
-    "and no smoothed influencer-face retouch geometry."
+    "and no smoothed influencer-face retouch geometry. "
+    "Preserve her adult sexy face structure: refined but natural nose shape, realistic lip volume, natural cheek width, "
+    "and a believable jawline that does not widen under smile. "
+    "Expressions can vary naturally across images, but avoid huge grins or any smile that unnaturally widens her jaw or lower face. "
+    "Soft smile or slightly parted lips are fine; no veneer-ad grin, no filler-look lips, and no teenified or doll-like face read."
+)
+
+PHOTO_REALISM = (
+    "Photograph realism: this should read like a real camera capture, not beauty-ad retouch. "
+    "Natural exposure rolloff, true skin color variation, slight sensor grain when appropriate, "
+    "realistic shadow transitions, subtle lens falloff, authentic depth of field, and non-plastic facial rendering. "
+    "Avoid polished campaign perfection, over-lit studio gloss, synthetic facial symmetry, oversized irises, "
+    "or veneer-perfect smile styling. "
+    "Face must stay reference-faithful rather than idealized into a generic pretty influencer face."
+)
+
+EXPRESSION_REALISM = (
+    "Expression realism: keep her facial expressions versatile and human across images. "
+    "Use neutral looks, soft smiles, playful looks, thoughtful looks, and confident expressions when appropriate, "
+    "but avoid huge grins or expression geometry that widens the face unnaturally."
+)
+
+PHONE_OBJECT_REALISM = (
+    "Real-world coherence: the image must make physical and social sense at a glance. "
+    "No impossible prop logic, no lipstick or makeup items fused into fingers or palms, no floating accessories, "
+    "no broken glassware, and no objects intersecting hands. "
+    "If a phone appears, it must obey real camera logic with correct front/back orientation, believable grip, "
+    "correct reflection behavior, and no impossible screen content or malformed device geometry. "
+    "No bathroom-mirror vanity grammar, elevator reflection gimmicks, or fake getting-ready props in public social scenes."
+)
+
+SOCIAL_HOOK_FLAVOR = (
+    "Taste profile: believable social-life energy with real-feed hook appeal, not sterile editorial staging. "
+    "The image should feel like a flattering but human post from an actual outing, dinner, drinks, coffee stop, "
+    "city errand, or candid in-between moment. "
+    "When the scene allows, use socially legible context cues like menu corners, table clutter, water glasses, "
+    "dessert plates, receipts, sidewalk texture, chair backs, nearby people in blur, window reflections, "
+    "or lived-in venue imperfections. Keep it sexy, socially plausible, and scroll-stopping without looking fabricated."
 )
 
 HAND_REALISM = (
@@ -82,12 +121,13 @@ HAND_REALISM = (
     "correct thumb placement, believable knuckle joints, realistic nail scale, "
     "relaxed wrists, and simple candid hand posing. "
     "Avoid complex interlocked fingers, overlapping hand tangles, mannequin hands, "
-    "melted fingers, fused fingers, twisted wrists, or broken-looking joints."
+    "melted fingers, fused fingers, twisted wrists, broken-looking joints, hands clipping through "
+    "doorframes or walls, fingers intersecting glassware or furniture, or arms merging into nearby objects."
 )
 
 MAIN_REFERENCE_POLICY = (
-    "Preserve Lena's provided facial identity, skin tone, body proportions, silhouette, posture, clothing fit, hands, legs, waist-to-hip shape, and overall likeness from the uploaded reference imagery. "
-    "Use supplemental angle references only when a specific pose, camera angle, or body orientation is needed."
+    "Preserve Lena's facial identity, skin tone, body proportions, silhouette, posture, clothing fit, hands, legs, waist-to-hip shape, and overall likeness from the current approved Lena character element. "
+    "Use only the current approved Lena element as the identity source of truth."
 )
 
 LENA_BODY_DESCRIPTOR = (
@@ -105,62 +145,222 @@ LENA_BODY_DESCRIPTOR = (
     "no exaggerated cartoon proportions, not slim, not petite, not bulky."
 )
 
-NEGATIVE_PROMPT = (
-    "low quality, blurry, distorted face, changed face, identity drift, "
-    "unrealistic body proportions, deformed hands, extra fingers, "
-    "missing fingers, fused fingers, melted fingers, tangled fingers, "
-    "broken knuckles, twisted wrists, bad thumb placement, mannequin hands, "
-    "bad anatomy, crossed eyes, "
-    "unnaturally long fingers, elongated slender fingers, "
-    "glossy plastic fake nails, uniform white press-on nails, "
-    "overly manicured nails, doll-like fingers, rubbery fingers, "
-    "stiff posed fingers, airbrushed hand skin, "
-    "harsh face distortion, waxy skin, plastic skin, over-smoothed skin, "
-    "airbrushed skin, beauty filter skin, mannequin skin, poreless face, "
-    "CGI face, 3D-rendered face, glossy doll skin, synthetic smooth face, "
-    "skin blur, denoised skin, softened pore detail, blurred skin texture, "
-    "beauty-retouched face, foundation-ad skin, "
-    "porcelain doll face, baby-face stylization, oversized irises, inflated lips, "
-    "over-clean facial geometry, glam retouch face, "
-    "random added freckles, extra freckle-like speckles, "
-    "decorative freckle mask, beauty-filter speckling, moved beauty marks, mirrored beauty marks, "
-    "multiplied beauty marks, enlarged beauty marks, new non-reference mole placements, "
-    "new non-reference heavy freckle clusters, "
-    "skinny body, petite frame, narrow hips, inward-pulled hip points, narrow pelvis, thin thighs, "
-    "slim runway model proportions, wasp waist, bulky thighs, thickened torso, "
-    "exaggerated heavy lower body, flat chest, "
-    "belly button piercing, navel jewelry, navel ring, "
-    "bike shorts, compression shorts, hot pants, underwear-like shorts, "
-    "bra as outerwear, lingerie in public, bikini top as streetwear, "
-    "underwear visible as clothing in outdoor or street settings, "
-    "uncanny expression, cartoon, anime, doll-like, "
-    "hotel room, luxury suite, hospitality decor, showroom interior, "
-    "upholstered hotel headboard, nightstand hotel telephone, commercial beauty ad lighting, "
-    "editorial glam campaign lighting, polished resort room, overly glossy specular skin, "
-    "watermark, text overlay, logo, duplicate person, extra limbs, "
-    "navel piercing, belly button jewelry"
+# Negative-prompt budget repair (2026-07-06). The prior single flat
+# NEGATIVE_PROMPT string measured 2734 chars against the executor's 2499-char
+# cap -- an overflow before any outfit-specific/public-lane term was even
+# added, meaning first-N-fit compaction silently dropped whatever fell past
+# the budget with no priority given to any category. Restructured into five
+# tiers so the executor (pipeline/kling_apilena_api_executor.py) can apply a
+# narrow reserved floor per tier, the same pattern already proven on the
+# positive-prompt side. NEGATIVE_PROMPT below is reconstructed as the exact
+# concatenation of all five tiers, in the same order as before, so its value
+# and every consumer of it are unaffected by this refactor.
+#
+# Two terms were dropped as confirmed exact-concept duplicates found by direct
+# audit: "navel piercing" (duplicate of "belly button piercing") and "belly
+# button jewelry" (duplicate of "navel jewelry"). No other term was removed,
+# reworded, or reordered across categories -- every other term from the prior
+# flat list is preserved, just grouped by protection class instead of left in
+# one undifferentiated string.
+CORE_NEGATIVE_TERMS = (
+    "low quality", "blurry", "distorted face", "changed face", "identity drift",
+    "wrong eye color for the current Lena element", "altered iris color", "brightened irises",
+    "pale irises", "desaturated irises", "hazel eyes", "amber eyes", "green eyes", "gray eyes",
+    "light eyes", "gray-green eyes",
+    "watermark", "text overlay", "logo", "duplicate person", "extra limbs",
+)
+
+STYLE_REALISM_NEGATIVE_TERMS = (
+    "harsh face distortion", "waxy skin", "plastic skin", "over-smoothed skin", "airbrushed skin",
+    "beauty filter skin", "mannequin skin", "poreless face", "CGI face", "3D-rendered face",
+    "glossy doll skin", "synthetic smooth face", "skin blur", "denoised skin", "softened pore detail",
+    "blurred skin texture", "beauty-retouched face", "foundation-ad skin", "porcelain doll face",
+    "baby-face stylization", "oversized irises", "inflated lips", "over-clean facial geometry",
+    "glam retouch face", "uncanny expression", "cartoon", "anime", "doll-like",
+    "overly glossy specular skin",
+)
+
+PUBLIC_SAFETY_NEGATIVE_TERMS = (
+    "belly button piercing", "navel jewelry", "navel ring",
+    "bike shorts", "compression shorts", "hot pants", "underwear-like shorts",
+    "bra as outerwear", "lingerie in public", "bikini top as streetwear",
+    "underwear visible as clothing in outdoor or street settings",
+)
+
+BODY_ANATOMY_NEGATIVE_TERMS = (
+    "unrealistic body proportions",
+    "deformed hands", "extra fingers", "missing fingers", "fused fingers", "melted fingers",
+    "tangled fingers", "broken knuckles", "twisted wrists", "bad thumb placement", "mannequin hands",
+    "bad anatomy", "crossed eyes", "unnaturally long fingers", "elongated slender fingers",
+    "glossy plastic fake nails", "uniform white press-on nails", "overly manicured nails",
+    "doll-like fingers", "rubbery fingers", "stiff posed fingers", "airbrushed hand skin",
+    "skinny body", "petite frame", "narrow hips", "inward-pulled hip points", "narrow pelvis",
+    "thin thighs", "slim runway model proportions", "wasp waist", "bulky thighs", "thickened torso",
+    "exaggerated heavy lower body", "flat chest", "reduced bust volume", "reduced hip volume",
+    "thinned seated body",
+)
+
+OPTIONAL_FILL_NEGATIVE_TERMS = (
+    "random added freckles", "light freckling", "visible freckle field", "extra freckle-like speckles",
+    "decorative freckle mask", "beauty-filter speckling", "fake pore dots", "pore-dot mask",
+    "moved beauty marks", "mirrored beauty marks", "multiplied beauty marks", "enlarged beauty marks",
+    "new non-reference mole placements", "new non-reference heavy freckle clusters",
+    "overstretched smile", "widened smiling face", "broad cartoon grin", "jaw widened by smile",
+    "puffed smile cheeks", "pinched doll nose", "filler-look lips", "overly plumped lips",
+    "teenified face", "generic instagram face",
+    "hand through wall", "hand through door", "arm clipping through doorframe",
+    "fingers intersecting glass", "limb clipping through furniture", "object-merging hands",
+    "hotel room", "luxury suite", "hospitality decor", "showroom interior",
+    "upholstered hotel headboard", "nightstand hotel telephone", "commercial beauty ad lighting",
+    "editorial glam campaign lighting", "polished resort room",
+)
+
+# Union of every outfit-conditional substitution term from the dress / crop-top /
+# bodysuit / skirt / shorts / outerwear branches of build_public_lane_negative_prompt()
+# below, exposed as a named constant purely so the executor can use it as a
+# reserved-floor matching set. Deliberately duplicated (not refactored out of)
+# the inline lists below -- this keeps build_public_lane_negative_prompt's own
+# assembly logic byte-for-byte unchanged, at the cost of needing to keep this
+# constant in sync if those inline lists ever change. Does NOT include the
+# sleeveless-top-and-skirt garment-obedience terms, which are a separate,
+# already-floor-protected class (kling_apilena_api_executor.py's
+# _GARMENT_OBEDIENCE_NEGATIVE_TERMS) left untouched by this repair.
+OUTFIT_SPECIFIC_SUBSTITUTION_TERMS = (
+    "dress split into top and skirt", "cutout dress drift", "two-piece outfit replacing dress",
+    "crop top when full-length top is specified", "cropped sweater replacing named top",
+    "turtleneck crop top replacing named top", "bra-band silhouette replacing named top",
+    "bodysuit rendered as bra top", "bodysuit rendered as sports bra", "bodysuit rendered as crop top",
+    "bodysuit hem floating above waistband", "exposed stomach when bodysuit is specified",
+    "separated bra band and jeans waistband when bodysuit is specified",
+    "dress replacing separate top and skirt", "bodycon tube skirt replacing named skirt",
+    "soft knit skirt replacing structured skirt", "denim skirt replaced with jersey or knit bodycon skirt",
+    "bike shorts replacing named shorts", "biker shorts replacing named shorts",
+    "shapewear shorts replacing named shorts", "underwear-like shorts replacing named shorts",
+    "hot pants replacing tailored shorts",
+    "coat over bra top", "trench coat over bra top", "blazer over bralette", "jacket over bra",
+    "visible stomach under outerwear", "midriff exposed under outerwear",
+    "underbust exposed under open coat",
+)
+
+# The clothing-safety subset of build_public_lane_negative_prompt()'s always-added
+# public-lane extras (selfie-framing terms excluded -- those are a composition
+# preference, not a clothing-safety protection, and are covered by the optional
+# fill tier). Same duplication rationale as OUTFIT_SPECIFIC_SUBSTITUTION_TERMS
+# above: exposed for the executor's reserved-floor matching without touching the
+# inline assembly logic below.
+PUBLIC_LANE_SAFETY_TERMS = (
+    "bra top", "bikini-like bodice", "triangle top",
+    "separated top and skirt when dress is specified",
+    "underbust exposed in public", "bare midriff in public when dress is specified",
+)
+
+NEGATIVE_PROMPT = ", ".join(
+    CORE_NEGATIVE_TERMS
+    + STYLE_REALISM_NEGATIVE_TERMS
+    + PUBLIC_SAFETY_NEGATIVE_TERMS
+    + BODY_ANATOMY_NEGATIVE_TERMS
+    + OPTIONAL_FILL_NEGATIVE_TERMS
 )
 
 MIDRIFF_COVERAGE_NEGATIVE_SUFFIX = (
-    "exposed belly button, visible navel, bare navel, midriff gap, "
-    "gap between top hem and waistband, visible stomach with full-length top, "
+    "unplanned midriff gap on a full-coverage outfit, full-length top shrinking into a crop, "
+    "gap between top hem and waistband when the outfit specifies coverage, "
     "hoodie floating above waistband, ultra-cropped hoodie, cropped quarter-zip, "
     "cropped pullover, cropped sweater, cropped long-sleeve top, "
-    "bikini-like crop top, bra top under open shirt, bralette substituted for "
+    "bikini-like crop top replacing a real top, bra top under open shirt, bralette substituted for "
     "tank top, bandeau under open button-down, micro-cami ending above waistband"
 )
+
+
+def _catalog_prompt_lower(entry: dict | None) -> str:
+    return str((entry or {}).get("prompt") or "").lower()
+
+
+def catalog_outfit_is_bodysuit(entry: dict | None) -> bool:
+    return "bodysuit" in _catalog_prompt_lower(entry)
+
+
+def catalog_outfit_has_outerwear_shell(entry: dict | None) -> bool:
+    prompt = _catalog_prompt_lower(entry)
+    return any(
+        token in prompt
+        for token in [
+            "coat",
+            "trench",
+            "blazer",
+            "jacket",
+            "overshirt",
+            "open shirt",
+            "open blouse",
+            "cardigan",
+        ]
+    )
+
+
+def catalog_outfit_has_explicit_full_base_layer(entry: dict | None) -> bool:
+    prompt = _catalog_prompt_lower(entry)
+    if "dress" in prompt:
+        return True
+    full_length_tokens = [
+        "tee",
+        "t-shirt",
+        "tshirt",
+        "shirt",
+        "blouse",
+        "sweater",
+        "turtleneck",
+        "quarter-zip",
+        "quarter zip",
+        "pullover",
+        "long-sleeve",
+        "long sleeve",
+        "bodysuit",
+        "tank",
+        "tank top",
+        "cami",
+        "top",
+    ]
+    if not any(token in prompt for token in full_length_tokens):
+        return False
+    return not any(
+        token in prompt
+        for token in [
+            "crop",
+            "cropped",
+            "bralette",
+            "bikini",
+            "bandeau",
+            "bra top",
+            "micro-cami",
+        ]
+    )
+
+
+def catalog_outfit_public_outerwear_needs_underlayer(entry: dict | None) -> bool:
+    if not entry:
+        return False
+    return (
+        catalog_outfit_has_outerwear_shell(entry)
+        and not catalog_outfit_has_explicit_full_base_layer(entry)
+    )
 
 
 def catalog_outfit_midriff_must_stay_covered(entry: dict | None) -> bool:
     if not entry:
         return False
-    prompt = (entry.get("prompt") or "").lower()
+    prompt = _catalog_prompt_lower(entry)
+    if catalog_outfit_is_bodysuit(entry):
+        return True
     if any(
         token in prompt
-        for token in ["crop", "cropped", "bralette", "bikini"]
+        for token in ["crop", "cropped", "cutout"]
     ):
         return False
+    if any(token in prompt for token in ["low-rise", "low rise"]):
+        return False
     if "dress" in prompt:
+        return True
+    if catalog_outfit_public_outerwear_needs_underlayer(entry):
         return True
     return any(
         token in prompt
@@ -173,17 +373,191 @@ def catalog_outfit_midriff_must_stay_covered(entry: dict | None) -> bool:
     )
 
 
+# Batch 7 (2026-07-06): two consecutive same-slot proof renders on a sleeveless-tank
+# + mini-skirt public outfit (wc_p082) substituted a different, unrelated covering
+# garment (trench+scarf, then a turtleneck sweater) despite a verified-correct
+# submitted prompt. The existing Skirt-set continuity lock covers fabric/coverage
+# nuances (crop vs. full-length, shapewear-look) but never explicitly forbade
+# substituting the whole garment class for outerwear. Narrow, silhouette-class-scoped
+# fix: only the sleeveless/tank-top + skirt class, not a blanket rule.
+def catalog_outfit_is_sleeveless_top_skirt_set(entry: dict | None) -> bool:
+    """True for a public two-piece outfit: a sleeveless/tank-style top paired with a
+    separate skirt. Deliberately narrow -- does not match shirt/blouse/knit/sweater
+    tops, which are not the silhouette class implicated in the proof failures."""
+    prompt = _catalog_prompt_lower(entry)
+    if "skirt" not in prompt:
+        return False
+    if "crop" in prompt or "cropped" in prompt:
+        return False
+    return any(
+        token in prompt
+        for token in ("tank", "halter", "sleeveless", "strapless", "one-shoulder", "off-shoulder")
+    )
+
+
 def build_negative_prompt_for_catalog(entry: dict | None) -> str:
     negative = NEGATIVE_PROMPT
     if catalog_outfit_midriff_must_stay_covered(entry):
         negative = f"{negative}, {MIDRIFF_COVERAGE_NEGATIVE_SUFFIX}"
     return negative
 
+
+def build_public_lane_negative_prompt(entry: dict | None, lane: str, negative: str) -> str:
+    if lane not in PUBLIC_SOCIAL_LANES:
+        return negative
+
+    extra_bits = [
+        "mirror selfie",
+        "bathroom selfie",
+        "phone held toward camera",
+        "phone visible in foreground",
+        "arm-extended selfie framing",
+        "front-camera selfie",
+        "selfie composition instead of friend-shot",
+        "bra top",
+        "bikini-like bodice",
+        "triangle top",
+        "separated top and skirt when dress is specified",
+        "underbust exposed in public",
+        "bare midriff in public when dress is specified",
+    ]
+
+    prompt = str((entry or {}).get("prompt") or "").lower()
+
+    # Batch 7b (2026-07-06): moved ahead of every other conditional block. The
+    # negative-prompt compactor keeps terms in source order until the char budget
+    # runs out (no floor mechanism on the negative side yet) -- these terms were
+    # previously appended last, inside the skirt block, and none of them survived a
+    # real compaction test. Placing them here, immediately after the base list, gives
+    # them the same first-N-fit priority as the base selfie/bra-top protections,
+    # without adding a new mechanism.
+    if catalog_outfit_is_sleeveless_top_skirt_set(entry):
+        extra_bits.extend([
+            "turtleneck replacing sleeveless top",
+            "turtleneck sweater replacing named top",
+            "trench coat replacing named top",
+            "peacoat replacing named top",
+            "cardigan replacing named top",
+            "blazer replacing named top",
+            "scarf replacing named top",
+            "long sleeves replacing sleeveless top",
+            "winter coat over outfit",
+            "puffer jacket over outfit",
+            "layered coat replacing named outfit",
+        ])
+
+    if "dress" in prompt:
+        extra_bits.extend([
+            "dress split into top and skirt",
+            "cutout dress drift",
+            "two-piece outfit replacing dress",
+        ])
+    if (
+        any(token in prompt for token in ["top", "halter", "tank", "tee", "shirt", "blouse", "cami", "knit", "sweater"])
+        and "crop" not in prompt
+        and "cropped" not in prompt
+    ):
+        extra_bits.extend([
+            "crop top when full-length top is specified",
+            "cropped sweater replacing named top",
+            "turtleneck crop top replacing named top",
+            "bra-band silhouette replacing named top",
+        ])
+    if "bodysuit" in prompt:
+        extra_bits.extend([
+            "bodysuit rendered as bra top",
+            "bodysuit rendered as sports bra",
+            "bodysuit rendered as crop top",
+            "bodysuit hem floating above waistband",
+            "exposed stomach when bodysuit is specified",
+            "separated bra band and jeans waistband when bodysuit is specified",
+        ])
+    if "skirt" in prompt:
+        extra_bits.extend([
+            "dress replacing separate top and skirt",
+            "bodycon tube skirt replacing named skirt",
+            "soft knit skirt replacing structured skirt",
+        ])
+        if "denim" in prompt:
+            extra_bits.append("denim skirt replaced with jersey or knit bodycon skirt")
+    if "shorts" in prompt:
+        extra_bits.extend([
+            "bike shorts replacing named shorts",
+            "biker shorts replacing named shorts",
+            "shapewear shorts replacing named shorts",
+            "underwear-like shorts replacing named shorts",
+            "hot pants replacing tailored shorts",
+        ])
+    if catalog_outfit_has_outerwear_shell(entry):
+        extra_bits.extend([
+            "coat over bra top",
+            "trench coat over bra top",
+            "blazer over bralette",
+            "jacket over bra",
+            "visible stomach under outerwear",
+            "midriff exposed under outerwear",
+            "underbust exposed under open coat",
+        ])
+
+    return f"{negative}, {', '.join(extra_bits)}"
+
 PUBLIC_WARDROBE_RULE = (
-    "Wardrobe for public and street settings must read as real outerwear: "
-    "fitted top, bodysuit, blouse, dress, coordinated crop top, jacket, or layering. "
-    "Do not show bra, bra-like top, lingerie, bikini top, or underwear as public outerwear "
-    "in street, cafe, campus, outdoor, errand, park, or sidewalk scenes."
+    "Wardrobe must read as intentional real fashion for the setting: sexy, model-like, graceful, stylish, believable, "
+    "and appropriate to the scene rather than accidental underwear, swimwear, or garment failure. "
+    "In public scenes like restaurants, bars, patios, sidewalks, hotel lobbies, elevators, shops, and transit, "
+    "the main visible garment must read as deliberate public-facing fashion. Intentional skin is allowed when the outfit calls for it; "
+    "do not turn unrelated garments into a bikini, bra, lingerie set, or half-dressed improv."
+)
+
+PUBLIC_SOCIAL_LANES = {
+    "night out",
+    "dinner booth",
+    "wine bar patio",
+    "brunch patio",
+    "sidewalk dinner",
+    "lobby cocktail bar",
+    "coffee shop",
+    "bookstore",
+    "flower shop",
+    "record store",
+    "museum afternoon",
+    "city bench",
+    "rooftop sunset",
+    "elevator moment",
+    "laundry day",
+}
+
+VISIBLE_TORSO_GARMENT_TERMS = (
+    "dress", "top", "tee", "shirt", "blouse", "sweater", "knit",
+    "cami", "tank", "bodysuit", "corset", "cardigan", "halter",
+    "strapless", "one-shoulder", "off-shoulder"
+)
+
+OUTER_LAYER_ONLY_TERMS = (
+    "coat", "trench", "blazer", "jacket",
+)
+
+SEXY_PUBLIC_PRIMARY_TERMS = (
+    "mini dress", "mini skirt", "scoop-neck", "scoop neck", "square-neck", "square neckline",
+    "v-neck", "v neckline", "off-shoulder", "one-shoulder", "wrap mini dress",
+    "slip dress", "blazer dress", "asymmetric neckline", "asymmetric wrap", "fitted mini dress",
+    "tank top", "fitted tank", "blazer vest", "tailored high-waist wide-leg shorts",
+    "bodysuit", "corset-style fashion top", "halter fashion top", "halter knit top",
+    "strapless corset-style", "mesh sleeves", "satin midi skirt", "denim maxi skirt",
+    "leather mini skirt", "low-rise", "low-slung", "side slit", "knee-high boots",
+)
+
+SEXY_PUBLIC_SECONDARY_TERMS = (
+    "fitted", "satin", "silk-look", "silky", "velvet", "bias-cut", "side slit",
+    "strappy", "body-skimming", "curve-skimming", "open blazer", "open jacket",
+    "straight jeans", "wide-leg trousers", "maxi skirt", "cardigan worn buttoned",
+    "cargo maxi skirt", "open shoulders", "structured seams", "real waistband",
+)
+
+TOO_SAFE_PUBLIC_TERMS = (
+    "button-down shirt", "button-front shirt", "button-front top",
+    "plain white tee", "crew-neck tee", "oversized white button-down",
+    "corporate", "office", "businesslike", "business-like",
 )
 
 STYLE_BANK = [
@@ -797,14 +1171,615 @@ def pick_style(rng=None) -> dict:
     return _rng.choice(STYLE_BANK)
 
 
-_PRODUCTION_EXCLUDE_CATEGORIES = {"cozy", "fitness"}
+_WARDROBE_CATALOG_CACHE: dict | None = None
+
+
+def load_wardrobe_catalog() -> dict:
+    global _WARDROBE_CATALOG_CACHE
+    if _WARDROBE_CATALOG_CACHE is None:
+        _WARDROBE_CATALOG_CACHE = json.loads(
+            WARDROBE_CATALOG_PATH.read_text(encoding="utf-8")
+        )
+    return _WARDROBE_CATALOG_CACHE
+
+
+CATALOG_PUBLIC_BLOCKED_RISK_TAGS = {
+    "body_hide_risk",
+    "identity_drift_risk",
+    "gymwear_drift_risk",
+    "lingerie_risk",
+    "public_context_risk",
+    "leggings_public_risk",
+    "biker_shorts_risk",
+}
+
+CATALOG_PUBLIC_BLOCKED_TERMS = [
+    "bralette",
+    "bra",
+    "lingerie",
+    "underwear",
+    "bikini",
+    "bandeau",
+    "puffer vest",
+    "hoodie",
+    "sweatshirt",
+]
+
+PUBLIC_ONLY_LINGERIE_DRIFT_TERMS = [
+    "lace-trim",
+    "lace trim",
+    "lace-inset",
+    "lace inset",
+]
+
+LANE_STYLE_LANE_ALLOWLIST = {
+    "morning apartment": {"cozy", "elevated_casual"},
+    "late kitchen snack": {"cozy", "elevated_casual"},
+    "apartment doorway": {"elevated_casual", "going_out"},
+    "coffee shop": {"elevated_casual", "street"},
+    "rainy street": {"street", "elevated_casual"},
+    "rooftop sunset": {"going_out", "elevated_casual"},
+    "bookstore": {"street", "elevated_casual"},
+    "car moment": {"going_out", "elevated_casual"},
+    "night out": {"going_out"},
+    "skincare evening": {"elevated_casual"},
+    "laundry day": {"cozy", "elevated_casual", "street"},
+    "museum afternoon": {"elevated_casual", "street"},
+    "flower shop": {"street", "elevated_casual"},
+    "record store": {"street", "elevated_casual"},
+    "mirror outfit check": {"going_out", "elevated_casual", "cozy"},
+    "city bench": {"street", "elevated_casual"},
+    "elevator moment": {"going_out", "elevated_casual"},
+    "dinner booth": {"going_out", "elevated_casual"},
+    "wine bar patio": {"going_out", "elevated_casual"},
+    "brunch patio": {"going_out", "elevated_casual", "street"},
+    "sidewalk dinner": {"going_out", "elevated_casual"},
+    "lobby cocktail bar": {"going_out", "elevated_casual"},
+}
+
+LANE_WARDROBE_PRODUCTION_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": {"apartment_elevated"},
+    "late kitchen snack": {"apartment_elevated"},
+    "apartment doorway": {"apartment_elevated", "mirror_fitcheck", "street_glam", "going_out"},
+    "mirror outfit check": {"mirror_fitcheck", "apartment_elevated", "going_out"},
+    "skincare evening": {"beauty_selfie_vanity", "apartment_elevated"},
+    "coffee shop": {"cafe_styled", "street_glam"},
+    "bookstore": {"cafe_styled", "street_glam"},
+    "brunch patio": {"street_glam", "cafe_styled", "going_out"},
+    "flower shop": {"street_glam"},
+    "record store": {"street_glam"},
+    "museum afternoon": {"cafe_styled", "street_glam"},
+    "city bench": {"street_glam"},
+    "laundry day": {"apartment_elevated"},
+    "car moment": {"car_elevator", "going_out"},
+    "elevator moment": {"car_elevator", "going_out"},
+    "rooftop sunset": {"rooftop_night_city", "going_out"},
+    "night out": {"going_out", "editorial_flash"},
+    "dinner booth": {"going_out"},
+    "wine bar patio": {"going_out"},
+    "sidewalk dinner": {"going_out", "street_glam"},
+    "lobby cocktail bar": {"going_out"},
+    "gym cooldown": {"gym_glam"},
+}
+
+LANE_CAPTURE_LOGIC = {
+    "apartment doorway": "Capture source: candid friend-shot from a few feet away in the hall, natural eye-height perspective.",
+    "coffee shop": "Capture source: candid friend-shot from a nearby seat or counter edge, clearly a real human-taken photo rather than an impossible floating camera.",
+    "rainy street": "Capture source: handheld candid shot by a friend standing on the sidewalk, believable street-photo timing.",
+    "rooftop sunset": "Capture source: real friend-shot candid from a nearby standing position, not a drone or impossible overhead angle.",
+    "bookstore": "Capture source: quiet candid photo taken by a friend across the aisle at normal standing height.",
+    "car moment": "Capture source: phone propped on the dashboard or driver-side console timer, with a believable in-car angle and no invisible photographer.",
+    "night out": "Capture source: candid friend-shot near the venue entrance or just inside the room, clearly human-taken and never dependent on a mirror gimmick.",
+    "skincare evening": "Capture source: bathroom mirror or counter-level phone timer shot with clear home-bathroom logic.",
+    "laundry day": "Capture source: candid friend-shot from the laundromat aisle at normal standing height.",
+    "museum afternoon": "Capture source: candid friend-shot from a few feet away in the gallery, natural visitor perspective.",
+    "flower shop": "Capture source: candid friend-shot on the sidewalk outside the storefront, natural standing perspective.",
+    "record store": "Capture source: candid friend-shot from the next aisle over, natural documentary angle.",
+    "mirror outfit check": "Capture source: candid getting-ready photo from a friend standing nearby; avoid phone-forward mirror grammar and keep the face readable.",
+    "city bench": "Capture source: candid friend-shot from the sidewalk a few feet away, believable street-life perspective.",
+    "elevator moment": "Capture source: candid hallway or elevator-bank photo from a friend a few feet away, never a reflection gimmick or mirror selfie.",
+    "dinner booth": "Capture source: friend-shot from across the table, with an obvious seated restaurant perspective and no impossible floating angle.",
+    "wine bar patio": "Capture source: candid friend-shot from the adjacent chair or standing beside the table, natural nightlife perspective.",
+    "brunch patio": "Capture source: friend-shot from the other side of the brunch table or just beside it, clearly human-taken and socially plausible.",
+    "sidewalk dinner": "Capture source: candid friend-shot from a few steps away on the sidewalk, natural city-night timing.",
+    "lobby cocktail bar": "Capture source: candid friend-shot from across the small bar table, believable phone-camera composition in low light.",
+}
+
+SOCIAL_PRIORITY_LANES = {
+    "coffee shop",
+    "rooftop sunset",
+    "car moment",
+    "night out",
+    "mirror outfit check",
+    "elevator moment",
+    "dinner booth",
+    "wine bar patio",
+    "brunch patio",
+    "sidewalk dinner",
+    "lobby cocktail bar",
+}
+
+
+def choose_scene_production(scene_pool: list[dict], rng: random.Random) -> dict:
+    bank = load_photo_scene_bank()
+    priority_lanes = {
+        str(item).strip().lower()
+        for item in bank.get("social_priority_lanes", [])
+        if str(item).strip()
+    } or SOCIAL_PRIORITY_LANES
+    weighted: list[dict] = []
+    for scene in scene_pool:
+        lane = str(scene.get("lane") or "").strip().lower()
+        weight = 4 if lane in priority_lanes else 1
+        weighted.extend([scene] * weight)
+    return rng.choice(weighted or scene_pool)
+
+
+def public_capture_lock(lane: str) -> str:
+    if lane not in PUBLIC_SOCIAL_LANES:
+        return ""
+    return (
+        "Public-scene lock: this must read as a normal real-world human-taken social photo, not a selfie. "
+        "Do not put a phone in Lena's hand or in the foreground unless the scene explicitly requires a phone. "
+        "Do not use mirror-selfie grammar, front-camera framing, or an arm-extended selfie pose."
+    )
+
+
+def public_wardrobe_continuity_lock(entry: dict, lane: str) -> str:
+    if lane not in PUBLIC_SOCIAL_LANES:
+        return ""
+    prompt = str(entry.get("prompt") or "").lower()
+    if "dress" in prompt:
+        return (
+            "Dress continuity lock: keep the specified dress as one continuous real public dress with full bodice continuity. "
+            "No bra-top reinterpretation, no triangle-bikini bodice drift, no separated top-and-skirt reading, "
+            "no exposed underbust, and no exposed midriff created by garment splitting."
+        )
+    if "bodysuit" in prompt:
+        return (
+            "Bodysuit continuity lock: keep the named bodysuit as a real one-piece torso garment tucked into the waistband. "
+            "The fabric must stay continuous from neckline through the torso into the jeans, skirt, or trousers, with full side coverage. "
+            "Do not reinterpret it as a bra top, sports bra, cropped tank, bra-band silhouette, or floating hem above the waistband. "
+            "No exposed underbust, no exposed stomach, and no fake two-piece separation unless the catalog explicitly names a crop top."
+        )
+    if (
+        "skirt" in prompt
+        and any(token in prompt for token in ["top", "halter", "tank", "tee", "shirt", "blouse", "cami", "knit", "sweater"])
+        and "crop" not in prompt
+        and "cropped" not in prompt
+    ):
+        lock = (
+            "Skirt-set continuity lock: keep the named top and skirt as two real separate garments. "
+            "The top must stay full-length to the waistband unless the catalog explicitly names a crop top. "
+            "The skirt must keep its stated fabric, visible waistband, and named hem length instead of turning into a dress, leggings, or a generic bodycon tube skirt. "
+            "Do not expose underbust or stomach by shrinking the top, and do not swap denim or structured skirt fabric into soft knit shapewear-looking material."
+        )
+        if catalog_outfit_is_sleeveless_top_skirt_set(entry):
+            # Single self-contained sentence on purpose: the executor's compaction
+            # step splits on sentence boundaries, and a reserved floor can only
+            # reliably key on one marker matching one whole sentence. Keeping the
+            # prohibition list in the same sentence as the "Garment-obedience lock:"
+            # marker guarantees they survive or drop together.
+            lock += (
+                " Garment-obedience lock: the named sleeveless top must remain the visible top garment exactly as specified, "
+                "and must not be substituted with a sweater, turtleneck, blouse, cardigan, jacket, blazer, coat, or scarf, "
+                "or replaced with long sleeves or a high neckline."
+            )
+        return lock
+    if (
+        "shorts" in prompt
+        and any(token in prompt for token in ["top", "one-shoulder", "one shoulder", "tank", "tee", "shirt", "blouse", "cami", "knit", "sweater"])
+        and "bike shorts" not in prompt
+        and "biker shorts" not in prompt
+    ):
+        return (
+            "Shorts-set continuity lock: keep the named top and shorts as two real separate garments. "
+            "The top must keep its intended neckline and stay full-length to the waistband unless a crop top is explicitly named. "
+            "The shorts must read as real public shorts with the stated rise, pleats, waistband, and hem shape instead of turning into bike shorts, shapewear shorts, underwear, or hot pants."
+        )
+    if catalog_outfit_has_outerwear_shell(entry):
+        if catalog_outfit_public_outerwear_needs_underlayer(entry):
+            return (
+                "Outerwear continuity lock: the coat, trench, blazer, jacket, cardigan, or overshirt must have a real fitted full-length top underneath. "
+                "Add a simple opaque waistband-length top if the catalog text did not name one. "
+                "The underlayer must cover underbust, stomach, and navel, and must never read as a bra, bralette, bandeau, bikini top, or micro-crop."
+            )
+        return (
+            "Outerwear continuity lock: keep the named underlayer as a real opaque public top under the outerwear. "
+            "The top must stay full-length to the waistband and cover underbust, stomach, and navel. "
+            "Do not reinterpret the underlayer as a bra, bralette, bandeau, bikini top, or micro-crop."
+        )
+    if (
+        any(token in prompt for token in ["top", "halter", "tank", "tee", "shirt", "blouse", "cami", "knit", "sweater"])
+        and "crop" not in prompt
+        and "cropped" not in prompt
+    ):
+        return (
+            "Top continuity lock: keep the named top as real public clothing with its intended neckline, shoulder treatment, and full torso coverage to the waistband. "
+            "Do not reinterpret it as a bra top, bikini-like top, cropped sweater, micro-crop, or lingerie-coded garment."
+        )
+    return (
+        "Public outfit continuity lock: keep the specified garment classes as real public clothing. "
+        "Do not reinterpret them as lingerie, a bra top, swimwear, shapewear, or a half-dressed look."
+    )
+
+
+def catalog_outfit_silhouette_class(entry: dict | None) -> str:
+    prompt = _catalog_prompt_lower(entry)
+    if "dress" in prompt:
+        if "maxi dress" in prompt:
+            return "maxi_dress"
+        if "midi dress" in prompt:
+            return "midi_dress"
+        return "mini_or_short_dress"
+    if "bodysuit" in prompt:
+        return "bodysuit_denim_or_bottoms"
+    if "maxi skirt" in prompt:
+        return "maxi_skirt_set"
+    if "midi skirt" in prompt:
+        return "midi_skirt_set"
+    if "mini skirt" in prompt:
+        return "mini_skirt_set"
+    if "jeans" in prompt or "denim" in prompt:
+        return "jeans_based"
+    if "trousers" in prompt or "wide-leg" in prompt:
+        return "trouser_based"
+    if "shorts" in prompt:
+        return "tailored_shorts_set"
+    if "leggings" in prompt:
+        return "athleisure_or_lounge"
+    if "tank" in prompt or "halter" in prompt or "strapless" in prompt or "one-shoulder" in prompt or "off-shoulder" in prompt:
+        return "statement_top"
+    return "other_modern_fashion"
+
+
+def _prompt_has_visible_public_torso_garment(prompt: str) -> bool:
+    lower = prompt.lower()
+    if any(term in lower for term in VISIBLE_TORSO_GARMENT_TERMS):
+        return True
+    if any(term in lower for term in OUTER_LAYER_ONLY_TERMS):
+        return (
+            any(term in lower for term in ("over a", "over an", "over the", "with a", "with an", "layered over"))
+            and any(term in lower for term in ("cami", "tank", "tee", "shirt", "blouse", "dress", "sweater", "knit"))
+        )
+    return False
+
+
+def _public_sexy_bias_weight(entry: dict) -> int:
+    prompt = str(entry.get("prompt", "")).lower()
+    score = 1
+    primary_hits = sum(1 for term in SEXY_PUBLIC_PRIMARY_TERMS if term in prompt)
+    secondary_hits = sum(1 for term in SEXY_PUBLIC_SECONDARY_TERMS if term in prompt)
+    safe_hits = sum(1 for term in TOO_SAFE_PUBLIC_TERMS if term in prompt)
+
+    score += primary_hits * 3
+    score += secondary_hits * 2
+    score -= safe_hits * 4
+
+    modern_variety_terms = [
+        "bodysuit", "jeans", "trousers", "maxi skirt", "midi skirt", "mini skirt",
+        "tank top", "halter", "one-shoulder", "off-shoulder", "strapless",
+        "corset-style fashion top", "mesh sleeves", "cardigan worn buttoned",
+        "leather mini skirt", "denim maxi skirt", "cargo maxi skirt",
+        "knee-high boots", "sneakers", "ankle boots",
+    ]
+    score += sum(2 for term in modern_variety_terms if term in prompt)
+
+    if "dress" in prompt:
+        score += 1
+    if "mini" in prompt:
+        score += 2
+    if "fitted" in prompt:
+        score += 2
+    if "scoop-neck" in prompt or "square-neck" in prompt or "v-neck" in prompt:
+        score += 2
+    if "corporate" in prompt or "office" in prompt or "businesslike" in prompt:
+        score -= 8
+
+    return max(1, score)
+
+
+LANE_SCENE_FIT_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": {"apartment_morning"},
+    "late kitchen snack": {"apartment_morning", "skincare_evening"},
+    "apartment doorway": {"apartment_morning", "mirror_fitcheck", "street", "errand"},
+    "mirror outfit check": {"mirror_fitcheck", "apartment_morning"},
+    "coffee shop": {"coffee_shop"},
+    "brunch patio": {"coffee_shop", "street", "dinner_social"},
+    "flower shop": {"street", "errand"},
+    "record store": {"street", "errand"},
+    "museum afternoon": {"street", "errand", "campus"},
+    "laundry day": {"apartment_morning", "errand"},
+    "car moment": {"street", "errand", "night_out", "dinner_social"},
+    "wine bar patio": {"night_out", "dinner_social"},
+    "lobby cocktail bar": {"night_out", "dinner_social"},
+    "rooftop sunset": {"night_out", "dinner_social"},
+    "gym cooldown": {"gym"},
+}
+
+LANE_OCCASION_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": {"apartment", "daily"},
+    "late kitchen snack": {"apartment"},
+    "apartment doorway": {"apartment", "daily", "street"},
+    "mirror outfit check": {"apartment", "daily"},
+    "coffee shop": {"daily", "street"},
+    "brunch patio": {"daily", "going_out", "dinner_social"},
+    "flower shop": {"daily", "street", "errand"},
+    "record store": {"daily", "street", "errand"},
+    "museum afternoon": {"daily", "street"},
+    "laundry day": {"apartment", "daily"},
+    "car moment": {"daily", "street", "night_out", "dinner_social"},
+    "wine bar patio": {"night_out", "dinner_social", "going_out"},
+    "lobby cocktail bar": {"night_out", "dinner_social", "going_out"},
+    "rooftop sunset": {"night_out", "dinner_social", "going_out"},
+    "gym cooldown": {"gym"},
+}
+
+
+def _outfit_matches_lane_context(entry: dict, lane: str) -> bool:
+    scene_fit = {str(item).strip() for item in entry.get("scene_fit", []) if str(item).strip()}
+    occasion = str(entry.get("occasion") or "").strip()
+
+    allowed_scene_fit = LANE_SCENE_FIT_ALLOWLIST.get(lane, set())
+    allowed_occasion = LANE_OCCASION_ALLOWLIST.get(lane, set())
+
+    if allowed_scene_fit and scene_fit:
+        if scene_fit.intersection(allowed_scene_fit):
+            return True
+        if occasion and occasion in allowed_occasion:
+            return True
+        return False
+
+    if allowed_occasion and occasion:
+        return occasion in allowed_occasion
+
+    return True
+
+
+def pick_catalog_outfit_production(lane: str, reference_mode: str = "upper_body", rng=None) -> dict:
+    _rng = rng if rng is not None else random.Random()
+    catalog = load_wardrobe_catalog()
+    allowed_style_lanes = LANE_STYLE_LANE_ALLOWLIST.get(
+        lane, {"going_out", "elevated_casual", "street"}
+    )
+    preferred_production_lanes = LANE_WARDROBE_PRODUCTION_ALLOWLIST.get(lane, set())
+    safe_candidates = []
+    preferred_candidates = []
+    for entry in catalog.get("outfits", []):
+        if entry.get("status") in {"rejected", "high_risk"}:
+            continue
+        if not _outfit_matches_lane_context(entry, lane):
+            continue
+        if entry.get("style_lane") not in allowed_style_lanes:
+            continue
+        if any(tag in CATALOG_PUBLIC_BLOCKED_RISK_TAGS for tag in entry.get("risk_tags", [])):
+            continue
+        prompt = str(entry.get("prompt", ""))
+        lower = prompt.lower()
+        if any(term in lower for term in CATALOG_PUBLIC_BLOCKED_TERMS):
+            continue
+        if lane in PUBLIC_SOCIAL_LANES and any(term in lower for term in PUBLIC_ONLY_LINGERIE_DRIFT_TERMS):
+            continue
+        if lane in PUBLIC_SOCIAL_LANES and reference_mode == "upper_body":
+            if not _prompt_has_visible_public_torso_garment(prompt):
+                continue
+        safe_candidates.append(entry)
+        if str(entry.get("production_lane") or "").strip() in preferred_production_lanes:
+            preferred_candidates.append(entry)
+
+    candidate_source = preferred_candidates if preferred_candidates else safe_candidates
+    safe_pool = []
+    for entry in candidate_source:
+        weight = 1
+        if lane in PUBLIC_SOCIAL_LANES:
+            weight = _public_sexy_bias_weight(entry)
+        elif str(entry.get("production_lane") or "").strip() in preferred_production_lanes:
+            weight += 2
+        safe_pool.extend([entry] * weight)
+
+    if not safe_pool:
+        raise SystemExit(
+            f"[ABORT] pick_catalog_outfit_production: no safe wardrobe catalog entries remain for lane '{lane}'."
+        )
+
+    return _rng.choice(safe_pool)
+
+
+_PRODUCTION_EXCLUDE_CATEGORIES = {"cozy", "fitness", "creator", "street"}
 _PRODUCTION_BLOCKED_TERMS = [
     "hoodie", "jogger", "joggers", "sweatpants",
     "pajama", "pajamas", "biker shorts", "bike shorts",
     "bralette", "bodysuit", "jumpsuit",
     "quarter-zip", "turtleneck", "mock-neck", "mock neck",
-    "puffer vest",
+    "puffer vest", "sports bra", "baby tee", "crop tee", "crop top",
+    "cropped zip hoodie", "worn open over", "nothing underneath",
+    "cropped ", "slightly cropped", "tank", "sleeveless", "spaghetti-strap", "spaghetti strap",
 ]
+
+ROOT = Path(__file__).resolve().parents[2]
+WARDROBE_CATALOG_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json"
+)
+ENVIRONMENT_CATALOG_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_environment_catalog_v1.json"
+)
+PHOTO_SCENE_BANK_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_photo_scene_bank_v1.json"
+)
+
+_PHOTO_SCENE_BANK_CACHE: dict | None = None
+_ENVIRONMENT_CATALOG_CACHE: dict | None = None
+_PROMPT_SOURCE_VALIDATED = False
+
+
+def load_photo_scene_bank() -> dict:
+    global _PHOTO_SCENE_BANK_CACHE
+    if _PHOTO_SCENE_BANK_CACHE is None:
+        if not PHOTO_SCENE_BANK_PATH.exists():
+            raise SystemExit(
+                f"[ABORT] Saved photo scene bank missing: {PHOTO_SCENE_BANK_PATH}"
+            )
+        _PHOTO_SCENE_BANK_CACHE = json.loads(
+            PHOTO_SCENE_BANK_PATH.read_text(encoding="utf-8")
+        )
+    return _PHOTO_SCENE_BANK_CACHE
+
+
+def get_production_scene_pool() -> tuple[list[dict], dict]:
+    bank = load_photo_scene_bank()
+    blocked = {
+        str(item).strip().lower()
+        for item in bank.get("production_blocked_lanes", [])
+        if str(item).strip()
+    }
+    scenes = [
+        dict(scene)
+        for scene in bank.get("scenes", [])
+        if str(scene.get("lane") or "").strip().lower() not in blocked
+    ]
+    return scenes, bank
+
+
+def load_environment_catalog() -> dict:
+    global _ENVIRONMENT_CATALOG_CACHE
+    if _ENVIRONMENT_CATALOG_CACHE is None:
+        _ENVIRONMENT_CATALOG_CACHE = json.loads(
+            ENVIRONMENT_CATALOG_PATH.read_text(encoding="utf-8")
+        )
+    return _ENVIRONMENT_CATALOG_CACHE
+
+
+LANE_ENVIRONMENT_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": {"apartment_elevated"},
+    "late kitchen snack": {"apartment_elevated"},
+    "apartment doorway": {"apartment_elevated", "going_out"},
+    "mirror outfit check": {"mirror_fitcheck"},
+    "skincare evening": {"beauty_selfie_vanity", "apartment_elevated"},
+    "coffee shop": {"street_glam"},
+    "brunch patio": {"street_glam", "going_out"},
+    "bookstore": {"street_glam"},
+    "flower shop": {"street_glam"},
+    "record store": {"street_glam"},
+    "museum afternoon": {"street_glam"},
+    "city bench": {"street_glam"},
+    "grocery run": {"street_glam"},
+    "airport day": {"street_glam", "editorial_flash"},
+    "rainy street": {"street_glam", "editorial_flash"},
+    "rooftop sunset": {"rooftop_night_city"},
+    "night out": {"going_out", "editorial_flash"},
+    "dinner booth": {"going_out"},
+    "wine bar patio": {"going_out"},
+    "sidewalk dinner": {"going_out", "street_glam"},
+    "lobby cocktail bar": {"going_out"},
+    "car moment": {"car_elevator"},
+    "elevator moment": {"car_elevator"},
+    "gym cooldown": {"gym_glam"},
+    "laundry day": {"apartment_elevated"},
+}
+
+
+def _clean_sentence_fragment(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip(" .,;:")
+
+
+def choose_environment_production(scene: dict, rng: random.Random) -> dict | None:
+    catalog = load_environment_catalog()
+    lane = str(scene.get("lane") or "").strip().lower()
+    allowed_lanes = LANE_ENVIRONMENT_ALLOWLIST.get(lane, set())
+    pool = []
+    for entry in catalog.get("environments", []):
+        if str(entry.get("status") or "").lower() == "rejected":
+            continue
+        production_lane = str(entry.get("production_lane") or "").strip()
+        if allowed_lanes and production_lane not in allowed_lanes:
+            continue
+        pool.append(entry)
+    if not pool:
+        raise SystemExit(
+            f"[ABORT] No active environment catalog candidates remain for scene lane '{lane}'."
+        )
+    return dict(rng.choice(pool))
+
+
+def build_environment_prompt_parts(scene: dict, env_entry: dict | None) -> tuple[str, str]:
+    scene_environment = _clean_sentence_fragment(scene.get("environment", ""))
+    scene_details = _clean_sentence_fragment(scene.get("details", ""))
+
+    # Keep one coherent world per render.
+    # The saved scene bank already defines both the place and the scene-detail grammar.
+    # Do not inject extra environment-catalog realism text here, because it can collide
+    # with the actual scene lane and produce mixed-location prompts.
+    return scene_environment, scene_details
+
+
+def validate_saved_prompt_sources() -> None:
+    global _PROMPT_SOURCE_VALIDATED
+    if _PROMPT_SOURCE_VALIDATED:
+        return
+
+    bank = load_photo_scene_bank()
+    scenes = bank.get("scenes", [])
+    if not isinstance(scenes, list) or not scenes:
+        raise SystemExit("[ABORT] Saved photo scene bank has no scenes.")
+    blocked_lanes = {
+        str(item).strip().lower()
+        for item in bank.get("production_blocked_lanes", [])
+        if str(item).strip()
+    }
+
+    required_scene_keys = ("lane", "action", "environment", "details", "camera", "lighting", "caption")
+    missing_scene_fields = []
+    for idx, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise SystemExit(f"[ABORT] Scene bank entry #{idx} is not an object.")
+        for key in required_scene_keys:
+            if not str(scene.get(key) or "").strip():
+                missing_scene_fields.append(f"{scene.get('lane', f'index_{idx}')}:{key}")
+
+    if missing_scene_fields:
+        preview = ", ".join(missing_scene_fields[:10])
+        raise SystemExit(
+            f"[ABORT] Saved photo scene bank has incomplete scenes: {preview}"
+        )
+
+    env_catalog = load_environment_catalog()
+    env_entries = [
+        entry for entry in env_catalog.get("environments", [])
+        if str(entry.get("status") or "").lower() != "rejected"
+    ]
+    if not env_entries:
+        raise SystemExit("[ABORT] Environment catalog has no active entries.")
+
+    missing_lane_mappings = []
+    empty_environment_lanes = []
+    for scene in scenes:
+        lane = str(scene.get("lane") or "").strip().lower()
+        if lane in blocked_lanes:
+            continue
+        allowed = LANE_ENVIRONMENT_ALLOWLIST.get(lane)
+        if not allowed:
+            missing_lane_mappings.append(lane)
+            continue
+        candidates = [
+            entry for entry in env_entries
+            if str(entry.get("production_lane") or "").strip() in allowed
+        ]
+        if not candidates:
+            empty_environment_lanes.append(lane)
+
+    if missing_lane_mappings:
+        raise SystemExit(
+            "[ABORT] Missing lane->environment mapping for saved scenes: "
+            + ", ".join(sorted(set(missing_lane_mappings)))
+        )
+
+    if empty_environment_lanes:
+        raise SystemExit(
+            "[ABORT] Environment catalog has no active matches for scene lanes: "
+            + ", ".join(sorted(set(empty_environment_lanes)))
+        )
+
+    _PROMPT_SOURCE_VALIDATED = True
 
 
 def pick_style_production(rng=None) -> dict:
@@ -899,6 +1874,7 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
     lower = prompt.lower()
     fit_guard = ""
     layered_guard = ""
+    outerwear_underlayer_guard = ""
     has_base_layer = any(
         token in lower
         for token in [
@@ -929,6 +1905,12 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
                 "Preserve the named long sleeves as actual sleeves on both arms. "
                 "Do not convert the dress into halter, sleeveless, strappy, or shoulder-bare construction. "
             )
+    elif "bodysuit" in lower:
+        fit_guard = (
+            "Keep the named bodysuit as a real one-piece garment with continuous torso coverage and a true tucked-in read at the waistband. "
+            "Do not reinterpret it as a bra top, sports bra, bikini-like top, cropped tank, or floating hem above the jeans or skirt. "
+            "The torso fabric must stay connected and body-conscious without exposing underbust, stomach, or a fake crop gap. "
+        )
     elif (
         any(
             token in lower
@@ -944,11 +1926,23 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
         fit_guard = (
             "Keep the named top's intended construction and overall coverage. "
             "Do not reinterpret it as a bra top, sports-bra-like top, "
-            "bikini-like top, or underwear-like garment. A slight natural "
-            "waistband reveal is acceptable if the pose or styling makes it "
-            "plausible, but do not shrink a normal top into an extreme "
-            "micro-crop or bra-band-only drift. "
+            "bikini-like top, or underwear-like garment. The hem should read "
+            "as a normal full-length everyday top that reaches the natural "
+            "waistband area rather than floating high above it. Do not expose "
+            "underbust, do not turn it into a bra-band silhouette, and do not "
+            "shrink a normal top into an extreme micro-crop. "
         )
+        if "long-sleeve" in lower or "long sleeve" in lower:
+            fit_guard += (
+                "Preserve the named long sleeves on both arms and keep the "
+                "scoop-neck or other stated neckline modest and realistic, not "
+                "strapless, halter, off-shoulder, or cut down into lingerie-like coverage. "
+            )
+        if "halter" in lower:
+            fit_guard += (
+                "If the named top is halter or high-neck, keep that neckline with open shoulders while still preserving full torso coverage to the waistband. "
+                "Do not turn it into a cropped turtleneck, bra-band top, or shortened sweater. "
+            )
     if has_base_layer and has_open_layer:
         layered_guard = (
             "If an open overshirt or jacket is layered over a cami, tank, or "
@@ -956,11 +1950,18 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
             "side coverage and waistband-length coverage, not a bralette, "
             "bandeau, bikini top, sports bra, triangle bra, or micro-crop. "
         )
+    if catalog_outfit_public_outerwear_needs_underlayer(entry):
+        outerwear_underlayer_guard = (
+            "If the look uses a coat, trench, blazer, jacket, cardigan, or overshirt as the main visible layer and no full base top is explicitly named, "
+            "add a simple opaque fitted full-length everyday top underneath, visible as real public clothing, tucked or reaching the waistband, fully covering underbust, stomach, and navel. "
+            "Never place a bra top, bralette, bandeau, bikini top, or micro-crop under public outerwear. "
+        )
     return (
         "Wardrobe override — use this catalog outfit for clothing only: "
         f"{prompt}. "
         f"{fit_guard}"
         f"{layered_guard}"
+        f"{outerwear_underlayer_guard}"
         "Lena's face, hair, body, skin tone, and identity come from the "
         "approved character element/reference images, not the outfit text."
     )
@@ -969,26 +1970,43 @@ def format_catalog_wardrobe_override(entry: dict) -> str:
 PHOTO_SCENES = [
     {"lane":"morning apartment","action":"standing barefoot in her kitchen while pouring coffee into a ceramic mug, glancing toward the window like she is still waking up","environment":"a lived-in apartment kitchen with warm wood shelves, a half-open linen curtain, a small bowl of oranges, and morning light sliding across the counter","details":"steam from the coffee, one loose strand of hair near her cheek, a phone face-down on the counter, soft shadows on the wall","camera":"candid editorial lifestyle photo, 50mm lens, shallow depth of field, waist-up composition","lighting":"early morning natural window light, warm highlights, gentle contrast","caption":"coffee first, personality later"},
     {"lane":"apartment doorway","action":"leaving through the apartment doorway, looking back over her shoulder with a half-smile like she almost forgot something but went anyway","environment":"a lived-in apartment entryway with a coat rack hung with jackets in the foreground, a small entry table with keys and mail, a potted plant near the door, warm interior light spilling into the hallway in the background","details":"tote bag over her shoulder, keys in one hand, a jacket draped over her arm, soft shadow from the doorframe","camera":"full-body candid lifestyle portrait, 35mm lens, natural candid framing from just outside the door","lighting":"warm apartment interior light mixing with cool hallway light, soft natural split on her face","caption":"leaving on the first try today"},
-    {"lane":"coffee shop","action":"leaning against a small cafe window counter, holding an iced coffee and smiling like someone just made a quiet joke","environment":"a narrow neighborhood coffee shop with mismatched two-top tables and a scratched wooden pickup counter in the foreground, handwritten menu board and pastry case in the midground, condensation on the front window with blurred street and foot traffic beyond","details":"iced coffee condensation ring on the counter in the foreground, receipt and straw wrapper beside the cup, tote bag hooked on the stool, silver spoon on the saucer, soft window reflection in the glass","camera":"candid street-style cafe photo, 50mm lens, soft background blur","lighting":"cloudy daylight through glass, neutral tones, realistic skin highlights","caption":"quick coffee turned into a whole little reset"},
+    {"lane":"coffee shop","action":"leaning against a small cafe window counter, holding an iced coffee and giving the camera a soft almost-smile like someone just made a quiet joke","environment":"a narrow neighborhood coffee shop with mismatched two-top tables and a scratched wooden pickup counter in the foreground, handwritten menu board and pastry case in the midground, condensation on the front window with blurred street and foot traffic beyond","details":"iced coffee condensation ring on the counter in the foreground, receipt and straw wrapper beside the cup, tote bag hooked on the stool, silver spoon on the saucer, soft window reflection in the glass","camera":"candid street-style cafe photo, 50mm lens, soft background blur","lighting":"cloudy daylight through glass, neutral tones, realistic skin highlights","caption":"quick coffee turned into a whole little reset"},
     {"lane":"rainy street","action":"walking across a wet city sidewalk while looking back over her shoulder, one hand holding her coat closed","environment":"a rainy downtown street with glossy pavement, blurred headlights, muted storefronts, and a dark umbrella passing behind her","details":"tiny raindrops on her coat, reflective puddles, wind lifting a few strands of hair, soft bokeh lights","camera":"handheld street photo, 85mm lens, full-body candid, natural motion blur, not cinematic grading","lighting":"overcast blue-gray daylight with warm reflections from shop windows","caption":"rain always makes errands feel more dramatic"},
     {"lane":"rooftop sunset","action":"standing near a rooftop railing at sunset, turning slightly toward the camera with relaxed confidence","environment":"a city rooftop with low lounge furniture, concrete planters, skyline in the background, and warm sunset haze","details":"gold light along her hair, subtle wind movement, glass of sparkling water on a side table, skyline softly blurred","camera":"candid outdoor portrait, 70mm lens, medium shot, shallow depth of field, natural light","lighting":"golden-hour backlight, warm rim light, soft face fill","caption":"stayed for the light"},
     {"lane":"bookstore","action":"standing between tall bookstore shelves, holding one book open while her eyes lift toward the camera","environment":"an independent bookstore with warm lamps, narrow aisles, stacked novels, wood floors, and a small reading chair in the background","details":"paper texture, a receipt tucked into the book, soft dust in the light, one hand resting on the shelf","camera":"quiet cinematic portrait, 50mm lens, natural framing through shelves","lighting":"warm indoor lamp light with soft shadows","caption":"went in for one book and immediately lied to myself"},
     {"lane":"grocery run","action":"standing beside a small grocery cart, reaching for fresh flowers while glancing down with a half-smile","environment":"a bright neighborhood market with produce crates, eucalyptus bundles, handwritten price signs, and soft morning activity behind her","details":"green stems in her hand, canvas tote bag, oranges and lemons nearby, realistic aisle clutter","camera":"documentary lifestyle photo, 35mm lens, candid mid-shot","lighting":"clean natural store light mixed with daylight from front windows","caption":"flowers were not on the list but here we are"},
     {"lane":"car moment","action":"sitting in the passenger seat of a parked car, looking out the window with one hand near her cheek","environment":"foreground dashboard and worn console details, neutral leather interior in the midground, blurred city street through rain-specked windshield in the background","details":"seatbelt strap, faint reflection on the window, lip gloss catching light, phone cable near the console","camera":"intimate candid portrait, 50mm lens from driver-side angle","lighting":"soft overcast window light, muted tones","caption":"parked for five minutes and somehow reset my whole mood"},
     {"lane":"studio desk","action":"sitting at a cluttered-but-curated desk with a laptop open, chin resting lightly on one hand, looking focused but calm, like she framed this angle on purpose","environment":"a lived-in home workspace with a large monitor in the background, scattered notebooks and sticky notes around the frame, warm desk lamp in the foreground, wall of pinned inspiration softly blurred behind","details":"tangled cable at the desk edge, sticky notes with scrawled reminders, open notebook with crossed-out lines, iced coffee condensation ring on the desk surface, laptop screen glow on her face","camera":"modern creator workspace portrait, 35mm lens, medium composition","lighting":"late afternoon window light mixed with a warm desk lamp","caption":"pretending this is organized because the lamp is cute"},
-    {"lane":"night out","action":"standing near a bathroom mirror at a low-lit lounge, checking one earring while looking at her reflection","environment":"an upscale lounge restroom with dark marble, warm sconces, brushed brass fixtures, and a blurred doorway behind her","details":"mirror smudges, lipstick in one hand, soft highlights on jewelry, slight motion blur from the room behind her","camera":"flash-adjacent nightlife editorial photo, 35mm lens, mirror composition","lighting":"warm low light, soft mirror reflections, controlled highlights","caption":"one last mirror check"},
+    {"lane":"night out","action":"stepping out near the entrance of a low-lit lounge, pausing with one hand at her side and a calm unreadable look toward the camera like someone caught her on the way in","environment":"a real city-night venue entrance with dark painted walls, soft doorway spill light, a host stand or velvet rope nearby, and blurred people moving behind her","details":"small clutch or mini bag, subtle jewelry highlights, scuffed sidewalk, a posted menu or sign near the door, and nightlife imperfections that feel real not staged","camera":"flash-adjacent nightlife social photo, 35mm lens, candid friend-shot composition, no mirror","lighting":"warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain","caption":"caught me on the way in"},
+    {"lane":"dinner booth","action":"sitting in a restaurant booth with one elbow resting lightly on the table, holding a wine glass and looking calmly at the camera like the conversation just paused for a second","environment":"a busy evening bistro with dark booth seating, half-closed blinds, neon reflections in the window, and other diners blurred behind her","details":"water glass, dessert plate with a few bites left, folded napkin, menu corner, chair pattern, and subtle table clutter that feels used not staged","camera":"candid phone-camera dinner photo, 35mm lens feel, seated mid-shot from across the table","lighting":"warm restaurant practical lighting mixed with window reflections and slight low-light grain","caption":"the restaurant lighting was working harder than i was"},
+    {"lane":"wine bar patio","action":"standing beside a small patio table with one hand around a stemmed glass, looking over with a soft unreadable expression like someone said her name mid-thought","environment":"a narrow city wine bar patio with metal cafe chairs, candlelight on tables, passing headlights, and a softly crowded sidewalk beyond","details":"half-finished drink, small appetizer plate, receipt folder, candle wax marks on the table, nearby people blurred in the background","camera":"nighttime candid social photo, realistic phone flash or ambient-phone capture, natural seated-standing angle from a friend nearby","lighting":"warm patio practicals, low ambient city light, believable highlight rolloff on skin and glass","caption":"just one drink and then suddenly it was a whole night"},
+    {"lane":"brunch patio","action":"sitting at an outdoor brunch table with sunglasses pushed up in her hair, holding a coffee or mimosa while glancing toward the camera with a half-smile","environment":"a bright brunch patio with striped umbrellas, nearby tables, textured plates, and weekend foot traffic in soft blur behind her","details":"silverware on a folded napkin, glass water bottle, brunch plate in frame, phone face-down on the table, slight table clutter and sun patches","camera":"real social-feed brunch photo, natural friend-shot from the opposite side of the table, mid-shot with face and upper body clear","lighting":"soft daylight with mild shadow contrast, flattering but unretouched outdoor light","caption":"brunch is basically just daytime gossip with silverware"},
+    {"lane":"sidewalk dinner","action":"walking away from a restaurant table set on a city sidewalk, looking back over her shoulder with one hand holding a small bag and the other brushing her hair","environment":"a lively sidewalk dining block with candlelit two-top tables, parked cars, menu stands, and warm storefront spill lighting","details":"table numbers, glassware, scuffed pavement, diners nearby, a chair pulled out awkwardly, and small imperfect venue details","camera":"candid street-night photo from a friend a few steps behind her, 35mm lens feel, natural movement","lighting":"mixed storefront glow and city-night ambient light, realistic shadow falloff, slight motion softness","caption":"stepped outside for two seconds and somehow stayed out"},
+    {"lane":"lobby cocktail bar","action":"seated at a dark bar-height table, resting one hand under her jaw while the other loosely holds a cocktail glass, giving the camera a composed slightly amused look","environment":"a polished cocktail bar with low lamps, reflective dark wood, people moving in the background, and lived-in glassware on nearby tables","details":"coaster, cocktail napkin, menu tucked under one glass, ambient reflections, imperfect chair placement, subtle background patrons","camera":"low-light candid social portrait, friend-shot from across the small table, natural phone-camera framing","lighting":"warm bar light, controlled shadows, slight sensor grain, no polished ad finish","caption":"this looked more put together than the rest of my day"},
     {"lane":"skincare evening","action":"standing at a bathroom sink with a white towel around her shoulders, pressing moisturizer gently into one cheek","environment":"a calm apartment bathroom with frosted glass, a small plant, neutral stone counter, and warm mirror light","details":"dewy skin texture, tiny water droplets near the sink, open moisturizer jar, soft robe fabric","camera":"close-up beauty lifestyle portrait, 85mm lens, natural skin detail","lighting":"soft warm bathroom light, realistic highlights on skin","caption":"night routine doing the heavy lifting"},
     {"lane":"airport day","action":"walking through an airport terminal with a small suitcase, turning slightly as if someone called her name","environment":"a modern terminal with glass walls, polished floors, gate signs blurred in the background, and early morning travelers passing behind her","details":"passport wallet in hand, coffee cup in suitcase side pocket, moving walkway reflections, realistic travel fatigue","camera":"travel street-style photo, 35mm lens, full-body candid shot","lighting":"cool airport daylight mixed with overhead lighting","caption":"airport coffee counts as a personality trait"},
     {"lane":"gym cooldown","action":"sitting on a bench after a workout, tying her sneaker while looking down with a calm focused expression","environment":"a boutique fitness studio with worn rubber flooring, soft mirrors, towels stacked nearby, and sunlight from high windows","details":"slight flyaways, natural post-workout skin glow, water bottle on the floor, realistic fabric folds","camera":"candid wellness lifestyle photo, 50mm lens, low angle","lighting":"clean morning studio light, soft reflections in the mirror","caption":"the part where you just sit for a minute"},
     {"lane":"laundry day","action":"leaning against a washing machine in a quiet laundromat, folding a white tee and laughing to herself","environment":"a retro laundromat with laundry basket and folded clothes in the foreground, chrome machines in the midground, checker tile floor and fluorescent ceiling lights blurred toward the background window","details":"laundry basket, dryer glow, quarters on top of the machine, a paperback book nearby","camera":"cinematic slice-of-life photo, 35mm lens, natural candid framing","lighting":"mixed fluorescent and daylight, realistic color balance","caption":"romanticizing laundry because someone has to"},
     {"lane":"museum afternoon","action":"standing in front of a large abstract painting, arms loosely crossed, studying it with a thoughtful expression","environment":"a quiet modern art museum gallery with polished concrete floors, white walls, soft benches, and visitors blurred in the distance","details":"gallery card beside painting, soft footsteps implied, simple jewelry, calm posture","camera":"quiet handheld portrait, 50mm lens, natural museum composition, candid visitor feel","lighting":"soft museum track lighting, clean neutral tones","caption":"came for the quiet"},
-    {"lane":"late kitchen snack","action":"standing in the kitchen at night, eating a strawberry over the sink and smiling like she got caught","environment":"a dim apartment kitchen with one under-cabinet light on, dark window reflection, marble counter, and a half-open fridge glow","details":"bowl of strawberries, loose hair, bare shoulders under a cardigan, reflection in the window","camera":"intimate night lifestyle photo, 50mm lens, close candid framing","lighting":"warm kitchen practical light with soft fridge glow","caption":"standing over the sink counts as dinner sometimes"},
+    {"lane":"late kitchen snack","action":"standing in the kitchen at night, eating a strawberry over the sink and smiling like she got caught","environment":"a dim apartment kitchen with one under-cabinet light on, dark window reflection, marble counter, and a half-open fridge glow","details":"bowl of strawberries, loose hair, reflection in the window, one cabinet door slightly ajar","camera":"intimate night lifestyle photo, 50mm lens, close candid framing","lighting":"warm kitchen practical light with soft fridge glow","caption":"standing over the sink counts as dinner sometimes"},
     {"lane":"flower shop","action":"standing outside a flower shop holding a wrapped bouquet, looking down at the flowers with a soft smile","environment":"a small storefront with buckets of tulips and ranunculus, faded awning, old brick wall, and morning pedestrians blurred behind her","details":"brown paper bouquet wrap, ribbon ends, petals near the sidewalk, soft wind in her hair","camera":"candid street photo, 85mm lens, shallow background blur, natural morning light","lighting":"bright but soft morning light, gentle skin highlights","caption":"bought flowers for the apartment and maybe also for my mood"},
     {"lane":"record store","action":"flipping through vinyl records, pausing with one sleeve halfway pulled out and a curious look","environment":"a moody record shop with narrow aisles, posters on the wall, warm lamps, and stacks of albums around her","details":"fingertips on album sleeve, soft dust, vintage speakers in the background, tote bag on her shoulder","camera":"grainy candid phone photo, 35mm lens, natural side angle, warm store light","lighting":"warm low store lighting, subtle film-like grain","caption":"found three records and zero self-control"},
-    {"lane":"mirror outfit check","action":"taking a mirror outfit check in a softly lit bedroom, phone held low enough that her face is still visible","environment":"a clean but lived-in bedroom with a standing mirror, linen bedding, a chair with clothes draped over it, and late afternoon light on the floor","details":"slight mirror dust, jewelry tray, boots near the wall, realistic phone reflection","camera":"realistic mirror photo, natural proportions, full outfit visible, not overly posed","lighting":"late afternoon window light, soft warm tones","caption":"this was supposed to be the quick outfit check"},
+    {"lane":"mirror outfit check","action":"standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave","environment":"a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor","details":"jewelry tray, boots near the wall, soft mirror dust at the edge only, and ordinary apartment clutter that keeps it human","camera":"natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance","lighting":"late afternoon window light, soft warm tones","caption":"almost ready and somehow still late"},
     {"lane":"city bench","action":"sitting on a city bench with one leg crossed, holding a paper coffee cup and watching people pass","environment":"a tree-lined city block, coffee cup and tote strap in the foreground, worn city bench in the midground, brownstones and parked bikes softly blurred in the background","details":"wind moving her hair, coffee lid detail, tote bag beside her, small sun patches through leaves","camera":"street-style lifestyle portrait, 85mm lens, natural candid framing","lighting":"dappled late morning sunlight, soft shadows","caption":"five quiet minutes before the day started asking for things"},
-    {"lane":"elevator moment","action":"standing in an elevator, looking at the camera reflection with a calm unreadable expression","environment":"an elevator with phone and handrail in the foreground, brushed metal walls with smudged finger marks in the midground, warm overhead lights and scuffed mirrored panel in the background","details":"one hand holding a small bag, realistic metal reflections, slight motion blur from elevator movement","camera":"mirror-like editorial candid, 35mm lens, centered composition","lighting":"warm overhead elevator light softened by reflection","caption":"elevator lighting had one job and somehow did it"},
+    {"lane":"elevator moment","action":"standing just outside the elevator doors with one hand on a small bag, turning slightly toward the camera with a calm unreadable expression","environment":"a real corridor outside an elevator bank with brushed metal doors, scuffed floor trim, warm overhead lights, and ordinary wall texture","details":"small bag in one hand, elevator call button panel, imperfect corridor reflections, slight motion softness from the doors","camera":"candid hallway photo from a friend a few feet away, 35mm lens, no reflection gimmick","lighting":"warm overhead corridor light with realistic shadow falloff","caption":"the hallway was doing more than the elevator"},
 ]
+
+PRODUCTION_BLOCKED_LANES = {
+    "late kitchen snack",
+    "gym cooldown",
+    "studio desk",
+    "airport day",
+    "grocery run",
+    "apartment doorway",
+    "skincare evening",
+    "mirror outfit check",
+    "elevator moment",
+}
 
 
 SCENE_EVIDENCE_CONTRACTS: dict = {
@@ -1616,33 +2634,33 @@ def _hashtags(rng: random.Random, lane: str, count: int = 3) -> str:
 
 REFERENCE_MODE_POLICIES = {
     "face_detail": (
-        "Reference mode: close-up face detail. Preserve Lena's facial identity, skin tone, hairline, eye shape, brows, cheekbones, mouth shape, and natural skin texture from the uploaded close face reference. "
+        "Reference mode: close-up face detail. Preserve Lena's facial identity, skin tone, hairline, eye shape, brows, cheekbones, mouth shape, and natural skin texture from the current Lena character element. "
         "Prioritize facial realism, hair detail, skin detail, and expression consistency."
     ),
     "upper_body": (
-        "Reference mode: upper-body lifestyle. Preserve Lena's facial identity plus her upper-body proportions, shoulders, waistline, hands, posture, jewelry placement, and clothing fit from the uploaded reference imagery. "
+        "Reference mode: upper-body lifestyle. Preserve Lena's facial identity plus her upper-body proportions, shoulders, waistline, hands, posture, jewelry placement, and clothing fit from the current Lena character element. "
         "Use body proportions naturally without forcing a full-body pose."
     ),
     "full_body": (
         "Reference mode: full-body fashion/lifestyle. Preserve Lena's facial identity "
         "plus her full-body proportions, defined waist without shrinking her frame, "
         "visibly wider hips, fuller thighs, rounded lower-body silhouette, "
-        "long legs, hands, feet, posture, and clothing fit from the uploaded reference imagery. "
+        "long legs, hands, feet, posture, and clothing fit from the current Lena character element. "
         "Keep her athletic-curvy proportions consistent, attractive, realistic, "
         "fully clothed, and editorial. Do not slim her down."
     ),
     "video_body": (
-        "Reference mode: video continuity. Preserve Lena's facial identity, body proportions, posture, hands, legs, clothing fit, and silhouette from the uploaded reference imagery so the seed image can animate naturally. "
+        "Reference mode: video continuity. Preserve Lena's facial identity, body proportions, posture, hands, legs, clothing fit, and silhouette from the current Lena character element so the seed image can animate naturally. "
         "Prioritize stable identity, stable body proportions, believable posture, and subtle realistic movement."
     ),
 }
 
 
 REFERENCE_PRIORITY = {
-    "face_detail": ["close_up.jpeg", "lena_reference.jpeg", "body_ref.png"],
-    "upper_body": ["body_ref.png", "lena_reference.jpeg", "close_up.jpeg"],
-    "full_body": ["body_ref.png", "lena_reference.jpeg", "close_up.jpeg"],
-    "video_body": ["body_ref.png", "lena_reference.jpeg", "close_up.jpeg"],
+    "face_detail": ["kling_element_close_face", "kling_element_public_full_body", "kling_element_smile_upper_body"],
+    "upper_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_close_face"],
+    "full_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_relaxed_seated"],
+    "video_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_relaxed_seated"],
 }
 
 
@@ -1729,11 +2747,27 @@ def framing_policy_for_mode(mode: str) -> str:
 def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequence_index: int | None = None) -> Dict[str, Any]:
     rng = random.Random(_seed(date_str, slot_id, media_type, str(sequence_index or "")))
 
-    scene = rng.choice(PHOTO_SCENES)
-    outfit = rng.choice(OUTFITS)
-    camera_extra = rng.choice(CAMERA_EXTRAS)
+    validate_saved_prompt_sources()
+    production_scene_pool, scene_bank = get_production_scene_pool()
+    if not production_scene_pool:
+        raise SystemExit("[ABORT] No production-safe saved photo scenes remain.")
 
+    scene = choose_scene_production(production_scene_pool, rng)
+    environment_entry = choose_environment_production(scene, rng)
+    environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
     reference_mode = choose_reference_mode(media_type, scene)
+    wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+    wardrobe_override = format_catalog_wardrobe_override(wardrobe_entry)
+    negative_prompt = build_negative_prompt_for_catalog(wardrobe_entry)
+    negative_prompt = build_public_lane_negative_prompt(wardrobe_entry, scene["lane"], negative_prompt)
+    camera_extra = rng.choice(CAMERA_EXTRAS)
+    capture_logic = LANE_CAPTURE_LOGIC.get(
+        scene["lane"],
+        "Capture source: real handheld candid or clearly motivated phone-timer framing, never an impossible floating camera.",
+    )
+    capture_lock = public_capture_lock(scene["lane"])
+    wardrobe_continuity_lock = public_wardrobe_continuity_lock(wardrobe_entry, scene["lane"])
+
     reference_policy = reference_policy_for_mode(reference_mode)
     framing_policy = framing_policy_for_mode(reference_mode)
     body_descriptor = LENA_MASTER_IDENTITY
@@ -1741,12 +2775,19 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     image_prompt = (
         f"{IDENTITY_ANCHOR} {reference_policy} {body_descriptor} {framing_policy} "
         f"Scene: {scene['action']}. "
-        f"Wardrobe: she is wearing {outfit}. {PUBLIC_WARDROBE_RULE} "
-        f"Environment: {scene['environment']}. "
-        f"Small details: {scene['details']}. "
+        f"Wardrobe: {wardrobe_override} {PUBLIC_WARDROBE_RULE} {wardrobe_continuity_lock} "
+        "Do not substitute a different garment class, do not simplify the outfit into random basics, "
+        "and do not replace the specified look with loungewear or underwear-coded clothing. "
+        f"Environment: {environment_text}. "
+        f"Small details: {detail_text}. "
         f"Camera and composition: {scene['camera']}, {camera_extra}. "
+        f"{capture_logic} {capture_lock} "
         f"Lighting: {scene['lighting']}. "
         f"Face and skin: {SKIN_REALISM}. "
+        f"{PHOTO_REALISM} "
+        f"{EXPRESSION_REALISM} "
+        f"{PHONE_OBJECT_REALISM} "
+        f"{SOCIAL_HOOK_FLAVOR} "
         f"Hands: {HAND_REALISM}. "
         f"Keep her identity consistent, make the moment feel specific, lived-in, candid, and emotionally believable."
     )
@@ -1754,21 +2795,36 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     caption = _clean_public_text(scene["caption"])
     caption = f"{caption}\n\n{_hashtags(rng, scene['lane'], 3)}"
 
+    prompt_brain_version = "lena_prompt_brain_v1_8_saved_bank_lock"
+
     package = {
         "slot_id": slot_id,
         "media_type": media_type,
         "lane": scene["lane"],
+        "activity": scene["lane"],
+        "pose": scene["action"],
+        "visual_style": f"{scene['camera']}; {scene['lighting']}",
+        "style_category": wardrobe_entry.get("style_lane"),
+        "wardrobe_outfit_id": wardrobe_entry.get("outfit_id"),
+        "wardrobe_outfit_name": wardrobe_entry.get("name"),
+        "wardrobe_silhouette_class": catalog_outfit_silhouette_class(wardrobe_entry),
+        "environment_id": environment_entry.get("environment_id") if environment_entry else None,
+        "environment_name": environment_entry.get("name") if environment_entry else None,
+        "environment_production_lane": environment_entry.get("production_lane") if environment_entry else None,
         "reference_mode": reference_mode,
         "reference_priority": reference_priority_for_mode(reference_mode),
+        "scene_bank_version": scene_bank.get("version", "unknown"),
+        "scene_bank_source": scene_bank.get("source", str(PHOTO_SCENE_BANK_PATH)),
         "image_prompt": _clean_public_text(image_prompt),
         "prompt": _clean_public_text(image_prompt),
         "positive_prompt": _clean_public_text(image_prompt),
-        "negative_prompt": NEGATIVE_PROMPT,
+        "negative_prompt": negative_prompt,
         "caption": caption,
         "public_language_policy": {
             "never_mention_artificial_origin": True,
             "banned_terms": BANNED_PUBLIC_TERMS,
         },
+        "prompt_brain_version": prompt_brain_version,
     }
 
     if media_type == "video":
@@ -1781,7 +2837,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         package["seed_image_prompt"] = package["image_prompt"]
         package["video_prompt"] = _clean_public_text(video_prompt)
         package["motion_prompt"] = package["video_prompt"]
-        package["duration_seconds"] = 10
+        package["duration_seconds"] = 7
 
     _evidence = SCENE_EVIDENCE_CONTRACTS.get(scene["lane"], {})
     if _evidence:
@@ -1807,26 +2863,48 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     for key in ["prompt", "positive_prompt", "image_prompt", "negative_prompt", "caption"]:
         slot[key] = package[key]
 
+    slot["activity"] = package.get("activity")
+    slot["pose"] = package.get("pose")
+    slot["visual_style"] = package.get("visual_style")
+
     if media_type == "video":
         slot["seed_image_prompt"] = package["seed_image_prompt"]
         slot["video_prompt"] = package["video_prompt"]
         slot["motion_prompt"] = package["motion_prompt"]
-        slot["duration_seconds"] = 10
-        slot["max_video_seconds"] = 10
+        slot["duration_seconds"] = 7
+        slot["max_video_seconds"] = 7
 
     meta = slot.setdefault("metadata", {})
-    meta["prompt_brain_version"] = "lena_prompt_brain_v1_1"
+    meta["prompt_brain_version"] = package.get("prompt_brain_version", "lena_prompt_brain_v1_8_saved_bank_lock")
+    meta["activity"] = package.get("activity")
+    meta["pose"] = package.get("pose")
+    meta["visual_style"] = package.get("visual_style")
+    meta["style_category"] = package.get("style_category")
+    meta["wardrobe_outfit_id"] = package.get("wardrobe_outfit_id")
+    meta["wardrobe_outfit_name"] = package.get("wardrobe_outfit_name")
+    meta["wardrobe_silhouette_class"] = package.get("wardrobe_silhouette_class")
+    meta["environment_id"] = package.get("environment_id")
+    meta["environment_name"] = package.get("environment_name")
+    meta["environment_production_lane"] = package.get("environment_production_lane")
     meta["lane"] = package["lane"]
     meta["reference_mode"] = package.get("reference_mode")
     meta["reference_priority"] = package.get("reference_priority")
+    meta["scene_bank_version"] = package.get("scene_bank_version")
+    meta["scene_bank_source"] = package.get("scene_bank_source")
     meta["image_prompt"] = package["image_prompt"]
     meta["negative_prompt"] = package["negative_prompt"]
     meta["caption"] = package["caption"]
     meta["public_language_policy"] = package["public_language_policy"]
+    if media_type == "video":
+        meta["kling_route"] = "https://kling.ai/app/video/new"
+        meta["estimated_credits"] = int(os.environ.get("LENA_ESTIMATED_VIDEO_CREDITS", "25"))
+    else:
+        meta["kling_route"] = "https://kling.ai/app/image/new"
+        meta["estimated_credits"] = int(os.environ.get("LENA_ESTIMATED_PHOTO_CREDITS", "2"))
 
     if media_type == "video":
         meta["video_prompt"] = package["video_prompt"]
         meta["motion_prompt"] = package["motion_prompt"]
-        meta["duration_seconds"] = 10
+        meta["duration_seconds"] = 7
 
     return slot

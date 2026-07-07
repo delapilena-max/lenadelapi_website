@@ -14,16 +14,22 @@
     "ai_human_avatar_url": "https://kling.ai/app/ai-human/new",
     "image_engine": "kling_image_3.0",
     "video_engine": "kling_video_3.0",
+    "preferred_video_ui_model": "VIDEO 3.0 Turbo",
+    "preferred_video_model_name_candidate": "kling-v2-1-master",
+    "preferred_video_model_name_status": "live_validated_for_account_2026-07-01",
+    "fallback_video_model_name": "kling-v2-1-master",
+    "video_model_policy_path": "pipeline/config/kling_video_model_policy_v1.json",
     "motion_control_required_for_video": true,
     "resolution_required": "1080p",
     "fps_required": 30,
-    "max_video_seconds": 10
+    "max_video_seconds": 7
   },
   "daily_mix": {
-    "photos_per_day": 2,
-    "videos_per_day_max": 1,
+    "photos_per_day": 3,
+    "videos_per_day_max": 0,
     "no_extra_videos_if_photos_missing": true,
-    "videos_per_day": 1,
+    "videos_per_day": 0,
+    "video_generation_target_per_day": 0,
     "max_posts_per_day": 3
   },
   "speech": {
@@ -50,6 +56,10 @@
     "video_generation": {
       "url": "https://kling.ai/app/video/new",
       "engine": "kling_video_3.0",
+      "preferred_ui_model": "VIDEO 3.0 Turbo",
+      "model_name_candidate": "kling-v2-1-master",
+      "model_name_status": "live_validated_for_account_2026-07-01",
+      "fallback_model_name": "kling-v2-1-master",
       "required_for": [
         "video"
       ]
@@ -75,17 +85,21 @@
   "required_media_specs": {
     "image_engine": "kling_image_3.0",
     "video_engine": "kling_video_3.0",
+    "preferred_video_ui_model": "VIDEO 3.0 Turbo",
+    "preferred_video_model_name_candidate": "kling-v2-1-master",
+    "preferred_video_model_name_status": "live_validated_for_account_2026-07-01",
+    "fallback_video_model_name": "kling-v2-1-master",
     "video_resolution": "1080p",
     "video_fps": 30,
-    "max_video_duration_seconds": 10,
+    "max_video_duration_seconds": 7,
     "motion_control_required_for_video": true
   },
   "daily_autonomy": {
     "platforms": [
       "instagram"
     ],
-    "photos_per_day": 2,
-    "videos_per_day_max": 1,
+    "photos_per_day": 3,
+    "videos_per_day_max": 0,
     "max_posts_per_day": 3,
     "no_video_substitution_for_photos": true,
     "posting_window_local": {
@@ -93,10 +107,11 @@
       "start": "10:00",
       "end": "21:00"
     },
-    "video_frequency": "daily",
-    "max_posts_video_day": 3,
-    "max_posts_photo_only_day": 2,
-    "videos_per_day": 1
+    "video_frequency": "none",
+    "max_posts_video_day": 0,
+    "max_posts_photo_only_day": 3,
+    "videos_per_day": 0,
+    "video_generation_target_per_day": 0
   },
   "generation_contract": {
     "two_call_video_required": true,
@@ -136,18 +151,18 @@
         ]
       },
       {
-        "slot": "afternoon_video",
-        "media_type": "video",
-        "base_time": "14:12",
+        "slot": "midday_photo",
+        "media_type": "photo",
+        "base_time": "12:10",
         "jitter_minutes": [
-          4,
-          34
+          6,
+          26
         ]
       },
       {
         "slot": "evening_photo",
         "media_type": "photo",
-        "base_time": "19:25",
+        "base_time": "19:40",
         "jitter_minutes": [
           7,
           38
