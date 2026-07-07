@@ -4222,3 +4222,103 @@ No packet-builder code without separate explicit approval. No edits to
 render, no publish, no R2 upload, no `.env` edit, no secrets printed, no
 video API work, no studio-element use, no `business_media`/sales/outreach
 work, no broad repo cleanup.
+
+## 2026-07-07 (continued) — Publish packet builder -- Batches 1+2
+
+### Direction
+Following the read-only scoping pass for `90_content_packet` packet-builder
+code, approved to implement it in two small, explicitly-approved batches:
+Batch 1 (read-only resolver) first, then Batch 2 (Markdown packet writing)
+as a separate approval.
+
+### A. What changed
+1. **Batch 1 (`346d0006`) -- created `tools/lena_build_publish_packet_v1.py`,
+   read-only resolver.** Resolves a named `--date`/`--slot` against
+   `pipeline/kling_workorders/<date>/daily_workorders.json`, resolves and
+   existence-checks the rendered image path, resolves the QA path via
+   `pipeline/qa/lena_photo_qa.py`, runs `validate_qa_result()`, hard-fails
+   unless `overall == "pass"`, resolves optional debug/result-manifest
+   artifacts. Writes nothing. **Confirmed and deliberately avoided reusing
+   `tools/lena_review_proof_render_v1.py`'s `build_review_bundle()`**,
+   because it calls `lena_photo_qa.save_qa_template()`, which writes an
+   unreviewed QA scaffold file the first time a slot has no QA file
+   (`force=False` means "never overwrite," not "never write") -- correct for
+   a review helper, wrong for a resolver that must hard-fail with zero
+   writes. Validated: `py_compile` clean; positive case against the real
+   QA-passed `2026-07-07-03-photo` slot succeeded; two negative cases (a real
+   slot with no QA file at all, `2026-07-07-01-photo`; a real slot with QA
+   `overall: fail`, `2026-07-05-02-photo`) both aborted cleanly, zero files
+   written, exit 1.
+2. **Batch 2 (`ea139e69`) -- extended the same file with Markdown packet
+   assembly and non-clobber write logic.** Adds `build_caption_options()`
+   (deterministic, mechanical caption-option drafts grounded in the
+   workorder's own caption/lane/wardrobe/environment metadata -- explicitly
+   not creative copywriting, no generation call involved) and
+   `build_packet_markdown()` (the 10-section format from
+   `90_content_packet/OUTPUTS.md`: header with an explicit "does not approve
+   or publish anything" statement, image/scene/wardrobe/environment/task-id
+   details, QA summary including `publish_ready`/`publish_ready_reason`,
+   3-5 caption options each capped at 3 hashtags, soft CTA, optional Story
+   poll, optional pinned comment, platform notes, a fully unchecked operator
+   approval checklist, and closing notes). `write_packet()` writes to
+   `pipeline/publish_packets/lena/<date>/LENA_PUBLISH_PACKET_<slot_id>.md`,
+   non-clobber by default (aborts with `PacketWriteError` unless `--force`),
+   `--force` overwrites only that exact resolved file (explicit directory
+   guard). New CLI flags `--out-dir` and `--force`; **no `--live`,
+   `--approve`, or `--queue` flag added.** No queue-draft writing exists in
+   this batch. Validated: `py_compile` clean; a no-`--force` run against the
+   real existing hand-built packet path aborted cleanly, packet confirmed
+   untouched via mtime check; a `--out-dir scratch/
+   lena_packet_builder_validation` run succeeded, wrote one file, contents
+   inspected (all required elements present, matched the real precedent's
+   task id `903349357289414713`), then the entire scratch output directory
+   was deleted; `pipeline/queue/` confirmed untouched via mtime check across
+   both batches.
+
+### B. Files changed (committed)
+`tools/lena_build_publish_packet_v1.py` -- created read-only (`346d0006`),
+extended with Markdown writing (`ea139e69`).
+
+### C. Validations run
+`py_compile` on both commits. Real-artifact positive/negative resolver
+tests (QA-pass, missing-QA, failing-QA). Real non-clobber-abort test against
+the existing hand-built packet (confirmed untouched by mtime). Real write
+test to an isolated scratch directory (inspected, then deleted). `git
+status`/mtime checks confirming `pipeline/queue/` and the real publish
+packet were never modified. Exact-staged-set checks before each commit.
+Manual review of both cached diffs confirming no imports of
+`pipeline.posting_manager`, `tools.process_queue`,
+`pipeline.kling_apilena_api_executor`, `pipeline.env_loader`, `requests`, or
+`urllib` in either batch.
+
+### D. Decisions made
+- Split into two commits (resolver, then writer) matching the two explicitly
+  approved batches, rather than one combined commit.
+- Explicitly reject reusing `build_review_bundle()` once its
+  `save_qa_template()` side effect was confirmed, in favor of a
+  purpose-built read-only equivalent.
+- Keep caption-option generation purely mechanical/template-based (grounded
+  in real workorder metadata, no generation call) rather than attempting
+  creative copywriting in code.
+- Defer queue-draft writing (Batch 3) and `95_publish_gate/` to separate,
+  later, explicitly-approved steps.
+
+### E. Blockers / parked branches
+None new. `business_media`/`podcast_repurpose`, video API work, and the
+studio element remain untouched/paused per standing direction.
+
+### F. Next approved step
+Not yet decided. Batch 3 (`--queue-draft` JSON emission, to a clearly
+non-live path, `approved_for_live_publish` hardcoded `false`) remains
+optional and deferred, needing its own separate approval. A further,
+explicitly-approved Kling reliability check remains a separate, alternative
+track. `95_publish_gate/` remains deferred until packet/queue-draft behavior
+is settled.
+
+### G. What must not be done
+No queue-draft writing without separate explicit approval. No writes to
+`pipeline/queue/`. No `--live`/`--approve`/`--queue` flag added without
+separate explicit approval and design review. No Kling call, no render, no
+publish, no R2 upload, no `.env` edit, no secrets printed, no video API
+work, no studio-element use, no `business_media`/sales/outreach work, no
+broad repo cleanup.

@@ -136,6 +136,44 @@
 > code, Kling call, render, publish, R2 upload, or `.env` edit occurred in
 > this checkpoint.
 
+> ## ✅ `90_content_packet/` FIRST REAL TOOL BUILT, TWO BATCHES (2026-07-07, commits `346d0006` + `ea139e69`)
+> **`90_content_packet/` now has its first real tool:
+> `tools/lena_build_publish_packet_v1.py`.** Resolves a named `--date`/`--slot`,
+> requires the rendered image to exist on disk, requires an existing QA
+> verdict, runs `lena_photo_qa.validate_qa_result()`, and hard-fails unless
+> `overall == "pass"` — no packet is ever built ahead of a real QA pass
+> (`90_content_packet/RULES.md` Rule zero).
+>
+> **Batch 1 (`346d0006`): read-only resolver.** Wrote nothing. Deliberately
+> does not reuse `tools/lena_review_proof_render_v1.py`'s
+> `build_review_bundle()`, because that function calls
+> `lena_photo_qa.save_qa_template()`, which **does write** an unreviewed QA
+> scaffold the first time a slot has no QA file — a correct side effect for a
+> review helper, wrong for a resolver that must hard-fail with zero writes.
+>
+> **Batch 2 (`ea139e69`): Markdown packet writing only.** Writes to
+> `pipeline/publish_packets/lena/<date>/LENA_PUBLISH_PACKET_<slot_id>.md`.
+> **Non-clobber default** — aborts unless `--force` is passed; `--force`
+> overwrites only that exact resolved file, never a directory. **Still does
+> not write a queue draft, still does not write to `pipeline/queue/`, still
+> has no `--live`, `--approve`, or `--queue` flag** — no code path in the
+> tool can call Kling, render, publish, upload to R2, or read/edit `.env`; no
+> imports of `posting_manager`, `process_queue`, the Kling executor, any
+> publisher/API module, `requests`, or `urllib`. Validated against the real
+> QA-passed `2026-07-07-03-photo` slot (positive case), two real
+> missing/failing-QA slots (clean aborts, zero writes), a real non-clobber
+> abort against the existing hand-built packet (untouched), and a temporary
+> `--out-dir scratch/` write that was inspected then deleted.
+>
+> `pipeline/publish_packets/lena/` and `pipeline/queue/` remain untracked,
+> pre-existing artifact directories — not staged, not committed, not touched
+> by either batch.
+>
+> **Batch 3 (`--queue-draft` JSON emission) remains optional/deferred,
+> needs separate explicit approval.** `95_publish_gate/` remains deferred
+> until the packet/queue-draft behavior is settled. Video API work, the
+> studio element, and `business_media`/sales/outreach remain out of scope.
+
 > ## ✅ FIRST LIVE INSTAGRAM PUBLISH SUCCEEDED (2026-07-07) — read this before assuming publish is still blocked
 > Nicolas manually fixed the Meta/Instagram access token (external, outside
 > this session). Token/account check then passed (username

@@ -58,6 +58,27 @@
 > ("90_content_packet slice checkpoint") and the matching banner in
 > `NEXT_SESSION_START.md`.
 
+> **`90_content_packet/` FIRST REAL TOOL, TWO BATCHES (2026-07-07, commits
+> `346d0006` + `ea139e69`):** `tools/lena_build_publish_packet_v1.py` now
+> exists -- resolves a named date/slot, requires an existing rendered image
+> and an existing, internally-consistent QA verdict, hard-fails unless
+> `overall == "pass"`. **Batch 1** (`346d0006`) is a read-only resolver, wrote
+> nothing; deliberately avoids `tools/lena_review_proof_render_v1.py`'s
+> `build_review_bundle()` because it can write a QA scaffold as a side
+> effect. **Batch 2** (`ea139e69`) adds Markdown publish-packet writing only,
+> to `pipeline/publish_packets/lena/<date>/LENA_PUBLISH_PACKET_<slot_id>.md`,
+> non-clobber by default (`--force` overwrites only the exact resolved file,
+> never a directory). **Still no queue-draft writing, no write access to
+> `pipeline/queue/`, no `--live`/`--approve`/`--queue` flag, no
+> Kling/publish/R2/`.env` code path, no publisher/API imports.** Validated
+> against real QA-pass/missing-QA/failing-QA slots and a real non-clobber
+> abort against the existing hand-built packet (untouched). Batch 3
+> (`--queue-draft`) remains optional/deferred, separate approval required.
+> `95_publish_gate/` remains deferred until packet/queue-draft behavior is
+> settled. Full detail: the §14 changelog entry dated 2026-07-07 ("Publish
+> packet builder -- Batches 1+2") and the matching banner in
+> `NEXT_SESSION_START.md`.
+
 > **ROOT CAUSE IDENTIFIED (2026-07-07) — AND SOLVED IN PRINCIPLE (2026-07-07,
 > same day, later):** the wrong-outfit / identity-drift / cartoon-style
 > failures are **conditioning-level, not prompt-level.** The current executor
