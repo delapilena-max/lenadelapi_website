@@ -1,97 +1,177 @@
 {
   "version": "v1",
   "source": "lena_prompt_brain_expression_gaze_layer_2026-07-07",
-  "notes": "Performance-only expression/gaze/head-pose combos. Deliberately does NOT touch face shape, eye color, ethnicity, age, hair identity, or freckle density -- identity comes from IDENTITY_ANCHOR/LENA_MASTER_IDENTITY/SKIN_REALISM elsewhere in the prompt. Each entry composes into exactly one short prompt line via format_expression_gaze_line().",
+  "notes": "Performance-only expression/gaze/head-pose combos. Deliberately does NOT touch face shape, eye color, ethnicity, age, hair identity, or freckle density -- identity comes from IDENTITY_ANCHOR/LENA_MASTER_IDENTITY/SKIN_REALISM elsewhere in the prompt. Each entry composes into exactly one short prompt line via format_expression_gaze_line(). attitude_level (2026-07-08, Visual Hook / Allure Gate follow-up) added to every combo (neutral/moderate/high), read by _expression_attitude_weight() in lena_prompt_brain.py as an additive selection-weight bonus -- never a hard filter. exp_g003/exp_g005/exp_g011 (pre-existing) and 2 new combos (exp_g016, exp_g017) are tagged high; the rest are neutral/moderate, unchanged in content.",
   "combos": [
     {
       "expression_gaze_id": "exp_g001",
       "label": "closed_mouth_smile_direct",
       "text": "closed-mouth smile, soft direct eye contact, slight head tilt",
-      "compatibility_tags": ["calm_quiet", "candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "calm_quiet",
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "moderate"
     },
     {
       "expression_gaze_id": "exp_g002",
       "label": "soft_smile_three_quarter",
       "text": "soft smile, three-quarter glance past the camera, chin slightly raised",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g003",
       "label": "amused_smirk_off_camera",
       "text": "amused closed-mouth smirk, eyes glancing slightly off-camera, relaxed natural face",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "high"
     },
     {
       "expression_gaze_id": "exp_g004",
       "label": "laughing_mid_reaction",
       "text": "caught mid-laugh, head turned slightly, natural candid motion",
-      "compatibility_tags": ["candid_playful", "in_motion"]
+      "compatibility_tags": [
+        "candid_playful",
+        "in_motion"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g005",
       "label": "playful_side_eye",
       "text": "playful side-eye glance toward the camera, chin slightly tucked",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "high"
     },
     {
       "expression_gaze_id": "exp_g006",
       "label": "off_camera_thoughtful",
       "text": "looking slightly off-camera in thought, relaxed neutral face, not a model stare",
-      "compatibility_tags": ["calm_quiet"]
+      "compatibility_tags": [
+        "calm_quiet"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g007",
       "label": "phone_glance_shoulders_back",
       "text": "looking down at her phone, soft focused expression, shoulders turned with her face angled back toward the camera",
-      "compatibility_tags": ["candid_playful", "going_out_social", "in_motion"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social",
+        "in_motion"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g008",
       "label": "over_shoulder_mid_step",
       "text": "glancing back over one shoulder mid-step, natural candid motion",
-      "compatibility_tags": ["in_motion"]
+      "compatibility_tags": [
+        "in_motion"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g009",
       "label": "thoughtful_focused_past_camera",
       "text": "thoughtful focused expression, eyes looking past the camera, calm posture",
-      "compatibility_tags": ["calm_quiet"]
+      "compatibility_tags": [
+        "calm_quiet"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g010",
       "label": "candid_mid_sentence",
       "text": "candid mid-sentence look, mouth slightly open as if caught talking, natural unposed moment",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g011",
       "label": "playful_eyebrow_raise",
       "text": "playful eyebrow raise, slightly skeptical amused look, direct eye contact",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "high"
     },
     {
       "expression_gaze_id": "exp_g012",
       "label": "quiet_mirror_glance",
       "text": "quiet glance toward the camera, soft focused expression, chin slightly tucked",
-      "compatibility_tags": ["calm_quiet"]
+      "compatibility_tags": [
+        "calm_quiet"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g013",
       "label": "looking_down_at_object",
       "text": "looking down at an object in her hands, calm relaxed face, slight head tilt",
-      "compatibility_tags": ["calm_quiet", "candid_playful"]
+      "compatibility_tags": [
+        "calm_quiet",
+        "candid_playful"
+      ],
+      "attitude_level": "neutral"
     },
     {
       "expression_gaze_id": "exp_g014",
       "label": "relaxed_neutral_direct",
       "text": "relaxed neutral expression, direct eye contact, natural unforced look",
-      "compatibility_tags": ["calm_quiet", "candid_playful", "going_out_social", "in_motion"]
+      "compatibility_tags": [
+        "calm_quiet",
+        "candid_playful",
+        "going_out_social",
+        "in_motion"
+      ],
+      "attitude_level": "moderate"
     },
     {
       "expression_gaze_id": "exp_g015",
       "label": "eyes_toward_someone_off_frame",
       "text": "eyes drifting toward someone just out of frame, soft amused smile, relaxed shoulders",
-      "compatibility_tags": ["candid_playful", "going_out_social"]
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "moderate"
+    },
+    {
+      "expression_gaze_id": "exp_g016",
+      "label": "confident_direct_gaze_smirk",
+      "text": "confident direct gaze at the camera, the faintest hint of a smirk",
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "high"
+    },
+    {
+      "expression_gaze_id": "exp_g017",
+      "label": "chin_down_eyes_up_composed",
+      "text": "chin tipped slightly down, eyes up, composed confident expression",
+      "compatibility_tags": [
+        "candid_playful",
+        "going_out_social"
+      ],
+      "attitude_level": "high"
     }
   ]
 }

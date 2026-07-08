@@ -1789,6 +1789,19 @@ def _recent_expression_gaze_ids(
     return set(seen[-lookback_slots:]) if seen else set()
 
 
+# Visual Hook / Allure Gate (2026-07-08, pose/expression attitude follow-up):
+# every expression/gaze combo now carries an attitude_level field
+# (neutral/moderate/high). This is an additive weight bonus only, same
+# pattern as _body_visibility_hook_weight()/_environment_allure_weight()
+# added in the wardrobe/environment weighting patch -- it never excludes an
+# entry, it only shifts the odds within the already tag/lane-filtered pool.
+ATTITUDE_LEVEL_WEIGHT_BONUS = {"neutral": 0, "moderate": 2, "high": 4}
+
+
+def _expression_attitude_weight(entry: dict) -> int:
+    return 1 + ATTITUDE_LEVEL_WEIGHT_BONUS.get(str(entry.get("attitude_level") or "neutral"), 0)
+
+
 def choose_expression_gaze_production(
     rng: random.Random,
     lane: str | None = None,
@@ -1798,7 +1811,9 @@ def choose_expression_gaze_production(
     tag (so it never contradicts the scene's own action) and, when possible,
     avoids whatever expression_gaze_id was used on nearby recent slots. Falls
     back gracefully (recency filter relaxed, then tag filter relaxed) rather than
-    hard-failing production over cosmetic variety."""
+    hard-failing production over cosmetic variety. Weights toward higher
+    attitude_level entries additively (see _expression_attitude_weight) --
+    never hard-bans neutral entries."""
     bank = load_expression_gaze_bank()
     combos = [dict(c) for c in bank.get("combos", [])]
     if not combos:
@@ -1814,7 +1829,10 @@ def choose_expression_gaze_production(
     non_recent = [c for c in tag_filtered if c.get("expression_gaze_id") not in recent_used]
 
     pool = non_recent or tag_filtered
-    return rng.choice(pool)
+    weighted = []
+    for entry in pool:
+        weighted.extend([entry] * _expression_attitude_weight(entry))
+    return rng.choice(weighted or pool)
 
 
 def format_expression_gaze_line(entry: dict) -> str:
@@ -2145,6 +2163,15 @@ def _recent_pose_ids(
     return set(seen[-lookback_slots:]) if seen else set()
 
 
+# Visual Hook / Allure Gate (2026-07-08, pose/expression attitude follow-up):
+# every pose/body-language combo now carries an attitude_level field
+# (neutral/moderate/high), same additive-weight pattern as
+# _expression_attitude_weight() above -- never excludes an entry, only shifts
+# the odds within the already tag/mode/recency-filtered pool.
+def _pose_attitude_weight(entry: dict) -> int:
+    return 1 + ATTITUDE_LEVEL_WEIGHT_BONUS.get(str(entry.get("attitude_level") or "neutral"), 0)
+
+
 def choose_pose_body_language_production(
     rng: random.Random,
     lane: str | None = None,
@@ -2157,7 +2184,9 @@ def choose_pose_body_language_production(
     walking/seated full-body pose for a face_detail close crop). Falls back
     gracefully (recency relaxed, then reference_mode relaxed, then tag relaxed)
     rather than hard-failing production over cosmetic variety -- same pattern
-    as choose_expression_gaze_production()."""
+    as choose_expression_gaze_production(). Weights toward higher
+    attitude_level entries additively (see _pose_attitude_weight) -- never
+    hard-bans neutral entries."""
     bank = load_pose_body_language_bank()
     combos = [dict(c) for c in bank.get("combos", [])]
     if not combos:
@@ -2178,7 +2207,10 @@ def choose_pose_body_language_production(
     non_recent = [c for c in mode_filtered if c.get("pose_body_language_id") not in recent_used]
 
     pool = non_recent or mode_filtered
-    return rng.choice(pool)
+    weighted = []
+    for entry in pool:
+        weighted.extend([entry] * _pose_attitude_weight(entry))
+    return rng.choice(weighted or pool)
 
 
 def format_pose_body_language_line(entry: dict) -> str:
