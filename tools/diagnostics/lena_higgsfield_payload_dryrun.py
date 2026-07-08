@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -45,6 +46,10 @@ from pipeline.prompting.lena_prompt_brain import (
     generate_higgsfield_prompt_package,
     HIGGSFIELD_FRAMING_LINE,
     HIGGSFIELD_CAMERA_CONFLICT_TERMS,
+    HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS,
+    HIGGSFIELD_POSE_REINFORCEMENT_LINE,
+    HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS,
+    HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE,
 )
 
 ACTIVE_PROVIDER = "higgsfield"
@@ -100,6 +105,16 @@ def _unset_or(value: Any) -> str:
     return str(value)
 
 
+def _extract_wardrobe_segment(prompt: str) -> str:
+    """Isolate the 'Wardrobe: ... Pose:' segment so the casual-term check below
+    matches the actual sanitizer's scope (wardrobe text only) instead of
+    false-flagging legitimate scene/environment words (e.g. 'lounge' as in
+    'rooftop lounge furniture') that happen to share a substring with a
+    wardrobe-casual block term."""
+    match = re.search(r"Wardrobe:\s*(.*?)\s*Pose:", prompt, flags=re.S)
+    return match.group(1) if match else ""
+
+
 def build_dryrun_summary(date_str: str, slot: dict) -> dict:
     metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
     expected_assets = slot.get("expected_assets") if isinstance(slot.get("expected_assets"), dict) else {}
@@ -138,6 +153,21 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
         term for term in HIGGSFIELD_CAMERA_CONFLICT_TERMS if term in _prompt_lower
     ]
     higgsfield_camera_conflict_free = not higgsfield_camera_conflict_terms_found
+    _wardrobe_segment_lower = _extract_wardrobe_segment(higgsfield_package["image_prompt"]).lower()
+    higgsfield_wardrobe_casual_terms_found = [
+        term for term in HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS if term in _wardrobe_segment_lower
+    ]
+    higgsfield_wardrobe_casual_free = not higgsfield_wardrobe_casual_terms_found
+    higgsfield_pose_reinforcement_present = (
+        HIGGSFIELD_POSE_REINFORCEMENT_LINE in higgsfield_package["image_prompt"]
+    )
+    higgsfield_scene_action_conflict_terms_found = [
+        term for term in HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS if term in _prompt_lower
+    ]
+    higgsfield_scene_action_conflict_free = not higgsfield_scene_action_conflict_terms_found
+    higgsfield_expression_reinforcement_present = (
+        HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE in higgsfield_package["image_prompt"]
+    )
 
     return {
         "date": date_str,
@@ -158,6 +188,12 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
         "higgsfield_soul_anchor_absent_from_prompt": higgsfield_soul_anchor_absent_from_prompt,
         "higgsfield_camera_conflict_free": higgsfield_camera_conflict_free,
         "higgsfield_camera_conflict_terms_found": higgsfield_camera_conflict_terms_found,
+        "higgsfield_wardrobe_casual_free": higgsfield_wardrobe_casual_free,
+        "higgsfield_wardrobe_casual_terms_found": higgsfield_wardrobe_casual_terms_found,
+        "higgsfield_pose_reinforcement_present": higgsfield_pose_reinforcement_present,
+        "higgsfield_scene_action_conflict_free": higgsfield_scene_action_conflict_free,
+        "higgsfield_scene_action_conflict_terms_found": higgsfield_scene_action_conflict_terms_found,
+        "higgsfield_expression_reinforcement_present": higgsfield_expression_reinforcement_present,
         "higgsfield_soul_name": higgsfield_package["soul_name"],
         "higgsfield_soul_version": higgsfield_package["soul_version"],
         "higgsfield_soul_selection_mode": higgsfield_package["soul_selection_mode"],
@@ -209,6 +245,14 @@ def print_summary(summary: dict) -> None:
     print(f"  camera text free of full-body-conflicting crop language : {summary['higgsfield_camera_conflict_free']}")
     if summary["higgsfield_camera_conflict_terms_found"]:
         print(f"    conflicting terms found: {summary['higgsfield_camera_conflict_terms_found']}")
+    print(f"  wardrobe text free of casual/shape-hiding terms : {summary['higgsfield_wardrobe_casual_free']}")
+    if summary["higgsfield_wardrobe_casual_terms_found"]:
+        print(f"    casual terms found: {summary['higgsfield_wardrobe_casual_terms_found']}")
+    print(f"  hip-forward pose reinforcement line present : {summary['higgsfield_pose_reinforcement_present']}")
+    print(f"  final prompt free of scene/action/expression conflict terms : {summary['higgsfield_scene_action_conflict_free']}")
+    if summary["higgsfield_scene_action_conflict_terms_found"]:
+        print(f"    conflict terms found: {summary['higgsfield_scene_action_conflict_terms_found']}")
+    print(f"  direct-gaze/confident expression reinforcement present : {summary['higgsfield_expression_reinforcement_present']}")
     print(f"  Soul anchor text absent from prompt : {summary['higgsfield_soul_anchor_absent_from_prompt']}")
     print(f"  Soul selection is metadata/provider config, not prompt text:")
     print(f"    soul_name            : {summary['higgsfield_soul_name']}")

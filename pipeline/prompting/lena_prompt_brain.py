@@ -3481,6 +3481,195 @@ def _higgsfield_safe_camera_text(camera_text: str) -> str:
     return camera_text
 
 
+# Corrective patch (2026-07-08, same day): a real manual Higgsfield test on a
+# builder-selected "bodysuit + relaxed straight jeans + coat" street lane came
+# back low-hook -- hips hidden, low sex appeal, dated/casual styling. The
+# underlying catalog entry/scene text is fine for Kling's variety goals, but
+# Higgsfield-forward Lena needs a much harder bias toward sexy-but-platform-
+# safe fitted/hip-hugging glam silhouettes and away from casual/shape-hiding
+# wardrobe by default. Two mechanisms, both wardrobe-text-only (does not touch
+# the catalog or scene bank):
+#   1. If the drawn wardrobe text contains a casual/shape-hiding term, replace
+#      it wholesale with one of two safe high-hook fallback silhouettes.
+#   2. Otherwise, append a short fitted/hip-hugging qualifier so every
+#      Higgsfield wardrobe line -- fallback or pass-through -- reads as a
+#      deliberately sexy, hip-hugging silhouette, not just "not casual."
+# Expanded 2026-07-08 (evidence-audit follow-up): the audit's 10-sample scan
+# found "wide-leg straight-cut jeans" and "high-waist straight jeans" passing
+# through unflagged -- only the two exact compound phrases below ("relaxed
+# straight jeans", "medium-wash straight jeans") were previously covered, not
+# these other real catalog phrasing variants.
+HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS = (
+    "relaxed straight jeans", "medium-wash straight jeans", "coat closed",
+    "holding her coat closed", "oversized coat", "baggy denim", "loose jeans",
+    "hoodie", "pullover", "fleece", "lounge", "socks", "barefoot",
+    "straight-cut jeans", "straight jeans", "wide-leg straight-cut jeans",
+    "high-waist straight jeans", "wide-leg jeans",
+)
+
+HIGGSFIELD_SAFE_WARDROBE_FALLBACKS = (
+    "fitted black ruched mini dress with a sculpted waist, hip-hugging side "
+    "seams, subtle gold jewelry, and pointed heels",
+    "sleek fitted corset mini dress, fitted through the waist and hips, "
+    "subtle jewelry, and pointed heels",
+)
+
+HIGGSFIELD_WARDROBE_GLAM_SUFFIX = (
+    ", fitted through the waist and hips for a hip-hugging silhouette"
+)
+
+# The exact duplicate-prone phrase inside the suffix above -- one of the two
+# fallback silhouettes (the corset variant) already contains this phrase
+# verbatim, so it must never be appended a second time.
+HIGGSFIELD_WARDROBE_GLAM_SUFFIX_PHRASE = "fitted through the waist and hips"
+
+HIGGSFIELD_WARDROBE_HIP_HUGGING_ONLY_SUFFIX = ", hip-hugging silhouette"
+
+# Manual Higgsfield finding (2026-07-08, same corrective patch): a fixed,
+# always-on hip-forward pose reinforcement line reads more reliably on
+# Higgsfield than leaving pose entirely to the (Kling-tuned) pose bank's
+# per-combo text. Deliberately literal and short, not a paraphrase of any
+# bank combo.
+HIGGSFIELD_POSE_REINFORCEMENT_LINE = (
+    "three-quarter stance with one hip pushed outward, feet slightly apart, "
+    "one knee softly bent, hand placed on the outside hip"
+)
+
+
+def _higgsfield_wardrobe_conflicts_with_hook(wardrobe_text: str) -> bool:
+    lower = str(wardrobe_text or "").lower()
+    return any(term in lower for term in HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS)
+
+
+def _higgsfield_safe_wardrobe_text(wardrobe_text: str, rng: random.Random) -> str:
+    if _higgsfield_wardrobe_conflicts_with_hook(wardrobe_text):
+        base = rng.choice(HIGGSFIELD_SAFE_WARDROBE_FALLBACKS)
+    else:
+        base = wardrobe_text
+    lower_base = base.lower()
+    has_fitted = "fitted" in lower_base
+    has_hip_hugging = "hip-hugging" in lower_base
+    if has_fitted and has_hip_hugging:
+        return base
+    # The corset fallback already contains the exact phrase "fitted through
+    # the waist and hips" (has_fitted True) but not the literal word
+    # "hip-hugging" -- appending the full HIGGSFIELD_WARDROBE_GLAM_SUFFIX in
+    # that case would duplicate that exact phrase. Add only the missing
+    # "hip-hugging" concept instead (2026-07-08 duplicate-phrase fix).
+    if HIGGSFIELD_WARDROBE_GLAM_SUFFIX_PHRASE.lower() in lower_base and not has_hip_hugging:
+        return f"{base}{HIGGSFIELD_WARDROBE_HIP_HUGGING_ONLY_SUFFIX}"
+    return f"{base}{HIGGSFIELD_WARDROBE_GLAM_SUFFIX}"
+
+
+# Bug found during manual-test sample review (2026-07-08, later same day): the
+# scene bank's own "action" field (written for Kling, where a plain candid
+# moment like "pouring coffee" or "walking across" is normal) can directly
+# contradict the forced Higgsfield glam wardrobe/pose above -- e.g. "standing
+# barefoot ... pouring coffee" fighting a fitted mini dress and pointed heels,
+# or "walking across ... one hand holding her coat closed" fighting a
+# three-quarter hip-pushed-outward stance. Two-layer sanitizer, scene-action-
+# text-only (does not touch the scene bank itself): first apply a small set of
+# whole-sentence rewrites for the specific compound phrases seen in manual
+# testing (rewrite, not delete, so the scene keeps a real described moment),
+# then a term-level fallback rewrite for any of the same conflict terms that
+# slip through on their own (e.g. inside a different scene's action text).
+HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS = (
+    "one hand holding her coat closed",
+    "holding her coat closed",
+    "coat closed",
+    "standing barefoot",
+    "barefoot",
+    "walking across",
+    "mid-step",
+    "pouring coffee",
+    "glancing back over one shoulder",
+    "looking back over her shoulder",
+    # Added 2026-07-08 (later same day): a fresh sample review found
+    # "glancing toward the window like she is still waking up" surviving in
+    # the morning-apartment lane, fighting the forced "direct eye contact"
+    # expression reinforcement -- away-gaze scene fragments are the same
+    # class of conflict as the earlier over-the-shoulder phrases, just not
+    # covered by that term list.
+    "glancing toward the window",
+    "looking toward the window",
+    "looking away",
+    "glancing away",
+    "gazing away",
+    "turned away from the camera",
+)
+
+HIGGSFIELD_SCENE_ACTION_PHRASE_REWRITES = (
+    (
+        "walking across a wet city sidewalk while looking back over her "
+        "shoulder, one hand holding her coat closed",
+        "standing on a wet city sidewalk angled three-quarter toward the "
+        "camera, one hand resting on her outside hip",
+    ),
+    (
+        "standing barefoot in her kitchen while pouring coffee into a "
+        "ceramic mug",
+        "standing near her kitchen island before going out, a ceramic "
+        "coffee mug resting on the counter beside her",
+    ),
+    (
+        "glancing toward the window like she is still waking up",
+        "facing the camera with a faint waking-up smirk",
+    ),
+)
+
+HIGGSFIELD_SCENE_ACTION_TERM_REWRITES = (
+    ("one hand holding her coat closed", "one hand resting on her outside hip"),
+    ("holding her coat closed", "resting a hand on her outside hip"),
+    ("coat closed", "hand on her outside hip"),
+    ("standing barefoot", "standing in pointed heels"),
+    ("barefoot", "in pointed heels"),
+    ("walking across", "standing across"),
+    ("mid-step", "posed naturally"),
+    ("pouring coffee", "with a coffee mug nearby"),
+    ("glancing back over one shoulder", "confident direct gaze with a faint smirk"),
+    ("looking back over her shoulder", "with a confident direct gaze"),
+    ("glancing toward the window", "facing the camera"),
+    ("looking toward the window", "facing the camera"),
+    ("looking away", "facing the camera"),
+    ("glancing away", "facing the camera"),
+    ("gazing away", "facing the camera"),
+    ("turned away from the camera", "facing the camera"),
+)
+
+
+def _higgsfield_sanitize_scene_action(scene_action: str) -> str:
+    text = str(scene_action or "")
+    for phrase, replacement in HIGGSFIELD_SCENE_ACTION_PHRASE_REWRITES:
+        text = re.sub(re.escape(phrase), replacement, text, flags=re.IGNORECASE)
+    for term, replacement in HIGGSFIELD_SCENE_ACTION_TERM_REWRITES:
+        text = re.sub(re.escape(term), replacement, text, flags=re.IGNORECASE)
+    return text
+
+
+# Manual Higgsfield finding (2026-07-08, same corrective patch): expression/
+# gaze text drawn from the (Kling-tuned) expression bank can itself conflict
+# with the forced glam pose -- e.g. "glancing back over one shoulder mid-step"
+# fighting a confident three-quarter hip-forward stance. Same fixed-line
+# pattern already used for HIGGSFIELD_POSE_REINFORCEMENT_LINE: always used,
+# not conditional, not a paraphrase of any one bank combo.
+HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE = (
+    "faint smirk, relaxed eyes, composed confident look, direct eye contact"
+)
+
+# Reversed 2026-07-08 (Nicolas direction change, same day): an earlier version
+# of this patch added a separate, heavier "Silhouette:" prompt block (explicit
+# hip-flare/fuller-thighs/waist-to-hip-contrast/"not narrow"/"not slim-hipped"
+# body-geometry language). Nicolas reviewed real Higgsfield/Soul 2.0
+# photo-dump output and found the current Soul character already reads
+# attractive and high-hook -- the heavier block risked overcorrecting into
+# exaggerated body language, not fixing a confirmed problem. Removed
+# entirely. The only silhouette cue that remains is the existing soft,
+# wardrobe-embedded qualifier in HIGGSFIELD_WARDROBE_GLAM_SUFFIX below
+# ("fitted through the waist and hips for a hip-hugging silhouette") --
+# fitted/feminine/natural waist definition, not a separate body-geometry
+# reinforcement paragraph.
+
+
 HIGGSFIELD_PROMPT_BRAIN_VERSION = "lena_prompt_brain_higgsfield_native_v1"
 
 
@@ -3491,8 +3680,16 @@ def generate_higgsfield_prompt_package(
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
     Lena's identity/body. Soul selection is recorded as package metadata
     (soul_name/soul_version/soul_selection_mode) only, never as prompt text.
-    See module-level comment above for the full rationale. Does not touch or
-    call any Kling executor code."""
+    Wardrobe text is sanitized to a fitted/hip-hugging high-hook silhouette
+    (see _higgsfield_safe_wardrobe_text) -- this is the only silhouette cue,
+    deliberately soft/wardrobe-embedded, not a separate body-geometry
+    reinforcement block; pose and expression text are fixed reinforcement
+    lines (HIGGSFIELD_POSE_REINFORCEMENT_LINE,
+    HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE), not the raw pose/expression
+    bank text; scene-action text is sanitized against known Higgsfield-glam
+    conflicts (see _higgsfield_sanitize_scene_action). See module-level
+    comment above for the full rationale. Does not touch or call any Kling
+    executor code."""
     rng = random.Random(
         _seed(date_str, slot_id, media_type, str(sequence_index or ""), "higgsfield")
     )
@@ -3513,9 +3710,11 @@ def generate_higgsfield_prompt_package(
     )
 
     wardrobe_text = _clean_sentence_fragment(str(wardrobe_entry.get("prompt", "")))
-    pose_text = _clean_sentence_fragment(str(pose_body_language_entry.get("text", "")))
-    expression_text = _clean_sentence_fragment(str(expression_gaze_entry.get("text", "")))
+    wardrobe_text = _higgsfield_safe_wardrobe_text(wardrobe_text, rng)
+    pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
+    expression_text = HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
+    scene_action = _higgsfield_sanitize_scene_action(scene_action)
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
