@@ -1479,6 +1479,32 @@ def _public_sexy_bias_weight(entry: dict) -> int:
     return max(1, score)
 
 
+# Visual Hook / Allure Gate (2026-07-08, minimal additive pass): the wardrobe
+# catalog's own body_visibility/coverage_level/style_lane fields already exist
+# on every entry but were never read by selection -- only style_lane's
+# allowlist/blocklist role and risk_tags/status were consulted. This adds a
+# small additive weight bonus using that already-authored data, universally
+# across every lane (not just PUBLIC_SOCIAL_LANES, unlike
+# _public_sexy_bias_weight above). Weights against, never hard-bans --
+# existing safety filters (rejected/high_risk status, blocked risk tags,
+# blocked terms) remain the only exclusion mechanism; this function can only
+# shift the odds within the already-safe candidate pool.
+def _body_visibility_hook_weight(entry: dict) -> int:
+    weight = 0
+    body_visibility = entry.get("body_visibility")
+    if body_visibility == "full_body":
+        weight += 3
+    elif body_visibility == "three_quarter":
+        weight += 2
+    elif body_visibility == "waist_to_head":
+        weight -= 2
+    if entry.get("coverage_level") == "partial":
+        weight += 2
+    if entry.get("style_lane") in {"going_out", "street"}:
+        weight += 1
+    return weight
+
+
 LANE_SCENE_FIT_ALLOWLIST: dict[str, set[str]] = {
     "morning apartment": {"apartment_morning"},
     "late kitchen snack": {"apartment_morning", "skincare_evening"},
@@ -1575,6 +1601,10 @@ def pick_catalog_outfit_production(lane: str, reference_mode: str = "upper_body"
             weight = _public_sexy_bias_weight(entry)
         elif str(entry.get("production_lane") or "").strip() in preferred_production_lanes:
             weight += 2
+        # Visual Hook / Allure Gate (2026-07-08): additive, applies to every
+        # lane, never zeroes out a candidate -- floored at 1 below.
+        weight += _body_visibility_hook_weight(entry)
+        weight = max(1, weight)
         safe_pool.extend([entry] * weight)
 
     if not safe_pool:
@@ -1836,6 +1866,30 @@ def _clean_sentence_fragment(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip(" .,;:")
 
 
+# Visual Hook / Allure Gate (2026-07-08, minimal additive pass): every
+# environment catalog entry already carries a rich, hand-authored "mood"
+# field (e.g. "city night energy, main character, going-out social"), but
+# choose_environment_production() never read it -- selection was a flat,
+# unweighted rng.choice() over the lane-allowed pool. This adds an additive
+# weight bonus for moods matching allure/confidence/going-out language,
+# mirroring the same weighted-pool pattern choose_scene_production() already
+# uses for social_priority_lanes. Nightlife/rooftop/lounge/patio moods are
+# explicitly INCLUDED in the keyword list (weighted toward, not away from) --
+# per doctrine, nightlife/social settings are not risky, they are a strong
+# allure signal.
+ENVIRONMENT_ALLURE_MOOD_KEYWORDS = (
+    "main character", "confident", "going-out", "going out", "glam",
+    "editorial", "body as hero", "outfit as hero", "fashion", "rooftop",
+    "city-night", "city night", "lounge", "date-night", "date night", "patio",
+)
+
+
+def _environment_allure_weight(entry: dict) -> int:
+    mood = str(entry.get("mood") or "").lower()
+    hits = sum(1 for keyword in ENVIRONMENT_ALLURE_MOOD_KEYWORDS if keyword in mood)
+    return 1 + min(hits, 3) * 2
+
+
 def choose_environment_production(scene: dict, rng: random.Random) -> dict | None:
     catalog = load_environment_catalog()
     lane = str(scene.get("lane") or "").strip().lower()
@@ -1852,7 +1906,10 @@ def choose_environment_production(scene: dict, rng: random.Random) -> dict | Non
         raise SystemExit(
             f"[ABORT] No active environment catalog candidates remain for scene lane '{lane}'."
         )
-    return dict(rng.choice(pool))
+    weighted = []
+    for entry in pool:
+        weighted.extend([entry] * _environment_allure_weight(entry))
+    return dict(rng.choice(weighted or pool))
 
 
 def build_environment_prompt_parts(scene: dict, env_entry: dict | None) -> tuple[str, str]:
