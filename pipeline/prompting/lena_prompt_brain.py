@@ -3462,6 +3462,10 @@ HIGGSFIELD_FRAMING_LINE = (
 HIGGSFIELD_CAMERA_CONFLICT_TERMS = (
     "waist-up", "waist up", "chest-up", "chest up", "close-up", "close up",
     "tight crop", "medium shot", "cropped body", "portrait crop",
+    # Added 2026-07-08 (photo-dump pack review, same day): the brunch-patio
+    # scene's own camera text said "mid-shot with face and upper body clear"
+    # -- a direct contradiction of the full-body/head-to-shoes framing line.
+    "mid-shot", "upper body clear",
 )
 
 HIGGSFIELD_SAFE_CAMERA_TEXT = (
@@ -3596,6 +3600,24 @@ HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS = (
     "glancing away",
     "gazing away",
     "turned away from the camera",
+    # Added 2026-07-08 (photo-dump high-hook patch, same day): a real photo-
+    # dump pack sample surfaced "seated at a dark bar-height table" and
+    # "walking away from a restaurant table" -- both hard-conflict with the
+    # forced full-body/three-quarter standing pose (HIGGSFIELD_FRAMING_LINE +
+    # HIGGSFIELD_POSE_REINFORCEMENT_LINE). Deliberately narrow -- this does
+    # not ban seated/walking scenes broadly, only these two verified
+    # conflicting fragments; ordinary editorial action (leaning, holding a
+    # glass, etc.) is untouched.
+    "seated at",
+    "walking away from",
+    # Added 2026-07-08 (photo-dump pose-scene-match patch, same day): the
+    # photo-dump pack's forced standing pose variants directly contradict
+    # "sitting at"/"sitting in" scene text (verified: brunch-patio's
+    # "sitting at an outdoor brunch table", car-moment's "sitting in the
+    # passenger seat", dinner-booth's "sitting in a restaurant booth" --
+    # all real, previously-generated scene text, not guessed).
+    "sitting at",
+    "sitting in",
 )
 
 HIGGSFIELD_SCENE_ACTION_PHRASE_REWRITES = (
@@ -3614,6 +3636,26 @@ HIGGSFIELD_SCENE_ACTION_PHRASE_REWRITES = (
     (
         "glancing toward the window like she is still waking up",
         "facing the camera with a faint waking-up smirk",
+    ),
+    (
+        "seated at a dark bar-height table",
+        "standing beside a dark bar-height table",
+    ),
+    (
+        "walking away from a restaurant table",
+        "standing just outside a restaurant table",
+    ),
+    (
+        "sitting at an outdoor brunch table",
+        "standing beside an outdoor brunch table",
+    ),
+    (
+        "sitting in the passenger seat of a parked car",
+        "standing just outside a parked car",
+    ),
+    (
+        "sitting in a restaurant booth",
+        "standing beside a restaurant booth",
     ),
 )
 
@@ -3634,6 +3676,10 @@ HIGGSFIELD_SCENE_ACTION_TERM_REWRITES = (
     ("glancing away", "facing the camera"),
     ("gazing away", "facing the camera"),
     ("turned away from the camera", "facing the camera"),
+    ("seated at", "standing beside"),
+    ("walking away from", "standing just outside"),
+    ("sitting at", "standing beside"),
+    ("sitting in", "standing near"),
 )
 
 
@@ -3752,6 +3798,11 @@ def generate_higgsfield_prompt_package(
         "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
         "expression_gaze_label": expression_gaze_entry.get("label"),
         "reference_mode": reference_mode,
+        # The final, already-sanitized scene-action text (post
+        # _higgsfield_sanitize_scene_action) -- exposed so callers like
+        # generate_higgsfield_photo_dump_pack() can make scene-aware
+        # decisions (e.g. pose selection) without re-parsing image_prompt.
+        "scene_action": scene_action,
         "image_prompt": image_prompt,
         "prompt": image_prompt,
         "positive_prompt": image_prompt,
@@ -3763,6 +3814,375 @@ def generate_higgsfield_prompt_package(
             "banned_terms": BANNED_PUBLIC_TERMS,
         },
         "prompt_brain_version": HIGGSFIELD_PROMPT_BRAIN_VERSION,
+    }
+
+
+# Photo-dump pack builder (2026-07-08). Additive only -- does not change
+# generate_higgsfield_prompt_package() or any of its sanitizer behavior above
+# (wardrobe casual-block/fallback, scene-action conflict rewrite, fixed
+# pose/expression reinforcement lines, camera-conflict fix, Soul-as-metadata-
+# only). Every image in a pack is built by calling that same function once
+# per index, varied by slot_id and sequence_index -- no new identity/body/
+# hip reinforcement layer is added here, per Nicolas's explicit direction
+# against further body-overcorrection work.
+#
+# Soft-variety only, never a hard failure: if a lane or wardrobe-silhouette
+# class would exceed its soft cap, a small number of deterministic retries
+# (shifting sequence_index only, never slot_id, so image identity stays
+# stable across reruns) are attempted; if variety still can't be achieved
+# within that budget, the image is accepted anyway and a warning is recorded
+# in the pack's "variety_warnings" list -- the pack is always returned.
+HIGGSFIELD_PHOTO_DUMP_MIN_COUNT = 8
+HIGGSFIELD_PHOTO_DUMP_MAX_COUNT = 12
+HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT = 10
+HIGGSFIELD_PHOTO_DUMP_MAX_RETRIES_PER_IMAGE = 5
+HIGGSFIELD_PHOTO_DUMP_LANE_CAP_RATIO = 0.3
+HIGGSFIELD_PHOTO_DUMP_SILHOUETTE_CAP_RATIO = 0.4
+
+# High-hook filter (2026-07-08, corrective patch, same day): a real generated
+# pack sample surfaced a "flipping through vinyl records" record-store image
+# -- technically sanitizer-clean (no casual-wardrobe/scene-action-conflict
+# terms) but low-hook lifestyle filler, not the "famous social-media model"
+# energy Lena's photo-dump packs need. Builder-side only -- does not touch
+# the scene or wardrobe banks, and does not change
+# generate_higgsfield_prompt_package() itself. Every candidate image's final
+# assembled prompt is checked for low-hook terms (reject/retry) and at least
+# one hook term (reject/retry if none found), on top of the existing lane/
+# silhouette variety caps, all sharing the same small retry budget.
+#
+# Evidence-based additions beyond Nicolas's minimum list: "record shop" (the
+# actual environment-catalog wording generated for that lane was "a moody
+# record shop", not "record store") -- added because it was directly observed
+# in the flagged sample, not guessed.
+HIGGSFIELD_PHOTO_DUMP_LOW_HOOK_TERMS = (
+    "record store",
+    "record shop",
+    "vinyl records",
+    "flipping through vinyl",
+    "record sleeve",
+    "bookstore",
+    "grocery",
+    "laundromat",
+    "running errands",
+    "pouring coffee",
+    "doing dishes",
+    "folding laundry",
+    "sweatpants",
+    "hoodie",
+    "fleece",
+    "socks",
+    "barefoot",
+)
+
+# Corrected 2026-07-08 (later same day, evidence-based): the first version of
+# this hook-terms list included "main-character"/"IT-girl"/"scroll-stopping",
+# but HIGGSFIELD_MOOD_HOOK ("confident, main-character, IT-girl energy,
+# scroll-stopping feed hook") is unconditionally present in every prompt this
+# builder assembles -- those three terms (plus "feed hook") were trivially
+# satisfied on every candidate regardless of actual scene/wardrobe content,
+# making the hook-pass check pass-by-default. Split into two lists: the
+# always-on mood terms (tracked separately, reported, never counted toward a
+# pass) and the content-specific terms below, which must actually come from
+# scene/wardrobe/lane/camera text to count.
+HIGGSFIELD_PHOTO_DUMP_MOOD_ONLY_TERMS = (
+    "main-character",
+    "it-girl",
+    "scroll-stopping",
+    "feed hook",
+)
+
+HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS = (
+    "glam",
+    "night out",
+    "rooftop",
+    "hotel",
+    "lobby",
+    "elevator",
+    "mirror",
+    "fit-check",
+    "wine bar",
+    "cocktail bar",
+    "restaurant",
+    "date-night",
+    "luxury",
+    "parking garage",
+    "car",
+    "bodycon",
+    "mini dress",
+    "corset",
+    "heels",
+    "metallic",
+)
+
+# Pose-variety patch (2026-07-08, later same day): real photo-dump samples
+# showed the single-image builder's fixed HIGGSFIELD_POSE_REINFORCEMENT_LINE
+# ("hand placed on the outside hip") repeated verbatim across all 10 images,
+# both cloning the pack's feel and hard-conflicting with genuinely hooky
+# model/editorial actions the scene text already describes (holding a
+# cocktail glass, resting a hand under the jaw, holding a bag, brushing
+# hair). Per Nicolas's explicit direction: the single-image builder's pose
+# line stays untouched (still used as the base before this pack-level
+# substitution) -- only the photo-dump pack builder swaps it out.
+#
+# Corrected 2026-07-08 (same day, scene-match patch): the first version
+# picked a pose variant purely by image index, with no regard for the
+# scene it was being inserted into -- verified real mismatches: a brunch-
+# patio "sitting at" scene got a standing/stance pose line, and a sidewalk-
+# dinner scene (no mirror anywhere) got the mirror-fit-check pose. Fixed by
+# making selection scene-aware: the mirror pose is only ever used when the
+# scene text itself mentions a mirror/fit-check; car/table-adjacent poses
+# are only used for car/table-adjacent scenes (matched against the
+# sanitized scene_action text, not the whole prompt, so an incidental
+# background mention like "parked cars" in an unrelated scene's environment
+# text can't falsely trigger the car pose). Genuine variety is still
+# rotated within whichever category actually applies, deterministically by
+# image index; if a pack's scenes all land in one category, fewer distinct
+# poses are used and a warning is reported instead of forcing a mismatch.
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR = (
+    "mirror fit-check stance with one hip out, phone or hand near the "
+    "waist, full outfit visible from head to shoes"
+)
+
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_CAR = (
+    "standing beside the car angled toward the camera, one hip subtly "
+    "pushed outward, one hand near the door or holding a small bag, full "
+    "outfit visible"
+)
+
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_TABLE = (
+    "standing beside the table with one hip subtly pushed outward, one "
+    "hand resting near the table edge or holding a drink, body turned "
+    "toward the camera"
+)
+
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC = (
+    "front-facing three-quarter model stance with one hip pushed outward, "
+    "feet slightly apart, one knee softly bent, one hand on her outside hip",
+    "standing three-quarter toward the camera with one hip angled outward, "
+    "one hand lightly holding a drink or small bag, the other hand relaxed "
+    "near her waist",
+    "full-body fashion pose angled toward the camera, one knee softly bent, "
+    "one hand brushing her hair, shoulders relaxed, confident direct gaze",
+)
+
+# Full set, exposed for the diagnostic's "is this a known pose variant"
+# membership check -- not used directly for selection (see
+# _higgsfield_photo_dump_pose_for_scene below).
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS = (
+    (HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR,)
+    + (HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_CAR,)
+    + (HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_TABLE,)
+    + HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC
+)
+
+HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS = ("mirror", "fit-check", "fit check")
+HIGGSFIELD_PHOTO_DUMP_CAR_SCENE_KEYWORDS = ("car", "parking garage")
+HIGGSFIELD_PHOTO_DUMP_TABLE_SCENE_KEYWORDS = (
+    "table", "bar", "patio", "restaurant", "brunch", "booth",
+)
+
+
+def _higgsfield_photo_dump_pose_for_scene(scene_action: str, index: int) -> str:
+    """Scene-aware pose selection for one photo-dump image. Checked against
+    the sanitized scene_action text only (not the full prompt or camera/
+    environment text), so incidental background mentions elsewhere can't
+    falsely trigger a category. Falls back to a deterministic rotation of
+    generic full-body poses when no category matches."""
+    scene_lower = str(scene_action or "").lower()
+    if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS):
+        return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR
+    if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_CAR_SCENE_KEYWORDS):
+        return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_CAR
+    if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_TABLE_SCENE_KEYWORDS):
+        return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_TABLE
+    return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC[
+        index % len(HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC)
+    ]
+
+
+def generate_higgsfield_photo_dump_pack(
+    date_str: str, slot_prefix: str, count: int = HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT
+) -> Dict[str, Any]:
+    """Build a cohesive multi-image Higgsfield-native photo-dump pack.
+
+    Calls generate_higgsfield_prompt_package() once per image -- the single
+    source of truth for per-image sanitizer behavior is unchanged. count is
+    clamped to [HIGGSFIELD_PHOTO_DUMP_MIN_COUNT, HIGGSFIELD_PHOTO_DUMP_MAX_COUNT]
+    (8-12); values outside that range are silently clamped to the nearest
+    bound, not rejected, since this is a soft-variety planning tool, not a
+    hard-validated production contract. The pack applies soft lane/
+    wardrobe-silhouette-class caps (~30%/~40% of count respectively) AND a
+    high-hook filter (HIGGSFIELD_PHOTO_DUMP_LOW_HOOK_TERMS reject,
+    HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS require-at-least-one -- the always-on
+    HIGGSFIELD_PHOTO_DUMP_MOOD_ONLY_TERMS do NOT count toward this) with a
+    small shared deterministic retry budget per image; it never raises or
+    drops an image over variety/hook, only flags a warning if the budget is
+    exhausted without a clean result. After a candidate is accepted, its
+    fixed single-image pose line (HIGGSFIELD_POSE_REINFORCEMENT_LINE) is
+    swapped for a scene-aware variant (see
+    _higgsfield_photo_dump_pose_for_scene) -- mirror/car/table-adjacent
+    poses only apply when the sanitized scene_action text actually mentions
+    that setting; otherwise a deterministic rotation of generic full-body
+    poses is used. This is photo-dump-only; the single-image builder's own
+    pose behavior is untouched. Each returned image package also carries
+    photo_dump_low_hook_terms_found / photo_dump_hook_terms_found /
+    photo_dump_mood_hook_terms_found / photo_dump_hook_pass (all re-derived
+    against the final, pose-substituted prompt) / photo_dump_pose_variant /
+    photo_dump_pose_scene_match_pass / photo_dump_pose_scene_mismatch_terms_found
+    for reporting.
+    """
+    requested_count = count
+    count = max(HIGGSFIELD_PHOTO_DUMP_MIN_COUNT, min(HIGGSFIELD_PHOTO_DUMP_MAX_COUNT, count))
+
+    lane_cap = max(2, round(count * HIGGSFIELD_PHOTO_DUMP_LANE_CAP_RATIO))
+    silhouette_cap = max(3, round(count * HIGGSFIELD_PHOTO_DUMP_SILHOUETTE_CAP_RATIO))
+
+    lane_counts: Dict[str, int] = {}
+    silhouette_counts: Dict[str, int] = {}
+    pose_variant_counts: Dict[str, int] = {}
+    images: list[Dict[str, Any]] = []
+    variety_warnings: list[str] = []
+
+    for i in range(count):
+        slot_id = f"{slot_prefix}-{i:02d}-photo"
+        chosen_package = None
+        for attempt in range(HIGGSFIELD_PHOTO_DUMP_MAX_RETRIES_PER_IMAGE + 1):
+            candidate_seq = i if attempt == 0 else i + count * attempt
+            package = generate_higgsfield_prompt_package(
+                date_str, slot_id, "photo", sequence_index=candidate_seq
+            )
+            lane = package["lane"]
+            silhouette = package["wardrobe_silhouette_class"]
+            prompt_lower = package["image_prompt"].lower()
+
+            low_hook_terms_found = [
+                term for term in HIGGSFIELD_PHOTO_DUMP_LOW_HOOK_TERMS if term in prompt_lower
+            ]
+            # Content-specific only -- must come from actual scene/wardrobe/
+            # lane/camera text, not the always-on Mood line.
+            hook_terms_found = [
+                term for term in HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS if term in prompt_lower
+            ]
+            # Reported separately, never counted toward pass/fail.
+            mood_hook_terms_found = [
+                term for term in HIGGSFIELD_PHOTO_DUMP_MOOD_ONLY_TERMS if term in prompt_lower
+            ]
+            is_low_hook = bool(low_hook_terms_found)
+            has_no_hook = not hook_terms_found
+
+            lane_over_cap = lane_counts.get(lane, 0) + 1 > lane_cap
+            silhouette_over_cap = silhouette_counts.get(silhouette, 0) + 1 > silhouette_cap
+
+            reject = lane_over_cap or silhouette_over_cap or is_low_hook or has_no_hook
+            is_last_attempt = attempt == HIGGSFIELD_PHOTO_DUMP_MAX_RETRIES_PER_IMAGE
+
+            package["photo_dump_low_hook_terms_found"] = low_hook_terms_found
+            package["photo_dump_hook_terms_found"] = hook_terms_found
+            package["photo_dump_mood_hook_terms_found"] = mood_hook_terms_found
+            package["photo_dump_hook_pass"] = not is_low_hook and not has_no_hook
+
+            if not reject or is_last_attempt:
+                chosen_package = package
+                if is_last_attempt and reject:
+                    reasons = []
+                    if lane_over_cap or silhouette_over_cap:
+                        reasons.append(
+                            f"lane={lane!r}/wardrobe_silhouette_class={silhouette!r} "
+                            "exceeding soft cap"
+                        )
+                    if is_low_hook:
+                        reasons.append(f"low-hook terms found: {low_hook_terms_found}")
+                    if has_no_hook:
+                        reasons.append("no hook terms found")
+                    variety_warnings.append(
+                        f"image {i} (slot_id={slot_id}): accepted after "
+                        f"{HIGGSFIELD_PHOTO_DUMP_MAX_RETRIES_PER_IMAGE} retries despite "
+                        + "; ".join(reasons)
+                    )
+                break
+
+        # Photo-dump-only pose substitution: swap the single-image builder's
+        # fixed pose line for a scene-aware variant (see
+        # _higgsfield_photo_dump_pose_for_scene). The original
+        # pose_body_language_id/label metadata (from the pose bank draw) is
+        # left untouched for tracking; only the prompt text itself changes.
+        pose_variant = _higgsfield_photo_dump_pose_for_scene(
+            chosen_package.get("scene_action", ""), i
+        )
+        old_pose_line = f"Pose: {HIGGSFIELD_POSE_REINFORCEMENT_LINE}."
+        new_pose_line = f"Pose: {pose_variant}."
+        for text_key in ("image_prompt", "prompt", "positive_prompt"):
+            chosen_package[text_key] = chosen_package[text_key].replace(
+                old_pose_line, new_pose_line
+            )
+        chosen_package["photo_dump_pose_variant"] = pose_variant
+
+        # Re-derive the hook/low-hook/mood fields against the final,
+        # pose-substituted prompt text -- what gets reported must match what
+        # actually got accepted into the pack, not the pre-substitution draft.
+        final_lower = chosen_package["image_prompt"].lower()
+        chosen_package["photo_dump_low_hook_terms_found"] = [
+            term for term in HIGGSFIELD_PHOTO_DUMP_LOW_HOOK_TERMS if term in final_lower
+        ]
+        chosen_package["photo_dump_hook_terms_found"] = [
+            term for term in HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS if term in final_lower
+        ]
+        chosen_package["photo_dump_mood_hook_terms_found"] = [
+            term for term in HIGGSFIELD_PHOTO_DUMP_MOOD_ONLY_TERMS if term in final_lower
+        ]
+        chosen_package["photo_dump_hook_pass"] = (
+            not chosen_package["photo_dump_low_hook_terms_found"]
+            and bool(chosen_package["photo_dump_hook_terms_found"])
+        )
+
+        # Pose-scene match safety net: even though selection is now scene-
+        # aware by construction, this re-checks the final text directly so a
+        # gap in the sanitizer/keyword lists is reported, not silently
+        # shipped. Two known-bad combinations: (a) sitting/seated scene text
+        # next to standing/stance pose language, (b) the mirror-fit-check
+        # pose used when the scene itself never mentions a mirror/fit-check.
+        scene_lower = str(chosen_package.get("scene_action", "")).lower()
+        pose_scene_mismatch_reasons: list[str] = []
+        has_sitting_language = any(
+            term in final_lower for term in ("sitting at", "sitting in", "seated at")
+        )
+        has_standing_language = "standing" in final_lower or "stance" in final_lower
+        if has_sitting_language and has_standing_language:
+            pose_scene_mismatch_reasons.append(
+                "sitting/seated scene text combined with standing/stance pose language"
+            )
+        if (
+            pose_variant == HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR
+            and not any(
+                k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS
+            )
+        ):
+            pose_scene_mismatch_reasons.append(
+                "mirror fit-check pose used without mirror/fit-check in scene"
+            )
+        chosen_package["photo_dump_pose_scene_match_pass"] = not pose_scene_mismatch_reasons
+        chosen_package["photo_dump_pose_scene_mismatch_terms_found"] = pose_scene_mismatch_reasons
+
+        lane_counts[chosen_package["lane"]] = lane_counts.get(chosen_package["lane"], 0) + 1
+        silhouette_counts[chosen_package["wardrobe_silhouette_class"]] = (
+            silhouette_counts.get(chosen_package["wardrobe_silhouette_class"], 0) + 1
+        )
+        pose_variant_counts[pose_variant] = pose_variant_counts.get(pose_variant, 0) + 1
+        images.append(chosen_package)
+
+    return {
+        "date": date_str,
+        "slot_prefix": slot_prefix,
+        "requested_count": requested_count,
+        "count": count,
+        "count_clamped": requested_count != count,
+        "lane_cap": lane_cap,
+        "silhouette_cap": silhouette_cap,
+        "lane_distribution": lane_counts,
+        "wardrobe_silhouette_distribution": silhouette_counts,
+        "pose_variant_distribution": pose_variant_counts,
+        "variety_warnings": variety_warnings,
+        "images": images,
     }
 
 
