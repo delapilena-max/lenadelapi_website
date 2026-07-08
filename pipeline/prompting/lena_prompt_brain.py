@@ -3389,6 +3389,136 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     return package
 
 
+# --- Higgsfield-native prompt path (2026-07-08) -----------------------------
+#
+# Forward provider doctrine correction: Higgsfield is the active forward
+# visual/video generation provider for Lena; Kling is legacy/historical
+# infrastructure only (kept on disk for old workorders/receipts/assets, not
+# extended). generate_prompt_package() above stays completely unchanged --
+# it remains the real Kling-path builder for as long as any historical Kling
+# artifact needs it. This is a separate, additive builder for the Higgsfield
+# path, not a rewrite of the Kling one.
+#
+# Deliberately does NOT reuse generate_prompt_package()'s long identity/body/
+# skin/realism paragraphs (IDENTITY_ANCHOR, LENA_MASTER_IDENTITY,
+# REFERENCE_MODE_POLICIES, SKIN_REALISM, PHOTO_REALISM, EXPRESSION_REALISM,
+# HAND_REALISM, PHONE_OBJECT_REALISM) or the tiered NEGATIVE_PROMPT
+# machinery -- those exist specifically to fight Kling's weak reference-image
+# conditioning. Per the manual Higgsfield findings, Soul 2.0 owns Lena's
+# identity/body directly and applies no negative prompt by default, so this
+# builder keeps the prompt short and limits itself to wardrobe silhouette,
+# pose/body language, scene/environment, camera, lighting, and mood -- the
+# things a prompt should still control even with Soul handling identity.
+#
+# Reuses the same provider-agnostic scene/wardrobe/environment/pose/
+# expression selection functions the Kling path uses (choose_scene_production,
+# pick_catalog_outfit_production, choose_environment_production,
+# choose_pose_body_language_production, choose_expression_gaze_production) --
+# these already live outside any Kling-specific code and already bias toward
+# fitted/bodycon silhouettes (_public_sexy_bias_weight/_body_visibility_hook_weight)
+# and high-attitude hip-shift poses (_pose_attitude_weight) for the reasons
+# documented at each function's definition above. No new weighting mechanism
+# is added here.
+
+HIGGSFIELD_SOUL_ANCHOR = "Use my trained Soul 2.0 character Lena."
+
+HIGGSFIELD_MOOD_HOOK = (
+    "confident, main-character, IT-girl energy, scroll-stopping feed hook"
+)
+
+# Manual Higgsfield finding (2026-07-08): full-body/three-quarter framing
+# reads best on this provider. Always included, short, no per-mode branching --
+# unlike Kling's reference_mode system (face_detail/upper_body/full_body/
+# video_body), which exists to match Kling's own weak per-shot-type
+# conditioning. Deliberately not reusing framing_policy_for_mode()/
+# REFERENCE_MODE_POLICIES here: those are long identity/body paragraphs
+# scoped to Kling's needs, not a framing instruction.
+HIGGSFIELD_FRAMING_LINE = (
+    "Full-body three-quarter vertical 9:16 fashion photo, showing the "
+    "complete outfit from head to shoes with a little space below the shoes."
+)
+
+HIGGSFIELD_PROMPT_BRAIN_VERSION = "lena_prompt_brain_higgsfield_native_v1"
+
+
+def generate_higgsfield_prompt_package(
+    date_str: str, slot_id: str, media_type: str, sequence_index: int | None = None
+) -> Dict[str, Any]:
+    """Forward Higgsfield-native prompt builder. Short prompt, no negative
+    prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
+    Lena's identity/body. See module-level comment above for the full
+    rationale. Does not touch or call any Kling executor code."""
+    rng = random.Random(
+        _seed(date_str, slot_id, media_type, str(sequence_index or ""), "higgsfield")
+    )
+
+    validate_saved_prompt_sources()
+    production_scene_pool, scene_bank = get_production_scene_pool()
+    if not production_scene_pool:
+        raise SystemExit("[ABORT] No production-safe saved photo scenes remain.")
+
+    scene = choose_scene_production(production_scene_pool, rng)
+    environment_entry = choose_environment_production(scene, rng)
+    environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
+    reference_mode = choose_reference_mode(media_type, scene)
+    wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+    expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
+    pose_body_language_entry = choose_pose_body_language_production(
+        rng, lane=scene["lane"], reference_mode=reference_mode
+    )
+
+    wardrobe_text = _clean_sentence_fragment(str(wardrobe_entry.get("prompt", "")))
+    pose_text = _clean_sentence_fragment(str(pose_body_language_entry.get("text", "")))
+    expression_text = _clean_sentence_fragment(str(expression_gaze_entry.get("text", "")))
+    scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
+    camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
+    lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
+
+    image_prompt = _clean_public_text(
+        f"{HIGGSFIELD_SOUL_ANCHOR} "
+        f"{HIGGSFIELD_FRAMING_LINE} "
+        f"Scene: {scene_action}, {environment_text}. "
+        f"Wardrobe: {wardrobe_text}. "
+        f"Pose: {pose_text}. "
+        f"Expression: {expression_text}. "
+        f"Camera: {camera_text}. "
+        f"Lighting: {lighting_text}. "
+        f"Mood: {HIGGSFIELD_MOOD_HOOK}."
+    )
+
+    caption = _clean_public_text(scene["caption"])
+    caption = f"{caption}\n\n{_hashtags(rng, scene['lane'], 3)}"
+
+    return {
+        "slot_id": slot_id,
+        "media_type": media_type,
+        "provider": "higgsfield",
+        "lane": scene["lane"],
+        "activity": scene["lane"],
+        "wardrobe_outfit_id": wardrobe_entry.get("outfit_id"),
+        "wardrobe_outfit_name": wardrobe_entry.get("name"),
+        "wardrobe_silhouette_class": catalog_outfit_silhouette_class(wardrobe_entry),
+        "environment_id": environment_entry.get("environment_id") if environment_entry else None,
+        "environment_name": environment_entry.get("name") if environment_entry else None,
+        "pose_body_language_id": pose_body_language_entry.get("pose_body_language_id"),
+        "pose_body_language_label": pose_body_language_entry.get("label"),
+        "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
+        "expression_gaze_label": expression_gaze_entry.get("label"),
+        "reference_mode": reference_mode,
+        "image_prompt": image_prompt,
+        "prompt": image_prompt,
+        "positive_prompt": image_prompt,
+        "negative_prompt": "",
+        "negative_prompt_enabled": False,
+        "caption": caption,
+        "public_language_policy": {
+            "never_mention_artificial_origin": True,
+            "banned_terms": BANNED_PUBLIC_TERMS,
+        },
+        "prompt_brain_version": HIGGSFIELD_PROMPT_BRAIN_VERSION,
+    }
+
+
 def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) -> Dict[str, Any]:
     media_type = package["media_type"]
 
