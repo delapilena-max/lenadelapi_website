@@ -186,6 +186,31 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
     production_scoring = qa_result.get("production_scoring") or {}
     intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
 
+    # Contract fields required by instagram_queue_bridge._validate_contract() at
+    # actual live-publish time. Sourced only from the real workorder slot's own
+    # metadata -- never invented. A missing field here means the workorder itself
+    # is incomplete, which is a hard-fail, not something to paper over with a
+    # fabricated default (that would let a queue draft look valid while carrying
+    # wrong/placeholder contract data all the way to the live publish attempt).
+    avatar_nickname = metadata.get("avatar_nickname")
+    if not avatar_nickname:
+        raise ResolveError(
+            f"slot '{slot_id}' metadata is missing avatar_nickname -- refusing to "
+            "fabricate a value. Fix the workorder, don't patch the queue draft."
+        )
+    image_engine = metadata.get("image_engine")
+    if not image_engine:
+        raise ResolveError(
+            f"slot '{slot_id}' metadata is missing image_engine -- refusing to "
+            "fabricate a value. Fix the workorder, don't patch the queue draft."
+        )
+    image_prompt = metadata.get("image_prompt")
+    if not image_prompt:
+        raise ResolveError(
+            f"slot '{slot_id}' metadata is missing image_prompt -- refusing to "
+            "fabricate a value. Fix the workorder, don't patch the queue draft."
+        )
+
     return {
         "date": date_str,
         "slot_id": slot_id,
@@ -205,6 +230,9 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "activity": slot.get("activity") or metadata.get("activity"),
         "pose": slot.get("pose") or metadata.get("pose"),
         "reference_binding_mode": metadata.get("reference_binding_mode"),
+        "avatar_nickname": avatar_nickname,
+        "image_engine": image_engine,
+        "image_prompt": image_prompt,
         "debug_artifacts": debug_artifacts,
         "intended_packet_output_path": str(intended_packet_path),
         "intended_packet_output_already_exists": intended_packet_path.exists(),
@@ -473,6 +501,13 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
     an auto-selected one (RULES.md: never auto-select a caption)."""
     debug_artifacts = resolved.get("debug_artifacts") or {}
     metadata: Dict[str, Any] = {
+        # Contract fields required by instagram_queue_bridge._validate_contract()
+        # at live-publish time. resolve_packet_inputs() already hard-fails if any
+        # of these are missing from the real workorder slot, so they are always
+        # present here -- never a fabricated default.
+        "avatar_nickname": resolved["avatar_nickname"],
+        "image_engine": resolved["image_engine"],
+        "image_prompt": resolved["image_prompt"],
         "publish_packet_path": str(packet_output_path),
         "qa_path": resolved.get("qa_path"),
         "qa_overall": resolved.get("qa_overall"),
