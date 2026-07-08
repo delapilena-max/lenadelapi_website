@@ -4597,3 +4597,193 @@ review far beyond this session's scope. No writes to `pipeline/queue/`. No
 Kling call, no render, no publish, no R2 upload, no `.env` edit, no secrets
 printed, no video API work, no studio-element use, no
 `business_media`/sales/outreach work, no broad repo cleanup.
+
+---
+
+## 2026-07-07/08 — Frame-logic + expression/gaze layers committed; reliability render; compaction-budget redesign
+
+### A. What changed
+Six sequential pieces of work, in order:
+
+1. **Frame-logic layer** added to `pipeline/prompting/lena_prompt_brain.py`:
+   `Frame logic:` paragraph (frame_action, frame_evidence_objects,
+   frame_forbidden_objects, camera_intent, body_visibility_rule,
+   scene_coherence_note) inserted right after `Scene:` in every generated
+   prompt, sourced from new `pipeline/prompt_banks/lena/
+   lena_frame_logic_bank_v1.json` (26 lanes, covers the 17 active + 9
+   currently-blocked production lanes). Directly targets the gap that caused
+   the earlier `2026-07-05-01-photo` attempt-1 QA fail (wine-bar-patio and 4
+   other nightlife lanes had zero frame/evidence-contract data at all).
+2. **Executor floor for frame logic**: two reserved floors in
+   `_build_compact_prompt()` (`_FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_*` for
+   `Frame logic:`/`Avoid:`, `_FRAME_LOGIC_SUPPORT_FLOOR_*` for the remaining
+   sub-clauses) -- a real 200-slot pre-floor test showed the paragraph was
+   dropped in effectively every real slot without them.
+3. Both committed as `feat: add Lena frame logic prompt layer` (`b41495e6`),
+   via careful hunk-level staging (a HEAD-vs-working-tree reconstruction, not
+   `git add -p`) to exclude a pre-existing, separately-authored, still-
+   uncommitted "expression/gaze diversity layer" edit in the same file.
+4. **Expression/gaze layer** added the same way: `choose_expression_gaze_
+   production()` / `format_expression_gaze_line()`, new `lena_expression_
+   gaze_bank_v1.json` (15 combos), `LANE_EXPRESSION_TAG_ALLOWLIST` (26 lanes),
+   a real recency guard (`_recent_expression_gaze_ids()`, scans the last 5
+   dated `pipeline/kling_workorders/` folders / 6 slots on disk). Audited
+   read-only first: confirmed no identity-drift language in any of the 15
+   combos, confirmed the bank JSON existed on disk but was untracked. Its own
+   executor floor (`_EXPRESSION_GAZE_FLOOR_*`) added and validated the same
+   way (0/200 -> 200/200 survival). Committed as `feat: add Lena expression
+   gaze rotation` (`93abc27c`), same careful-staging technique.
+5. **Reliability render on the repaired `2026-07-05-01-photo` slot.**
+   Surgically refreshed only that slot's embedded entry in `daily_workorders.
+   json` (+ sidecar) to carry the new prompt -- confirmed via tracing
+   `_load_manifest()`/`_submit_photo()` that the executor reads exclusively
+   from `daily_workorders.json`'s embedded `slots[]`, never the standalone
+   sidecar file. Archived attempt 1's failed artifacts (seed PNG, debug dir,
+   QA json) to `*_attempt1_failed_alcohol_focal_body_drift.*` paths (moved,
+   not deleted) before running attempt 2. One real Kling render approved and
+   run: task `903633841376596038`, reference-by-URL, `kling-v3-omni` --
+   succeeded technically. QA verdict (schema v2): **`overall: fail`** on
+   `body_shape_continuity` only. Everything the new layers were built to fix
+   worked: alcohol non-focal (frame logic reframed the base scene's "glass in
+   hand" away from a raised/focal read), frame-logic evidence/forbidden
+   objects correctly reflected, expression natural and non-identity-breaking,
+   wardrobe/identity/environment/caption all pass. Per QA-fail rules: stopped,
+   no packet, no queue draft, no approval record, no publish. Attempt 2's
+   artifacts are NOT yet archived (deliberately left in place per explicit
+   instruction, pending a decision on attempt 3).
+6. **Body-shape continuity investigation (read-only)** found three
+   independent, unfixed contributing causes: (a) `build_reference_url_photo_
+   payload()` omits `negative_prompt` entirely from the payload (matching the
+   original successful live-test design) -- `BODY_ANATOMY_NEGATIVE_TERMS`
+   never reaches Kling on this path regardless of compaction; (b) the actual
+   reference image sent is `image_list[0]` from `_extract_live_element_urls()`,
+   which walks the APILENA element's registered resources in registration
+   order with no content-aware selection -- the one used for the attempt-2
+   render measured 2558x2560 (near-square, `resourceKey: "cover"`), and none
+   of the element's 4 registered resources are portrait/vertical-oriented like
+   a real full-body reference photo; (c) **the executor never reads
+   `reference_mode` or `reference_priority` at all** -- a whole-file grep
+   found zero matches -- so the prompt-brain's `REFERENCE_MODE_POLICIES`/
+   `REFERENCE_PRIORITY`/`reference_priority_for_mode()` machinery has no
+   effect on which reference image actually gets sent. None of these three
+   are patched.
+
+### B. Files changed
+- `pipeline/prompting/lena_prompt_brain.py` -- frame-logic layer, expression/
+  gaze layer (both committed).
+- `pipeline/prompt_banks/lena/lena_frame_logic_bank_v1.json`,
+  `lena_expression_gaze_bank_v1.json` -- both new, both committed.
+- `pipeline/kling_apilena_api_executor.py` -- frame-logic floor (committed in
+  `b41495e6`), expression floor (committed in `93abc27c`), a later attempted
+  20-char body-shape floor (implemented, tested, then explicitly reverted via
+  `git checkout`, never committed), and the compaction-budget redesign patch
+  described in the next entry (implemented, validated, **not yet committed**).
+- `pipeline/kling_workorders/2026-07-05/daily_workorders.json` +
+  `2026-07-05-01-photo.json` (sidecar) -- surgically refreshed, untracked
+  artifacts (never git-tracked either way).
+- `pipeline/kling_library/lena/2026-07-05/` and `pipeline/kling_debug/
+  apilena_api/2026-07-05/` and `pipeline/asset_review/lena/2026-07-05/` --
+  attempt-1 artifacts archived (moved, not deleted); attempt-2 artifacts
+  written, not yet archived.
+
+### C. Validations run
+`py_compile` on every patch. Real `_build_compact_prompt()` runs against the
+real `2026-07-05-01-photo` slot at every stage. Real 200-slot survival tests
+(not simulated) confirming marker survival before each commit and before/
+after each floor change. Direct image viewing + real schema-v2 QA scoring for
+the attempt-2 render. A whole-file grep confirming `reference_mode`/
+`reference_priority` are never read by the executor. Direct inspection of the
+real `live_apilena_lookup_response.json` debug artifact to get the actual
+registered-resource dimensions.
+
+### D. Decisions made
+- Careful hunk-level (not `git add -p`) staging to keep the frame-logic and
+  expression/gaze commits each isolated from the other, unrelated,
+  pre-existing uncommitted edit in the same file.
+- Reference-mode/negative-prompt/reference-image-selection findings from the
+  body-shape investigation are documented but explicitly NOT patched yet --
+  each flagged as needing its own separate approval, per explicit instruction
+  not to broaden scope past what was approved for a given task.
+- The first body-shape floor attempt (700 chars) was rejected after it broke
+  identity survival on a real slot; rather than silently picking a smaller
+  "safe-looking" number, a full sweep was run, which surfaced the pre-existing
+  ~21% identity-failure rate; the resulting 20-char no-op was explicitly
+  reported as a placeholder, not shipped as a feature, then reverted entirely.
+- The proper fix (a dedicated core identity/body-shape floor using existing
+  source sentences, not new executor-authored text) was simulated with a
+  standalone reimplementation of the floor algorithm before being approved and
+  implemented for real, to avoid another surprise regression.
+
+### E. Blockers / parked branches
+- The compaction-budget redesign patch is implemented and validated but
+  **uncommitted**, awaiting Nicolas's review of the validation report.
+- Attempt 2's render/debug/QA artifacts are not yet archived.
+- The three body-shape contributing-cause findings (negative-prompt omission,
+  reference-image selection, inert reference_mode) remain open and unfixed.
+- No attempt 3 is approved.
+
+### F. Next approved step
+Nicolas reviews the uncommitted executor redesign patch; if approved, commit
+it as its own change. Separately (own approval needed): archive attempt 2's
+artifacts before any attempt 3; decide whether/how to address the three
+body-shape contributing causes; decide whether to pursue attempt 3 at all
+before those are addressed, given body-shape drift may recur even with the
+compaction fix.
+
+### G. What must not be done
+No render, no publish, no queue/promotion, no approval record, no `.env`
+edit, no cleanup, no commit of the pending executor patch without explicit
+review. No archiving of attempt 2's artifacts without explicit approval. No
+further body-shape floor size changes without re-running the full 200-slot +
+real-target-slot validation described above.
+
+---
+
+## 2026-07-08 — First successful live Lena publish this session (checkpoint)
+
+### A. What changed
+No code changed in this entry -- this is a checkpoint recording a milestone
+already reached via prior approved steps. `2026-07-05-01-photo` published
+live to Instagram: permalink `https://www.instagram.com/p/Dag-lAQFFvj/`,
+media ID `18086313821391447`, published `2026-07-08T02:33:31+0000`, caption
+"one quick patio stop and suddenly it was a whole night" + `#softstyle
+#neutralstyle #outfitdetails`. QA schema-valid, `overall: pass`,
+`publish_ready: true`.
+
+### B. Files changed
+None (checkpoint only). Referenced artifacts: `pipeline/queue/published/
+2026-07-05-01-photo.json` + its `.receipt.json` (authoritative post-publish
+record); `pipeline/publish_packets/lena/2026-07-05/
+2026-07-05-01-photo_approval.json` (pre-publish signoff, deliberately left
+unrewritten, still reads `promotion_status: "not_yet_promoted"` by design).
+
+### C. Validations run
+None new -- this checkpoint follows the full validation chain already
+recorded in the 2026-07-07/08 entry above and the intervening session turns
+(local contract validation passed, real R2/Meta/Graph calls succeeded,
+receipt confirmed, no other queue item processed).
+
+### D. Decisions made
+Approval record is treated as an immutable pre-publish artifact and will
+never be rewritten to reflect post-publish outcomes; the queue's published
+receipt is the authoritative source of truth for what actually happened.
+Saved to Claude's cross-session memory as
+`feedback_approval_record_vs_receipt_doctrine.md`.
+
+### E. Blockers / parked branches
+None on this slot. Seven future tasks identified, none scoped or started:
+post-publish receipt-linking tool; pose/body-language rotation audit;
+camera-source realism audit; prop interaction rules audit; micro-story/
+moment-before-after layer; recent-repeat memory expansion
+(environment_id/camera_intent/reference_mode); reference-selection/body-
+conditioning investigation (negative-prompt omission, image_list[0]
+selection, inert reference_mode/reference_priority).
+
+### F. Next approved step
+None pending on this slot. Any of the 7 future tasks requires its own
+explicit approval before starting.
+
+### G. What must not be done
+Do not rewrite the approval record. Do not re-promote or republish this
+slot. Do not delete any archived failed-attempt artifact. Do not start any
+of the 7 future tasks without separate explicit approval.
