@@ -1,0 +1,47 @@
+{
+  "version": "v1.9.0",
+  "csv_path": "pipeline/monetization/lena/media_kit_metrics_v1_9.csv",
+  "profile_fields": {
+    "creator_name": "Lena Delapi",
+    "niche": "fitness, wellness, humor, lifestyle",
+    "positioning": "warm, playful, camera-roll realistic wellness/lifestyle creator",
+    "primary_platforms": [
+      "Instagram",
+      "TikTok",
+      "Facebook Reels",
+      "YouTube Shorts"
+    ],
+    "brand_tone": [
+      "warm",
+      "playful",
+      "confident",
+      "relatable",
+      "wellness-focused"
+    ],
+    "content_strengths": [
+      "short-form movement",
+      "outfit confidence",
+      "simple routines",
+      "humor/POV",
+      "daily lifestyle"
+    ],
+    "ai_disclosure": "Lena Delapi is an AI-generated virtual creator / digital fashion persona. Brand collaborations are reviewed and approved by the operator, and Lena should not be represented as a real human spokesperson."
+  },
+  "ai_disclosure_required": true,
+  "metrics_fields": [
+    "date",
+    "platform",
+    "followers",
+    "avg_reach",
+    "avg_views",
+    "avg_comments",
+    "avg_saves",
+    "avg_shares",
+    "avg_engagement_rate",
+    "top_series",
+    "top_post_url",
+    "notes"
+  ],
+  "rule": "Media kit claims must be based on logged metrics, not guesses.",
+  "ai_disclosure_rule": "profile_fields.ai_disclosure must be present and non-empty in every generated media kit brief. tools/lena_generate_media_kit_brief_v1_9.py hard-fails if it is missing. See pipeline/influencer_nodes/lena/disclosure_compliance_policy_v1_9.json (ai_virtual_creator_disclosure)."
+}

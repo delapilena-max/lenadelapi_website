@@ -1,0 +1,45 @@
+{
+  "version": "v1.9.0",
+  "basis": "Disclosure requirements should follow current platform rules and applicable advertising law. In the U.S., FTC influencer guidance emphasizes clear disclosure of a material relationship to a brand.",
+  "internal_rule": "Any paid, gifted, affiliate, commission, or brand-controlled post requires clear disclosure review before publishing.",
+  "acceptable_public_disclosures": [
+    "ad",
+    "sponsored",
+    "paid partnership",
+    "affiliate link",
+    "gifted"
+  ],
+  "blocked_practices": [
+    "hiding disclosures in a long hashtag block",
+    "using vague disclosures only",
+    "claiming independent recommendation when content is paid/controlled",
+    "claiming product experience if the product was not used or represented truthfully",
+    "making health/medical claims without substantiation"
+  ],
+  "manual_review_required": [
+    "health/wellness product claims",
+    "supplements",
+    "financial products",
+    "dating/adult products",
+    "regulated products",
+    "before/after claims",
+    "testimonials"
+  ],
+  "ai_virtual_creator_disclosure": {
+    "status": "required",
+    "added": "2026-07-08",
+    "scope_note": "Distinct from the paid-partnership disclosure fields above. Governs disclosure of Lena's fundamental nature as an AI-generated / virtual creator, not a real human -- a separate legal/ethical question from FTC material-relationship disclosure.",
+    "rule": "Lena must not be represented to users or brands as a real private human. A clear, durable AI/virtual-creator disclosure must be visible on every disclosure surface listed below at all times.",
+    "durable_disclosure_surfaces": [
+      "Instagram/profile bio",
+      "pinned intro post",
+      "website/about page",
+      "media kit",
+      "brand/sponsorship outreach materials",
+      "internal compliance docs"
+    ],
+    "relationship_to_banned_public_terms": "pipeline/prompting/lena_prompt_brain.py's BANNED_PUBLIC_TERMS and the equivalent rules in SKILL.md/persona.json govern ordinary in-character captions, replies, and content voice only. They must never be applied to, or used to justify omitting disclosure language from, any surface listed in durable_disclosure_surfaces above.",
+    "approved_disclosure_copy_reference": "pipeline/influencer_nodes/lena/ai_disclosure_copy_v1.md",
+    "implementation_status": "Doctrine and approved copy added 2026-07-08. No live bio/profile/website/media-kit update has been made yet -- this policy section and the referenced copy file are drafts pending manual application by the operator."
+  }
+}
