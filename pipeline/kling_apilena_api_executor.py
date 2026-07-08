@@ -244,22 +244,30 @@ GARMENT_OBEDIENCE_FLOOR_CHARS = 300
 # original order, and "Avoid:" sits after "Supporting objects"/"Camera intent"/"Body
 # visibility" in the source text).
 _FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_KEYWORDS = ("frame logic:", "avoid:")
-FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_CHARS = 450
+# Trimmed 450 -> 400 (2026-07-08 budget redesign): real measurement across 150 slots
+# showed this content maxes out at 367 chars (avg 257) -- 400 keeps 33 chars of
+# margin above the observed max while freeing 50 chars for the new core
+# identity/body-shape floor below. See that floor's comment for the full rationale.
+FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_CHARS = 400
 
-# Second, lower-priority floor for the remaining frame-logic clauses (supporting
-# objects, camera intent, body-visibility rule -- including its seated/table-
-# occlusion note when present -- and the closing coherence note). Applied after the
-# floor above so it only claims budget left over from the two hard-requirement
-# clauses first.
+# Second, lower-priority floor for the remaining frame-logic clauses. Narrowed
+# 2026-07-08 (budget redesign) to only the three always-present, load-bearing
+# clauses -- supporting objects, camera intent, body-visibility rule. The seated/
+# table-occlusion note and the closing "This should read as..." coherence note are
+# deliberately NOT floored here anymore: real measurement showed the three kept
+# clauses alone max out at 476 chars combined (180 + 107 + 189), while the two
+# dropped ones added up to 258 (occlusion note, present ~37% of slots) and 146
+# (coherence note, flavor text) of essentially unprotectable extra budget. Per
+# explicit instruction, lower-value frame-logic flavor must not be preserved at the
+# expense of identity/body-shape protection -- both now fall back to the normal
+# priority sweep like any other descriptive sentence, same as before frame-logic
+# floors existed at all.
 _FRAME_LOGIC_SUPPORT_FLOOR_KEYWORDS = (
     "supporting objects in frame:",
     "camera intent:",
     "body visibility:",
-    "this scene is seated or leaning at furniture",
-    "do not add any extra prop beyond that furniture",
-    "this should read as",
 )
-FRAME_LOGIC_SUPPORT_FLOOR_CHARS = 650
+FRAME_LOGIC_SUPPORT_FLOOR_CHARS = 500
 
 # Expression/gaze floor (2026-07-07): pipeline/prompting/lena_prompt_brain.py's
 # expression/gaze diversity layer inserts one short "Expression: ..." sentence
@@ -270,10 +278,32 @@ FRAME_LOGIC_SUPPORT_FLOOR_CHARS = 650
 # section. "expression:" is precise: verified to match only this one sentence type
 # (case-insensitive; the pre-existing EXPRESSION_REALISM constant's own text never
 # contains a bare "expression:" with a trailing colon). All 15 current bank entries
-# measure 74-125 chars; 180 gives comfortable margin for future entries without
-# reserving more budget than needed.
+# measure 74-125 chars; 150 (trimmed from 180 in the 2026-07-08 budget redesign)
+# still gives 25 chars of margin above the observed max without over-reserving.
 _EXPRESSION_GAZE_FLOOR_KEYWORDS = ("expression:",)
-EXPRESSION_GAZE_FLOOR_CHARS = 180
+EXPRESSION_GAZE_FLOOR_CHARS = 150
+
+# Core identity/body-shape contract floor (2026-07-08 budget redesign). A real
+# render on 2026-07-05-01-photo (attempt 2, post frame-logic/expression fixes)
+# still failed QA on body_shape_continuity. A read-only investigation found: (a)
+# identity/eye-color content had NO reserved floor at all, unlike every other
+# labeled section, and was already silently dropping in 13/61 sampled slots before
+# any of this redesign; (b) body-shape anti-slimming language had zero survival
+# (0/5 target sentences) under the pre-redesign floor set. This floor protects four
+# short EXISTING source-prompt sentences -- not new executor-authored text, per
+# explicit instruction and consistent with this function's own "source of truth is
+# slot['image_prompt']" principle -- covering: eye-color lock, recognizable-
+# likeness/identity, anti-slimming, and anti-overcorrection. Combined they measure
+# 429 chars; 450 gives small margin. Simulated and then validated at 200/200 marker
+# survival across a real 200-slot sample before this was implemented (see the
+# 2026-07-08 compaction-budget-audit report).
+_CORE_IDENTITY_BODY_FLOOR_KEYWORDS = (
+    "her eyes must stay deep dark brown",
+    "keep the same recognizable woman",
+    "do not slim her down",
+    "do not over-thicken her hips",
+)
+CORE_IDENTITY_BODY_FLOOR_CHARS = 450
 
 # Batch 7b (2026-07-06): the positive garment-obedience lock above has a reserved
 # floor and survives; a same-order reorder of these matching anti-substitution
@@ -456,6 +486,12 @@ def _build_compact_prompt(slot: Dict[str, Any]) -> str:
     # "Expression: ..." sentence survives -- it previously had no floor at all and
     # was measured dropped in effectively every real slot.
     _apply_reserved_floor(_EXPRESSION_GAZE_FLOOR_KEYWORDS, EXPRESSION_GAZE_FLOOR_CHARS)
+
+    # Reserved floor pass (Core identity/body-shape contract, 2026-07-08): guarantee
+    # the eye-color lock, recognizable-likeness, anti-slimming, and anti-
+    # overcorrection sentences survive -- confirmed to have zero reserved protection
+    # before this, unlike every other labeled prompt section.
+    _apply_reserved_floor(_CORE_IDENTITY_BODY_FLOOR_KEYWORDS, CORE_IDENTITY_BODY_FLOOR_CHARS)
 
     for group in _SAFETY_KEYWORD_PRIORITY:
         for idx, groups in enumerate(sentence_groups):
