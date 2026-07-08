@@ -129,6 +129,9 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
     higgsfield_package = generate_higgsfield_prompt_package(date_str, slot_id, media_type)
     higgsfield_prompt_length = len(higgsfield_package["image_prompt"])
     higgsfield_framing_present = HIGGSFIELD_FRAMING_LINE in higgsfield_package["image_prompt"]
+    higgsfield_soul_anchor_absent_from_prompt = (
+        "Use my trained Soul" not in higgsfield_package["image_prompt"]
+    )
 
     return {
         "date": date_str,
@@ -146,6 +149,10 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
         "higgsfield_native_negative_prompt_enabled": higgsfield_package["negative_prompt_enabled"],
         "higgsfield_native_framing_present": higgsfield_framing_present,
         "higgsfield_native_framing_line": HIGGSFIELD_FRAMING_LINE,
+        "higgsfield_soul_anchor_absent_from_prompt": higgsfield_soul_anchor_absent_from_prompt,
+        "higgsfield_soul_name": higgsfield_package["soul_name"],
+        "higgsfield_soul_version": higgsfield_package["soul_version"],
+        "higgsfield_soul_selection_mode": higgsfield_package["soul_selection_mode"],
         "metadata_image_engine": _unset_or(metadata.get("image_engine")),
         "metadata_seed_image_engine": _unset_or(metadata.get("seed_image_engine")),
         "intended_command_shape": intended_command,
@@ -154,9 +161,13 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
             ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "result_manifest.json"
         ),
         "identity_strategy": (
-            "Soul 2.0 owns Lena's identity/body directly (\"Use my trained Soul 2.0 "
-            "character Lena.\"); Kling element identity (KLING_LENA_ELEMENT_UI_ID) "
-            "does not transfer and is not used on this path."
+            "Soul 2.0 owns Lena's identity/body directly. Soul selection happens "
+            "via provider configuration / CLI / MCP job selection (soul_name/"
+            "soul_version/soul_selection_mode package metadata), never as prompt "
+            "text -- the prior literal \"Use my trained Soul 2.0 character Lena.\" "
+            "sentence has been removed from the assembled prompt. Kling element "
+            "identity (KLING_LENA_ELEMENT_UI_ID) does not transfer and is not used "
+            "on this path."
         ),
         "risk_flags": list(RISK_FLAGS),
     }
@@ -187,6 +198,11 @@ def print_summary(summary: dict) -> None:
     print(f"  negative prompt enabled   : {summary['higgsfield_native_negative_prompt_enabled']} (disabled by default)")
     print(f"  full-body/three-quarter framing instruction present : {summary['higgsfield_native_framing_present']}")
     print(f"    framing line: \"{summary['higgsfield_native_framing_line']}\"")
+    print(f"  Soul anchor text absent from prompt : {summary['higgsfield_soul_anchor_absent_from_prompt']}")
+    print(f"  Soul selection is metadata/provider config, not prompt text:")
+    print(f"    soul_name            : {summary['higgsfield_soul_name']}")
+    print(f"    soul_version         : {summary['higgsfield_soul_version']}")
+    print(f"    soul_selection_mode  : {summary['higgsfield_soul_selection_mode']}")
     print()
     print("existing metadata provider markers (not currently populated by any real code path):")
     print(f"  metadata.image_engine      : {summary['metadata_image_engine']}")

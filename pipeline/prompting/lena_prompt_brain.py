@@ -3419,8 +3419,20 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
 # and high-attitude hip-shift poses (_pose_attitude_weight) for the reasons
 # documented at each function's definition above. No new weighting mechanism
 # is added here.
+#
+# Correction (2026-07-08, same day): Soul selection is NOT natural-language
+# prompt content. Which Soul/character Higgsfield uses is a provider-config /
+# CLI / MCP job-selection decision (e.g. which Soul ID a job is submitted
+# against), not something to assert inside the prompt text itself. The prior
+# version of this builder prepended a literal "Use my trained Soul 2.0
+# character Lena." sentence to every prompt; that has been removed from the
+# assembled text. The Soul name/version are still recorded, but only as
+# package metadata (soul_name/soul_version/soul_selection_mode below), for a
+# future executor to read and act on outside the prompt string.
 
-HIGGSFIELD_SOUL_ANCHOR = "Use my trained Soul 2.0 character Lena."
+HIGGSFIELD_SOUL_NAME = "Lena"
+HIGGSFIELD_SOUL_VERSION = "Soul 2.0"
+HIGGSFIELD_SOUL_SELECTION_MODE = "provider_config_not_prompt_text"
 
 HIGGSFIELD_MOOD_HOOK = (
     "confident, main-character, IT-girl energy, scroll-stopping feed hook"
@@ -3446,8 +3458,10 @@ def generate_higgsfield_prompt_package(
 ) -> Dict[str, Any]:
     """Forward Higgsfield-native prompt builder. Short prompt, no negative
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
-    Lena's identity/body. See module-level comment above for the full
-    rationale. Does not touch or call any Kling executor code."""
+    Lena's identity/body. Soul selection is recorded as package metadata
+    (soul_name/soul_version/soul_selection_mode) only, never as prompt text.
+    See module-level comment above for the full rationale. Does not touch or
+    call any Kling executor code."""
     rng = random.Random(
         _seed(date_str, slot_id, media_type, str(sequence_index or ""), "higgsfield")
     )
@@ -3475,7 +3489,6 @@ def generate_higgsfield_prompt_package(
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
 
     image_prompt = _clean_public_text(
-        f"{HIGGSFIELD_SOUL_ANCHOR} "
         f"{HIGGSFIELD_FRAMING_LINE} "
         f"Scene: {scene_action}, {environment_text}. "
         f"Wardrobe: {wardrobe_text}. "
@@ -3493,6 +3506,9 @@ def generate_higgsfield_prompt_package(
         "slot_id": slot_id,
         "media_type": media_type,
         "provider": "higgsfield",
+        "soul_name": HIGGSFIELD_SOUL_NAME,
+        "soul_version": HIGGSFIELD_SOUL_VERSION,
+        "soul_selection_mode": HIGGSFIELD_SOUL_SELECTION_MODE,
         "lane": scene["lane"],
         "activity": scene["lane"],
         "wardrobe_outfit_id": wardrobe_entry.get("outfit_id"),
