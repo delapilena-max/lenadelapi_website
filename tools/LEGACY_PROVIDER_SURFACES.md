@@ -2,19 +2,39 @@
 
 This document is the routing legend for the `tools/` directory.
 
-## Active Lena generation path (Kling-only)
+## Current canonical Lena live path
 
-These are the canonical surfaces for current work:
+These are the active saved surfaces for the current Lena autonomy path:
 
 | Entry point | Purpose |
 |---|---|
-| `lena_strategy_autonomy_run_v1.py` | Top-level strategy + Meta refresh + dry-run prep |
-| `lena_daily_orchestrator_v1.py` | Orchestrator with strategy gate enforcement |
-| `strategy/lena_run_strategy_autonomy_prep_v1.py` | Full dry-run prep stack |
-| `strategy/lena_submit_kling_payload_v1.py` | Live Kling image submit |
-| `run_lena_strategy_autonomy.ps1` | Windows wrapper for the top-level runner |
+| `run_lena_autonomous.ps1` | Windows wrapper for the current autonomous run |
+| `lena_autonomous_run.py` | Top-level live runner: production, preflight, and queue publishing |
+| `../pipeline/lena_production_job.py` | Daily production orchestrator |
+| `lena_prepare_daily_workorders_brain.py` | Builds the daily Lena workorders |
+| `../pipeline/prompting/lena_prompt_brain.py` | Prompt construction brain used by the workorder flow |
+| `../pipeline/kling_apilena_api_executor.py` | Real current executor: APILENA-only Kling image submission (verified 2026-07-05 by tracing the actual `import` in `pipeline/lena_production_job.py`, not by this doc) |
+| `lena_preflight.py` | Contract and queue readiness gate |
+| `process_queue.py` | Current live publish surface |
 
-Provider policy: `pipeline/influencer_nodes/lena/provider_router.json`
+**Correction, 2026-07-05:** this doc previously named `../pipeline/kling_ui_executor.py` as canonical. That file is untracked, has no callers anywhere in the repo, and is not the executor that runs. See `pipeline/change_notes/lena_agentic_pivot_changelog.md` for the containment findings.
+
+Machine-readable source of truth:
+
+- `pipeline/config/lena_live_path_manifest_v1.json`
+- `tools/lena_live_path_status_v1.py`
+
+## Older strategy-era Lena surfaces (not canonical live path)
+
+These files are still in the repo, but they are no longer the source of truth for the live Lena path:
+
+| File | Status |
+|---|---|
+| `lena_strategy_autonomy_run_v1.py` | Legacy strategy-era runner |
+| `lena_daily_orchestrator_v1.py` | Legacy orchestration surface |
+| `strategy/lena_run_strategy_autonomy_prep_v1.py` | Legacy prep surface |
+| `strategy/lena_submit_kling_payload_v1.py` | Legacy strategy submit surface |
+| `run_lena_strategy_autonomy.ps1` | Legacy wrapper surface |
 
 ## Legacy surfaces — blocked (require `--allow-legacy-openart-seedance`)
 
@@ -27,6 +47,13 @@ They will refuse to run without an explicit override flag and should not be used
 | `run_lena_provider_only_daily_v1_5_2.py` | Ran the full legacy OpenArt/Seedance daily pipeline |
 | `wire_lena_v1_5_openart_seedance_provider.py` | Patched `run_lena_generate_daily.ps1` to insert the legacy provider steps |
 | `generation/lena_generation_adapter_interface_v1.py` | Planned OpenArt/Seedance multi-scene keyframe pipeline |
+
+## Doc-only / uncalled surfaces
+
+| File | Status |
+|---|---|
+| `../pipeline/kling_ui_executor.py` | Untracked, no callers anywhere in the repo. Was mistakenly documented as canonical above; not currently invoked. Quarantined pending decision, not deleted. |
+| `../pipeline/kling_direct_executor.py` | Absent from disk and from git history entirely. Older handoffs (2026-07-02/03) describe safety fixes living in this file; those fixes are not confirmed present in the real live executor. Do not assume they carried over. |
 
 ## Legacy surfaces — named but not blocked
 
@@ -57,7 +84,8 @@ They are preserved as historical context. Do not treat them as active architectu
 
 `pipeline/provider_workorders/openart_seedance/` and related subdirectories contain
 archived workorder JSON from the OpenArt/Seedance era. These are read-only historical
-artifacts. The active workorder and publish surface is under `pipeline/publishing/lena/`.
+artifacts. The active production and publish path is defined by
+`pipeline/config/lena_live_path_manifest_v1.json`.
 
 ## Provider transition in progress: Higgsfield (2026-07-08, docs-only, not yet integrated)
 
