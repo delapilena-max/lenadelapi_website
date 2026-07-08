@@ -229,6 +229,38 @@ FRAMING_FLOOR_CHARS = 160
 _GARMENT_OBEDIENCE_FLOOR_KEYWORDS = ("garment-obedience lock",)
 GARMENT_OBEDIENCE_FLOOR_CHARS = 300
 
+# Frame-logic floor (2026-07-07): pipeline/prompting/lena_prompt_brain.py now inserts
+# a "Frame logic:" paragraph (frame_action, supporting/forbidden objects, camera
+# intent, body-visibility rule, coherence note) right after the Scene: sentence, so
+# every render is a specific believable moment instead of just "Lena in a place."
+# Unlike the single-sentence Garment-obedience lock above, this paragraph is written
+# as several short sentences (one per labeled clause), so one keyword cannot capture
+# the whole thing the way "garment-obedience lock" does -- each clause needs its own
+# matching keyword in the tuple. Split into two floors, same narrow/additive style as
+# every floor above, so the two hard-requirement clauses (the action beat itself, and
+# the forbidden-object list that keeps alcohol/props non-focal) get first claim on
+# their budget ahead of the three supporting/quality clauses, rather than losing out
+# to them by pure source-order accident (the compactor otherwise walks sentences in
+# original order, and "Avoid:" sits after "Supporting objects"/"Camera intent"/"Body
+# visibility" in the source text).
+_FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_KEYWORDS = ("frame logic:", "avoid:")
+FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_CHARS = 450
+
+# Second, lower-priority floor for the remaining frame-logic clauses (supporting
+# objects, camera intent, body-visibility rule -- including its seated/table-
+# occlusion note when present -- and the closing coherence note). Applied after the
+# floor above so it only claims budget left over from the two hard-requirement
+# clauses first.
+_FRAME_LOGIC_SUPPORT_FLOOR_KEYWORDS = (
+    "supporting objects in frame:",
+    "camera intent:",
+    "body visibility:",
+    "this scene is seated or leaning at furniture",
+    "do not add any extra prop beyond that furniture",
+    "this should read as",
+)
+FRAME_LOGIC_SUPPORT_FLOOR_CHARS = 650
+
 # Batch 7b (2026-07-06): the positive garment-obedience lock above has a reserved
 # floor and survives; a same-order reorder of these matching anti-substitution
 # negative terms did not help (a real functional test showed zero present in the
@@ -395,6 +427,16 @@ def _build_compact_prompt(slot: Dict[str, Any]) -> str:
     # the catalog entry is a sleeveless-top + skirt outfit -- absent otherwise, which
     # is expected and correct (not a bug).
     _apply_reserved_floor(_GARMENT_OBEDIENCE_FLOOR_KEYWORDS, GARMENT_OBEDIENCE_FLOOR_CHARS)
+
+    # Reserved floor pass (Frame-logic, 2026-07-07): guarantee the frame-logic
+    # paragraph's two hard-requirement clauses (the "Frame logic:" action beat and
+    # the "Avoid:" forbidden-object list) survive first, then the remaining
+    # supporting clauses (evidence objects, camera intent, body-visibility rule,
+    # coherence note) claim whatever budget is left. See the constant definitions
+    # above for why this needed two keyword sets instead of the single-keyword
+    # pattern used by the Garment-obedience lock floor.
+    _apply_reserved_floor(_FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_KEYWORDS, FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_CHARS)
+    _apply_reserved_floor(_FRAME_LOGIC_SUPPORT_FLOOR_KEYWORDS, FRAME_LOGIC_SUPPORT_FLOOR_CHARS)
 
     for group in _SAFETY_KEYWORD_PRIORITY:
         for idx, groups in enumerate(sentence_groups):

@@ -1,0 +1,470 @@
+{
+  "version": "v1",
+  "source": "pipeline/prompt_banks/lena/lena_frame_logic_bank_v1.json",
+  "note": "Frame-logic layer (2026-07-07): supplies a clarifying action beat, supporting/forbidden object lists, camera intent, and a coherence note per lane so every render is a specific believable moment, not just 'Lena in a place'. Deliberately does not restate or override a scene's own action field -- it clarifies and supports it. seated_or_table_occlusion_ok marks lanes where furniture (a table, desk, or bench) naturally occluding the lower body is expected and not a coverage violation.",
+  "default_frame_logic": {
+    "frame_action": "settling naturally into the moment already described by the scene, without freezing into a posed stance",
+    "frame_evidence_objects": [
+      "at least one concrete prop tied to the setting",
+      "background detail consistent with the named location"
+    ],
+    "frame_forbidden_objects": [
+      "an empty or generic backdrop with no supporting objects",
+      "any object contradicting the named setting"
+    ],
+    "camera_intent": "friend-taken candid at natural eye height, never an impossible floating camera",
+    "scene_coherence_note": "a specific lived-in moment, not a generic backdrop portrait",
+    "seated_or_table_occlusion_ok": false
+  },
+  "lanes": {
+    "morning apartment": {
+      "frame_action": "pausing mid-pour by the counter, cup half-filled, weight still settling into her stance before the first sip",
+      "frame_evidence_objects": [
+        "coffee mug being filled",
+        "counter clutter such as a fruit bowl or mail",
+        "morning window light",
+        "kitchen surface behind her"
+      ],
+      "frame_forbidden_objects": [
+        "outdoor background",
+        "empty counter with no mug or clutter",
+        "nighttime lighting",
+        "restaurant or bar props"
+      ],
+      "camera_intent": "friend-taken candid at normal kitchen eye-height, no ring light",
+      "scene_coherence_note": "a slow drowsy apartment start built around the coffee pour, not a staged kitchen shoot",
+      "seated_or_table_occlusion_ok": false
+    },
+    "apartment doorway": {
+      "frame_action": "one hand already on the doorframe, keys caught mid-swing, weight shifted toward the hallway like she is already halfway out",
+      "frame_evidence_objects": [
+        "bag or tote on her shoulder",
+        "keys in hand",
+        "apartment light spilling from behind her",
+        "hallway just visible past the door"
+      ],
+      "frame_forbidden_objects": [
+        "seated or mid-room composition",
+        "no exit prop such as a bag or keys",
+        "outdoor street with no door in frame"
+      ],
+      "camera_intent": "friend-taken candid from just outside the door",
+      "scene_coherence_note": "a confident solo exit captured at the literal threshold, not a posed hallway portrait",
+      "seated_or_table_occlusion_ok": false
+    },
+    "coffee shop": {
+      "frame_action": "leaning into the counter edge with the iced coffee still sweating in her hand, mid-exhale like she just sat down",
+      "frame_evidence_objects": [
+        "iced coffee with condensation",
+        "menu board or pastry case",
+        "window with street beyond",
+        "counter clutter such as a receipt or straw wrapper"
+      ],
+      "frame_forbidden_objects": [
+        "no drink in frame",
+        "empty sterile counter",
+        "home kitchen props",
+        "commercial coffee-ad staging"
+      ],
+      "camera_intent": "friend-taken candid from a nearby seat or counter edge",
+      "scene_coherence_note": "an unplanned extended coffee break, grounded by the drink and counter clutter she is actually using",
+      "seated_or_table_occlusion_ok": false
+    },
+    "rainy street": {
+      "frame_action": "mid-stride with her coat gripped shut against the wind, glancing back like someone just called after her",
+      "frame_evidence_objects": [
+        "wet pavement reflections",
+        "coat held closed",
+        "blurred storefronts or headlights",
+        "umbrella or passerby nearby"
+      ],
+      "frame_forbidden_objects": [
+        "dry pavement",
+        "clear sky",
+        "indoor background",
+        "no rain evidence anywhere in frame"
+      ],
+      "camera_intent": "friend-taken handheld candid from the sidewalk",
+      "scene_coherence_note": "an ordinary errand turned cinematic purely by the rain, not a studio wet-look effect",
+      "seated_or_table_occlusion_ok": false
+    },
+    "rooftop sunset": {
+      "frame_action": "one hand resting on the railing, weight shifting back onto her heels as the light catches her shoulder",
+      "frame_evidence_objects": [
+        "rooftop railing or ledge",
+        "city skyline in background",
+        "warm sunset haze",
+        "worn lounge furniture or planters nearby"
+      ],
+      "frame_forbidden_objects": [
+        "overcast gray sky",
+        "street-level background",
+        "indoor apartment elements",
+        "studio flash lighting"
+      ],
+      "camera_intent": "friend-taken candid from a nearby standing position, never drone or overhead",
+      "scene_coherence_note": "unhurried golden-hour lingering, anchored by the skyline and railing, not a floating fashion-shoot backdrop",
+      "seated_or_table_occlusion_ok": false
+    },
+    "bookstore": {
+      "frame_action": "fingers still resting on the open page, eyes lifting just before she turns back to the shelf",
+      "frame_evidence_objects": [
+        "shelves of books",
+        "book open in hand",
+        "warm lamp light",
+        "narrow aisle framing"
+      ],
+      "frame_forbidden_objects": [
+        "no books visible",
+        "bright studio lighting",
+        "outdoor or cafe backdrop",
+        "institutional library signage"
+      ],
+      "camera_intent": "friend-taken quiet candid across the aisle",
+      "scene_coherence_note": "a browsing spiral that stretched past its errand, held together by the book and the shelf depth behind her",
+      "seated_or_table_occlusion_ok": false
+    },
+    "grocery run": {
+      "frame_action": "reaching into the flower bucket with the cart still rolling forward slightly, caught mid-decision",
+      "frame_evidence_objects": [
+        "grocery cart or basket",
+        "fresh flowers in hand",
+        "produce or market signage",
+        "store aisle light"
+      ],
+      "frame_forbidden_objects": [
+        "florist boutique with no grocery context",
+        "no flowers visible",
+        "apartment or cafe backdrop"
+      ],
+      "camera_intent": "friend-taken candid mid-aisle",
+      "scene_coherence_note": "a spontaneous impulse buy inside an ordinary errand, not a styled florist shoot",
+      "seated_or_table_occlusion_ok": false
+    },
+    "car moment": {
+      "frame_action": "head tipped slightly toward the window, hand resting near her cheek like the engine just went quiet",
+      "frame_evidence_objects": [
+        "car interior such as seat, dash, or console",
+        "window light from outside",
+        "seatbelt or dashboard detail"
+      ],
+      "frame_forbidden_objects": [
+        "driving motion blur",
+        "outdoor street with no car frame",
+        "apartment interior bleeding into shot"
+      ],
+      "camera_intent": "phone propped on the dash or console, believable in-car angle",
+      "scene_coherence_note": "a quiet parked-car reset between errands, not a driving shot",
+      "seated_or_table_occlusion_ok": true
+    },
+    "studio desk": {
+      "frame_action": "chin still resting on her hand mid-thought, one finger paused over the trackpad",
+      "frame_evidence_objects": [
+        "laptop open",
+        "desk lamp light",
+        "coffee or drink nearby",
+        "visible desk clutter such as cables or notes"
+      ],
+      "frame_forbidden_objects": [
+        "bare empty desk",
+        "no laptop or work item",
+        "outdoor or cafe backdrop",
+        "standing rather than seated"
+      ],
+      "camera_intent": "friend-taken candid from across the desk, late-afternoon window plus lamp",
+      "scene_coherence_note": "a curated-messy work setup, not a clean productivity stock photo",
+      "seated_or_table_occlusion_ok": true
+    },
+    "night out": {
+      "frame_action": "pausing right at the doorway threshold, weight on one hip, like she was caught mid-step into the room",
+      "frame_evidence_objects": [
+        "mirror or entry reflection",
+        "going-out outfit detail",
+        "warm venue sconce light",
+        "jewelry or clutch detail"
+      ],
+      "frame_forbidden_objects": [
+        "bright clean bathroom",
+        "casual daytime outfit",
+        "no mirror or entry framing",
+        "outdoor street backdrop"
+      ],
+      "camera_intent": "friend-taken candid at the venue entrance or mirror, never a posed studio flash",
+      "scene_coherence_note": "the last-second check before the room sees her, not a hallway portrait session",
+      "seated_or_table_occlusion_ok": false
+    },
+    "dinner booth": {
+      "frame_action": "elbow still on the table from the last exchange, glass resting near her hand rather than raised, like the conversation just paused",
+      "frame_evidence_objects": [
+        "water glass",
+        "dessert plate or folded napkin",
+        "menu corner",
+        "booth seating and neon window reflection"
+      ],
+      "frame_forbidden_objects": [
+        "wine glass lifted toward the camera or lit as the brightest object in frame",
+        "close-up hero shot of the drink",
+        "empty table with no place-setting clutter",
+        "outdoor setting"
+      ],
+      "camera_intent": "friend-shot from across the table, seated restaurant perspective",
+      "scene_coherence_note": "a booth conversation caught mid-pause; the wine glass is one item on a used table, not the point of the photo",
+      "seated_or_table_occlusion_ok": true
+    },
+    "wine bar patio": {
+      "frame_action": "pausing beside the patio table with her weight shifted onto one leg, glass resting near the table's edge rather than held up, like she just turned at the sound of her name",
+      "frame_evidence_objects": [
+        "candlelight on the table",
+        "half-finished appetizer plate",
+        "receipt folder or menu corner",
+        "metal cafe chair",
+        "city lights or passing headlights behind her"
+      ],
+      "frame_forbidden_objects": [
+        "stemmed glass raised toward the camera or used as the brightest lit object",
+        "close-up on the drink itself",
+        "empty patio table with nothing else on it",
+        "indoor apartment backdrop"
+      ],
+      "camera_intent": "friend-shot from the next chair or standing beside the table, natural nightlife perspective",
+      "scene_coherence_note": "one drink turning into a whole night, told through the candle and table clutter, not through a glowing hero shot of the glass",
+      "seated_or_table_occlusion_ok": false
+    },
+    "brunch patio": {
+      "frame_action": "sunglasses still pushed up in her hair, plate half-finished in front of her, glancing over mid-bite of conversation",
+      "frame_evidence_objects": [
+        "brunch plate with food",
+        "glass water bottle",
+        "folded napkin with silverware",
+        "striped umbrella or patio table"
+      ],
+      "frame_forbidden_objects": [
+        "mimosa glass held up or lit as the focal object",
+        "empty table with only a drink on it",
+        "indoor kitchen backdrop",
+        "gym or athletic wardrobe"
+      ],
+      "camera_intent": "friend-shot from across the table, real social-feed brunch framing",
+      "scene_coherence_note": "daytime brunch gossip anchored by the food and table clutter, with the drink present but incidental",
+      "seated_or_table_occlusion_ok": true
+    },
+    "sidewalk dinner": {
+      "frame_action": "already a step or two away from the table, glancing back over her shoulder with her bag swinging slightly",
+      "frame_evidence_objects": [
+        "candlelit two-top table behind her",
+        "menu stand or table number",
+        "scuffed sidewalk",
+        "storefront spill lighting"
+      ],
+      "frame_forbidden_objects": [
+        "glassware framed as the hero object",
+        "table completely empty behind her",
+        "indoor restaurant interior",
+        "daylight instead of evening spill-light"
+      ],
+      "camera_intent": "friend-shot from a few steps behind her on the sidewalk, natural night-city movement",
+      "scene_coherence_note": "stepping outside for two seconds and staying out, told through the table she is leaving, not a posed street shoot",
+      "seated_or_table_occlusion_ok": false
+    },
+    "lobby cocktail bar": {
+      "frame_action": "one hand still under her jaw from a moment ago, the cocktail glass resting on the table rather than raised, like she just landed the punchline",
+      "frame_evidence_objects": [
+        "coaster and cocktail napkin",
+        "menu tucked under a glass",
+        "low lamp light and reflective dark wood",
+        "other patrons blurred behind her"
+      ],
+      "frame_forbidden_objects": [
+        "cocktail glass lifted toward the camera or used as key light",
+        "close-up hero framing on the drink",
+        "empty bar table with nothing else on it",
+        "bright daylight setting"
+      ],
+      "camera_intent": "friend-shot from across the small bar table, low-light natural phone framing",
+      "scene_coherence_note": "a composed lobby-bar moment held together by the table setting, with the cocktail present but never the subject of the photo",
+      "seated_or_table_occlusion_ok": true
+    },
+    "skincare evening": {
+      "frame_action": "product still being pressed into her cheek, towel slipping slightly off one shoulder",
+      "frame_evidence_objects": [
+        "skincare product in hand",
+        "bathroom sink or mirror",
+        "warm bathroom light",
+        "damp or dewy skin texture"
+      ],
+      "frame_forbidden_objects": [
+        "outdoor or public backdrop",
+        "no product visible",
+        "daytime bright light with no bathroom context"
+      ],
+      "camera_intent": "bathroom mirror or counter-level phone-timer framing",
+      "scene_coherence_note": "the unseen nightly routine, grounded by product and counter detail, not a beauty-ad still",
+      "seated_or_table_occlusion_ok": false
+    },
+    "airport day": {
+      "frame_action": "suitcase handle still gripped mid-stride, head turning slightly like someone called her name across the terminal",
+      "frame_evidence_objects": [
+        "travel bag or suitcase",
+        "gate signage or terminal architecture",
+        "coffee cup in hand",
+        "travel-appropriate outfit"
+      ],
+      "frame_forbidden_objects": [
+        "no travel prop",
+        "home or park backdrop",
+        "gym or overly casual homewear"
+      ],
+      "camera_intent": "friend-taken candid mid-terminal, natural travel-day pace",
+      "scene_coherence_note": "early travel fatigue held together by the suitcase and terminal architecture, not a fashion-campaign airport set",
+      "seated_or_table_occlusion_ok": false
+    },
+    "gym cooldown": {
+      "frame_action": "still bent over one sneaker mid-tie, breath just evening out from the workout",
+      "frame_evidence_objects": [
+        "gym bench or equipment",
+        "workout outfit",
+        "water bottle with condensation",
+        "gym mirror or rubber flooring"
+      ],
+      "frame_forbidden_objects": [
+        "going-out or glam outfit",
+        "outdoor park with no gym context",
+        "pool or water setting"
+      ],
+      "camera_intent": "friend-taken candid at bench height, natural gym window light",
+      "scene_coherence_note": "the earned rest after the workout, anchored by the bench and gear, not a fitness-campaign pose",
+      "seated_or_table_occlusion_ok": true
+    },
+    "laundry day": {
+      "frame_action": "one tee still half-folded in her hands, laughing at something mid-fold rather than posing for it",
+      "frame_evidence_objects": [
+        "washing machine or dryer",
+        "laundry basket with clothes",
+        "folded tee in hand",
+        "checker tile floor"
+      ],
+      "frame_forbidden_objects": [
+        "going-out or glam outfit",
+        "no laundry machine or basket",
+        "outdoor or cafe backdrop"
+      ],
+      "camera_intent": "friend-taken candid from the laundromat aisle",
+      "scene_coherence_note": "romanticizing a boring chore, held together by the actual machines and basket, not a styled laundry set",
+      "seated_or_table_occlusion_ok": false
+    },
+    "museum afternoon": {
+      "frame_action": "arms still loosely crossed from studying the piece, weight settled on one hip like she has been standing there a minute",
+      "frame_evidence_objects": [
+        "artwork or exhibit on the wall",
+        "gallery bench or track lighting",
+        "polished gallery floor"
+      ],
+      "frame_forbidden_objects": [
+        "no artwork visible",
+        "outdoor or cafe backdrop",
+        "gym or athletic wardrobe"
+      ],
+      "camera_intent": "friend-taken candid a few feet away in the gallery",
+      "scene_coherence_note": "a quiet solo culture afternoon anchored by the actual artwork, not a fashion-editorial gallery backdrop",
+      "seated_or_table_occlusion_ok": false
+    },
+    "late kitchen snack": {
+      "frame_action": "still leaning over the sink mid-bite, caught smiling like she got caught raiding the fridge",
+      "frame_evidence_objects": [
+        "food item such as a bowl, plate, or strawberry",
+        "kitchen sink or counter",
+        "dim under-cabinet or fridge-glow light"
+      ],
+      "frame_forbidden_objects": [
+        "formal dining setting",
+        "bright daytime kitchen light",
+        "going-out or glam outfit",
+        "no food visible"
+      ],
+      "camera_intent": "friend-taken candid at counter height, dim practical kitchen light",
+      "scene_coherence_note": "an honest too-tired-to-sit snack moment, told through the food and dim kitchen light, not a staged dinner",
+      "seated_or_table_occlusion_ok": true
+    },
+    "flower shop": {
+      "frame_action": "still looking down at the bouquet mid-adjustment, one stem slightly loose in her grip",
+      "frame_evidence_objects": [
+        "wrapped bouquet in hand",
+        "flower shop storefront or buckets of flowers",
+        "morning street light"
+      ],
+      "frame_forbidden_objects": [
+        "no flowers visible",
+        "grocery-store interior instead of a florist storefront",
+        "nighttime lighting"
+      ],
+      "camera_intent": "friend-taken candid on the sidewalk outside the storefront",
+      "scene_coherence_note": "a small self-care impulse buy, anchored by the actual bouquet and storefront, not a styled floral backdrop",
+      "seated_or_table_occlusion_ok": false
+    },
+    "record store": {
+      "frame_action": "one sleeve still half-pulled from the rack, pausing mid-decision on whether to buy it",
+      "frame_evidence_objects": [
+        "record store racks or album sleeves",
+        "vinyl record in hand",
+        "warm store lamp light"
+      ],
+      "frame_forbidden_objects": [
+        "no records visible",
+        "bookstore substituted for a record shop",
+        "bright sterile studio lighting"
+      ],
+      "camera_intent": "friend-taken candid from the next aisle over",
+      "scene_coherence_note": "a browsing spiral in a real vinyl shop, held together by the actual records in hand",
+      "seated_or_table_occlusion_ok": false
+    },
+    "mirror outfit check": {
+      "frame_action": "one hand still on the earring mid-adjustment, weight shifting like she is about to grab her bag and go",
+      "frame_evidence_objects": [
+        "bedroom mirror",
+        "full outfit reflected head to thigh",
+        "bedroom detail such as linen, a chair, or clothes"
+      ],
+      "frame_forbidden_objects": [
+        "lounge or venue mirror instead of bedroom",
+        "phone held high blocking her face",
+        "outdoor backdrop"
+      ],
+      "camera_intent": "friend-taken getting-ready candid, not an arm-extended mirror selfie",
+      "scene_coherence_note": "the outfit check that ran long, anchored by the actual bedroom mirror and clothes, not a fitting-room shoot",
+      "seated_or_table_occlusion_ok": false
+    },
+    "city bench": {
+      "frame_action": "cup still warm in her hand, watching someone pass rather than posing for the shot",
+      "frame_evidence_objects": [
+        "city or park bench",
+        "coffee cup in hand",
+        "tree-lined street or park background"
+      ],
+      "frame_forbidden_objects": [
+        "indoor or apartment backdrop",
+        "no coffee or drink visible",
+        "nighttime without daytime context"
+      ],
+      "camera_intent": "friend-taken candid from the sidewalk a few feet away",
+      "scene_coherence_note": "a stolen still moment mid-errand, anchored by the bench and cup, not a posed park shoot",
+      "seated_or_table_occlusion_ok": true
+    },
+    "elevator moment": {
+      "frame_action": "hand still resting on the small bag strap, turning slightly like the doors just opened behind her",
+      "frame_evidence_objects": [
+        "elevator interior or metal panel walls",
+        "warm overhead elevator light",
+        "reflection in the metal panel"
+      ],
+      "frame_forbidden_objects": [
+        "stairwell substituted for an elevator",
+        "outdoor or apartment backdrop",
+        "bright full studio lighting",
+        "mirror-selfie phone-forward framing"
+      ],
+      "camera_intent": "friend-taken candid a few feet away in the elevator bank, never a reflection selfie",
+      "scene_coherence_note": "an accidental portrait moment in a mundane elevator, anchored by the actual metal walls and light",
+      "seated_or_table_occlusion_ok": false
+    }
+  }
+}

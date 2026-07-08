@@ -1606,6 +1606,9 @@ ENVIRONMENT_CATALOG_PATH = (
 PHOTO_SCENE_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_photo_scene_bank_v1.json"
 )
+FRAME_LOGIC_BANK_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_frame_logic_bank_v1.json"
+)
 
 _PHOTO_SCENE_BANK_CACHE: dict | None = None
 _ENVIRONMENT_CATALOG_CACHE: dict | None = None
@@ -1710,6 +1713,118 @@ def build_environment_prompt_parts(scene: dict, env_entry: dict | None) -> tuple
     # Do not inject extra environment-catalog realism text here, because it can collide
     # with the actual scene lane and produce mixed-location prompts.
     return scene_environment, scene_details
+
+
+# --- Frame-logic layer (2026-07-07) ------------------------------------------
+#
+# Adds explicit scene-coherence "frame logic" per lane: a clarifying action beat,
+# concrete supporting/forbidden objects, a camera-intent line, and a coherence
+# note, folded into one short paragraph inserted into the final image prompt so
+# every render is a specific believable moment, not just "Lena in a place."
+# Deliberately does not restate or override the scene bank's own "action" field --
+# it clarifies and supports whatever beat that scene already describes, per lane,
+# via lena_frame_logic_bank_v1.json. Body-visibility wording is derived here from
+# the already-chosen reference_mode (face_detail/upper_body/full_body/video_body)
+# rather than stored per-lane, so it always matches the actual framing decision
+# for this slot instead of a static guess.
+
+_FRAME_LOGIC_BANK_CACHE: dict | None = None
+
+
+def load_frame_logic_bank() -> dict:
+    global _FRAME_LOGIC_BANK_CACHE
+    if _FRAME_LOGIC_BANK_CACHE is None:
+        if not FRAME_LOGIC_BANK_PATH.exists():
+            raise SystemExit(
+                f"[ABORT] Saved frame-logic bank missing: {FRAME_LOGIC_BANK_PATH}"
+            )
+        _FRAME_LOGIC_BANK_CACHE = json.loads(
+            FRAME_LOGIC_BANK_PATH.read_text(encoding="utf-8")
+        )
+    return _FRAME_LOGIC_BANK_CACHE
+
+
+BODY_VISIBILITY_RULE_BY_REFERENCE_MODE: dict[str, str] = {
+    "full_body": (
+        "Body visibility: keep bust, waist, hips, and upper thighs visible and "
+        "unobstructed by any prop; do not let a bag, jacket, or framing choice "
+        "intentionally hide her waist-to-thigh silhouette."
+    ),
+    "upper_body": (
+        "Body visibility: keep bust and waist clearly visible; hips may fall "
+        "outside a waist-up crop naturally, but do not add a prop specifically "
+        "to block them."
+    ),
+    "face_detail": (
+        "Body visibility: not the priority in this close framing; do not force "
+        "full-body content, and do not use any prop to obscure her face, "
+        "neckline, or shoulders."
+    ),
+    "video_body": (
+        "Body visibility: keep bust, waist, and upper hips visible enough to "
+        "support stable motion continuity across the clip."
+    ),
+}
+
+SEATED_OR_TABLE_OCCLUSION_NOTE = (
+    "This scene is seated or leaning at furniture; hips and thighs may be "
+    "naturally out of view behind a table, desk, or bench -- that is acceptable "
+    "and is not a coverage violation. Do not add any extra prop beyond that "
+    "furniture to hide the waist or hips further."
+)
+
+
+def choose_frame_logic(lane: str) -> dict:
+    """Read-only lookup of the frame-logic bank entry for `lane`, falling back to
+    the bank's own default entry if the lane is missing. Never hard-fails
+    production over a missing lane -- every currently active production lane is
+    covered, and the default keeps the paragraph coherent for any future one."""
+    bank = load_frame_logic_bank()
+    lanes = bank.get("lanes", {})
+    entry = lanes.get(str(lane or "").strip().lower())
+    if not entry:
+        entry = bank.get("default_frame_logic", {})
+    return dict(entry)
+
+
+def build_body_visibility_rule(reference_mode: str, frame_logic: dict) -> str:
+    rule = BODY_VISIBILITY_RULE_BY_REFERENCE_MODE.get(
+        reference_mode, BODY_VISIBILITY_RULE_BY_REFERENCE_MODE["upper_body"]
+    )
+    if frame_logic.get("seated_or_table_occlusion_ok"):
+        rule = f"{rule} {SEATED_OR_TABLE_OCCLUSION_NOTE}"
+    return rule
+
+
+def format_frame_logic_paragraph(frame_logic: dict, reference_mode: str) -> str:
+    action = _clean_sentence_fragment(frame_logic.get("frame_action", ""))
+    evidence = [
+        str(item).strip() for item in frame_logic.get("frame_evidence_objects", [])
+        if str(item).strip()
+    ]
+    forbidden = [
+        str(item).strip() for item in frame_logic.get("frame_forbidden_objects", [])
+        if str(item).strip()
+    ]
+    camera_intent = _clean_sentence_fragment(frame_logic.get("camera_intent", ""))
+    coherence_note = _clean_sentence_fragment(frame_logic.get("scene_coherence_note", ""))
+    body_rule = build_body_visibility_rule(reference_mode, frame_logic)
+
+    sentences = []
+    if action:
+        sentences.append(f"Frame logic: {action}.")
+    if evidence:
+        sentences.append(f"Supporting objects in frame: {', '.join(evidence)}.")
+    if camera_intent:
+        sentences.append(f"Camera intent: {camera_intent}.")
+    if body_rule:
+        sentences.append(body_rule)
+    if forbidden:
+        sentences.append(f"Avoid: {', '.join(forbidden)}.")
+    if coherence_note:
+        sentences.append(f"This should read as {coherence_note}.")
+
+    return " ".join(sentences)
 
 
 def validate_saved_prompt_sources() -> None:
@@ -2767,6 +2882,8 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     )
     capture_lock = public_capture_lock(scene["lane"])
     wardrobe_continuity_lock = public_wardrobe_continuity_lock(wardrobe_entry, scene["lane"])
+    frame_logic = choose_frame_logic(scene["lane"])
+    frame_logic_paragraph = format_frame_logic_paragraph(frame_logic, reference_mode)
 
     reference_policy = reference_policy_for_mode(reference_mode)
     framing_policy = framing_policy_for_mode(reference_mode)
@@ -2775,6 +2892,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     image_prompt = (
         f"{IDENTITY_ANCHOR} {reference_policy} {body_descriptor} {framing_policy} "
         f"Scene: {scene['action']}. "
+        f"{frame_logic_paragraph} "
         f"Wardrobe: {wardrobe_override} {PUBLIC_WARDROBE_RULE} {wardrobe_continuity_lock} "
         "Do not substitute a different garment class, do not simplify the outfit into random basics, "
         "and do not replace the specified look with loungewear or underwear-coded clothing. "
@@ -2795,7 +2913,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     caption = _clean_public_text(scene["caption"])
     caption = f"{caption}\n\n{_hashtags(rng, scene['lane'], 3)}"
 
-    prompt_brain_version = "lena_prompt_brain_v1_8_saved_bank_lock"
+    prompt_brain_version = "lena_prompt_brain_v1_9_frame_logic"
 
     package = {
         "slot_id": slot_id,
@@ -2815,6 +2933,13 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         "reference_priority": reference_priority_for_mode(reference_mode),
         "scene_bank_version": scene_bank.get("version", "unknown"),
         "scene_bank_source": scene_bank.get("source", str(PHOTO_SCENE_BANK_PATH)),
+        "frame_action": frame_logic.get("frame_action"),
+        "frame_evidence_objects": frame_logic.get("frame_evidence_objects"),
+        "frame_forbidden_objects": frame_logic.get("frame_forbidden_objects"),
+        "camera_intent": frame_logic.get("camera_intent"),
+        "body_visibility_rule": build_body_visibility_rule(reference_mode, frame_logic),
+        "scene_coherence_note": frame_logic.get("scene_coherence_note"),
+        "frame_logic_text": frame_logic_paragraph,
         "image_prompt": _clean_public_text(image_prompt),
         "prompt": _clean_public_text(image_prompt),
         "positive_prompt": _clean_public_text(image_prompt),
@@ -2875,7 +3000,7 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
         slot["max_video_seconds"] = 7
 
     meta = slot.setdefault("metadata", {})
-    meta["prompt_brain_version"] = package.get("prompt_brain_version", "lena_prompt_brain_v1_8_saved_bank_lock")
+    meta["prompt_brain_version"] = package.get("prompt_brain_version", "lena_prompt_brain_v1_9_frame_logic")
     meta["activity"] = package.get("activity")
     meta["pose"] = package.get("pose")
     meta["visual_style"] = package.get("visual_style")
@@ -2891,6 +3016,13 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["reference_priority"] = package.get("reference_priority")
     meta["scene_bank_version"] = package.get("scene_bank_version")
     meta["scene_bank_source"] = package.get("scene_bank_source")
+    meta["frame_action"] = package.get("frame_action")
+    meta["frame_evidence_objects"] = package.get("frame_evidence_objects")
+    meta["frame_forbidden_objects"] = package.get("frame_forbidden_objects")
+    meta["camera_intent"] = package.get("camera_intent")
+    meta["body_visibility_rule"] = package.get("body_visibility_rule")
+    meta["scene_coherence_note"] = package.get("scene_coherence_note")
+    meta["frame_logic_text"] = package.get("frame_logic_text")
     meta["image_prompt"] = package["image_prompt"]
     meta["negative_prompt"] = package["negative_prompt"]
     meta["caption"] = package["caption"]
