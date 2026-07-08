@@ -305,6 +305,22 @@ _CORE_IDENTITY_BODY_FLOOR_KEYWORDS = (
 )
 CORE_IDENTITY_BODY_FLOOR_CHARS = 450
 
+# Pose/body-language rotation floor (2026-07-08). pipeline/prompting/
+# lena_prompt_brain.py's pose/body-language layer inserts one short
+# "Pose: ..." sentence right after the frame-logic paragraph, so nearby
+# renders don't repeat the same stance. Placed AFTER the core identity/body
+# floor above -- identity/body-shape protection must never be traded for pose
+# variety. A read-only, in-memory-only compaction simulation (2026-07-08,
+# 200-slot sample) measured the real bank's "Pose: ...." sentences at 56-68
+# chars (49-61 char raw bank text + the "Pose: " label + period); 120 gives
+# roughly double that observed max as margin, matching the audit's
+# recommendation to size this floor generously since it costs nothing when
+# unused (a floor only guarantees survival up to the sentence's own length,
+# it does not force-consume unused budget). "pose:" is precise -- verified to
+# match only this one sentence type.
+_POSE_BODY_LANGUAGE_FLOOR_KEYWORDS = ("pose:",)
+POSE_BODY_LANGUAGE_FLOOR_CHARS = 120
+
 # Batch 7b (2026-07-06): the positive garment-obedience lock above has a reserved
 # floor and survives; a same-order reorder of these matching anti-substitution
 # negative terms did not help (a real functional test showed zero present in the
@@ -492,6 +508,12 @@ def _build_compact_prompt(slot: Dict[str, Any]) -> str:
     # overcorrection sentences survive -- confirmed to have zero reserved protection
     # before this, unlike every other labeled prompt section.
     _apply_reserved_floor(_CORE_IDENTITY_BODY_FLOOR_KEYWORDS, CORE_IDENTITY_BODY_FLOOR_CHARS)
+
+    # Reserved floor pass (Pose/body-language rotation, 2026-07-08): guarantee the
+    # one short "Pose: ..." sentence survives. Placed after the core identity/body
+    # floor above on purpose -- pose variety must never squeeze out identity/body
+    # protection.
+    _apply_reserved_floor(_POSE_BODY_LANGUAGE_FLOOR_KEYWORDS, POSE_BODY_LANGUAGE_FLOOR_CHARS)
 
     for group in _SAFETY_KEYWORD_PRIORITY:
         for idx, groups in enumerate(sentence_groups):

@@ -1612,6 +1612,9 @@ EXPRESSION_GAZE_BANK_PATH = (
 FRAME_LOGIC_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_frame_logic_bank_v1.json"
 )
+POSE_BODY_LANGUAGE_BANK_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_pose_body_language_bank_v1.json"
+)
 KLING_WORKORDERS_ROOT = ROOT / "pipeline" / "kling_workorders"
 
 _PHOTO_SCENE_BANK_CACHE: dict | None = None
@@ -1973,6 +1976,159 @@ def format_frame_logic_paragraph(frame_logic: dict, reference_mode: str) -> str:
         sentences.append(f"This should read as {coherence_note}.")
 
     return " ".join(sentences)
+
+
+# --- Pose/body-language rotation layer (2026-07-08) --------------------------
+#
+# Adds controlled variety to physical stance/body language so nearby renders
+# don't all repeat the same weight-square-on "model pose." Modeled directly on
+# the expression/gaze layer above: one short "Pose: ..." line, filtered by lane
+# compatibility (LANE_POSE_TAG_ALLOWLIST) and by the already-chosen
+# reference_mode, with a recency guard against nearby real workorders. Never
+# restates or overrides the scene bank's own "action" field -- it is a
+# lightweight physical-stance modifier layered on top of whatever the scene's
+# action already describes, the same relationship frame logic has to Scene:.
+# Per the approved audit + compaction-simulation report, entries are kept short
+# (target 50-80 chars, hard max ~90) specifically because the compaction
+# budget was already tight before this layer existed.
+
+_POSE_BODY_LANGUAGE_BANK_CACHE: dict | None = None
+
+# Lane -> physical-compatibility tags this lane supports, beyond the always-
+# allowed "universal" tag (every lane implicitly allows "universal" combos).
+# Grounded directly in the real per-lane scene action text (lena_photo_scene_
+# bank_v1.json) and the frame-logic bank's seated_or_table_occlusion_ok flags,
+# not guessed: "seated" = the scene action itself says sitting/seated;
+# "leaning_ok" = the scene action already has her leaning against counter/
+# railing/appliance, or the setting plainly supports it without hiding her
+# waist; "low_hand_risk" = a scene where a small reach/adjust gesture is
+# already contextually normal (drink, laptop, menu, records, bag); "in_motion"
+# = the scene action itself is already walking, not standing/seated.
+LANE_POSE_TAG_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": set(),
+    "apartment doorway": {"in_motion"},
+    "coffee shop": {"leaning_ok", "low_hand_risk"},
+    "rainy street": {"in_motion"},
+    "rooftop sunset": {"leaning_ok"},
+    "bookstore": set(),
+    "grocery run": {"low_hand_risk"},
+    "car moment": {"seated"},
+    "studio desk": {"seated", "low_hand_risk"},
+    "night out": set(),
+    "dinner booth": {"seated", "low_hand_risk"},
+    "wine bar patio": {"leaning_ok"},
+    "brunch patio": {"seated", "low_hand_risk"},
+    "sidewalk dinner": {"in_motion"},
+    "lobby cocktail bar": {"seated", "low_hand_risk"},
+    "skincare evening": set(),
+    "airport day": {"in_motion"},
+    "gym cooldown": {"seated"},
+    "laundry day": {"leaning_ok"},
+    "museum afternoon": set(),
+    "late kitchen snack": {"leaning_ok"},
+    "flower shop": set(),
+    "record store": {"low_hand_risk"},
+    "mirror outfit check": set(),
+    "city bench": {"seated", "low_hand_risk"},
+    "elevator moment": set(),
+}
+
+# Same lookback shape as the expression/gaze recency guard -- read-only scan
+# of real on-disk daily_workorders.json files, no new persistent state file.
+POSE_RECENCY_LOOKBACK_SLOTS = 6
+POSE_RECENCY_LOOKBACK_DATES = 5
+
+
+def load_pose_body_language_bank() -> dict:
+    global _POSE_BODY_LANGUAGE_BANK_CACHE
+    if _POSE_BODY_LANGUAGE_BANK_CACHE is None:
+        if not POSE_BODY_LANGUAGE_BANK_PATH.exists():
+            raise SystemExit(
+                f"[ABORT] Saved pose/body-language bank missing: {POSE_BODY_LANGUAGE_BANK_PATH}"
+            )
+        _POSE_BODY_LANGUAGE_BANK_CACHE = json.loads(
+            POSE_BODY_LANGUAGE_BANK_PATH.read_text(encoding="utf-8")
+        )
+    return _POSE_BODY_LANGUAGE_BANK_CACHE
+
+
+def _recent_pose_ids(
+    lookback_dates: int = POSE_RECENCY_LOOKBACK_DATES,
+    lookback_slots: int = POSE_RECENCY_LOOKBACK_SLOTS,
+) -> set[str]:
+    """Read-only scan of the most recent real daily_workorders.json files already
+    on disk for whatever pose_body_language_id each slot's metadata recorded.
+    Returns an empty set if none found -- must never hard-fail prompt
+    generation just because history is thin. Mirrors
+    _recent_expression_gaze_ids() exactly."""
+    if not KLING_WORKORDERS_ROOT.exists():
+        return set()
+
+    date_dirs = sorted(
+        (p for p in KLING_WORKORDERS_ROOT.iterdir() if p.is_dir()),
+        key=lambda p: p.name,
+        reverse=True,
+    )[:lookback_dates]
+
+    seen: list[str] = []
+    for date_dir in date_dirs:
+        manifest_path = date_dir / "daily_workorders.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        for slot in manifest.get("slots", []):
+            metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
+            pose_id = str(metadata.get("pose_body_language_id") or "").strip()
+            if pose_id:
+                seen.append(pose_id)
+
+    return set(seen[-lookback_slots:]) if seen else set()
+
+
+def choose_pose_body_language_production(
+    rng: random.Random,
+    lane: str | None = None,
+    reference_mode: str | None = None,
+    recent_used: set[str] | None = None,
+) -> dict:
+    """Selects one pose/body-language combo. Filters by lane-compatibility tag
+    (never contradicts the scene's own action -- e.g. never picks a seated pose
+    for a lane whose action is walking) and by reference_mode (never picks a
+    walking/seated full-body pose for a face_detail close crop). Falls back
+    gracefully (recency relaxed, then reference_mode relaxed, then tag relaxed)
+    rather than hard-failing production over cosmetic variety -- same pattern
+    as choose_expression_gaze_production()."""
+    bank = load_pose_body_language_bank()
+    combos = [dict(c) for c in bank.get("combos", [])]
+    if not combos:
+        raise SystemExit(f"[ABORT] Pose/body-language bank has no combos: {POSE_BODY_LANGUAGE_BANK_PATH}")
+
+    allowed_tags = LANE_POSE_TAG_ALLOWLIST.get(str(lane or "").strip().lower(), set()) | {"universal"}
+    tag_filtered = [
+        c for c in combos
+        if allowed_tags.intersection(set(c.get("compatibility_tags") or []))
+    ] or combos
+
+    mode_filtered = [
+        c for c in tag_filtered
+        if str(reference_mode or "") in (c.get("reference_mode_tags") or [])
+    ] or tag_filtered
+
+    recent_used = recent_used if recent_used is not None else _recent_pose_ids()
+    non_recent = [c for c in mode_filtered if c.get("pose_body_language_id") not in recent_used]
+
+    pool = non_recent or mode_filtered
+    return rng.choice(pool)
+
+
+def format_pose_body_language_line(entry: dict) -> str:
+    text = _clean_sentence_fragment(entry.get("text", ""))
+    if not text:
+        return ""
+    return f"Pose: {text}."
 
 
 def validate_saved_prompt_sources() -> None:
@@ -3034,6 +3190,10 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     expression_gaze_line = format_expression_gaze_line(expression_gaze_entry)
     frame_logic = choose_frame_logic(scene["lane"])
     frame_logic_paragraph = format_frame_logic_paragraph(frame_logic, reference_mode)
+    pose_body_language_entry = choose_pose_body_language_production(
+        rng, lane=scene["lane"], reference_mode=reference_mode
+    )
+    pose_body_language_line = format_pose_body_language_line(pose_body_language_entry)
 
     reference_policy = reference_policy_for_mode(reference_mode)
     framing_policy = framing_policy_for_mode(reference_mode)
@@ -3043,6 +3203,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         f"{IDENTITY_ANCHOR} {reference_policy} {body_descriptor} {framing_policy} "
         f"Scene: {scene['action']}. "
         f"{frame_logic_paragraph} "
+        f"{pose_body_language_line} "
         f"Wardrobe: {wardrobe_override} {PUBLIC_WARDROBE_RULE} {wardrobe_continuity_lock} "
         "Do not substitute a different garment class, do not simplify the outfit into random basics, "
         "and do not replace the specified look with loungewear or underwear-coded clothing. "
@@ -3086,6 +3247,10 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         "scene_bank_source": scene_bank.get("source", str(PHOTO_SCENE_BANK_PATH)),
         "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
         "expression_gaze_label": expression_gaze_entry.get("label"),
+        "pose_body_language_id": pose_body_language_entry.get("pose_body_language_id"),
+        "pose_body_language_label": pose_body_language_entry.get("label"),
+        "pose_body_language_hand_risk": pose_body_language_entry.get("hand_risk"),
+        "pose_body_language_compatibility_tags": pose_body_language_entry.get("compatibility_tags"),
         "frame_action": frame_logic.get("frame_action"),
         "frame_evidence_objects": frame_logic.get("frame_evidence_objects"),
         "frame_forbidden_objects": frame_logic.get("frame_forbidden_objects"),
@@ -3171,6 +3336,10 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["scene_bank_source"] = package.get("scene_bank_source")
     meta["expression_gaze_id"] = package.get("expression_gaze_id")
     meta["expression_gaze_label"] = package.get("expression_gaze_label")
+    meta["pose_body_language_id"] = package.get("pose_body_language_id")
+    meta["pose_body_language_label"] = package.get("pose_body_language_label")
+    meta["pose_body_language_hand_risk"] = package.get("pose_body_language_hand_risk")
+    meta["pose_body_language_compatibility_tags"] = package.get("pose_body_language_compatibility_tags")
     meta["frame_action"] = package.get("frame_action")
     meta["frame_evidence_objects"] = package.get("frame_evidence_objects")
     meta["frame_forbidden_objects"] = package.get("frame_forbidden_objects")
