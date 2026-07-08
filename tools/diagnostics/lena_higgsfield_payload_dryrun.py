@@ -44,6 +44,7 @@ if str(ROOT) not in sys.path:
 from pipeline.prompting.lena_prompt_brain import (
     generate_higgsfield_prompt_package,
     HIGGSFIELD_FRAMING_LINE,
+    HIGGSFIELD_CAMERA_CONFLICT_TERMS,
 )
 
 ACTIVE_PROVIDER = "higgsfield"
@@ -132,6 +133,11 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
     higgsfield_soul_anchor_absent_from_prompt = (
         "Use my trained Soul" not in higgsfield_package["image_prompt"]
     )
+    _prompt_lower = higgsfield_package["image_prompt"].lower()
+    higgsfield_camera_conflict_terms_found = [
+        term for term in HIGGSFIELD_CAMERA_CONFLICT_TERMS if term in _prompt_lower
+    ]
+    higgsfield_camera_conflict_free = not higgsfield_camera_conflict_terms_found
 
     return {
         "date": date_str,
@@ -150,6 +156,8 @@ def build_dryrun_summary(date_str: str, slot: dict) -> dict:
         "higgsfield_native_framing_present": higgsfield_framing_present,
         "higgsfield_native_framing_line": HIGGSFIELD_FRAMING_LINE,
         "higgsfield_soul_anchor_absent_from_prompt": higgsfield_soul_anchor_absent_from_prompt,
+        "higgsfield_camera_conflict_free": higgsfield_camera_conflict_free,
+        "higgsfield_camera_conflict_terms_found": higgsfield_camera_conflict_terms_found,
         "higgsfield_soul_name": higgsfield_package["soul_name"],
         "higgsfield_soul_version": higgsfield_package["soul_version"],
         "higgsfield_soul_selection_mode": higgsfield_package["soul_selection_mode"],
@@ -198,6 +206,9 @@ def print_summary(summary: dict) -> None:
     print(f"  negative prompt enabled   : {summary['higgsfield_native_negative_prompt_enabled']} (disabled by default)")
     print(f"  full-body/three-quarter framing instruction present : {summary['higgsfield_native_framing_present']}")
     print(f"    framing line: \"{summary['higgsfield_native_framing_line']}\"")
+    print(f"  camera text free of full-body-conflicting crop language : {summary['higgsfield_camera_conflict_free']}")
+    if summary["higgsfield_camera_conflict_terms_found"]:
+        print(f"    conflicting terms found: {summary['higgsfield_camera_conflict_terms_found']}")
     print(f"  Soul anchor text absent from prompt : {summary['higgsfield_soul_anchor_absent_from_prompt']}")
     print(f"  Soul selection is metadata/provider config, not prompt text:")
     print(f"    soul_name            : {summary['higgsfield_soul_name']}")

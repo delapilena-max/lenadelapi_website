@@ -3450,6 +3450,37 @@ HIGGSFIELD_FRAMING_LINE = (
     "complete outfit from head to shoes with a little space below the shoes."
 )
 
+# Bug found during manual-test sample review (2026-07-08, same day): the
+# scene bank's own "camera" field (written for Kling, where medium-shot/
+# waist-up framing is normal) can directly contradict HIGGSFIELD_FRAMING_LINE
+# above -- e.g. "medium shot" or "waist-up composition" appearing right after
+# a line that requires full-body head-to-shoes framing. Higgsfield-specific
+# sanitizer: if the scene's camera text contains any conflicting crop/shot
+# language, replace the whole camera line with a short safe fallback instead
+# of trying to edit around the conflicting phrase. Does not touch the scene
+# bank itself -- this is a Higgsfield-builder-side sanitization step only.
+HIGGSFIELD_CAMERA_CONFLICT_TERMS = (
+    "waist-up", "waist up", "chest-up", "chest up", "close-up", "close up",
+    "tight crop", "medium shot", "cropped body", "portrait crop",
+)
+
+HIGGSFIELD_SAFE_CAMERA_TEXT = (
+    "candid full-body fashion photo, 35mm or 50mm lens, vertical 9:16, "
+    "natural friend-shot composition"
+)
+
+
+def _higgsfield_camera_conflicts_with_full_body(camera_text: str) -> bool:
+    lower = str(camera_text or "").lower()
+    return any(term in lower for term in HIGGSFIELD_CAMERA_CONFLICT_TERMS)
+
+
+def _higgsfield_safe_camera_text(camera_text: str) -> str:
+    if _higgsfield_camera_conflicts_with_full_body(camera_text):
+        return HIGGSFIELD_SAFE_CAMERA_TEXT
+    return camera_text
+
+
 HIGGSFIELD_PROMPT_BRAIN_VERSION = "lena_prompt_brain_higgsfield_native_v1"
 
 
@@ -3486,6 +3517,7 @@ def generate_higgsfield_prompt_package(
     expression_text = _clean_sentence_fragment(str(expression_gaze_entry.get("text", "")))
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
+    camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
 
     image_prompt = _clean_public_text(
