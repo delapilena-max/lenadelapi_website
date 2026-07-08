@@ -261,6 +261,20 @@ _FRAME_LOGIC_SUPPORT_FLOOR_KEYWORDS = (
 )
 FRAME_LOGIC_SUPPORT_FLOOR_CHARS = 650
 
+# Expression/gaze floor (2026-07-07): pipeline/prompting/lena_prompt_brain.py's
+# expression/gaze diversity layer inserts one short "Expression: ..." sentence
+# right after EXPRESSION_REALISM, so nearby renders don't all share the same facial
+# performance. A real 200-slot survival test showed it was dropped in 200/200 cases
+# under the real 2499-char cap (and 198/200 even before the frame-logic floors above
+# existed) -- it has never had a reserved floor, unlike every other labeled prompt
+# section. "expression:" is precise: verified to match only this one sentence type
+# (case-insensitive; the pre-existing EXPRESSION_REALISM constant's own text never
+# contains a bare "expression:" with a trailing colon). All 15 current bank entries
+# measure 74-125 chars; 180 gives comfortable margin for future entries without
+# reserving more budget than needed.
+_EXPRESSION_GAZE_FLOOR_KEYWORDS = ("expression:",)
+EXPRESSION_GAZE_FLOOR_CHARS = 180
+
 # Batch 7b (2026-07-06): the positive garment-obedience lock above has a reserved
 # floor and survives; a same-order reorder of these matching anti-substitution
 # negative terms did not help (a real functional test showed zero present in the
@@ -437,6 +451,11 @@ def _build_compact_prompt(slot: Dict[str, Any]) -> str:
     # pattern used by the Garment-obedience lock floor.
     _apply_reserved_floor(_FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_KEYWORDS, FRAME_LOGIC_ACTION_FORBIDDEN_FLOOR_CHARS)
     _apply_reserved_floor(_FRAME_LOGIC_SUPPORT_FLOOR_KEYWORDS, FRAME_LOGIC_SUPPORT_FLOOR_CHARS)
+
+    # Reserved floor pass (Expression/gaze, 2026-07-07): guarantee the one short
+    # "Expression: ..." sentence survives -- it previously had no floor at all and
+    # was measured dropped in effectively every real slot.
+    _apply_reserved_floor(_EXPRESSION_GAZE_FLOOR_KEYWORDS, EXPRESSION_GAZE_FLOOR_CHARS)
 
     for group in _SAFETY_KEYWORD_PRIORITY:
         for idx, groups in enumerate(sentence_groups):

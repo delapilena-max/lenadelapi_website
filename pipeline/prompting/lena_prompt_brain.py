@@ -1606,9 +1606,13 @@ ENVIRONMENT_CATALOG_PATH = (
 PHOTO_SCENE_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_photo_scene_bank_v1.json"
 )
+EXPRESSION_GAZE_BANK_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_expression_gaze_bank_v1.json"
+)
 FRAME_LOGIC_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_frame_logic_bank_v1.json"
 )
+KLING_WORKORDERS_ROOT = ROOT / "pipeline" / "kling_workorders"
 
 _PHOTO_SCENE_BANK_CACHE: dict | None = None
 _ENVIRONMENT_CATALOG_CACHE: dict | None = None
@@ -1641,6 +1645,150 @@ def get_production_scene_pool() -> tuple[list[dict], dict]:
         if str(scene.get("lane") or "").strip().lower() not in blocked
     ]
     return scenes, bank
+
+
+# --- Expression/gaze diversity layer (2026-07-07) ----------------------------
+#
+# Adds controlled variety to facial performance (expression, camera-relationship
+# gaze, head/pose cue) without touching identity. Deliberately kept separate from
+# scene selection: each scene's "action" field still describes the physical pose
+# and setting-specific business, but no longer has to also carry the *only*
+# expression/gaze the render will ever use for that lane. This layer supplies one
+# additional short line, filtered by a lane-compatibility tag so it never
+# contradicts the scene's own action (e.g. never pairs a low-motion sink/skincare
+# beat with "caught mid-laugh"), and avoided against whatever expression_gaze_id
+# was used on the most recent real workorders on disk so nearby slots don't repeat
+# the same performance.
+
+_EXPRESSION_GAZE_BANK_CACHE: dict | None = None
+
+# Compatibility tags: "calm_quiet" (still/low-motion, indoor-personal beats),
+# "candid_playful" (everyday errands/social, light motion), "going_out_social"
+# (dressed-up dining/nightlife/social lanes), "in_motion" (walking/transit/mid-step
+# lanes). A lane may allow more than one tag; a combo may be tagged with more than
+# one tag. This mirrors the existing LANE_STYLE_LANE_ALLOWLIST /
+# LANE_ENVIRONMENT_ALLOWLIST pattern already used for wardrobe/environment
+# selection, applied here to keep expression/gaze from fighting the scene's action.
+LANE_EXPRESSION_TAG_ALLOWLIST: dict[str, set[str]] = {
+    "morning apartment": {"calm_quiet", "candid_playful"},
+    "apartment doorway": {"in_motion", "candid_playful"},
+    "coffee shop": {"candid_playful"},
+    "rainy street": {"in_motion"},
+    "rooftop sunset": {"going_out_social", "candid_playful"},
+    "bookstore": {"calm_quiet"},
+    "grocery run": {"candid_playful"},
+    "car moment": {"calm_quiet"},
+    "studio desk": {"calm_quiet"},
+    "night out": {"going_out_social"},
+    "dinner booth": {"going_out_social"},
+    "wine bar patio": {"going_out_social"},
+    "brunch patio": {"going_out_social", "candid_playful"},
+    "sidewalk dinner": {"going_out_social", "in_motion"},
+    "lobby cocktail bar": {"going_out_social"},
+    "skincare evening": {"calm_quiet"},
+    "airport day": {"in_motion"},
+    "gym cooldown": {"calm_quiet"},
+    "laundry day": {"candid_playful", "calm_quiet"},
+    "museum afternoon": {"calm_quiet"},
+    "late kitchen snack": {"candid_playful"},
+    "flower shop": {"candid_playful"},
+    "record store": {"candid_playful"},
+    "mirror outfit check": {"calm_quiet", "going_out_social"},
+    "city bench": {"calm_quiet", "candid_playful"},
+    "elevator moment": {"in_motion", "calm_quiet"},
+}
+DEFAULT_EXPRESSION_TAGS = {"calm_quiet", "candid_playful", "going_out_social", "in_motion"}
+
+# How many of the most recent real workorder slots (across the most recent dated
+# folders under pipeline/kling_workorders/) to scan when avoiding a repeat
+# expression_gaze_id. Small and cheap -- reads real on-disk artifacts, no new
+# persistent state file.
+EXPRESSION_RECENCY_LOOKBACK_SLOTS = 6
+EXPRESSION_RECENCY_LOOKBACK_DATES = 5
+
+
+def load_expression_gaze_bank() -> dict:
+    global _EXPRESSION_GAZE_BANK_CACHE
+    if _EXPRESSION_GAZE_BANK_CACHE is None:
+        if not EXPRESSION_GAZE_BANK_PATH.exists():
+            raise SystemExit(
+                f"[ABORT] Saved expression/gaze bank missing: {EXPRESSION_GAZE_BANK_PATH}"
+            )
+        _EXPRESSION_GAZE_BANK_CACHE = json.loads(
+            EXPRESSION_GAZE_BANK_PATH.read_text(encoding="utf-8")
+        )
+    return _EXPRESSION_GAZE_BANK_CACHE
+
+
+def _recent_expression_gaze_ids(
+    lookback_dates: int = EXPRESSION_RECENCY_LOOKBACK_DATES,
+    lookback_slots: int = EXPRESSION_RECENCY_LOOKBACK_SLOTS,
+) -> set[str]:
+    """Read-only scan of the most recent real daily_workorders.json files already
+    on disk for whatever expression_gaze_id each slot's metadata recorded. Returns
+    an empty set if none found or the workorders root doesn't exist yet -- this
+    must never hard-fail prompt generation just because history is thin."""
+    if not KLING_WORKORDERS_ROOT.exists():
+        return set()
+
+    date_dirs = sorted(
+        (p for p in KLING_WORKORDERS_ROOT.iterdir() if p.is_dir()),
+        key=lambda p: p.name,
+        reverse=True,
+    )[:lookback_dates]
+
+    seen: list[str] = []
+    for date_dir in date_dirs:
+        manifest_path = date_dir / "daily_workorders.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        for slot in manifest.get("slots", []):
+            metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
+            expression_gaze_id = str(metadata.get("expression_gaze_id") or "").strip()
+            if expression_gaze_id:
+                seen.append(expression_gaze_id)
+
+    # Most-recent-first; keep only the lookback window.
+    return set(seen[-lookback_slots:]) if seen else set()
+
+
+def choose_expression_gaze_production(
+    rng: random.Random,
+    lane: str | None = None,
+    recent_used: set[str] | None = None,
+) -> dict:
+    """Selects one expression/gaze/head-pose combo. Filters by lane-compatibility
+    tag (so it never contradicts the scene's own action) and, when possible,
+    avoids whatever expression_gaze_id was used on nearby recent slots. Falls
+    back gracefully (recency filter relaxed, then tag filter relaxed) rather than
+    hard-failing production over cosmetic variety."""
+    bank = load_expression_gaze_bank()
+    combos = [dict(c) for c in bank.get("combos", [])]
+    if not combos:
+        raise SystemExit(f"[ABORT] Expression/gaze bank has no combos: {EXPRESSION_GAZE_BANK_PATH}")
+
+    allowed_tags = LANE_EXPRESSION_TAG_ALLOWLIST.get(str(lane or "").strip().lower(), DEFAULT_EXPRESSION_TAGS)
+    tag_filtered = [
+        c for c in combos
+        if allowed_tags.intersection(set(c.get("compatibility_tags") or []))
+    ] or combos
+
+    recent_used = recent_used if recent_used is not None else _recent_expression_gaze_ids()
+    non_recent = [c for c in tag_filtered if c.get("expression_gaze_id") not in recent_used]
+
+    pool = non_recent or tag_filtered
+    return rng.choice(pool)
+
+
+def format_expression_gaze_line(entry: dict) -> str:
+    text = _clean_sentence_fragment(entry.get("text", ""))
+    if not text:
+        return ""
+    return f"Expression: {text}."
 
 
 def load_environment_catalog() -> dict:
@@ -2882,6 +3030,8 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     )
     capture_lock = public_capture_lock(scene["lane"])
     wardrobe_continuity_lock = public_wardrobe_continuity_lock(wardrobe_entry, scene["lane"])
+    expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
+    expression_gaze_line = format_expression_gaze_line(expression_gaze_entry)
     frame_logic = choose_frame_logic(scene["lane"])
     frame_logic_paragraph = format_frame_logic_paragraph(frame_logic, reference_mode)
 
@@ -2904,6 +3054,7 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         f"Face and skin: {SKIN_REALISM}. "
         f"{PHOTO_REALISM} "
         f"{EXPRESSION_REALISM} "
+        f"{expression_gaze_line} "
         f"{PHONE_OBJECT_REALISM} "
         f"{SOCIAL_HOOK_FLAVOR} "
         f"Hands: {HAND_REALISM}. "
@@ -2933,6 +3084,8 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         "reference_priority": reference_priority_for_mode(reference_mode),
         "scene_bank_version": scene_bank.get("version", "unknown"),
         "scene_bank_source": scene_bank.get("source", str(PHOTO_SCENE_BANK_PATH)),
+        "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
+        "expression_gaze_label": expression_gaze_entry.get("label"),
         "frame_action": frame_logic.get("frame_action"),
         "frame_evidence_objects": frame_logic.get("frame_evidence_objects"),
         "frame_forbidden_objects": frame_logic.get("frame_forbidden_objects"),
@@ -3016,6 +3169,8 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["reference_priority"] = package.get("reference_priority")
     meta["scene_bank_version"] = package.get("scene_bank_version")
     meta["scene_bank_source"] = package.get("scene_bank_source")
+    meta["expression_gaze_id"] = package.get("expression_gaze_id")
+    meta["expression_gaze_label"] = package.get("expression_gaze_label")
     meta["frame_action"] = package.get("frame_action")
     meta["frame_evidence_objects"] = package.get("frame_evidence_objects")
     meta["frame_forbidden_objects"] = package.get("frame_forbidden_objects")
