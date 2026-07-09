@@ -3463,6 +3463,23 @@ HIGGSFIELD_FRAMING_LINE = (
     "complete outfit from head to shoes with a little space below the shoes."
 )
 
+# Body/silhouette anchor (2026-07-09, Nicolas correction): real motorcycle-lane
+# output showed Lena's hips/body silhouette drifting narrow, and the moto prop
+# taking priority over her identity. Reintroduces a dedicated silhouette line
+# (an earlier version of this existed, then was removed on 2026-07-08 -- see
+# the comment above generate_higgsfield_prompt_package() below -- as an
+# unnecessary overcorrection risk at the time; this is a deliberate reversal
+# of that decision based on newer evidence, not an accidental redo). Applied
+# globally to every Higgsfield prompt, not motorcycle-specific -- body/identity
+# comes first, props and scenes are secondary. Does not use the word "avatar"
+# (stripped by BANNED_PUBLIC_TERMS).
+HIGGSFIELD_BODY_SILHOUETTE_ANCHOR = (
+    "Silhouette: Lena keeps her consistent reference identity with a natural hourglass figure, "
+    "narrow waist, visibly wide hips, fuller hip flare, curvy lower body, hips clearly wider than her waist, "
+    "and toned legs; realistic proportions, not cartoonish. Pose and wardrobe must frame the waist-to-hip curve, "
+    "with full hips visible and no jacket, bag, arm, or prop blocking her hip line."
+)
+
 # Bug found during manual-test sample review (2026-07-08, same day): the
 # scene bank's own "camera" field (written for Kling, where medium-shot/
 # waist-up framing is normal) can directly contradict HIGGSFIELD_FRAMING_LINE
@@ -4202,18 +4219,23 @@ HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO = (
     "composed, sultry half-smile, direct confident eye contact",
 )
 
-# Reversed 2026-07-08 (Nicolas direction change, same day): an earlier version
-# of this patch added a separate, heavier "Silhouette:" prompt block (explicit
+# Reversed 2026-07-08 (Nicolas direction change, same day), then reinstated
+# 2026-07-09 (Nicolas correction, new evidence): an earlier version of this
+# patch added a separate, heavier "Silhouette:" prompt block (explicit
 # hip-flare/fuller-thighs/waist-to-hip-contrast/"not narrow"/"not slim-hipped"
-# body-geometry language). Nicolas reviewed real Higgsfield/Soul 2.0
-# photo-dump output and found the current Soul character already reads
-# attractive and high-hook -- the heavier block risked overcorrecting into
-# exaggerated body language, not fixing a confirmed problem. Removed
-# entirely. The only silhouette cue that remains is the existing soft,
-# wardrobe-embedded qualifier in HIGGSFIELD_WARDROBE_GLAM_SUFFIX below
-# ("fitted through the waist and hips for a hip-hugging silhouette") --
-# fitted/feminine/natural waist definition, not a separate body-geometry
-# reinforcement paragraph.
+# body-geometry language). On 2026-07-08 Nicolas reviewed real Higgsfield/
+# Soul 2.0 photo-dump output and found the current Soul character already
+# read attractive and high-hook -- the heavier block risked overcorrecting
+# into exaggerated body language, not fixing a confirmed problem, so it was
+# removed. On 2026-07-09, real motorcycle-lane output showed the opposite
+# failure -- Lena's hips/body silhouette drifting narrow and not matching her
+# approved identity -- so the anchor was reinstated as
+# HIGGSFIELD_BODY_SILHOUETTE_ANCHOR (defined near HIGGSFIELD_FRAMING_LINE
+# above) and is now always inserted into every Higgsfield prompt in
+# generate_higgsfield_prompt_package() below, immediately after
+# HIGGSFIELD_FRAMING_LINE. It coexists with, and does not replace, the
+# existing soft wardrobe-embedded qualifier in HIGGSFIELD_WARDROBE_GLAM_SUFFIX
+# below ("fitted through the waist and hips for a hip-hugging silhouette").
 
 
 HIGGSFIELD_PROMPT_BRAIN_VERSION = "lena_prompt_brain_higgsfield_native_v1"
@@ -4226,10 +4248,12 @@ def generate_higgsfield_prompt_package(
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
     Lena's identity/body. Soul selection is recorded as package metadata
     (soul_name/soul_version/soul_selection_mode) only, never as prompt text.
-    Wardrobe text is sanitized to a fitted/hip-hugging high-hook silhouette
-    (see _higgsfield_safe_wardrobe_text) -- this is the only silhouette cue,
-    deliberately soft/wardrobe-embedded, not a separate body-geometry
-    reinforcement block; pose and expression text are fixed reinforcement
+    A dedicated HIGGSFIELD_BODY_SILHOUETTE_ANCHOR line is always inserted
+    right after the framing line (see the comment above this function for
+    why it was reinstated 2026-07-09). Wardrobe text is additionally
+    sanitized to a fitted/hip-hugging high-hook silhouette
+    (see _higgsfield_safe_wardrobe_text) as a second, wardrobe-embedded cue;
+    pose and expression text are fixed reinforcement
     lines (HIGGSFIELD_POSE_REINFORCEMENT_LINE,
     HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE), not the raw pose/expression
     bank text; scene-action text is sanitized against known Higgsfield-glam
@@ -4296,6 +4320,7 @@ def generate_higgsfield_prompt_package(
 
     image_prompt = _clean_public_text(
         f"{HIGGSFIELD_FRAMING_LINE} "
+        f"{HIGGSFIELD_BODY_SILHOUETTE_ANCHOR} "
         f"Scene: {scene_action}, {environment_text}. "
         f"Wardrobe: {wardrobe_text}. "
         f"Pose: {pose_text}. "

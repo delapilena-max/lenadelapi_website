@@ -61,17 +61,38 @@ LEGACY_PROVIDER_STATUS = (
 )
 
 # Detection-only list, for reporting purposes in this diagnostic. Deliberately
-# NOT imported from lena_prompt_brain.py and NOT injected into any prompt --
-# per Nicolas's explicit direction (2026-07-08) against adding a forced heavy
-# body/hip-geometry reinforcement constant. This exists only to confirm none
-# of these terms leak in on their own from unrelated scene/wardrobe text.
+# NOT imported from lena_prompt_brain.py -- this list is diagnostic-only and
+# never injected into any prompt.
+#
+# Reworked 2026-07-09 (Nicolas direction change, new evidence): on 2026-07-08
+# this list existed to confirm a forced heavy body/hip-geometry block stayed
+# removed, and included ordinary body-description terms like "wide hips" for
+# that purpose. Nicolas has since reversed that decision -- real motorcycle-
+# lane output showed Lena's hips/body silhouette drifting narrow, and a
+# reusable HIGGSFIELD_BODY_SILHOUETTE_ANCHOR (in lena_prompt_brain.py) is now
+# always present in every Higgsfield prompt, using exactly this kind of
+# language ("visibly wide hips", "fuller hip flare", "waist-to-hip curve",
+# etc.) on purpose. Only the one term that was a literal substring of the
+# approved anchor text ("wide hips", inside "visibly wide hips") is removed.
+# "fuller thighs" is kept -- it is not a substring of the anchor's "fuller
+# hip flare" wording, so it does not conflict and still catches genuine
+# unrelated thigh-overcorrection drift. This list now also detects genuine
+# anatomical-distortion/overcorrection language that was never part of the
+# approved anchor -- impossible or cartoonish anatomy, exaggerated/fake
+# proportions, extreme distortion, or fetishized wording -- not the normal,
+# expected, now-required body-shape description.
 HEAVY_BODY_OVERCORRECTION_TERMS = (
-    "wide hips",
     "fuller thighs",
     "strong waist-to-hip contrast",
     "not narrow",
     "not slim-hipped",
     "outside curve of her hips",
+    "impossible anatomy",
+    "cartoonish proportions",
+    "exaggerated fake proportions",
+    "extreme body distortion",
+    "unrealistic hip size",
+    "fetishized proportions",
 )
 
 
