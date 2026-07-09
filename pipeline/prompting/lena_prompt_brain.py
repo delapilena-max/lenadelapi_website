@@ -3709,6 +3709,54 @@ HIGGSFIELD_POSE_REINFORCEMENT_LINE = (
 # separate Phase 2 that also revisits that sanitizer.
 HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS = frozenset({"seated", "in_motion"})
 
+# Live-contradiction fix (2026-07-09, Phase 2 pre-step): three lanes'
+# scene-bank action text is never touched by any HIGGSFIELD_SCENE_ACTION
+# rewrite ("sitting on a [city] bench..."/"walking through an airport
+# terminal..." -- none match "sitting at"/"sitting in"/"seated at"/
+# "walking across"/"walking away from"), so under Phase 1 (standing-safe
+# only) they could draw a universal standing pose while the scene text
+# still says sitting/walking. Confirmed as an ACTIVE production
+# contradiction for "city bench" (2/2 real seeded-pool draws showed the
+# conflict). "gym cooldown" and "airport day" are currently in
+# production_blocked_lanes -- cannot fire in default production today --
+# and are covered here defensively only, so the contradiction cannot
+# appear if either lane is later unblocked. LANE_POSE_TAG_ALLOWLIST
+# cannot fix this alone -- choose_pose_body_language_production()
+# unconditionally unions in {"universal"} for every lane, so merely
+# adding "seated"/"in_motion" to a lane's allowed tags would not remove
+# universal eligibility. This map forces the exact required pose for
+# exactly these three confirmed lanes, bypassing normal selection
+# entirely for them -- narrow, evidence-scoped, does not extend to any
+# other lane, the broader seated/in_motion categories generally, or
+# "apartment doorway" (a softer, unconfirmed case, left for a separate
+# Phase 2B). Does not touch the pose bank, scene bank, or Kling.
+HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE = {
+    "city bench": "pose_p012",
+    "gym cooldown": "pose_p012",
+    "airport day": "pose_p011",
+}
+
+
+def _higgsfield_required_pose_entry(lane_lower: str) -> dict | None:
+    """Returns the bank combo for HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE[lane_lower],
+    or None if this lane has no forced requirement. Raises rather than
+    silently falling back to normal (universal-inclusive) selection if a
+    required ID is missing from the bank -- a forced requirement must
+    never fail open, since that would recreate exactly the contradiction
+    this map exists to prevent."""
+    required_pose_id = HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE.get(lane_lower)
+    if not required_pose_id:
+        return None
+    bank = load_pose_body_language_bank()
+    for combo in bank.get("combos", []):
+        if combo.get("pose_body_language_id") == required_pose_id:
+            return dict(combo)
+    raise SystemExit(
+        f"[ABORT] HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE requires "
+        f"{required_pose_id!r} for lane {lane_lower!r}, but no such combo "
+        f"exists in the pose bank."
+    )
+
 
 def _higgsfield_wardrobe_conflicts_with_hook(wardrobe_text: str) -> bool:
     lower = str(wardrobe_text or "").lower()
@@ -4636,12 +4684,17 @@ def generate_higgsfield_prompt_package(
     ]
 
     expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
-    pose_body_language_entry = choose_pose_body_language_production(
-        rng,
-        lane=scene["lane"],
-        reference_mode=reference_mode,
-        exclude_tags=None if is_moto_lane else HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS,
-    )
+
+    required_pose_entry = None if is_moto_lane else _higgsfield_required_pose_entry(scene_lane_lower)
+    if required_pose_entry is not None:
+        pose_body_language_entry = required_pose_entry
+    else:
+        pose_body_language_entry = choose_pose_body_language_production(
+            rng,
+            lane=scene["lane"],
+            reference_mode=reference_mode,
+            exclude_tags=None if is_moto_lane else HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS,
+        )
 
     # Pose-diversity Phase 1 (2026-07-09): moto lanes keep the fixed
     # reinforcement line unchanged (no moto-tagged bank combos exist yet,
