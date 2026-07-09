@@ -261,14 +261,22 @@ explicit preferred visual benchmark, not a closed root cause.
 - Do not replace this benchmark without Nicolas's explicit approval. Do
   not resume blind prompt-wording experiments.
 
-**Current next-work status:** the provider-side aspect-ratio lookup was
-completed, the UI setting was confirmed at 3:4, and a controlled switch
-to explicit 9:16 produced two strong full-head/full-body outputs under
-Enhancer OFF. Nicolas selected the first of those two as his preferred
-Lena body benchmark. This narrows but does not universally close the
-broader body-consistency question. The next production-oriented step is
-not pre-approved; do not resume blind prompt rewrites or change the body
-anchor.
+**Current status: body-consistency workstream CLOSED FOR NOW (2026-07-09,
+later in session).** Body direction is now sufficiently validated across
+the approved benchmark and multiple varied production scenes (coffee-
+shop, brunch-patio, and a flower-shop three-run test where Nicolas
+selected image 3 as strongest on hips/body, recorded separately from a
+wardrobe-adherence miss on that same image -- maxi skirt drifted into
+cargo pants) to stop active body tuning and move forward. The body
+anchor remains frozen. Future body work should reopen only if new real-
+production evidence shows renewed narrow-hip or runway-slim drift.
+`HIGGSFIELD_BODY_SILHOUETTE_REINFORCEMENT` was evaluated and not added;
+the banked "pronounced waist-to-hip ratio" phrase stays banked for a
+future isolated A/B test only under that condition. This closure is
+scoped to body-consistency tuning only -- other prompt-assembly work
+(wardrobe, pose, expression, environment, automation) remains open. Full
+detail: the changelog's "Body-consistency workstream closed for now"
+entry.
 
 Prior benchmark (rooftop black-dress, complete-image reference; kept,
 not deleted -- see nuance above): full head-to-shoes framing, face/

@@ -2,6 +2,42 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ BODY-CONSISTENCY WORKSTREAM CLOSED FOR NOW (2026-07-09, later session) — read this before assuming active body tuning is still in progress
+>
+> Body direction is now sufficiently validated across the approved
+> benchmark and multiple varied production scenes to stop active body
+> tuning and move forward. The body anchor remains frozen. Future body
+> work should reopen only if new real-production evidence shows renewed
+> narrow-hip or runway-slim drift.
+>
+> Cumulative evidence: the Nicolas-approved black-dress benchmark, a
+> coffee-shop generalization pass, a brunch-patio generalization pass,
+> and a flower-shop three-run test -- image 3 explicitly selected by
+> Nicolas as strongest on hips/body ("3 is the best one"), recorded as a
+> body PASS and a separate wardrobe-compliance miss on the same image
+> (requested black cargo maxi skirt drifted into cargo pants) -- the two
+> are not conflated.
+>
+> **Frozen for body-consistency purposes, do not re-tune without new
+> body-failure evidence:** `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` and
+> current body/framing wording. The current successful Lena full-body
+> image baseline remains: Soul selected, Enhancer OFF, negative prompt
+> OFF, UI aspect ratio 9:16. `HIGGSFIELD_BODY_SILHOUETTE_REINFORCEMENT`
+> was evaluated and not added. The banked "pronounced waist-to-hip
+> ratio" phrase stays banked, not added, unless a future real-production
+> render shows renewed narrow-hip drift.
+>
+> **Open, non-body issues, not closed by this checkpoint:** wardrobe
+> adherence/metadata mismatch, long garments concealing hip/thigh
+> visibility, the 5-pose-variant ceiling, the away-vs-away scene-
+> expression contradiction class, fake/gibberish environment text, and
+> broader production automation/readiness.
+>
+> No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
+> install/login, no code change, no cleanup, no commit occurred producing
+> this checkpoint. Full detail: the changelog's matching "Body-
+> consistency workstream closed for now" entry.
+
 > ## ✅ NICOLAS-APPROVED PREFERRED LENA BODY BENCHMARK CHOSEN — 9:16 BLACK-BODYCON VERSION-B RENDER, ENHANCER OFF (2026-07-09, later session) — HEAD unchanged at `106be898`; read this before assuming the "BODY-CONSISTENCY QUESTION REOPENED" banner below fully describes current status
 >
 > **Narrows, does not close, the reopened body-consistency question below.**

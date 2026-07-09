@@ -9,7 +9,29 @@
 
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-09 (checkpoint: HEAD advanced to `106be898`; expression/gaze wiring and scene-expression compatibility fixed and committed; then 3/3 real production-readiness renders failed body continuity, reopening the "body target is production-ready" question the 2026-07-09 earlier checkpoint had closed; then Nicolas explicitly selected a preferred gold-standard body benchmark from a controlled 9:16/Enhancer-OFF render, narrowing but not closing that question)
+**Last updated:** 2026-07-09 (checkpoint: HEAD advanced to `106be898`; expression/gaze wiring and scene-expression compatibility fixed and committed; then 3/3 real production-readiness renders failed body continuity, reopening the "body target is production-ready" question the 2026-07-09 earlier checkpoint had closed; then Nicolas explicitly selected a preferred gold-standard body benchmark from a controlled 9:16/Enhancer-OFF render, narrowing but not closing that question; then the body-consistency workstream was closed for now after a flower-shop three-run test, with the anchor/framing baseline frozen and other prompt-assembly work left open)
+
+> **BODY-CONSISTENCY WORKSTREAM CLOSED FOR NOW (2026-07-09, later
+> session, read this before assuming active body tuning is still in
+> progress):** Full detail: `NEXT_SESSION_START.md`'s top banner and the
+> changelog's matching entry -- not restated here to avoid drift. Summary
+> only: "Body direction is now sufficiently validated across the
+> approved benchmark and multiple varied production scenes to stop
+> active body tuning and move forward. The body anchor remains frozen.
+> Future body work should reopen only if new real-production evidence
+> shows renewed narrow-hip or runway-slim drift." Evidence: benchmark +
+> coffee-shop + brunch-patio + flower-shop (image 3 selected by Nicolas
+> as strongest on hips/body, with a separate wardrobe-compliance miss on
+> the same image, not conflated with body continuity). **Frozen for
+> body-consistency purposes:** `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` and
+> body/framing wording; current successful full-body image baseline
+> preserved (Soul selected, Enhancer OFF, negative prompt OFF, UI 9:16).
+> **Not frozen:** other prompt-assembly work (wardrobe, pose, expression,
+> environment, automation) remains open for future changes. Banked, not
+> added: "pronounced waist-to-hip ratio." Open, non-body: wardrobe
+> adherence, loose-garment hip concealment, 5-pose ceiling, away-vs-away
+> expression contradictions, fake/gibberish environment text, broader
+> automation readiness.
 
 > **NICOLAS-APPROVED PREFERRED LENA BODY BENCHMARK CHOSEN (2026-07-09,
 > later session, read this before assuming the "BODY-CONSISTENCY QUESTION

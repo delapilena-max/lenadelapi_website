@@ -5779,3 +5779,87 @@ decision already made on existing renders.
 No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
 install/login, no code change, no cleanup, no commit occurred producing
 this checkpoint. Do not touch the unrelated dirty working-tree pile.
+
+## 2026-07-09 (later in session) — Body-consistency workstream closed for now: flower-shop three-run test completes the generalization evidence
+
+### A. What changed
+No code changed. Nicolas ran the exact original flower-shop readiness
+prompt (`readiness2-pack007-10-photo`) three times under the current
+successful configuration (Lena Soul selected, Prompt Enhancer OFF,
+negative prompt OFF, Higgsfield UI aspect ratio 9:16, no fixed seed,
+anchor/framing unchanged, no banked phrase added) and reviewed all
+three outputs.
+
+### B. Flower-shop three-run result
+- Image 1: good overall result, body fuller than earlier skinny
+  failures, hips improved, wardrobe stayed close to the requested long
+  black cargo skirt.
+- Image 2: weakest of the three on hip/body shape -- hips read somewhat
+  straighter/narrower than images 1 and 3.
+- Image 3: Nicolas's explicit verdict -- "3 is the best one." Strongest
+  of the three on hip width and waist-to-hip contrast, best lower-body
+  silhouette, closest to the target body direction. **Separately**, a
+  wardrobe-adherence failure: the requested black cargo maxi skirt
+  drifted into black cargo pants. Recorded as a body PASS and a
+  wardrobe-compliance miss on the same image -- the two are not
+  conflated.
+- General lesson confirmed: long/loose column garments can conceal the
+  hip-to-thigh transition and make body evaluation ambiguous --
+  concealed hips under loose garments are not automatic evidence of
+  body failure.
+
+### C. Cumulative evidence for closing the body workstream
+1. Nicolas-approved black-dress benchmark (9:16, Enhancer OFF).
+2. Successful coffee-shop generalization pass (`readiness2-pack000-00-photo`).
+3. Successful brunch-patio generalization pass (`readiness2-pack000-02-photo`).
+4. Flower-shop three-run test (`readiness2-pack007-10-photo`), image 3
+   selected by Nicolas as strongest on hips/body.
+
+### D. Decision
+"Body direction is now sufficiently validated across the approved
+benchmark and multiple varied production scenes to stop active body
+tuning and move forward. The body anchor remains frozen. Future body
+work should reopen only if new real-production evidence shows renewed
+narrow-hip or runway-slim drift."
+
+Frozen for body-consistency purposes, do not re-tune without new
+body-failure evidence: `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` and current
+body/framing wording. The current successful Lena full-body image
+baseline remains: Soul selected, Enhancer OFF, negative prompt OFF, UI
+aspect ratio 9:16. `HIGGSFIELD_BODY_SILHOUETTE_REINFORCEMENT` was
+evaluated and not added. The banked "pronounced waist-to-hip ratio"
+phrase stays banked, untested, for a future isolated A/B test only if
+renewed narrow-hip drift appears in real production.
+
+**Not frozen:** other prompt-assembly logic (wardrobe, pose, expression,
+environment, automation) remains open for future work -- this closure is
+scoped to body-consistency tuning only, not a freeze on all future
+prompt engineering.
+
+**Not claimed:** universal perfection, guaranteed future consistency
+across all possible content, or that the wardrobe-adherence miss on
+image 3 is resolved.
+
+### E. What remains open (outside the body workstream, not closed by this entry)
+- Wardrobe adherence / wardrobe-metadata mismatch (stale
+  `wardrobe_silhouette_class` labels, garment-type drift under loose
+  silhouettes -- e.g. maxi skirt -> cargo pants on flower-shop image 3).
+- Long/loose garments concealing hip-to-thigh visibility (evaluation
+  ambiguity, not necessarily a body failure).
+- The 5-pose-variant ceiling (table/bar/restaurant lanes structurally
+  forced into the same pose/camera line).
+- The away-vs-away scene-expression contradiction class (left open by
+  the `106be898` fix, scoped to forward-gaze-only).
+- Fake/gibberish text in environment signage/menu boards (flagged on the
+  coffee-shop retest, not yet addressed).
+- Broader production automation/readiness beyond body/framing tuning.
+
+### F. What must not be done
+No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
+install/login, no code change, no cleanup, no commit occurred producing
+this checkpoint. Do not re-tune the body anchor or body/framing baseline
+without new real-production body-failure evidence. Preserve Soul
+selected + Enhancer OFF + negative prompt OFF + UI 9:16 as the current
+Lena full-body image baseline unless new evidence justifies changing it.
+Do not add `HIGGSFIELD_BODY_SILHOUETTE_REINFORCEMENT` or the banked
+phrase preemptively.
