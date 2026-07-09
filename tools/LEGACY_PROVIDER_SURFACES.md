@@ -169,3 +169,54 @@ approval; none of steps 2-7 are authorized by this docs-only entry):**
 Full detail: the 2026-07-08 read-only Higgsfield provider-integration audit
 and Higgsfield docs/CLI/MCP verification (session record; not yet copied
 into a dedicated change-notes file).
+
+## Higgsfield provider-configuration doctrine (2026-07-09, docs-only)
+
+These are **provider/UI/API settings, not prompt text** -- never write any
+of the following into `image_prompt`/`prompt` strings. This section is the
+source of truth for how the eventual Higgsfield executor (step 3 in the
+sequence above, still unbuilt) must configure each generation call, and for
+what a manual UI test should set today.
+
+- **Prompt Enhancer: ON**, for all Lena manual Higgsfield tests and future
+  production, unless Nicolas explicitly says otherwise. Nicolas ran a real
+  side-by-side manual comparison directly in the Higgsfield UI (outside
+  this repo -- no executor exists yet) and found Prompt Enhancer OFF
+  produced measurably weaker Lena results: less premium fashion finish,
+  flatter image quality, a weaker hip/body read, and less natural
+  creator/influencer polish, versus the earlier Prompt-Enhancer-ON velvet
+  rooftop outputs. No code path exists today that could set this flag --
+  recorded now so the future executor skeleton builds it in from the
+  start rather than needing a later correction.
+- **Negative prompt: disabled by default** (unchanged) --
+  `generate_higgsfield_prompt_package()` in `pipeline/prompting/
+  lena_prompt_brain.py` sets `negative_prompt_enabled: False`; Soul 2.0
+  is expected to own identity/body directly without a negative-prompt
+  fight, unlike Kling's reference-image conditioning.
+- **Lena Soul: selected in provider/UI config, never written into prompt
+  text** (unchanged) -- already implemented as
+  `soul_selection_mode: "provider_config_not_prompt_text"` package
+  metadata; Prompt Enhancer follows the same pattern.
+- **Motorcycle lanes: paused/opt-in, not default production** (unchanged)
+  -- all 7 moto lanes are in `production_blocked_lanes` in
+  `pipeline/prompt_banks/lena/lena_photo_scene_bank_v1.json` as of commit
+  `1a01add9`; still present in code/scene bank for manual opt-in, not
+  deleted.
+- **Body silhouette anchor: top production priority over props/scenes**
+  (unchanged) -- `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` in
+  `pipeline/prompting/lena_prompt_brain.py`, always inserted into every
+  Higgsfield prompt (commits `1a01add9`, `7ad7ac6a`). Current wording
+  separates body shape from pose: hips must read structurally wider than
+  the waist even in a neutral standing pose, not only via a hip-pushed
+  pose.
+
+**Current creative benchmark**: the earlier Prompt-Enhancer-ON rooftop
+velvet midi dress outputs are the reference standard for Lena's
+silhouette -- narrow waist, hips clearly wider than the waist, visible
+outward hip flare, fitted wardrobe tracing the waist-to-hip curve,
+realistic but curvy, no prop blocking the hips. Judge any future manual
+test or executor output against this benchmark, not against a generic
+"looks fine" read.
+
+Full detail: `pipeline/change_notes/lena_agentic_pivot_changelog.md`'s
+2026-07-09 (later in session) entry.

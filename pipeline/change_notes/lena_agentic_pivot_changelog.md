@@ -5121,3 +5121,274 @@ touch `pipeline/prompting/lena_prompt_brain.py`,
 Kling files, or anything in `pipeline/queue/`/publish/R2/`.env`. Do not
 render, call Higgsfield/Kling live, install/login, or touch the untracked
 dirty pile beyond what is already documented above.
+
+## 2026-07-09 — Motorcycle glam pillar built, corrected twice, 5 commits
+
+### A. What changed
+Built a full motorcycle content pillar for Lena from scratch, in 5
+separately-approved, separately-validated commits, each with a real
+200-prompt dry-run before commit:
+
+1. **`06813da7` `feat: add Lena motorcycle glam prompt lane`** -- first
+   real motorcycle content. One lane (`motorcycle street glam`, matte-
+   black sport bike), a dedicated in-code wardrobe pool (5 variants, kept
+   out of the shared catalog so its safety boundaries stay under direct
+   code control), 7 pose variants swapped in for moto-lane images the same
+   way the pack builder already swaps generic pose variants, a safety
+   lock, and curator archetype (`motorsport_street_glam`) / broad-group
+   (`motorsport_or_vehicle_editorial`) recognition.
+2. **`c9f89552` `feat: expand Lena motorcycle glam prompt pillar`** --
+   Nicolas's correction: the first lane proved the plumbing worked but was
+   creatively too narrow. Expanded to 7 lanes: `heritage moto pinup`,
+   `antique cruiser editorial`, `custom chopper eye candy`, `garage grease
+   glam`, `bike wash bikini`, `desert roadside cruiser`, plus the original.
+   Added 5 more lane-restricted wardrobe variants (moto_w06-w10: halter+
+   jeans, cut-off denim shorts, coveralls, two bikini-adjacent combos) and
+   expanded `HIGGSFIELD_PHOTO_DUMP_MOTO_SCENE_KEYWORDS` so the new lanes'
+   "cruiser"/"chopper" action text still triggers moto-specific pose
+   selection. **Bug caught and fixed pre-commit**: `garage grease glam`/
+   `bike wash bikini` were pulling from the *entire* wardrobe pool instead
+   of their themed-only variants -- a 200-sample run showed zero coveralls/
+   bikini draws despite those being the whole point of those two lanes.
+   Fixed via `HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES`, restricting those
+   two lanes to their tagged variants only; reran and confirmed exact
+   1:1 match between themed-variant draws and lane draws.
+3. **`2cc6b204` `feat: add real motorcycle anchors and seductive moto
+   styling`** -- two corrections bundled in one commit. (a) Real historic
+   motorcycle model anchors: `HIGGSFIELD_MOTO_MODEL_ANCHORS`, 20 approved
+   names (Indian Chief/Scout/101 Scout/Four, Harley Knucklehead/Panhead/
+   WLA/Hydra-Glide/Duo-Glide/Shovelhead/Sportster Ironhead, Vincent Black
+   Shadow/Triumph Bonneville/Norton Commando as occasional extras, 6
+   chopper anchors), lane-restricted and drawn via `rng.choice()` the same
+   way wardrobe already is, injected into a new `_higgsfield_moto_realism_
+   clause()` function replacing the old fixed "a real parked motorcycle"
+   wording. (b) Skin-forward wardrobe/pose/expression expansion after
+   Nicolas flagged the safety lock read as conservative, not platform-
+   safe: 6 new wardrobe variants (moto_w11-w16: bandeau, tied crop tops,
+   open-jacket-over-bikini), 5 new seductive-but-editorial poses (arched
+   posture, hand on thigh/waistband, boot on foot peg), and a brand-new
+   moto-only Expression pool (`HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_
+   MOTO`, 4 variants) swapped in the same way pose already is -- the first
+   time this system has had per-lane expression variety instead of one
+   single global Expression line. **Two bugs caught and fixed pre-commit,
+   both self-inflicted collisions with the curator's own term lists**: the
+   word "sheer" inside the rewritten safety lock's "non-sheer fabric"
+   false-triggered `HOOK_WARDROBE_TERMS`' "sheer" reward term (crediting a
+   safety negation as a sexy cue -- moto score briefly read 20 instead of
+   the correct 19); the word "explicit" inside "no legs-spread or sexually
+   explicit posing" false-triggered `UNSAFE_EXPLICIT_TERMS`' "explicit"
+   hard-exclusion, silently hard-excluding all 50 moto prompts in a test
+   run (39/50 excluded) from ever reaching curation. Both reworded ("no
+   see-through material anywhere", "overtly sexual posing"), both reran
+   clean (0/50 excluded, curator picks restored).
+4. **`356a66e3` `fix: enforce motorcycle authenticity and text hygiene`**
+   -- Nicolas's first hard-QA correction, after the first real Higgsfield
+   visual test: fake/gibberish AI lettering on background signage, and
+   generic/inaccurate bike anatomy with invented logos, were both real
+   render failures. Added an anatomy-match clause (tank shape/engine
+   layout/exhaust pipes/wheels-spokes/seat/forks/handlebars visually
+   matching the named real model) and a text-hygiene clause (blank/aged/
+   blurred signage only, no gibberish lettering) to both realism-clause
+   variants (named-model and unnamed-street-glam), removed the vague
+   "Indian-style"/"Harley-style" scene-bank placeholders (3 lanes) now
+   that a real model name comes from code, and added 3 new reporting-only
+   diagnostics (`motorcycle_model_anchor_present`, `moto_logo_
+   authenticity_clause_present`, `background_text_hygiene_clause_present`,
+   plus `fake_text_avoidance_present`) plus a manual-generation doctrine
+   comment (hide/crop in post, real reference images, or verified logo add
+   in post -- three fallback options if prompt text alone proves
+   insufficient). **Bug caught and fixed pre-commit**: the word "fake" in
+   "...over a fake one" is one of the pipeline's pre-existing `BANNED_
+   PUBLIC_TERMS` (the AI-disclosure-avoidance sanitizer applied to every
+   assembled Higgsfield prompt) and got silently stripped, leaving broken
+   grammar ("...over a one"). Reworded to "an invented one," reran clean.
+5. **`a1639bb0` `fix: hide motorcycle logos and remove text surfaces`** --
+   Nicolas's second, stricter correction, after reviewing more real
+   renders: "no readable logo" still implicitly allowed a small/blank
+   badge to be visible; the real rule is that logos are never visible at
+   all -- hidden/covered/obscured by construction (turned away from
+   camera, cropped out, blocked by hand/helmet/jacket, lost in shadow or
+   glare), real or invented, verified or not. Likewise "blank/blurred
+   signs" became "no sign-shaped objects at all" -- a blank sign is still
+   a sign-shaped thing for the model to hallucinate text onto. Rewrote
+   both realism-clause variants accordingly; removed sign objects entirely
+   from 3 scene-bank lanes (`heritage moto pinup`, `antique cruiser
+   editorial` dropped their sign phrases outright; `desert roadside
+   cruiser`'s gas-station sign became a silhouette-with-lights, no
+   signage); replaced the 2 prior-commit reporting checks with 3 new ones
+   matching the escalated clause (`moto_logo_hidden_clause_present`,
+   `no_visible_motorcycle_logo_clause_present`, `no_text_surfaces_clause_
+   present`), kept `fake_text_avoidance_present` and the model-anchor
+   check unchanged. **Bug caught and fixed pre-commit**: the new `no_text_
+   surfaces` check's signature phrase, `"no readable text surfaces"`,
+   didn't actually occur in the clause text (which reads "...labels, *or*
+   readable text surfaces...", not "*no* readable text surfaces" as one
+   phrase) -- first run showed 0/30 present; fixed by correcting the
+   signature to `"readable text surfaces"` (the substring that's actually
+   there), reran to 30/30.
+
+### B. Files changed
+All 5 commits touched exactly the same 3 files each time (never more, per
+explicit per-commit approval): `pipeline/prompting/lena_prompt_brain.py`,
+`pipeline/prompt_banks/lena/lena_photo_scene_bank_v1.json` (the live scene
+source -- was untracked in git before this pillar's work began; `06813da7`
+brought it under version control for the first time, since it's the only
+mechanism that actually determines which lanes generate, `PHOTO_SCENES` in
+`lena_prompt_brain.py` being long-dead code), `tools/diagnostics/
+lena_higgsfield_prompt_library_dryrun.py`. No wardrobe-catalog, Kling,
+queue, publish, R2, or `.env` file was ever touched across any of the 5
+commits.
+
+### C. Validations run
+Every commit: `python -m py_compile` on the two `.py` files, then a real
+`python tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py --date
+2026-07-09 --library-prefix <run-name> --packs 20 --count-per-pack 10
+--select-top 20 --show-prompts --show-selected-prompts` dry-run (200
+prompts), inspected in full before approval. Final state (post-`a1639bb0`):
+all 10 pre-existing hard checks 200/200, `hard-excluded: 0`,
+`motorcycle_model_anchor_present` 28/28, `moto_logo_hidden_clause_present`
+30/30, `no_visible_motorcycle_logo_clause_present` 30/30, `no_text_
+surfaces_clause_present` 30/30, `fake_text_avoidance_present` 30/30. Zero
+render, Higgsfield/Kling call, network access, file write, or `.env`
+read at any point across all 5 commits and their validation runs --
+enforced by the diagnostic tool's own construction (stdout-only, no
+subprocess/network/SDK import, confirmed by grep each time).
+
+### D. Decisions made
+Real model anchors and skin-forward styling are both permanent production
+doctrine now, not experiments -- confirmed twice by Nicolas after seeing
+real dry-run output. Logo/text-hygiene is the more consequential decision:
+prompt-text mitigation is documented as necessary but explicitly
+insufficient on its own (Higgsfield has no ground-truth reference for "the
+real 1948 Indian Chief" beyond its own training data) -- the manual-
+generation doctrine comment in `lena_prompt_brain.py` records three real
+production fallbacks (hide/crop in post, real reference images, verified
+logo add in post) as the actual answer if prompt text alone doesn't hold
+up once more real renders are reviewed. Diagnostic checks for QA
+correctness (model anchor, logo-hidden, text-surfaces, fake-text) are
+deliberately kept reporting-only, never folded into curator scoring --
+scoring answers "how hot is this," these checks answer "is this safe to
+send," and conflating the two would be a category error.
+
+### E. Blockers / parked branches
+No Higgsfield executor exists yet -- everything in this pillar is still
+dry-run prompt generation, not a real API call. The logo-hidden/text-
+hygiene prompt-side mitigation has not yet been tested against a real
+Higgsfield render since the `a1639bb0` escalation -- the one real visual
+test that happened (which triggered the `356a66e3` correction) predates
+it. Several exact manual-test prompts (slot_id/score/model-anchor/full
+text) were extracted and handed off across this session's later turns,
+ready for the next real visual test whenever that's approved.
+
+### F. Next approved step
+None of the following is pre-approved -- each needs its own explicit
+instruction: (1) a real manual Higgsfield visual test of the post-
+`a1639bb0` logo-hidden prompts, to confirm whether prompt-text mitigation
+alone is sufficient or whether one of the three documented fallback
+options is needed in production; (2) a Higgsfield executor skeleton
+(unchanged from prior entries, still gated on separate CLI install/login
+approval); (3) folding the motorcycle pillar's real-model-anchor pattern
+back into the non-moto lanes, if useful (not discussed, not scoped).
+
+### G. What must not be done
+Do not render, call Higgsfield/Kling live, install/login, publish, promote
+the queue, or touch R2/`.env` for this pillar without separate explicit
+approval. Do not remove the reporting-only nature of the 5 moto QA checks
+by folding them into `HOOK_*` scoring. Do not soften the logo-hidden or
+no-text-surfaces clauses without an explicit Nicolas correction the way
+the two prior escalations happened. Do not touch the wardrobe-catalog
+drift or the rest of the pre-existing untracked dirty pile.
+
+## 2026-07-09 (later in session) — Body/silhouette anchor committed, motorcycle paused from default production, Higgsfield Prompt Enhancer doctrine recorded
+
+### A. What changed
+Three real commits landed on top of the motorcycle pillar (HEAD moved
+`a1639bb0` -> `1a01add9` -> `7ad7ac6a`), reversing priority back to
+Lena's body/identity coming before any prop or scene:
+
+1. **`1a01add9` `fix: prioritize Lena silhouette and pause motorcycle
+   defaults`** -- added a new, always-on `HIGGSFIELD_BODY_SILHOUETTE_
+   ANCHOR` constant to `pipeline/prompting/lena_prompt_brain.py`, inserted
+   into every Higgsfield prompt (`generate_higgsfield_prompt_package()`)
+   immediately after `HIGGSFIELD_FRAMING_LINE` and before `Scene:` --
+   global, not motorcycle-specific. This deliberately reverses the
+   2026-07-08 decision (recorded in this same changelog) to remove a
+   heavier silhouette block as an overcorrection risk; real motorcycle-
+   lane output showed the opposite failure -- hips reading narrow, the
+   bike distracting from Lena -- so Nicolas explicitly re-authorized it.
+   Same commit added all 7 motorcycle lanes to `production_blocked_lanes`
+   in `pipeline/prompt_banks/lena/lena_photo_scene_bank_v1.json` --
+   motorcycles are paused from default generation, not deleted; still
+   fully available for explicit opt-in/manual testing. A real conflict
+   was found and fixed in the same session: the diagnostic curator's own
+   `HEAVY_BODY_OVERCORRECTION_TERMS` list (`tools/diagnostics/
+   lena_higgsfield_photo_dump_dryrun.py`) still contained `"wide hips"`
+   from the 2026-07-08 removal-era check, which hard-excluded 50/50
+   prompts once the new anchor reintroduced that exact phrase -- fixed by
+   dropping only the literal conflicting term and adding real
+   overcorrection terms (`impossible anatomy`, `cartoonish proportions`,
+   `exaggerated fake proportions`, `extreme body distortion`,
+   `unrealistic hip size`, `fetishized proportions`) in its place.
+2. **`7ad7ac6a` `fix: clarify Lena structural hip silhouette anchor`** --
+   Nicolas's follow-up correction: a hip-pushed pose alone was producing
+   outputs where the pose read wide but Lena's actual underlying body
+   still looked narrow. Reworded the anchor to explicitly separate body
+   shape from pose -- hips must read structurally wider than the waist
+   "even standing straight in a neutral stance," "not something created
+   only by a hip-pushed pose," with a "visible outward hip flare" and a
+   lower body that "must never look straight, narrow, or column-shaped."
+   Same file only, same insertion point, no other files touched.
+
+Both commits were validated before landing: `py_compile` clean, and a
+real `tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py`
+50-prompt dry-run (5 packs x 10) after each commit -- all 10 hard-gating
+checks 50/50, curator selecting 10/10 requested, zero motorcycle prompts
+generated by default in either run.
+
+### B. New Higgsfield Prompt Enhancer doctrine (docs-only, no code change)
+Nicolas ran a real side-by-side manual comparison directly in the
+Higgsfield UI (outside this repo -- no executor exists yet) and found
+Prompt Enhancer OFF produced measurably weaker Lena results: less premium
+fashion finish, flatter image quality, a weaker hip/body read, and less
+natural creator/influencer polish, versus the earlier Prompt-Enhancer-ON
+velvet rooftop outputs. New standing doctrine, recorded here and in
+`tools/LEGACY_PROVIDER_SURFACES.md` (the provider-configuration source of
+truth):
+
+- **Higgsfield Prompt Enhancer: ON** for all Lena manual Higgsfield tests
+  and future production, unless Nicolas explicitly says otherwise.
+- This is a **provider/UI/API setting, not prompt text** -- never write
+  "use prompt enhancer" (or similar) inside `image_prompt`/`prompt`
+  strings. Consistent with how Soul selection is already handled
+  (`soul_selection_mode: "provider_config_not_prompt_text"` in
+  `generate_higgsfield_prompt_package()`) -- Prompt Enhancer joins Soul
+  selection as provider-config metadata for a future executor to read and
+  act on, not prompt content.
+- **Current creative benchmark**: the earlier enhancer-ON rooftop velvet
+  midi dress outputs are the reference standard for Lena's silhouette --
+  narrow waist, hips clearly wider than the waist, visible outward hip
+  flare, fitted wardrobe tracing the waist-to-hip curve, realistic but
+  curvy, no prop blocking the hips. Any future manual test or executor
+  output should be judged against this benchmark.
+- Restated alongside (unchanged, not new): negative prompt stays disabled
+  by default; Lena Soul is selected in provider/UI, never written into
+  prompt text; motorcycle lanes remain paused/opt-in
+  (`production_blocked_lanes`); the body silhouette anchor remains
+  top production priority over props/scenes.
+
+No Higgsfield executor exists yet, so there is no code path today that
+could even set a Prompt Enhancer flag -- this doctrine is recorded now so
+the eventual executor skeleton (still gated on separate CLI install/login
+approval, per `tools/LEGACY_PROVIDER_SURFACES.md`) builds it in from the
+start rather than needing a later correction.
+
+### C. What must not be done
+Do not write "prompt enhancer" language into any prompt string -- it is
+provider config, not prompt text. Do not re-litigate the 2026-07-08 vs.
+2026-07-09 silhouette-anchor reversal without new evidence -- the current
+anchor (structural, pose-independent hip language) is the settled state.
+Do not re-enable motorcycle lanes in `production_blocked_lanes` without
+explicit instruction. Do not start Higgsfield executor code, CLI
+install/login, or any live provider call from this entry alone -- each
+remains separately gated per `tools/LEGACY_PROVIDER_SURFACES.md`'s
+future implementation sequence.
