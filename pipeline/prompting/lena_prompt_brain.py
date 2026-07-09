@@ -3645,17 +3645,102 @@ HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE = (
     "completely stationary, no motion blur and no active riding"
 )
 
-# Safety/style boundaries (2026-07-09, explicit from Nicolas): no nudity, no
-# sheer/see-through nipple or areola visibility, no thong/bare-buttocks
-# focus, no fetish language, no teen/schoolgirl/underage-coded wording,
-# clearly adult, editorial fashion framing not explicit sexual framing.
+# Safety/style boundaries, revised 2026-07-09 (Nicolas correction, same
+# day): the original wording ("fully opaque fabric throughout") was
+# ambiguous and read as "cover everything," which is not what it was meant
+# to enforce -- opacity is not the same constraint as coverage area. Nicolas
+# was explicit: platform-safe does not mean conservative, and the pillar
+# should be skin-forward/seductive (bare shoulders, midriff, legs, cleavage
+# where the garment allows, bikinis, open jackets) while every hard boundary
+# below stays exactly as strict as before. This wording now states the real
+# constraint precisely: chest and groin coverage/opacity, not overall skin
+# exposure. "No visible genitals" and "no legs-spread pose" added explicitly
+# (previously only implied by "no explicit sexual pose").
 HIGGSFIELD_MOTO_SAFETY_LOCK = (
-    " Editorial fashion styling only, not underwear or fetish wear; fully "
-    "opaque fabric throughout, no see-through material anywhere, no nipple "
-    "or areola visibility; no exposed thong or bare-buttocks framing; "
-    "confident adult model energy, clearly adult, never schoolgirl or "
-    "underage-coded styling."
+    " Editorial fashion/pinup styling, not fetish or underwear-only "
+    "content; bare skin -- shoulders, midriff, legs, cleavage where the "
+    "garment allows -- is expected and fine, but chest and groin stay "
+    "fully covered by opaque, non-see-through fabric with no nipple, "
+    "areola, or genital visibility; no exposed thong or bare-buttocks "
+    "framing; no legs-spread pose or overtly sexual posing; confident adult "
+    "model energy, clearly adult, never schoolgirl or underage-coded "
+    "styling."
 )
+
+# Real motorcycle model anchors (2026-07-09, Nicolas correction): the
+# original realism clause only ever said "a real parked motorcycle" --
+# directionally fine but not a concrete visual anchor. Nicolas's approved
+# list, real historic models/families, drawn per-lane via rng.choice() the
+# same way wardrobe is (see HIGGSFIELD_MOTO_WARDROBE_VARIANTS below) so a
+# real 20-pack sample surfaces genuine variety instead of one bike per lane
+# forever. Doctrine: use the real name as a visual anchor, never ask for a
+# readable logo/emblem (see HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE's suffix
+# below). "lanes": frozenset() is not used here -- every anchor is
+# explicitly scoped to the lane(s) it fits; motorcycle street glam
+# deliberately has no entries and keeps its unnamed modern sport-bike
+# wording, per Nicolas's explicit instruction to leave that one lane alone
+# "for now."
+HIGGSFIELD_MOTO_MODEL_ANCHORS = (
+    {"model": "restored 1948 Indian Chief", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP})},
+    {"model": "Indian Chief", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP, HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE})},
+    {"model": "Indian Scout", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP, HIGGSFIELD_MOTO_LANE_GARAGE_GREASE, HIGGSFIELD_MOTO_LANE_BIKE_WASH, HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE})},
+    {"model": "Indian 101 Scout", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP})},
+    {"model": "Indian Four", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP})},
+    {"model": "1940s Harley-Davidson Knucklehead", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    {"model": "Harley-Davidson Panhead", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER, HIGGSFIELD_MOTO_LANE_GARAGE_GREASE, HIGGSFIELD_MOTO_LANE_BIKE_WASH})},
+    {"model": "Harley-Davidson WLA", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER, HIGGSFIELD_MOTO_LANE_GARAGE_GREASE})},
+    {"model": "Harley-Davidson Hydra-Glide", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER, HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE})},
+    {"model": "Harley-Davidson Duo-Glide", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    {"model": "Harley-Davidson Shovelhead", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    {"model": "Harley-Davidson Sportster Ironhead", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    # Occasional non-American heritage bikes -- Nicolas's own "occasional"
+    # framing, so these only fit the vintage-editorial lane, not repeated
+    # across every lane.
+    {"model": "Vincent Black Shadow", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    {"model": "Triumph Bonneville", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    {"model": "Norton Commando", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER})},
+    # Chopper anchors -- exclusive to the chopper lane, matches Nicolas's
+    # explicit "chopper anchors" list one-to-one.
+    {"model": "Panhead chopper", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+    {"model": "Knucklehead chopper", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+    {"model": "Shovelhead chopper", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+    {"model": "Indian Chief bobber", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+    {"model": "old-school hardtail chopper", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+    {"model": "long-fork custom chopper", "lanes": frozenset({HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER})},
+)
+
+# Chopper/bobber anchor names already end in a bike-type noun ("chopper",
+# "bobber"), so appending the generic "motorcycle" suffix in the realism
+# clause below would read as a doubled noun ("Panhead chopper motorcycle").
+# Checked against this suffix list instead of hardcoding per-name.
+HIGGSFIELD_MOTO_MODEL_ANCHOR_SELF_DESCRIBING_SUFFIXES = ("chopper", "bobber")
+
+
+def _higgsfield_moto_realism_clause(scene_lane_lower: str, rng: random.Random) -> str:
+    """Builds the always-on bike-realism clause for one moto-lane image,
+    injecting a real model anchor drawn from HIGGSFIELD_MOTO_MODEL_ANCHORS
+    when the lane has eligible anchors (every vintage lane); falls back to
+    the original unnamed generic wording for motorcycle street glam, which
+    intentionally has no anchor pool. Doctrine line at the end (no readable
+    logo/emblem required) is Nicolas's explicit instruction, stated as
+    prompt guidance so the image model doesn't over-fixate on rendering a
+    specific badge."""
+    eligible_anchors = [
+        anchor for anchor in HIGGSFIELD_MOTO_MODEL_ANCHORS if scene_lane_lower in anchor["lanes"]
+    ]
+    if not eligible_anchors:
+        return HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE
+    model = rng.choice(eligible_anchors)["model"]
+    model_lower = model.lower()
+    noun = "" if model_lower.endswith(HIGGSFIELD_MOTO_MODEL_ANCHOR_SELF_DESCRIBING_SUFFIXES) else " motorcycle"
+    return (
+        f"with a real parked {model}{noun} fully in frame -- visible chrome "
+        "details, mirrors, a real seat, and the kickstand down, engine off, "
+        "completely stationary, no motion blur and no active riding, "
+        "subtle period-correct styling without needing readable logos or "
+        "emblems"
+    )
+
 
 # "lanes": frozenset() means usable across any moto lane; a non-empty
 # frozenset restricts the variant to only those lanes (used for
@@ -3751,16 +3836,22 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
         ),
     },
     {
+        # Revised 2026-07-09 (Nicolas correction): the original high-neck
+        # tank read as too conservative for the lane's "eye candy" brief.
+        # Swapped for a scoop-neck bandeau underneath -- still fully covers
+        # her chest (opaque, no nipple/areola), but shows shoulders/collar-
+        # bone/upper chest skin the way the lane is supposed to.
         "outfit_id": "moto_w08",
-        "name": "greasy coveralls + suspenders, chest covered",
+        "name": "greasy coveralls + suspenders, bandeau underneath",
         "silhouette_class": "moto_editorial_coveralls",
         "lanes": frozenset({HIGGSFIELD_MOTO_LANE_GARAGE_GREASE}),
         "prompt": (
-            "a fitted black tank top fully covering her chest, worn under "
-            "unbuttoned denim coveralls pulled down to the waist with the "
-            "sleeves tied at her hips, suspenders resting loosely over bare "
-            "shoulders on top of the tank, a shop rag tucked in one back "
-            "pocket, scuffed work boots"
+            "a fitted scoop-neck bandeau top fully covering her chest, worn "
+            "under unbuttoned denim coveralls pulled down low to the waist "
+            "with the sleeves tied at her hips, bare shoulders and midriff "
+            "visible above the coveralls, suspenders resting loosely over "
+            "bare shoulders, smudges of grease on her collarbone, a shop "
+            "rag tucked in one back pocket, scuffed work boots"
         ),
     },
     {
@@ -3792,6 +3883,120 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
             "bikini bottoms (not a thong), a thin gold anklet, rubber pool "
             "sandals, a small towel draped over one shoulder, sun-warmed "
             "skin"
+        ),
+    },
+    # moto_w11-w16 added 2026-07-09 (Nicolas correction): skin-forward
+    # expansion -- bare shoulders/midriff/legs/cleavage, bikinis, open
+    # jackets -- available to the vintage lanes (heritage pinup, antique
+    # cruiser, custom chopper, desert roadside, plus the original street-
+    # glam lane). garage grease glam and bike wash bikini keep their
+    # existing exclusive, themed-only pools untouched (moto_w08/moto_w10).
+    {
+        "outfit_id": "moto_w11",
+        "name": "bandeau top + leather mini skirt",
+        "silhouette_class": "moto_editorial_bandeau_mini",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted bandeau top with a scoop neckline showing cleavage "
+            "and bare shoulders, bare midriff, a low-rise leather mini "
+            "skirt, tall lace-up boots, a thin layered gold necklace"
+        ),
+    },
+    {
+        "outfit_id": "moto_w12",
+        "name": "tied crop top + low-rise jeans",
+        "silhouette_class": "moto_editorial_crop_jeans",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted ribbed tank knotted at the waist into a crop top, "
+            "bare midriff, low-rise faded denim jeans, tall lace-up boots, "
+            "a slim leather belt"
+        ),
+    },
+    {
+        "outfit_id": "moto_w13",
+        "name": "open moto jacket over bikini top + leather mini skirt",
+        "silhouette_class": "moto_editorial_open_jacket_bikini",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "an open cropped leather moto jacket worn over a fitted "
+            "triangle bikini top (full-coverage, not a thong), bare "
+            "shoulders and midriff visible under the open jacket, a "
+            "low-rise leather mini skirt, tall lace-up boots"
+        ),
+    },
+    {
+        "outfit_id": "moto_w14",
+        "name": "halter bikini top + cut-off denim shorts + open jacket",
+        "silhouette_class": "moto_editorial_bikini_denim",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted halter bikini top (full-coverage, not a thong) under "
+            "an open cropped denim moto jacket draped loosely off one "
+            "shoulder, high-waist cut-off denim shorts, tall lace-up boots, "
+            "sunglasses pushed into her hair"
+        ),
+    },
+    {
+        "outfit_id": "moto_w15",
+        "name": "bandeau top + cut-off denim shorts",
+        "silhouette_class": "moto_editorial_bandeau_shorts",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted bandeau top showing bare shoulders and midriff, "
+            "high-waist cut-off denim shorts, bare legs, tall lace-up "
+            "boots, a thin gold anklet"
+        ),
+    },
+    {
+        "outfit_id": "moto_w16",
+        "name": "tied crop top + low-rise leather pants",
+        "silhouette_class": "moto_editorial_crop_leather_pants",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted ribbed top knotted at the waist into a crop top, bare "
+            "midriff, low-rise black leather pants, a cropped moto jacket "
+            "tied at the waist, chunky combat-style boots"
         ),
     },
 )
@@ -3934,6 +4139,22 @@ HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE = (
     "faint smirk, relaxed eyes, composed confident look, direct eye contact"
 )
 
+# Motorsport/heritage-motorcycle expression pool (2026-07-09, Nicolas
+# correction): the single global Expression line above is shared by every
+# prompt in the system, not lane-specific, and reads as too neutral for the
+# skin-forward/seductive direction this pillar needs. Swapped in for moto-
+# lane images only, in generate_higgsfield_photo_dump_pack() below, the same
+# way HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO already replaces the fixed
+# Pose line -- a proven pattern, not a new mechanism. Still editorial, not
+# pornographic: no wording implies an explicit act.
+HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO = (
+    "confident pinup smile, chin lightly lowered, eyes up toward the camera",
+    "faint smirk, detached seductive gaze, direct eye contact",
+    "chin turned back over one shoulder toward the camera, seductive "
+    "unbothered look",
+    "composed, sultry half-smile, direct confident eye contact",
+)
+
 # Reversed 2026-07-08 (Nicolas direction change, same day): an earlier version
 # of this patch added a separate, heavier "Silhouette:" prompt block (explicit
 # hip-flare/fuller-thighs/waist-to-hip-contrast/"not narrow"/"not slim-hipped"
@@ -3985,7 +4206,9 @@ def generate_higgsfield_prompt_package(
     scene_lane_lower = str(scene.get("lane") or "").strip().lower()
     is_moto_lane = scene_lane_lower in HIGGSFIELD_MOTO_LANES
     if is_moto_lane:
-        environment_text = f"{environment_text}, {HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE}"
+        environment_text = (
+            f"{environment_text}, {_higgsfield_moto_realism_clause(scene_lane_lower, rng)}"
+        )
         if scene_lane_lower in HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES:
             eligible_moto_variants = [
                 variant
@@ -4263,6 +4486,22 @@ HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO = (
     "posture",
     "standing beside the motorcycle with one hand at her jacket zipper as "
     "if adjusting it, weight on one hip, full outfit visible",
+    # Added 2026-07-09 (Nicolas correction: seductive-but-editorial pose
+    # expansion). Every variant stays positional/fashion-editorial -- none
+    # imply an explicit act, a legs-spread pose, or active riding.
+    "arched fashion posture leaning back against the parked motorcycle, "
+    "one hand trailing down her thigh, hip pushed outward, confident "
+    "detached gaze",
+    "standing beside the motorcycle with one hand resting low at her "
+    "waistband, hip pushed toward the bike, full outfit visible",
+    "leaning against the parked motorcycle with one boot propped on the "
+    "foot peg, weight on the other leg, arched posture, confident detached "
+    "gaze",
+    "standing beside the motorcycle brushing her hair back with one hand, "
+    "chin lowered, eyes lifted toward the camera",
+    "standing beside the motorcycle with her chin turned back over one "
+    "shoulder toward the camera, detached seductive gaze, body angled "
+    "toward the bike",
 )
 
 # Full set, exposed for the diagnostic's "is this a known pose variant"
@@ -4428,6 +4667,24 @@ def generate_higgsfield_photo_dump_pack(
                 old_pose_line, new_pose_line
             )
         chosen_package["photo_dump_pose_variant"] = pose_variant
+
+        # Photo-dump-only expression substitution (2026-07-09, Nicolas
+        # correction), same pattern as the pose swap above: motorcycle-lane
+        # images only get a seductive/pinup expression variant instead of
+        # the single global neutral Expression line every other lane keeps.
+        # Deterministic rotation by image index, same as pose.
+        lane_lower = str(chosen_package.get("lane", "")).strip().lower()
+        if lane_lower in HIGGSFIELD_MOTO_LANES:
+            expression_variant = HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO[
+                i % len(HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO)
+            ]
+            old_expression_line = f"Expression: {HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE}."
+            new_expression_line = f"Expression: {expression_variant}."
+            for text_key in ("image_prompt", "prompt", "positive_prompt"):
+                chosen_package[text_key] = chosen_package[text_key].replace(
+                    old_expression_line, new_expression_line
+                )
+            chosen_package["photo_dump_expression_variant"] = expression_variant
 
         # Re-derive the hook/low-hook/mood fields against the final,
         # pose-substituted prompt text -- what gets reported must match what

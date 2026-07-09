@@ -52,9 +52,62 @@ from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
+    HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE,
+    HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO,
 )
 
 DEFAULT_PACKS = 3
+
+# Real motorcycle model anchors (2026-07-09, Nicolas correction) -- must
+# stay in sync with HIGGSFIELD_MOTO_MODEL_ANCHORS in lena_prompt_brain.py.
+# Checked against the full final prompt text, lowercased. "motorcycle
+# street glam" is deliberately excluded from MOTORCYCLE_VINTAGE_LANES: it
+# intentionally keeps its unnamed modern sport-bike wording, per Nicolas's
+# explicit instruction to leave that one lane alone "for now" -- so it is
+# never reported as "missing" an anchor.
+MOTORCYCLE_VINTAGE_LANES = frozenset(
+    {
+        "heritage moto pinup",
+        "antique cruiser editorial",
+        "custom chopper eye candy",
+        "garage grease glam",
+        "bike wash bikini",
+        "desert roadside cruiser",
+    }
+)
+MOTORCYCLE_MODEL_ANCHOR_TERMS = (
+    "indian chief", "indian scout", "indian 101 scout", "indian four",
+    "knucklehead", "panhead", "harley-davidson wla", "hydra-glide",
+    "duo-glide", "shovelhead", "sportster ironhead", "vincent black shadow",
+    "triumph bonneville", "norton commando", "bobber", "hardtail chopper",
+    "long-fork",
+)
+
+
+def _motorcycle_model_anchor_present(lane: str, prompt_text: str) -> bool | None:
+    """True/False for the 6 vintage moto lanes (real model-anchor check);
+    None ("not applicable") for every other lane, including motorcycle
+    street glam, which intentionally has no anchor pool."""
+    if str(lane or "").strip().lower() not in MOTORCYCLE_VINTAGE_LANES:
+        return None
+    lower = prompt_text.lower()
+    return any(term in lower for term in MOTORCYCLE_MODEL_ANCHOR_TERMS)
+
+
+# Correction (2026-07-09, Nicolas's moto-expression-pool patch): the
+# imported single-pack validator's expression_reinforcement_present check
+# only recognizes the single global HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
+# -- it predates HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO and doesn't
+# know about it (that file isn't in this patch's allowed scope). Left
+# uncorrected, every one of the ~38 moto-lane images in a typical library
+# run would be falsely reported as "missing" expression reinforcement, when
+# they actually carry a real (better, lane-appropriate) expression line.
+# Recomputed here at the library level, mirroring the exact "OR any known
+# variant" pattern pose_reinforcement_present already uses.
+def _expression_reinforcement_present(prompt_text: str) -> bool:
+    return HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE in prompt_text or any(
+        variant in prompt_text for variant in HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO
+    )
 
 # The validation-count keys reported by build_report(), reused verbatim here
 # so the library aggregate matches the single-pack tool's own definitions.
@@ -84,10 +137,16 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
 
     total_prompts = sum(len(p["images"]) for p in pack_reports)
 
+    # "expression_reinforcement_present" is excluded from this pass and
+    # recomputed per-image in the loop below via _expression_reinforcement_
+    # present() -- see that function's docstring for why.
     aggregate_validation_counts = {}
     for key in VALIDATION_LABELS:
+        if key == "expression_reinforcement_present":
+            continue
         passed = sum(p["validation_counts"][key][0] for p in pack_reports)
         aggregate_validation_counts[key] = (passed, total_prompts)
+    expression_reinforcement_corrected = 0
 
     lane_distribution: Counter = Counter()
     silhouette_distribution: Counter = Counter()
@@ -96,6 +155,9 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
     all_prompt_texts: list[str] = []
     warning_count = 0
     pack_summaries = []
+    motorcycle_anchor_checked = 0
+    motorcycle_anchor_present = 0
+    motorcycle_anchor_missing_slot_ids: list[str] = []
 
     for pack_report in pack_reports:
         lane_distribution.update(pack_report["lane_distribution"])
@@ -108,6 +170,15 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
         for image in pack_report["images"]:
             hook_term_distribution.update(image["validation"]["hook_terms_found"])
             all_prompt_texts.append(image["image_prompt"])
+            anchor_result = _motorcycle_model_anchor_present(image["lane"], image["image_prompt"])
+            if anchor_result is not None:
+                motorcycle_anchor_checked += 1
+                if anchor_result:
+                    motorcycle_anchor_present += 1
+                else:
+                    motorcycle_anchor_missing_slot_ids.append(image["slot_id"])
+            if _expression_reinforcement_present(image["image_prompt"]):
+                expression_reinforcement_corrected += 1
 
         pack_summaries.append(
             {
@@ -122,6 +193,11 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
                 "pose_scene_match_pass_count": pack_report["validation_counts"]["pose_scene_match_pass"],
             }
         )
+
+    aggregate_validation_counts["expression_reinforcement_present"] = (
+        expression_reinforcement_corrected,
+        total_prompts,
+    )
 
     prompt_text_counts = Counter(all_prompt_texts)
     duplicate_prompt_count = sum(c - 1 for c in prompt_text_counts.values() if c > 1)
@@ -142,6 +218,9 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
         "hook_term_distribution": dict(hook_term_distribution.most_common()),
         "warning_count": warning_count,
         "duplicate_prompt_count": duplicate_prompt_count,
+        "motorcycle_anchor_checked": motorcycle_anchor_checked,
+        "motorcycle_anchor_present": motorcycle_anchor_present,
+        "motorcycle_anchor_missing_slot_ids": motorcycle_anchor_missing_slot_ids,
         "pack_reports": pack_reports,
     }
 
@@ -165,6 +244,15 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
     for key, label in VALIDATION_LABELS.items():
         count, total = library["aggregate_validation_counts"][key]
         print(f"  {label:<58}: {count}/{total}")
+    print()
+
+    print(
+        "motorcycle model anchor present (vintage moto lanes only, "
+        f"motorcycle street glam excluded by design): "
+        f"{library['motorcycle_anchor_present']}/{library['motorcycle_anchor_checked']}"
+    )
+    if library["motorcycle_anchor_missing_slot_ids"]:
+        print(f"  !! missing a real model anchor: {library['motorcycle_anchor_missing_slot_ids']}")
     print()
 
     print(f"aggregate lane distribution           : {library['lane_distribution']}")
@@ -261,6 +349,10 @@ HOOK_WARDROBE_TERMS = (
     # Added 2026-07-09 (heritage-motorcycle breadth expansion): terms from
     # the 6 new wardrobe variants (moto_w06-w10) not already covered above.
     "leather seat", "suspenders", "coveralls", "bikini", "gloves", "helmet",
+    # Added 2026-07-09 (Nicolas correction: skin-forward/seductive
+    # expansion): terms from moto_w11-w16 not already covered above.
+    "bandeau", "crop top", "midriff", "cleavage", "tied top", "open jacket",
+    "bikini top", "cut-off denim shorts", "low-rise",
 )
 
 # Bank-label keywords, not prompt text -- see module comment above for why.
@@ -301,10 +393,20 @@ HOOK_SCENE_REWARD_TERMS = (
     # Added 2026-07-09 (motorsport/street-glam lane).
     "motorcycle", "sport bike", "garage", "industrial",
     # Added 2026-07-09 (heritage-motorcycle breadth expansion), per
-    # Nicolas's explicit reward-term list.
+    # Nicolas's explicit reward-term list. "indian-style"/"harley-style" are
+    # now stale (removed from the scene bank text once real model anchors
+    # were added below) but kept harmlessly in case older cached samples or
+    # future scene edits still reference them.
     "indian-style", "heritage cruiser", "antique cruiser", "harley-style",
     "custom chopper", "chrome", "engine block", "exhaust pipes",
     "bike wash", "roadside", "gas station", "americana",
+    # Added 2026-07-09 (real motorcycle model anchors, Nicolas correction):
+    # matches HIGGSFIELD_MOTO_MODEL_ANCHORS in lena_prompt_brain.py.
+    "indian chief", "indian scout", "indian 101 scout", "indian four",
+    "knucklehead", "panhead", "harley-davidson wla", "hydra-glide",
+    "duo-glide", "shovelhead", "sportster ironhead", "vincent black shadow",
+    "triumph bonneville", "norton commando", "bobber", "hardtail chopper",
+    "long-fork",
 )
 # Deliberately does NOT include record shop/night market/bodega/corner
 # shop/music venue/vintage shop/theater (2026-07-09, Nicolas direction):
