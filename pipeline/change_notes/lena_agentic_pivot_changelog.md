@@ -5863,3 +5863,226 @@ selected + Enhancer OFF + negative prompt OFF + UI 9:16 as the current
 Lena full-body image baseline unless new evidence justifies changing it.
 Do not add `HIGGSFIELD_BODY_SILHOUETTE_REINFORCEMENT` or the banked
 phrase preemptively.
+
+## 2026-07-09 (later session) — Higgsfield production-readiness hardening: 5 commits (wardrobe metadata, environment text risk, Phase 1 pose wiring, downward-object gaze conflict, live-contradiction pose fix)
+
+### A. What changed
+Five narrow, evidence-based fixes to the Higgsfield generation path in
+`pipeline/prompting/lena_prompt_brain.py` (plus two diagnostic-tool files
+for the first two), each individually diagnosed on a 120-candidate seeded
+`build_library_report()` pool, proposed as a minimal scoped diff,
+implemented, validated against a captured pre-patch baseline, and
+committed only after explicit approval. HEAD advanced
+`1d742f24 -> cca6c1b2 -> 5b90e36a -> db688b47 -> 13b82cf7 -> 10f9b1d7`.
+
+**1. `cca6c1b2` `fix: add effective Higgsfield wardrobe metadata`**
+`wardrobe_silhouette_class` was computed from the raw catalog entry
+*before* the Higgsfield-only safe-wardrobe fallback substitution could
+run, so it could disagree with the actual rendered `Wardrobe:` text. A
+120-sample audit found 17/120 confirmed real cases (12 stale-after-
+fallback, 5 a pre-existing substring-matching gap in the raw
+classifier). Fix: added `effective_wardrobe_silhouette_class`, computed
+from the final wardrobe text via a new shared classifier
+(`classify_effective_wardrobe_silhouette()`), returned alongside the
+unchanged raw field. The diagnostic tool's own duplicate classifier was
+retired in favor of importing the shared one. **`wardrobe_silhouette_class`
+itself, Kling's `generate_prompt_package()`, Kling sexy/skin-showing
+scoring, and Kling recency memory are all untouched** -- a real
+consumer audit found Kling depends on the raw field's exact legacy
+vocabulary. Validated: 120/120 raw field unchanged, 120/120 effective
+field populated and text-verified, 120/120 `image_prompt` byte-identical
+to baseline, 0 Kling references to the new field/function.
+
+**2. `5b90e36a` `fix: reduce Higgsfield environment text risk`**
+5 live scene-bank environment phrases (coffee-shop "handwritten menu
+board", grocery-run "handwritten price signs", sidewalk-dinner "menu
+stands", airport "gate signs blurred", record-store "posters on the
+wall") explicitly invited fake/gibberish rendered text -- 23/120 in
+audit, concentrated 100% in whichever lane drew (coffee shop, sidewalk
+dinner). Fix: a Higgsfield-only exact-phrase substitution
+(`HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS` / `_higgsfield_safe_environment_text()`)
+swapping each for an equally rich non-text detail (e.g. "espresso
+machine and pastry case"), operating only on the in-memory
+`environment_text` string inside `generate_higgsfield_prompt_package()`
+-- **does not touch the shared scene-bank JSON** (also read by Kling) and
+does not add a universal negative clause (would contradict the scene's
+own positive instruction). Validated: 0/120 post-patch hits (was 23),
+97/120 byte-identical, 23/120 changed by exactly the approved
+substitution, richness manually spot-checked as preserved. **Important
+caveat: this removed the five known prompt-created text-surface
+invitations found in the audit; provider-side hallucinated/gibberish
+text on unrequested surfaces remains a separate unresolved risk.**
+
+**3. `db688b47` `fix: wire standing-safe pose bank into Higgsfield`**
+The single-image builder always used one hardcoded pose line
+(`HIGGSFIELD_POSE_REINFORCEMENT_LINE`); the pack builder swapped that
+for one of only 5 hardcoded mirror/car/table/generic variants. Meanwhile
+a real 18-combo, lane-filtered, attitude-weighted pose bank was selected
+every time (`choose_pose_body_language_production()`) but its text was
+always discarded -- the same "selected but inert metadata" pattern as
+fix #1 above, confirmed via `pose_body_language_id`/`label` never
+matching rendered text (0% match rate). **Phase 1**: wired the real bank
+text into Higgsfield for standing-safe categories only -- added an
+`exclude_tags` parameter to `choose_pose_body_language_production()`
+(default `None`, Kling's call site unaffected byte-for-byte) and
+`HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS = frozenset({"seated", "in_motion"})`,
+excluded via a strict filter that raises rather than falling back to the
+unfiltered pool. `seated`/`in_motion` stay excluded this phase because
+`_higgsfield_sanitize_scene_action()` still rewrites sitting/walking
+scene language into standing equivalents -- restoring those pose
+categories now would recreate the scene/pose contradiction that
+sanitizer exists to prevent. The old pack-level civilian substitution
+mechanism was reconciled (gated to moto-lanes-only, which are exempted
+from the bank-wiring and keep the old fixed line so the mechanism's
+search string still matches) rather than left to silently no-op with
+stale metadata. Result: 5 -> 13 unique rendered pose texts, hip-push
+language 88% -> 19%, 0% seated/in-motion leakage, 100%
+`pose_body_language_id` <-> rendered-text match (was 0%), no lane
+100%-pose-locked (was 6 lanes). Two disclosed, non-blocking watch-items
+(not fixed, evidence-gated for later): `pose_p005`/`pose_p006`
+("leaning against the counter"/"the railing") occasionally drawn for
+`rooftop sunset`, whose scene text doesn't literally name either surface
+(2/120); the "mirror outfit check" lane lost its dedicated
+mirror/phone-check gesture (no bank equivalent exists) but a
+supplementary probe found it remains compatible with the 8 generic poses
+it now draws, no hard contradiction. Motorcycle lanes exempted, fully
+unchanged.
+
+**4. `13b82cf7` `fix: prevent Higgsfield downward-object gaze conflicts`**
+The existing scene-vs-expression compatibility check
+(`_higgsfield_expression_scene_conflict_terms()`, from the `106be898`
+fix) only ever inspected `HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS` against
+away-gaze scene text -- any other expression, including every "away"
+gaze combo, was never checked at all. A 120-sample audit found this gap
+is mostly harmless (13 "soft tension" cases -- a camera-adjacent/
+generic-away expression paired with a camera-leaning scene reads as
+normal photographic variety, deliberately left unsuppressed) but
+`exp_g013` ("looking down at an object in her hands") is a real
+exception: unlike `exp_g007` (which resolves back to the camera in its
+own text), it names a concrete, unconditional away-target, and 3/3 real
+occurrences conflicted (car moment's "looking out the window" x2,
+brunch patio's "glancing toward the camera" x1). Fix: added
+`HIGGSFIELD_EXPRESSION_DOWNWARD_OBJECT_CONFLICT_IDS = {"exp_g013"}` and
+a matching narrow term list, checked via a second branch in the same
+function -- `_higgsfield_safe_expression_text()` required no changes,
+since it already falls back generically on any non-empty conflict list.
+Deliberately excludes "looking down at the flowers" (flower shop) and
+any bare "looking down"/"glancing down" scene phrasing -- the flowers
+can plausibly be the referenced object, confirmed via direct unit check
+(`conflict_terms == []`). Validated: 3/3 `exp_g013` conflicts fixed,
+117/120 byte-identical, 3/120 changed by exactly the Expression:
+substitution, all 4 named soft-tension IDs (`exp_g002`/`exp_g003`/
+`exp_g006`/`exp_g009`) confirmed unchanged, `exp_g017` checked as a
+watch-item and found already camera-compatible (no fix needed).
+Metadata truth preserved and explicitly reported, not glossed over:
+`expression_gaze_id`/`label` still reflect the *originally selected*
+`exp_g013`/`looking_down_at_object` even when the fallback renders --
+`expression_text` is the field that reflects the real rendered text, and
+`expression_safe_fallback_used`/`fallback_reason`/`conflict_terms`
+disclose the substitution honestly, same pre-existing pattern as
+`exp_g008`'s pose-conflict fallback.
+
+**5. `10f9b1d7` `fix: enforce scene-compatible Higgsfield poses`**
+A narrow Phase 2 pre-step/live-contradiction fix, not full Phase 2.
+Three lanes' scene-bank action text is never touched by any
+`HIGGSFIELD_SCENE_ACTION` rewrite ("sitting on a [city] bench..."/
+"walking through an airport terminal..." -- none match "sitting at"/
+"sitting in"/"seated at"/"walking across"/"walking away from"), so under
+Phase 1 (standing-safe only) they could draw a universal standing pose
+while the scene text still said sitting/walking. **Active live
+production fix:** `city bench` was active in default production; the
+exact seeded pool reproduced 2/2 contradictory `city bench` prompts
+before the fix (scene said "sitting on a city bench," selected poses
+were standing/hip-angled). Fix: a new
+`HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE` map bypasses normal
+`choose_pose_body_language_production()` selection entirely for the
+mapped lanes, forcing a specific real bank combo instead -- structural
+prevention, not probabilistic reduction. After the fix: 0/2
+contradictions, both `city bench` candidates use `pose_p012`, rendered
+text matches the real bank entry exactly. **Latent defensive mappings,
+not current live production failures:** `gym cooldown` -> `pose_p012`
+and `airport day` -> `pose_p011` are covered the same way, but **both
+lanes are currently in `production_blocked_lanes` and cannot appear in
+current default production** -- verified via `get_production_scene_pool()`
+and a 300-sequence direct sweep finding zero real draws of either.
+`pose_p007` remains fully excluded (0/7 eligible lanes were clean in the
+earlier diagnosis); `apartment doorway` deliberately not included (a
+softer, unconfirmed case, left for Phase 2B). Validated: `city bench`
+2/2 -> 0/2 contradictions, `pose_body_language_id`/rendered-text match
+120/120, 0 seated/in-motion leakage outside the 3 mapped lanes, `pose_p007`
+0/120, body anchor/framing/expression-gaze/wardrobe-metadata/environment-
+sanitizer all unchanged, motorcycles 0/120, zero Kling references to the
+new symbols. Separate, pre-existing, unrelated finding surfaced by a
+`gym cooldown` targeted probe: a full end-to-end package for that lane
+currently fails earlier, at wardrobe selection ("no safe wardrobe
+catalog entries remain for lane 'gym cooldown'") -- confirmed unrelated
+to this pose fix and moot in practice since the lane is already blocked
+from production; not fixed, not in scope.
+
+### B. Files changed
+- `pipeline/prompting/lena_prompt_brain.py` (all five commits)
+- `tools/diagnostics/lena_higgsfield_photo_dump_dryrun.py` (commits 1-2 only)
+- `tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py` (commits 1-2 only)
+
+### C. Validations run
+Each commit: `python -m py_compile` on changed files; a real
+`build_library_report("2026-07-09", "<prefix>", packs=12, count_per_pack=10)`
+120-image dry-run against a captured pre-patch baseline, diffed
+byte-for-byte; `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR`/`HIGGSFIELD_FRAMING_LINE`/
+`HIGGSFIELD_FRAMING_REINFORCEMENT` presence re-confirmed 120/120 every
+time; motorcycle count re-confirmed 0/120 every time; grep-confirmed zero
+references to any new symbol in any Kling file every time. Commit 5
+additionally used clearly-labeled targeted local probes (not
+default-production evidence) for `gym cooldown`/`airport day`, since
+both are blocked from the seeded pool by `production_blocked_lanes`.
+
+### D. Decisions made
+All five fixes retained as committed. Phase 1 pose wiring intentionally
+excludes `seated`/`in_motion` broadly -- explicitly not a final state.
+Commit 5 is an explicitly-scoped narrow pre-step (3 named lanes only),
+not broader Phase 2 -- **a narrow Phase 2 pre-step/live-contradiction fix
+was implemented and committed in `10f9b1d7`; broader seated/in-motion
+restoration remains separately scoped and unimplemented.** The two pose
+watch-items, the mirror-lane narrowing, and the `gym cooldown`
+wardrobe-selection finding are accepted, disclosed tradeoffs/notes, not
+blockers, per explicit approval.
+
+### E. Blockers / parked branches
+- Broader Phase 2: the other 5 seated-compatible lanes, `pose_p007`
+  entirely, broader pose-aware `_higgsfield_sanitize_scene_action()`
+  rewiring, and `pose_p011` restoration beyond the currently-forced
+  `airport day` defensive mapping -- diagnosed (read-only), not
+  implemented.
+- `apartment doorway` -- unconfirmed future Phase 2B candidate, not
+  included in commit 5.
+- `pose_p005`/`pose_p006` literal-surface mismatch on `rooftop sunset`
+  (2/120) -- disclosed, not fixed, low priority.
+- Mirror outfit-check lane's lost dedicated gesture -- disclosed, not
+  fixed, no bank equivalent authored.
+- `gym cooldown`'s pre-existing, unrelated wardrobe-selection failure
+  (no safe catalog entries for that lane) -- disclosed, not fixed, moot
+  while the lane stays production-blocked.
+- Bookstore lane's low-hook hard-exclude (pre-existing, unrelated to any
+  of these five fixes, confirmed via `variety_warnings` during Phase 1
+  validation) -- not touched.
+
+### F. Next approved step
+None of the following is pre-approved -- broader Phase 2 needs its own
+explicit approval, same discipline as every fix above: restoring
+`pose_p007` or `pose_p012` for the other 5 seated-compatible lanes,
+restoring `pose_p011` beyond `airport day`, extending coverage to
+`apartment doorway`, and/or revisiting
+`_higgsfield_sanitize_scene_action()`'s sitting/walking rewrite rules to
+make them pose-aware generally.
+
+### G. What must not be done
+No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
+install/login, no cleanup occurred producing any of these five commits
+beyond the code changes themselves. Do not re-tune the body anchor,
+framing, or provider configuration. Do not touch the shared scene-bank,
+environment-catalog, wardrobe-catalog, expression-bank, or pose-bank
+JSON files. Do not change Kling behavior. Do not reopen the closed
+body-consistency workstream without new real-production evidence. Do
+not describe `gym cooldown` or `airport day` as current live production
+failures -- both are production-blocked. Do not describe broader Phase 2
+as complete or seated/in-motion poses as broadly restored.

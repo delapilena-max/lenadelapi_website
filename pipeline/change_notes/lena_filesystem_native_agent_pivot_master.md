@@ -9,7 +9,60 @@
 
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-09 (checkpoint: HEAD advanced to `106be898`; expression/gaze wiring and scene-expression compatibility fixed and committed; then 3/3 real production-readiness renders failed body continuity, reopening the "body target is production-ready" question the 2026-07-09 earlier checkpoint had closed; then Nicolas explicitly selected a preferred gold-standard body benchmark from a controlled 9:16/Enhancer-OFF render, narrowing but not closing that question; then the body-consistency workstream was closed for now after a flower-shop three-run test, with the anchor/framing baseline frozen and other prompt-assembly work left open)
+**Last updated:** 2026-07-09 (checkpoint: HEAD advanced to `106be898`; expression/gaze wiring and scene-expression compatibility fixed and committed; then 3/3 real production-readiness renders failed body continuity, reopening the "body target is production-ready" question the 2026-07-09 earlier checkpoint had closed; then Nicolas explicitly selected a preferred gold-standard body benchmark from a controlled 9:16/Enhancer-OFF render, narrowing but not closing that question; then the body-consistency workstream was closed for now after a flower-shop three-run test, with the anchor/framing baseline frozen and other prompt-assembly work left open; then HEAD advanced to `10f9b1d7` across five more commits hardening Higgsfield production-readiness -- effective wardrobe metadata, environment text-risk substitutions, Phase 1 standing-safe pose-bank wiring, a downward-object gaze-conflict fix, and a narrow live-contradiction pose fix; broader Phase 2 seated/in-motion restoration remains separately scoped and unimplemented)
+
+> **HIGGSFIELD PRODUCTION-READINESS HARDENING: 5 COMMITS (2026-07-09,
+> later session, read this before assuming the "BODY-CONSISTENCY
+> WORKSTREAM CLOSED" entry below is the most recent checkpoint):** HEAD
+> is now `10f9b1d7`. Full detail: `NEXT_SESSION_START.md`'s top banner
+> and the changelog's matching entries -- not restated here to avoid
+> drift. Summary only:
+> - `cca6c1b2` -- added `effective_wardrobe_silhouette_class` (computed
+>   from final rendered text) alongside the pre-existing
+>   `wardrobe_silhouette_class` (kept raw/unchanged for Kling
+>   compatibility) -- fixed 17/120 confirmed stale-metadata cases.
+> - `5b90e36a` -- Higgsfield-only exact-phrase substitution removing 5
+>   live fake-text-inviting environment phrases (23/120 in audit);
+>   shared scene-bank JSON and Kling untouched. Important caveat: this
+>   removed the five known prompt-created text-surface invitations found
+>   in the audit; provider-side hallucinated/gibberish text on
+>   unrequested surfaces remains a separate unresolved risk.
+> - `db688b47` -- Phase 1: wired the real 18-combo pose bank into
+>   Higgsfield for standing-safe categories only (`seated`/`in_motion`
+>   excluded, scene-action sanitizer still rewrites those away). 5 -> 13
+>   unique rendered poses, hip-push language 88% -> 19%, 0%
+>   seated/in-motion leakage, 100% pose-ID<->text match. Two disclosed
+>   non-blocking watch-items: `pose_p005`/`pose_p006` counter/railing
+>   mismatch on `rooftop sunset` (2/120); "mirror outfit check" lane lost
+>   its dedicated gesture, remains compatible with generic poses.
+> - `13b82cf7` -- extended the scene-vs-expression compatibility check to
+>   also catch `exp_g013` ("looking down at an object in her hands")
+>   against concrete competing scene targets (3/3 real conflicts fixed);
+>   13 other soft-tension pairings deliberately left unsuppressed as
+>   harmless variety.
+> - `10f9b1d7` -- a narrow Phase 2 pre-step/live-contradiction fix, not
+>   full Phase 2. **Active live production fix:** `city bench` (active in
+>   default production, scene text "sitting on a city bench" untouched by
+>   any sanitizer rewrite) went from 2/2 contradictory seeded-pool
+>   candidates to 0/2 -- both now structurally forced onto `pose_p012` via
+>   a new `HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE` map that bypasses normal
+>   random pose selection for the mapped lanes. **Latent defensive
+>   mappings, not current live production failures:** `gym cooldown` ->
+>   `pose_p012`, `airport day` -> `pose_p011` -- both currently in
+>   `production_blocked_lanes`, cannot appear in default production today.
+>   `pose_p007` remains fully excluded; no seated/in-motion leakage
+>   outside the 3 mapped lanes; pose metadata matches rendered text 100%;
+>   body anchor, framing, and Kling unchanged.
+> - All five: validated via the same 120-candidate seeded-pool
+>   discipline, zero Kling-path exposure, zero change to
+>   `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR`/framing/provider-config.
+> - **A narrow Phase 2 pre-step/live-contradiction fix was implemented
+>   and committed in `10f9b1d7`. Broader seated/in-motion restoration
+>   remains separately scoped and unimplemented:** the other 5
+>   seated-compatible lanes, `pose_p007` entirely, broader pose-aware
+>   scene-action sanitization, and `pose_p011` restoration beyond the
+>   currently-forced `airport day` defensive mapping are all still open.
+>   `apartment doorway` remains an unconfirmed future Phase 2B candidate.
 
 > **BODY-CONSISTENCY WORKSTREAM CLOSED FOR NOW (2026-07-09, later
 > session, read this before assuming active body tuning is still in

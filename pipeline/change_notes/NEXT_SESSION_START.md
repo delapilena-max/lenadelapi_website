@@ -2,6 +2,110 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ HIGGSFIELD PRODUCTION-READINESS HARDENING: 5 COMMITS (2026-07-09, later session) — HEAD is now `10f9b1d7`; read this before assuming the "BODY-CONSISTENCY WORKSTREAM CLOSED" banner below is the most recent checkpoint
+>
+> Five narrow, evidence-based fixes landed on the Higgsfield generation
+> path after the body-consistency workstream closed, each following the
+> same discipline (diagnose on a 120-candidate seeded pool, propose a
+> minimal scoped diff, validate against a pre-patch baseline, commit only
+> after explicit approval):
+>
+> - `cca6c1b2` `fix: add effective Higgsfield wardrobe metadata` --
+>   `wardrobe_silhouette_class` was computed from the raw catalog entry
+>   before any fallback substitution, so it could disagree with the
+>   actual rendered Wardrobe: text (17/120 confirmed real cases in
+>   audit). Added `effective_wardrobe_silhouette_class`, computed from
+>   final text via a shared classifier now also used by diagnostics.
+>   `wardrobe_silhouette_class`'s raw semantics, Kling scoring, and Kling
+>   recency memory are all unchanged -- Kling depends on its exact legacy
+>   vocabulary.
+> - `5b90e36a` `fix: reduce Higgsfield environment text risk` -- 5 live
+>   scene-bank environment phrases (coffee-shop menu board, grocery-run
+>   price signs, sidewalk-dinner menu stands, airport gate signs,
+>   record-store posters) explicitly invited fake/gibberish rendered
+>   text (23/120 in audit, concentrated 100% in 2 lanes). Added a
+>   Higgsfield-only exact-phrase substitution layer swapping each for an
+>   equally rich non-text detail. Does not touch the shared scene-bank
+>   JSON (also read by Kling) or add a universal negative clause.
+>   **Important caveat: this removed the five known prompt-created
+>   text-surface invitations found in the audit; provider-side
+>   hallucinated/gibberish text on unrequested surfaces remains a
+>   separate unresolved risk.**
+> - `db688b47` `fix: wire standing-safe pose bank into Higgsfield` --
+>   Higgsfield always used one hardcoded pose line (or, in the pack
+>   builder, one of 5 hardcoded variants), while a real 18-combo
+>   lane-filtered/attitude-weighted pose bank was selected but discarded
+>   every time (metadata-only, never reached prompt text) -- the same
+>   "selected but inert" pattern as the wardrobe fix above. Phase 1 wires
+>   the real bank text into Higgsfield for standing-safe categories only
+>   (`universal`/`leaning_ok`/`low_hand_risk`); `seated`/`in_motion`
+>   combos stay excluded this phase because current scene-action
+>   sanitization still rewrites sitting/walking scene language into
+>   standing equivalents -- restoring them now would recreate scene/pose
+>   contradictions. Result: 5 -> 13 unique rendered pose texts, hip-push
+>   language 88% -> 19%, 0% seated/in-motion leakage, 100%
+>   `pose_body_language_id` <-> rendered-text match (previously 0%).
+>   Motorcycle lanes exempted, unchanged. Two known non-blocking
+>   watch-items recorded, not fixed: `pose_p005`/`pose_p006` occasionally
+>   reference a counter/railing not literally present in `rooftop
+>   sunset`'s scene text (2/120); the "mirror outfit check" lane lost its
+>   dedicated mirror-gesture pose (no bank equivalent exists) but remains
+>   compatible with the generic poses it now draws.
+> - `13b82cf7` `fix: prevent Higgsfield downward-object gaze conflicts` --
+>   the existing scene-vs-expression compatibility check only ever
+>   inspected forward-gaze expressions against away-gaze scene text, so
+>   any "away" expression (including `exp_g013`, "looking down at an
+>   object in her hands") was never checked against scene text at all.
+>   3/3 real `exp_g013` occurrences in audit were genuine conflicts (car
+>   moment's "looking out the window", brunch patio's "glancing toward
+>   the camera"). Added a second narrow ID+term check, same architecture
+>   as the existing one; deliberately excludes "looking down at the
+>   flowers" (flower shop) since the flowers can plausibly be the
+>   referenced object -- not a real conflict. 13 other "soft tension"
+>   away-vs-forward-leaning pairings found in the same audit were
+>   deliberately left alone as harmless photographic variety, not
+>   suppressed.
+> - `10f9b1d7` `fix: enforce scene-compatible Higgsfield poses` -- a
+>   narrow Phase 2 pre-step/live-contradiction fix, not full Phase 2.
+>   **Active live production fix:** `city bench` was active in default
+>   production and its scene text says "sitting on a city bench," which
+>   no sanitizer rewrite touches -- Phase 1's standing-safe selector
+>   could still draw a universal standing pose there. The exact seeded
+>   pool reproduced 2/2 contradictory `city bench` prompts before the
+>   fix. After the fix: 0/2 contradictions, both `city bench` candidates
+>   use `pose_p012`, and the wrong standing-pose pairing is now
+>   structurally prevented (not merely made unlikely) by a new
+>   `HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE` map that bypasses normal random
+>   pose selection entirely for the mapped lanes. **Latent defensive
+>   mappings, not current live production failures:** `gym cooldown` ->
+>   `pose_p012` and `airport day` -> `pose_p011` are covered the same way,
+>   but both lanes are currently in `production_blocked_lanes` and cannot
+>   appear in current default production. `pose_p007` remains fully
+>   excluded (0/7 eligible lanes were clean in the earlier diagnosis); no
+>   seated/in-motion leakage found outside the 3 mapped lanes; pose
+>   metadata matches rendered pose text 100%; body anchor, framing, and
+>   Kling all unchanged. **A narrow Phase 2 pre-step/live-contradiction
+>   fix was implemented and committed in `10f9b1d7`. Broader seated/
+>   in-motion restoration remains separately scoped and unimplemented** --
+>   the other 5 seated-compatible lanes, `pose_p007` entirely, broader
+>   pose-aware scene-action sanitization, and `pose_p011` restoration
+>   beyond the currently-forced `airport day` defensive mapping are all
+>   still open. `apartment doorway` remains an unconfirmed future Phase 2B
+>   candidate, deliberately not included in this fix.
+>
+> **All five validated via the same 120-candidate seeded-pool discipline
+> (`build_library_report` with a fixed date/prefix/packs/count),
+> comparing byte-for-byte against a pre-patch baseline each time; each
+> confirmed zero Kling-path exposure (grep-verified) and zero change to
+> `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR`/framing/provider-config.** No
+> render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
+> install/login, no cleanup occurred producing any of these five commits
+> beyond the code changes themselves -- each was a text-generation-layer
+> change validated by local dry-run only.
+>
+> Full detail: the changelog's five matching 2026-07-09 (later session)
+> entries.
+
 > ## ✅ BODY-CONSISTENCY WORKSTREAM CLOSED FOR NOW (2026-07-09, later session) — read this before assuming active body tuning is still in progress
 >
 > Body direction is now sufficiently validated across the approved
