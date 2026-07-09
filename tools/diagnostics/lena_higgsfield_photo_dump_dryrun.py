@@ -47,6 +47,8 @@ from pipeline.prompting.lena_prompt_brain import (
     HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE,
     HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS,
     HIGGSFIELD_EXPRESSION_SAFE_FALLBACK,
+    HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS,
+    HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS,
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
@@ -65,22 +67,18 @@ _EXPRESSION_GAZE_TEXT_BY_ID: dict[str, str] = {
     for combo in load_expression_gaze_bank().get("combos", [])
 }
 
-# Small, independent heuristic (diagnostic-only, mirrors nothing in
-# lena_prompt_brain.py) for catching a real regression: the final Expression:
-# text claiming direct eye contact while the scene action itself describes
-# her gaze pointed somewhere else. This is exactly the class of contradiction
-# the 2026-07-09 readiness audit found (flower shop "looking down at the
-# flowers", car moment "looking out the window", museum "studying" a
-# painting) -- all three used the single forced "direct eye contact" line.
-EXPRESSION_GAZE_AWAY_SCENE_TERMS = (
-    "looking down",
-    "looking away",
-    "looking out the window",
-    "studying",
-    "glancing away",
-    "glancing toward the window",
-    "watching people pass",
-)
+# Scene-vs-expression compatibility patch (2026-07-09, second correction): the
+# real bank texts belonging to HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS, used
+# below to independently re-verify (not just trust) that no forward-gaze
+# combo's real text survives into a final prompt alongside a conflicting
+# away-gaze scene action -- i.e. that the generator's own fallback layer
+# (_higgsfield_safe_expression_text() in lena_prompt_brain.py) actually
+# resolved every detected conflict, not just that it claims to have.
+_FORWARD_GAZE_TEXTS: set[str] = {
+    text
+    for gaze_id, text in _EXPRESSION_GAZE_TEXT_BY_ID.items()
+    if gaze_id in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS
+}
 
 # A photo-dump pack should show real pose variety, not one clone repeated
 # across every image.
@@ -180,9 +178,15 @@ def _validate_image(package: dict) -> dict:
     # compares it against what actually landed in the prompt.
     expression_gaze_id = str(package.get("expression_gaze_id") or "")
     final_expression_text = _extract_expression_segment(prompt)
+    # fallback_expected is independently recomputed (pose-conflict ID or
+    # missing bank text), then OR'd with the generator's own
+    # expression_safe_fallback_used flag so a scene-vs-forward-gaze fallback
+    # (which depends on the actual scene_action text, not reproducible from
+    # expression_gaze_id alone) is also accounted for here.
     fallback_expected = (
         expression_gaze_id in HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS
         or not _EXPRESSION_GAZE_TEXT_BY_ID.get(expression_gaze_id)
+        or bool(package.get("expression_safe_fallback_used"))
     )
     expected_expression_text = (
         HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
@@ -203,9 +207,30 @@ def _validate_image(package: dict) -> dict:
             and final_expression_text == photo_dump_expression_variant
         )
     )
-    expression_scene_gaze_conflict_terms_found = (
-        [term for term in EXPRESSION_GAZE_AWAY_SCENE_TERMS if term in scene_segment_lower]
-        if "direct eye contact" in final_expression_text.lower()
+
+    # Scene-vs-expression compatibility, rewritten 2026-07-09 (second
+    # correction) -- reuses the generator's own structural fallback metadata
+    # (package["expression_safe_fallback_used"/"_reason"/"expression_scene_
+    # conflict_terms"]) rather than re-guessing the conflict from free text a
+    # second time. "detected" reflects (A): did selection originally produce
+    # a real scene-vs-forward-gaze conflict, whether or not it was resolved.
+    expression_scene_conflict_detected_pre_fallback = list(
+        package.get("expression_scene_conflict_terms") or []
+    )
+    expression_scene_gaze_conflict_terms_found = expression_scene_conflict_detected_pre_fallback
+    expression_safe_fallback_used = bool(package.get("expression_safe_fallback_used"))
+    expression_safe_fallback_reason = package.get("expression_safe_fallback_reason")
+
+    # Independent re-verification (B): does the FINAL prompt text -- not the
+    # generator's self-reported metadata -- still show a real forward-gaze
+    # combo's exact text alongside a conflicting away-gaze scene action? This
+    # is the actual proof that the fallback layer resolved every detected
+    # case, using the same real bank-text/away-term data as the generator
+    # (not loose keyword matching), independent of whether the package claims
+    # a fallback fired.
+    unresolved_expression_scene_conflict_terms = (
+        [term for term in HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS if term in scene_segment_lower]
+        if final_expression_text in _FORWARD_GAZE_TEXTS
         else []
     )
 
@@ -229,7 +254,17 @@ def _validate_image(package: dict) -> dict:
         "expected_expression_text": expected_expression_text,
         "expression_fallback_expected": fallback_expected,
         "expression_selected_text_reached_prompt": expression_selected_text_reached_prompt,
+        # (A) Pre-fallback: did selection originally detect a real scene-vs-
+        # forward-gaze conflict (from the generator's own structural
+        # metadata), whether or not it was then resolved.
         "expression_scene_gaze_conflict_terms_found": expression_scene_gaze_conflict_terms_found,
+        "expression_safe_fallback_used": expression_safe_fallback_used,
+        "expression_safe_fallback_reason": expression_safe_fallback_reason,
+        # (B) Post-fallback: independent re-verification against the actual
+        # final prompt text -- should be empty for every case covered by the
+        # evidence-based HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS /
+        # HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS sets.
+        "unresolved_expression_scene_conflict_terms": unresolved_expression_scene_conflict_terms,
         # Renamed in meaning (2026-07-09): now verifies the real selected/
         # fallback expression text reached the prompt, not just that a fixed
         # string is present. Old name kept for report-label continuity.
@@ -306,12 +341,28 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
             expression_gaze_label_distribution.get(glabel, 0) + 1
         )
     expression_fallback_used_count = sum(
-        1 for item in per_image if item["validation"]["expression_fallback_expected"]
+        1 for item in per_image if item["validation"]["expression_safe_fallback_used"]
     )
+    expression_fallback_reason_distribution: dict[str, int] = {}
+    for item in per_image:
+        reason = item["validation"]["expression_safe_fallback_reason"] or "(no fallback)"
+        expression_fallback_reason_distribution[reason] = (
+            expression_fallback_reason_distribution.get(reason, 0) + 1
+        )
+    # (A) Pre-fallback: real scene-vs-forward-gaze conflicts detected at
+    # selection time (from generator metadata), whether or not resolved.
     expression_scene_gaze_conflict_count = sum(
         1
         for item in per_image
         if item["validation"]["expression_scene_gaze_conflict_terms_found"]
+    )
+    # (B) Post-fallback: independently re-verified contradictions still
+    # present in the actual final prompt text. Target: 0 for the evidence-
+    # based cases this patch covers.
+    expression_unresolved_scene_conflict_count = sum(
+        1
+        for item in per_image
+        if item["validation"]["unresolved_expression_scene_conflict_terms"]
     )
 
     return {
@@ -347,7 +398,9 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
         "expression_gaze_id_distribution": expression_gaze_id_distribution,
         "expression_gaze_label_distribution": expression_gaze_label_distribution,
         "expression_fallback_used_count": expression_fallback_used_count,
+        "expression_fallback_reason_distribution": expression_fallback_reason_distribution,
         "expression_scene_gaze_conflict_count": expression_scene_gaze_conflict_count,
+        "expression_unresolved_scene_conflict_count": expression_unresolved_scene_conflict_count,
         "validation_counts": {
             "framing_present": (_count("framing_present"), n),
             "wardrobe_casual_free": (_count("wardrobe_casual_free"), n),
@@ -421,8 +474,15 @@ def print_report(report: dict, show_prompts: bool) -> None:
     print(f"expression_gaze_id distribution   : {report['expression_gaze_id_distribution']}")
     print(f"expression_gaze_label distribution: {report['expression_gaze_label_distribution']}")
     print(f"safe-fallback used (count)        : {report['expression_fallback_used_count']}/{n}")
-    print(f"expression/scene gaze-direction conflicts detected (count): "
+    print(f"safe-fallback reason distribution : {report['expression_fallback_reason_distribution']}")
+    print(f"(A) scene-vs-forward-gaze conflicts DETECTED at selection (count): "
           f"{report['expression_scene_gaze_conflict_count']}/{n}")
+    print(f"(B) UNRESOLVED scene-expression contradictions in final prompt (count): "
+          f"{report['expression_unresolved_scene_conflict_count']}/{n}")
+    if report["expression_unresolved_scene_conflict_count"]:
+        print("  !! WARNING: at least one unresolved scene-vs-expression "
+              "contradiction survived the fallback layer for an "
+              "evidence-based forward-gaze/away-scene case.")
     if report["distinct_expression_text_count"] <= 1 and n > 1:
         print("  !! WARNING: only one distinct Expression: string across this "
               "pack -- this is the exact regression the 2026-07-09 fix "
@@ -439,7 +499,9 @@ def print_report(report: dict, show_prompts: bool) -> None:
         print(f"      photo-dump pose variant used in final prompt: {item['photo_dump_pose_variant']!r}")
         v = item["validation"]
         print(f"      expression: {item['expression_gaze_id']} ({item['expression_gaze_label']!r}) "
-              f"fallback_expected={v['expression_fallback_expected']}")
+              f"fallback_expected={v['expression_fallback_expected']} "
+              f"fallback_used={v['expression_safe_fallback_used']} "
+              f"fallback_reason={v['expression_safe_fallback_reason']!r}")
         print(f"      final Expression: text  : {v['final_expression_text']!r}")
         print(f"      expected Expression: text: {v['expected_expression_text']!r}")
         print(f"      prompt_length={item['prompt_length']} chars, "
@@ -469,8 +531,11 @@ def print_report(report: dict, show_prompts: bool) -> None:
         if v["pose_scene_mismatch_terms_found"]:
             print(f"      !! pose/scene mismatch: {v['pose_scene_mismatch_terms_found']}")
         if v["expression_scene_gaze_conflict_terms_found"]:
-            print(f"      !! expression/scene gaze conflict: Expression claims direct eye "
-                  f"contact but scene text found: {v['expression_scene_gaze_conflict_terms_found']}")
+            print(f"      !! (A) scene-vs-forward-gaze conflict DETECTED at selection: "
+                  f"{v['expression_scene_gaze_conflict_terms_found']}")
+        if v["unresolved_expression_scene_conflict_terms"]:
+            print(f"      !!! (B) UNRESOLVED in final prompt: "
+                  f"{v['unresolved_expression_scene_conflict_terms']}")
     print()
 
     if show_prompts:

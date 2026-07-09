@@ -4267,18 +4267,111 @@ HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS = {
 HIGGSFIELD_EXPRESSION_SAFE_FALLBACK = "relaxed natural expression, composed face"
 
 
-def _higgsfield_safe_expression_text(expression_gaze_entry: dict) -> str:
-    """Returns the real selected expression/gaze text for Higgsfield prompts,
-    falling back to HIGGSFIELD_EXPRESSION_SAFE_FALLBACK only for the narrow,
-    evidence-based HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set or when the
-    selected entry carries no text. Does not otherwise alter, re-filter, or
-    re-select the entry -- choose_expression_gaze_production()'s lane-
-    compatibility and recency logic is trusted as-is."""
+# Narrow, evidence-based scene-vs-expression compatibility layer (2026-07-09,
+# second correction). A 120-prompt audit of the first expression-wiring fix
+# found real contradictions: a combo asserting forward/camera-directed gaze
+# selected against a scene action that puts her gaze elsewhere (e.g. museum
+# "studying" a painting, car "looking out the window"). Inspecting all 17
+# bank combos found exactly 6 that assert forward/camera gaze in some
+# phrasing ("direct eye contact", "direct gaze", or "glance/gaze toward the
+# camera"). exp_g007 ("looking down at her phone, ... face angled back
+# toward the camera") is deliberately excluded -- it is internally coherent
+# with a "looking down" scene action (that's what it describes) and was not
+# proven to be one of the actual contradiction cases; including it
+# speculatively would incorrectly suppress a valid, non-conflicting combo.
+HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS = {
+    "exp_g001",
+    "exp_g005",
+    "exp_g011",
+    "exp_g012",
+    "exp_g014",
+    "exp_g016",
+}
+
+# Evidence-based away-gaze scene phrases only -- each one was found in a real
+# generated scene action paired with a forward-gaze combo above and produced
+# an actual contradiction (or, for the near-exact phrasings included here, is
+# the same real scene text observed during the audit). Deliberately not the
+# bare word "looking down" (too broad -- would also match exp_g007's own,
+# non-conflicting "looking down at her phone" text and any future scene
+# describing her looking down at something in a way that isn't a real
+# conflict); "looking down at the flowers" is scoped to the actual observed
+# case instead.
+HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS = (
+    "looking down at the flowers",
+    "looking out the window",
+    "studying",
+    "watching people pass",
+    "looking away",
+    "glancing away",
+    "glancing toward the window",
+)
+
+
+def _higgsfield_expression_scene_conflict_terms(
+    scene_action: str, expression_gaze_entry: dict
+) -> list[str]:
+    """Returns the exact away-gaze scene terms that conflict with the
+    selected expression, or an empty list if there is no conflict. Only ever
+    inspects entries in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS -- any other
+    selected combo is assumed compatible with any scene action (no loose
+    mood inference, no lane-wide suppression, no retry/reselection)."""
+    expression_gaze_id = str(expression_gaze_entry.get("expression_gaze_id") or "")
+    if expression_gaze_id not in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS:
+        return []
+    scene_lower = str(scene_action or "").lower()
+    return [
+        term for term in HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS if term in scene_lower
+    ]
+
+
+def _higgsfield_safe_expression_text(scene_action: str, expression_gaze_entry: dict) -> dict:
+    """Returns the real selected expression/gaze text for Higgsfield prompts
+    as a small result dict: {"text", "fallback_used", "fallback_reason",
+    "conflict_terms"}. Falls back to HIGGSFIELD_EXPRESSION_SAFE_FALLBACK only
+    for: (a) the narrow, evidence-based HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS
+    set (reason "pose_conflict_id"), (b) an actual scene-vs-forward-gaze
+    conflict per _higgsfield_expression_scene_conflict_terms() (reason
+    "scene_gaze_conflict"), or (c) a selected entry with no text at all
+    (reason "missing_bank_text" -- not currently reachable with the real
+    bank, kept as a defensive fallback). Otherwise the real selected text
+    passes through unchanged (fallback_used False, fallback_reason None).
+    Does not otherwise alter, re-filter, or re-select the entry --
+    choose_expression_gaze_production()'s lane-compatibility and recency
+    logic is trusted as-is; no pre-filtering, no retry, no global
+    direct-eye-contact rule."""
     expression_gaze_id = str(expression_gaze_entry.get("expression_gaze_id") or "")
     if expression_gaze_id in HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS:
-        return HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
+        return {
+            "text": HIGGSFIELD_EXPRESSION_SAFE_FALLBACK,
+            "fallback_used": True,
+            "fallback_reason": "pose_conflict_id",
+            "conflict_terms": [],
+        }
+    conflict_terms = _higgsfield_expression_scene_conflict_terms(
+        scene_action, expression_gaze_entry
+    )
+    if conflict_terms:
+        return {
+            "text": HIGGSFIELD_EXPRESSION_SAFE_FALLBACK,
+            "fallback_used": True,
+            "fallback_reason": "scene_gaze_conflict",
+            "conflict_terms": conflict_terms,
+        }
     text = _clean_sentence_fragment(str(expression_gaze_entry.get("text", "")))
-    return text or HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
+    if not text:
+        return {
+            "text": HIGGSFIELD_EXPRESSION_SAFE_FALLBACK,
+            "fallback_used": True,
+            "fallback_reason": "missing_bank_text",
+            "conflict_terms": [],
+        }
+    return {
+        "text": text,
+        "fallback_used": False,
+        "fallback_reason": None,
+        "conflict_terms": [],
+    }
 
 # Motorsport/heritage-motorcycle expression pool (2026-07-09, Nicolas
 # correction): the single global Expression line above is shared by every
@@ -4388,9 +4481,10 @@ def generate_higgsfield_prompt_package(
     )
 
     pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
-    expression_text = _higgsfield_safe_expression_text(expression_gaze_entry)
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
     scene_action = _higgsfield_sanitize_scene_action(scene_action)
+    expression_result = _higgsfield_safe_expression_text(scene_action, expression_gaze_entry)
+    expression_text = expression_result["text"]
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
@@ -4436,6 +4530,14 @@ def generate_higgsfield_prompt_package(
         # real current Expression: line (e.g. for the moto expression swap)
         # instead of assuming it's always HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE.
         "expression_text": expression_text,
+        # Structural fallback metadata (2026-07-09, scene-vs-expression
+        # compatibility patch) -- exposed so diagnostics can verify actual
+        # generator behavior directly instead of re-inferring conflicts from
+        # free text. fallback_reason is one of "pose_conflict_id",
+        # "scene_gaze_conflict", "missing_bank_text", or None.
+        "expression_safe_fallback_used": expression_result["fallback_used"],
+        "expression_safe_fallback_reason": expression_result["fallback_reason"],
+        "expression_scene_conflict_terms": expression_result["conflict_terms"],
         "reference_mode": reference_mode,
         # The final, already-sanitized scene-action text (post
         # _higgsfield_sanitize_scene_action) -- exposed so callers like
