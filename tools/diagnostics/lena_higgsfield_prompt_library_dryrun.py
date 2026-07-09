@@ -94,6 +94,45 @@ def _motorcycle_model_anchor_present(lane: str, prompt_text: str) -> bool | None
     return any(term in lower for term in MOTORCYCLE_MODEL_ANCHOR_TERMS)
 
 
+# Hard-QA correction (2026-07-09, Nicolas, after the first real visual
+# test): fake/gibberish AI lettering on background signage and generic/
+# inaccurate bike anatomy with invented logos were both real failures.
+# Three reporting-only checks (explicitly NOT added to HOOK_* scoring --
+# these are correctness constraints, not hotness cues, so folding them into
+# the curator's ranking would be a category error) confirm the new
+# authenticity/text-hygiene clause in _higgsfield_moto_realism_clause()
+# actually landed in the final prompt text. Applies to all 7 moto lanes,
+# including motorcycle street glam -- the text-hygiene/no-invented-marks
+# half of the clause applies there too, even without a named model.
+MOTORCYCLE_ALL_LANES = MOTORCYCLE_VINTAGE_LANES | {"motorcycle street glam"}
+
+# Signature phrases lifted verbatim from the two realism-clause variants in
+# lena_prompt_brain.py (named-model and unnamed/street-glam) -- if either
+# ever drifts out of sync, these checks will start reporting false
+# negatives, which is the intended fail-loud behavior.
+MOTO_LOGO_AUTHENTICITY_SIGNATURE = "no invented motorcycle brand marks"
+BACKGROUND_TEXT_HYGIENE_SIGNATURE = "no readable background text"
+FAKE_TEXT_AVOIDANCE_SIGNATURE = "no gibberish lettering"
+
+
+def _moto_logo_authenticity_clause_present(lane: str, prompt_text: str) -> bool | None:
+    if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
+        return None
+    return MOTO_LOGO_AUTHENTICITY_SIGNATURE in prompt_text.lower()
+
+
+def _background_text_hygiene_clause_present(lane: str, prompt_text: str) -> bool | None:
+    if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
+        return None
+    return BACKGROUND_TEXT_HYGIENE_SIGNATURE in prompt_text.lower()
+
+
+def _fake_text_avoidance_present(lane: str, prompt_text: str) -> bool | None:
+    if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
+        return None
+    return FAKE_TEXT_AVOIDANCE_SIGNATURE in prompt_text.lower()
+
+
 # Correction (2026-07-09, Nicolas's moto-expression-pool patch): the
 # imported single-pack validator's expression_reinforcement_present check
 # only recognizes the single global HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
@@ -158,6 +197,15 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
     motorcycle_anchor_checked = 0
     motorcycle_anchor_present = 0
     motorcycle_anchor_missing_slot_ids: list[str] = []
+    moto_logo_authenticity_checked = 0
+    moto_logo_authenticity_present = 0
+    moto_logo_authenticity_missing_slot_ids: list[str] = []
+    background_text_hygiene_checked = 0
+    background_text_hygiene_present = 0
+    background_text_hygiene_missing_slot_ids: list[str] = []
+    fake_text_avoidance_checked = 0
+    fake_text_avoidance_present = 0
+    fake_text_avoidance_missing_slot_ids: list[str] = []
 
     for pack_report in pack_reports:
         lane_distribution.update(pack_report["lane_distribution"])
@@ -177,6 +225,31 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
                     motorcycle_anchor_present += 1
                 else:
                     motorcycle_anchor_missing_slot_ids.append(image["slot_id"])
+
+            logo_result = _moto_logo_authenticity_clause_present(image["lane"], image["image_prompt"])
+            if logo_result is not None:
+                moto_logo_authenticity_checked += 1
+                if logo_result:
+                    moto_logo_authenticity_present += 1
+                else:
+                    moto_logo_authenticity_missing_slot_ids.append(image["slot_id"])
+
+            hygiene_result = _background_text_hygiene_clause_present(image["lane"], image["image_prompt"])
+            if hygiene_result is not None:
+                background_text_hygiene_checked += 1
+                if hygiene_result:
+                    background_text_hygiene_present += 1
+                else:
+                    background_text_hygiene_missing_slot_ids.append(image["slot_id"])
+
+            fake_text_result = _fake_text_avoidance_present(image["lane"], image["image_prompt"])
+            if fake_text_result is not None:
+                fake_text_avoidance_checked += 1
+                if fake_text_result:
+                    fake_text_avoidance_present += 1
+                else:
+                    fake_text_avoidance_missing_slot_ids.append(image["slot_id"])
+
             if _expression_reinforcement_present(image["image_prompt"]):
                 expression_reinforcement_corrected += 1
 
@@ -221,6 +294,15 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
         "motorcycle_anchor_checked": motorcycle_anchor_checked,
         "motorcycle_anchor_present": motorcycle_anchor_present,
         "motorcycle_anchor_missing_slot_ids": motorcycle_anchor_missing_slot_ids,
+        "moto_logo_authenticity_checked": moto_logo_authenticity_checked,
+        "moto_logo_authenticity_present": moto_logo_authenticity_present,
+        "moto_logo_authenticity_missing_slot_ids": moto_logo_authenticity_missing_slot_ids,
+        "background_text_hygiene_checked": background_text_hygiene_checked,
+        "background_text_hygiene_present": background_text_hygiene_present,
+        "background_text_hygiene_missing_slot_ids": background_text_hygiene_missing_slot_ids,
+        "fake_text_avoidance_checked": fake_text_avoidance_checked,
+        "fake_text_avoidance_present": fake_text_avoidance_present,
+        "fake_text_avoidance_missing_slot_ids": fake_text_avoidance_missing_slot_ids,
         "pack_reports": pack_reports,
     }
 
@@ -253,6 +335,27 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
     )
     if library["motorcycle_anchor_missing_slot_ids"]:
         print(f"  !! missing a real model anchor: {library['motorcycle_anchor_missing_slot_ids']}")
+
+    print(
+        "moto logo authenticity clause present (all 7 moto lanes): "
+        f"{library['moto_logo_authenticity_present']}/{library['moto_logo_authenticity_checked']}"
+    )
+    if library["moto_logo_authenticity_missing_slot_ids"]:
+        print(f"  !! missing the logo-authenticity clause: {library['moto_logo_authenticity_missing_slot_ids']}")
+
+    print(
+        "background text hygiene clause present (all 7 moto lanes): "
+        f"{library['background_text_hygiene_present']}/{library['background_text_hygiene_checked']}"
+    )
+    if library["background_text_hygiene_missing_slot_ids"]:
+        print(f"  !! missing the background-text-hygiene clause: {library['background_text_hygiene_missing_slot_ids']}")
+
+    print(
+        "fake/gibberish text avoidance present (all 7 moto lanes): "
+        f"{library['fake_text_avoidance_present']}/{library['fake_text_avoidance_checked']}"
+    )
+    if library["fake_text_avoidance_missing_slot_ids"]:
+        print(f"  !! missing the gibberish-lettering-avoidance clause: {library['fake_text_avoidance_missing_slot_ids']}")
     print()
 
     print(f"aggregate lane distribution           : {library['lane_distribution']}")

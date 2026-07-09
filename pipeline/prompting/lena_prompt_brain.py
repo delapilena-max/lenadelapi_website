@@ -3639,10 +3639,20 @@ HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES = frozenset(
 # own "details" field in the scene bank, not here. This clause exists only
 # to guarantee, in code, that the bike always reads as real/parked/
 # stationary no matter what the scene bank text says.
+# Extended 2026-07-09 (Nicolas hard-QA correction, after the first real
+# visual test): two failure modes found -- fake/gibberish AI lettering on
+# background signage, and generic/inaccurate bike anatomy with invented
+# logos. This is the unnamed-model fallback (motorcycle street glam only,
+# which intentionally has no real-model pool); the named-model version with
+# the anatomy-match clause lives in _higgsfield_moto_realism_clause() below.
 HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE = (
     "with a real parked motorcycle fully in frame -- visible chrome "
     "details, mirrors, a real seat, and the kickstand down, engine off, "
-    "completely stationary, no motion blur and no active riding"
+    "completely stationary, no motion blur and no active riding; keep any "
+    "tank badge or logo small, blank, or not visible, no invented "
+    "motorcycle brand marks; no readable background text anywhere in "
+    "frame -- signs, posters, plates blank, aged, blurred, or out of "
+    "focus, no gibberish lettering"
 )
 
 # Safety/style boundaries, revised 2026-07-09 (Nicolas correction, same
@@ -3716,15 +3726,32 @@ HIGGSFIELD_MOTO_MODEL_ANCHORS = (
 HIGGSFIELD_MOTO_MODEL_ANCHOR_SELF_DESCRIBING_SUFFIXES = ("chopper", "bobber")
 
 
+# Manual-generation doctrine (2026-07-09, Nicolas, after the first real
+# visual QA pass): prompt text alone can reduce fake logos/gibberish text
+# and steer toward correct model anatomy, but it cannot GUARANTEE either --
+# Higgsfield has no ground-truth reference for "the real 1948 Indian Chief"
+# beyond its own training data. Fake/invented logos remain a hard QA
+# reject, never "close enough." Three real production options if prompt
+# text alone proves insufficient once real renders are reviewed:
+#   A. hide/crop/obscure the badge area and rely on correct body/frame
+#      anatomy instead of a visible logo.
+#   B. supply real reference images of the exact motorcycle model/logo
+#      (a Higgsfield capability, not yet wired into this pipeline).
+#   C. add a verified, accurate logo/emblem in post-production after
+#      generation, never trust the model to render one correctly.
+# This function only implements the prompt-text mitigation; A/B/C above are
+# workflow decisions for whoever reviews real renders, not code changes.
 def _higgsfield_moto_realism_clause(scene_lane_lower: str, rng: random.Random) -> str:
     """Builds the always-on bike-realism clause for one moto-lane image,
     injecting a real model anchor drawn from HIGGSFIELD_MOTO_MODEL_ANCHORS
     when the lane has eligible anchors (every vintage lane); falls back to
-    the original unnamed generic wording for motorcycle street glam, which
-    intentionally has no anchor pool. Doctrine line at the end (no readable
-    logo/emblem required) is Nicolas's explicit instruction, stated as
-    prompt guidance so the image model doesn't over-fixate on rendering a
-    specific badge."""
+    HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE's unnamed wording for motorcycle
+    street glam, which intentionally has no anchor pool. For named models,
+    explicitly asks for anatomy (tank/engine/exhaust/wheels/seat/forks/
+    handlebars) to match the real bike, not just an unnamed "real
+    motorcycle" -- and, in both the named and unnamed cases, asks for no
+    invented brand marks and no readable/gibberish background text
+    anywhere in frame (background signs/posters/plates)."""
     eligible_anchors = [
         anchor for anchor in HIGGSFIELD_MOTO_MODEL_ANCHORS if scene_lane_lower in anchor["lanes"]
     ]
@@ -3735,10 +3762,14 @@ def _higgsfield_moto_realism_clause(scene_lane_lower: str, rng: random.Random) -
     noun = "" if model_lower.endswith(HIGGSFIELD_MOTO_MODEL_ANCHOR_SELF_DESCRIBING_SUFFIXES) else " motorcycle"
     return (
         f"with a real parked {model}{noun} fully in frame -- visible chrome "
-        "details, mirrors, a real seat, and the kickstand down, engine off, "
-        "completely stationary, no motion blur and no active riding, "
-        "subtle period-correct styling without needing readable logos or "
-        "emblems"
+        f"details and mirrors, its tank shape, engine layout, exhaust "
+        f"pipes, wheels/spokes, seat, forks, and handlebars visually "
+        f"matching a real {model}, kickstand down, engine off, completely "
+        "stationary, no motion blur and no active riding; no invented "
+        "motorcycle brand marks, prefer no visible tank badge over an "
+        "invented one; no readable background text anywhere in frame -- "
+        "signs, posters, plates blank, aged, blurred, or out of focus, no "
+        "gibberish lettering"
     )
 
 
