@@ -4787,3 +4787,337 @@ explicit approval before starting.
 Do not rewrite the approval record. Do not re-promote or republish this
 slot. Do not delete any archived failed-attempt artifact. Do not start any
 of the 7 future tasks without separate explicit approval.
+
+---
+
+## 2026-07-08 (later in session) — Pose/attitude layer, Visual Hook / Allure QA gate, Higgsfield provider pivot
+
+### A. What changed
+Seven commits landed, in order: `9c53281e` (pose/body-language rotation
+layer), `ef5dad4f` (wardrobe/environment visual-hook weighting),
+`8f5261be` (pose/expression attitude weighting), `5b53d7a3` (QA schema-v3
+allure hard gate), `7f9ab9aa` (visual QA `RULES.md` reviewed and
+committed), `331f0d1c` (Higgsfield provider-transition doc), `d082c170`
+(Higgsfield no-live-call dry-run diagnostic). Two real live renders were
+attempted and both QA-failed for real, different reasons -- neither was a
+wasted step; each exposed a real gap that was then closed with code, not
+just doctrine.
+
+1. **Pose/body-language rotation** (`9c53281e`): new
+   `pipeline/prompt_banks/lena/lena_pose_body_language_bank_v1.json` (12
+   neutral/modifier combos), `choose_pose_body_language_production()` wired
+   into `lena_prompt_brain.py`, new `Pose:` compaction floor in
+   `kling_apilena_api_executor.py`. Validated: 200-slot survival, all prior
+   markers intact.
+2. **Attempt 1** (`2026-07-04-02-photo`, morning apartment/wc_p047):
+   surgical splice-refresh (only new layers added, original scene/wardrobe
+   preserved), one approved live render, task `903717132796563465`.
+   **QA-failed** after direct operator review: body_shape_continuity fail
+   (wide-leg trousers hid the hip/thigh line the pose was meant to prove),
+   plus a prop-logic fail (pouring vessel read as another cup, not a
+   creamer/pot). Saved as cross-session memory
+   `project_lena_pose_proof_2026-07-04-02-photo_fail.md` and
+   `feedback_qa_body_sexiness_calibration.md` (Claude's own QA judgment had
+   under-scrutinized body-shape/prop-plausibility, corrected).
+3. **Candidate search + attempt 2** (`2026-07-07-01-photo`, flower
+   shop/wc_p030, denim-mini-skirt/crop-top/open-blazer -- a fitted,
+   pose-visible outfit chosen specifically to fix attempt 1's failure
+   mode): attempt-1's original *cartoon-era* failed render on this slot
+   was archived first (`*_attempt1_failed_cartoon_3d_pre_reference_url.*`,
+   moved not deleted), then one approved live render, task
+   `903723240236523560`. Technically clean (pose clearly visible, frame
+   logic reflected, no cartoon drift, identity held) -- **QA-failed anyway**
+   after a major doctrine correction from Nicolas: "not enough allure / sexy
+   IT-girl energy... too cute, safe, and lifestyle-boring... technically
+   coherent images that do not feel like Lena" are real failures, not
+   passes. Saved as major cross-session memory
+   `project_lena_visual_hook_allure_doctrine.md`. A related correction,
+   `feedback_nightlife_alcohol_not_prohibited.md`: nightlife/social/going-
+   out settings are fully allowed; the only real guardrail is alcohol
+   non-focality (hero/focal/promotional/intoxication/unwanted-centering),
+   never the setting itself -- prior audit phrasing ("no alcohol/nightlife
+   issue") was corrected going forward.
+4. **Visual Hook / Allure Gate, read-only audit then patch** (`ef5dad4f`):
+   found `lena_wardrobe_catalog_v1.json`'s `body_visibility`/
+   `coverage_level` fields and `lena_environment_catalog_v1.json`'s `mood`
+   field already existed but were never read by selection. Added
+   `_body_visibility_hook_weight()` and `_environment_allure_weight()` to
+   `lena_prompt_brain.py` -- additive-only, floored at 1, never hard-bans;
+   validated via a real before/after distribution shift (e.g. flower-shop
+   wardrobe draws shifted from 13.6%/81.8%/4.5% to ~26.8%/~73.2%/0% across
+   full_body/three_quarter/waist_to_head) and a full 200-slot marker
+   survival re-check.
+5. **Pose/expression attitude weighting, read-only audit then patch**
+   (`8f5261be`): found the pose bank had zero attitude-coded entries by
+   design and the expression bank had only 3 of 15. Added `attitude_level`
+   (neutral/moderate/high) to every existing combo, added 6 new
+   high-attitude poses (`pose_p013`-`pose_p018`: hand-on-hip, hip-shift-
+   chin-down, wall-lean-hip-pop, three-quarter-angle-curve-visible,
+   hair-touch-confident-gaze, squared-confident-stance) and 2 new
+   high-attitude expressions (`exp_g016`, `exp_g017`), plus
+   `_pose_attitude_weight()`/`_expression_attitude_weight()` in
+   `lena_prompt_brain.py`. Validated: 1000-draw distributions clearly favor
+   high/moderate without eliminating neutral; all attitude levels still
+   appear across 4 different lanes at 300 draws each.
+6. **QA schema-v3 allure hard gate, read-only audit then patch**
+   (`5b53d7a3`): `pipeline/qa/lena_photo_qa.py` bumped to
+   `SCHEMA_VERSION = "3"`, new `LEGACY_SCHEMA_VERSIONS_WITHOUT_ALLURE_GATE
+   = {"1", "2"}` so existing on-disk "1"/"2" QA files (including both real
+   failed renders above) validate **unchanged** -- confirmed via direct
+   reload, not assumed. Six new `production_scoring` fields:
+   `allure_level` (none forces `overall: fail`), `it_girl_energy` (fail
+   forces `overall: fail`), `body_visibility_score`/`outfit_hook_score`/
+   `pose_attitude_score` (advisory only this first pass, deliberately not
+   gating yet), `feed_worthy_reason` (required non-empty once a record is
+   finalized pass/fail). Validated with 9+ synthetic checks covering every
+   gating combination (false-green rejections both directions, advisory
+   fields not forcing fail alone, empty-reason rejection on finalized
+   records).
+7. **`pipeline/agents/lena/70_visual_qa/RULES.md` reviewed and committed**
+   (`7f9ab9aa`): this file (and its whole directory) had substantial real
+   pre-existing content but had never once been committed. Read-only
+   reviewed for accuracy against the just-shipped schema-v3 code (every
+   referenced constant/field name cross-checked and confirmed to exist),
+   found zero stale/conflicting content, committed as-is. Sibling files
+   (`AGENT.md`/`CURRENT_STATE.md`/`INPUTS.md`/`OUTPUTS.md`) deliberately
+   left untracked/unreviewed.
+8. **250-sample no-render audit**: confirmed the full stack (wardrobe +
+   environment + pose + expression weighting, all 14 prior compaction
+   markers, QA-v3 template scaffold) works together in memory, before any
+   further render was considered. Zero files written, zero API calls.
+9. **Provider pivot: Higgsfield established as the committed forward
+   direction** (Nicolas's decision). A read-only repo-side audit found the
+   selection/QA/publish layers already provider-agnostic; only the executor
+   and Kling's element-based identity mechanism are actually Kling-specific.
+   A read-only **official-docs-only** verification (higgsfield.ai/cli,
+   higgsfield.ai/mcp, the official CLI and Python-SDK GitHub READMEs -- no
+   scraping, no browser automation, no install, no login) established CLI
+   over MCP as the right first integration route (Higgsfield's own MCP page
+   recommends CLI for Claude-Code-class agents) and documented real,
+   unresolved blockers: no documented prompt-length limit, no documented
+   negative-prompt support, no native dry-run mode, no documented output-
+   download-to-file path, Soul character identity (20+ reference photos)
+   does not map 1:1 from Kling's single-hosted-element mechanism, auth
+   token refresh/storage undocumented, per-model pricing undocumented, and
+   a genuine content-moderation/NSFW risk given Lena's sexy-but-platform-
+   safe strategy (Higgsfield's own Soul model blocks NSFW prompts; the SDK
+   has a terminal `NSFW` job-status value).
+10. **`331f0d1c`** (docs-only): added a "Provider transition in progress:
+    Higgsfield" section to `tools/LEGACY_PROVIDER_SURFACES.md` recording all
+    of the above plus a 7-step future sequence. Committed via an
+    **index-only `git hash-object`/`git update-index` technique**, not
+    `git add -p` -- this file already carried real, unrelated, pre-existing
+    2026-07-05 uncommitted drift with zero unchanged context line
+    separating it from the new section (`git add -p --split` literally
+    returned "Sorry, cannot split this hunk" when tried). The index-only
+    method constructed HEAD's content plus only the new section, verified
+    byte-for-byte, and committed that -- leaving the older drift exactly as
+    it was in the working tree, untouched.
+11. **`d082c170`**: added `tools/diagnostics/lena_higgsfield_payload_dryrun.py`
+    -- stdout-only, zero subprocess/network/Higgsfield-SDK imports (verified
+    by grep), reads a real slot and prints a Higgsfield command/contract
+    summary (model placeholder, raw prompt/negative-prompt lengths,
+    intended-but-never-executed CLI shape, expected output path, proposed
+    `pipeline/higgsfield_debug/...` manifest path, identity-strategy
+    placeholder, 8 risk flags). Validated against two real slots; zero
+    files written either time.
+12. **Explicitly recommended NOT done**: rewriting `LIVE_PATHS.md`/
+    `AUTHORITATIVE_SURFACES.md`/the live-path manifest to call Kling
+    "legacy" -- read-only audit concluded those statements are still
+    factually true today (Higgsfield has no working executor yet) and
+    changing them now would be misleading, not accurate.
+
+### B. Files changed
+`pipeline/prompt_banks/lena/lena_pose_body_language_bank_v1.json` (new, then
+extended with `attitude_level` + 6 combos), `lena_expression_gaze_bank_v1.json`
+(extended with `attitude_level` + 2 combos), `pipeline/prompting/
+lena_prompt_brain.py` (pose layer wiring, 4 new weighting helper functions),
+`pipeline/kling_apilena_api_executor.py` (new `Pose:` compaction floor only),
+`pipeline/qa/lena_photo_qa.py` (schema v3), `pipeline/agents/lena/
+70_visual_qa/RULES.md` (newly tracked), `tools/LEGACY_PROVIDER_SURFACES.md`
+(Higgsfield section only, via index-only staging -- pre-existing 2026-07-05
+drift on this file deliberately left uncommitted), new
+`tools/diagnostics/lena_higgsfield_payload_dryrun.py`. Two real render
+artifacts + two real QA files (`2026-07-04-02-photo`, `2026-07-07-01-photo`,
+both `overall: fail`) plus one archived failed-cartoon-render pair
+(`2026-07-07-01-photo` attempt 1).
+
+### C. Validations run
+`py_compile` on every Python file touched. Real 200/250-slot
+`generate_prompt_package()` + `_build_compact_prompt()` survival sweeps after
+every patch (pose layer, wardrobe/environment weighting, attitude weighting)
+-- always 100% on all 14 tracked markers. Real distribution-shift
+measurements (before/after weighting) on real catalog data, not simulated.
+9+ synthetic QA-v3 validator checks covering every new gating combination.
+Real reload of all pre-existing on-disk QA files (schema "1" and "2")
+confirming zero regression. Two real live Kling renders, each followed by
+direct image viewing and a real QA verdict (both `fail`, for different,
+specific, documented reasons). Static-analysis (grep-based) confirmation
+that the new Higgsfield dry-run tool imports zero network/subprocess/SDK
+surfaces.
+
+### D. Decisions made
+Technical coherence is not sufficient for a Lena QA pass -- allure/IT-girl/
+scroll-stopping energy is now a hard, code-enforced gate, not just written
+doctrine. Nightlife/social settings are never themselves a risk signal --
+only alcohol focality is. New QA-v3 fields launch mostly gating
+(`allure_level`, `it_girl_energy`) with three fields deliberately advisory-
+only for this first pass, to force structured reviewer attention without
+over-constraining before real usage data exists. Provider-transition
+doctrine is recorded as "committed direction" (in `LEGACY_PROVIDER_SURFACES.md`)
+separately from "current technical reality" (in `LIVE_PATHS.md`/
+`AUTHORITATIVE_SURFACES.md`, deliberately left unchanged) -- these must not
+be conflated until Higgsfield actually has a working, QA-reviewed render.
+
+### E. Blockers / parked branches
+`tools/LEGACY_PROVIDER_SURFACES.md`'s pre-existing 2026-07-05 drift is
+reviewed (accurate, every referenced file confirmed to exist, no doctrine
+conflict) but **not yet committed** -- needs one more explicit approval. No
+third pose-proof render attempted yet. No Higgsfield executor exists --
+blocked on explicit approval for CLI install + login before any of that
+work starts. `business_media`/`podcast_repurpose` and ElevenLabs both remain
+untouched and paused; ElevenLabs was confirmed (read-only) to already have
+substantial pre-existing, dormant code from an earlier paused video/podcast
+lane, not to be touched.
+
+### F. Next approved step
+None of the following is pre-approved -- each needs its own explicit
+instruction: (1) commit the reviewed `LEGACY_PROVIDER_SURFACES.md` drift
+(message: `docs: correct Lena canonical live-path routing legend`); (2) a
+third pose/body-language proof render using the now-complete weighting +
+QA-v3 stack, starting with a fresh read-only candidate search; (3) Higgsfield
+executor skeleton work, gated on separate CLI install/login approval first.
+
+### G. What must not be done
+Do not rewrite `LIVE_PATHS.md`/`AUTHORITATIVE_SURFACES.md`/the live-path
+manifest to call Kling legacy yet. Do not delete/rename/clean any Kling path
+(`kling_library/`, `kling_debug/`, `kling_workorders/`). Do not install,
+login, or call the Higgsfield CLI/SDK without separate explicit approval. Do
+not build an OpenAI image-generation path, a Kling fallback, or broad multi-
+provider routing. Do not integrate ElevenLabs or touch its existing dormant
+code. Do not rerender either failed pose-proof slot without separate
+approval. Do not touch the remaining untracked `70_visual_qa/` sibling files.
+Do not commit `LEGACY_PROVIDER_SURFACES.md`'s pre-existing drift bundled with
+anything else.
+
+## 2026-07-08 (continuity checkpoint) — Higgsfield-native prompt/photo-dump/library tooling landed undocumented; multi-axis curator built uncommitted
+
+### A. What changed
+This entry is itself the fix for a documentation gap: 8 real commits landed
+after `d082c170` with zero entry in `NEXT_SESSION_START.md`, this changelog,
+or the master doc's §0, and a further real patch landed on top of the
+newest of those commits without ever being committed. Nothing in this
+entry is new code -- it is a read-only inspection (`git log`, `git diff
+--stat`, `git show`) plus running the one dry-run diagnostic that was
+already sitting validated-but-uncommitted, to confirm it still works before
+recording it accurately.
+
+1. **Correction:** the previous entry above (`2026-07-08 (later in
+   session)`) lists `tools/LEGACY_PROVIDER_SURFACES.md`'s reviewed
+   2026-07-05 drift as "not yet committed -- needs one more explicit
+   approval" (see its §E). That is now stale -- it was committed as
+   `fa4b2b2c` (`docs: correct Lena canonical live-path routing legend`).
+2. **8 commits recorded, in order, none previously documented:**
+   `fa4b2b2c` (committed the `LEGACY_PROVIDER_SURFACES.md` drift, see
+   above), `1b7f2a48` (`docs: add Lena AI creator disclosure layer` --
+   disclosure copy/policy/media-kit-schema/persona files), `c5d5faf6`
+   (`feat: add Higgsfield-native Lena prompt-pack builder` --
+   `generate_higgsfield_prompt_package()` in `pipeline/prompting/
+   lena_prompt_brain.py`), `e8d2858b` (`fix: move Higgsfield Soul selection
+   out of prompt text` -- Soul reclassified as provider config/metadata,
+   `soul_selection_mode: provider_config_not_prompt_text`), `9fc84356`
+   (`fix: prevent Higgsfield crop conflicts`), `b4e85687` (`fix: sanitize
+   Higgsfield wardrobe and pose prompts` -- wardrobe/silhouette sanitizer,
+   high-hook fitted-wardrobe fallback, straight-jeans/casual/shape-hiding
+   block coverage), `fb13a12f` (`feat: add Higgsfield photo dump prompt
+   dry-run` -- `generate_higgsfield_photo_dump_pack()` plus `tools/
+   diagnostics/lena_higgsfield_photo_dump_dryrun.py`, deterministic,
+   stdout-only), `9f5bcb7d` (`feat: add Higgsfield prompt library dry-run`
+   -- **current committed HEAD**; `tools/diagnostics/
+   lena_higgsfield_prompt_library_dryrun.py` committed at 244 lines,
+   generates many photo-dump packs by calling the single-pack builder once
+   per pack with deterministic slot prefixes). `negative_prompt_enabled`
+   stayed `False` and no heavy body-overcorrection language was
+   reintroduced anywhere across this range.
+3. **Multi-axis model-hook curator found as uncommitted WIP on top of
+   `9f5bcb7d`, inspected, compiled, and run (not written by this
+   checkpoint -- it already existed on disk).**
+   `tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py` carries a
+   603-line working-tree version against a 244-line committed version (a
+   359-line uncommitted diff). It adds `--select-top N` /
+   `--show-selected-prompts`: hard-excludes any prompt failing the
+   existing pack-level validation (framing, wardrobe casual-terms,
+   scene/action conflicts, Soul leak, negative-prompt-disabled,
+   heavy-overcorrection, pose-scene match, low-hook filler, a basic
+   unsafe/explicit-term check), scores survivors on five independent axes
+   (wardrobe/pose/expression/scene/camera -- explicitly not a
+   wardrobe-only search, matching the standing "sexy is not just mini
+   dresses" correction), and greedily selects the top N with soft
+   lane/silhouette diversity caps (max 2 each, relaxed only if needed to
+   fill N). `pipeline/prompting/lena_prompt_brain.py` was not touched.
+
+### B. Files changed
+None, by this checkpoint itself. The 8 commits in item 2 above already
+touched `pipeline/prompting/lena_prompt_brain.py`,
+`tools/diagnostics/lena_higgsfield_payload_dryrun.py`,
+`tools/diagnostics/lena_higgsfield_photo_dump_dryrun.py`,
+`tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py`,
+`tools/LEGACY_PROVIDER_SURFACES.md`, root `SKILL.md`, and the Lena
+disclosure/persona files under `pipeline/influencer_nodes/lena/` -- all
+prior to this checkpoint, all already committed. The only uncommitted code
+in the working tree relevant to this checkpoint is the curator patch on
+`tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py` (item 3
+above), which this checkpoint did not author.
+
+### C. Validations run
+`git log --oneline`, `git diff --stat`, and `git show --stat` across the
+`d082c170..9f5bcb7d` range to enumerate the undocumented commits and
+confirm none touched `NEXT_SESSION_START.md`/the master doc/this
+changelog. For the uncommitted curator: `python -m py_compile
+tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py` (clean); one
+real run with `--date 2026-07-08 --library-prefix july08 --packs 3
+--count-per-pack 10 --select-top 5 --show-selected-prompts` (30/30
+hard-validation pass, 0 excluded, 5/5 selected across 3 lanes and 4
+silhouettes); a grep across the file confirming no
+`subprocess`/`requests`/`urllib`/`socket` import and no file-write call.
+No render, no network call, no Higgsfield/Kling call, no publish, no queue
+promotion, no R2, no `.env` access, no install/login, no cleanup/delete/
+move, no approval-record edit, no commit.
+
+### D. Decisions made
+Continuity docs are updated by inspecting real `git log`/`git diff`
+against their own claimed state, not by trusting the most recent banner's
+self-report -- this checkpoint found the banners were 8 commits and one
+full uncommitted feature behind reality. The uncommitted curator is
+recorded as exactly that (uncommitted WIP, validated, not committed) --
+this checkpoint does not commit it, since committing code was explicitly
+out of scope for this pass.
+
+### E. Blockers / parked branches
+The multi-axis model-hook curator (`tools/diagnostics/
+lena_higgsfield_prompt_library_dryrun.py`, +359 uncommitted lines) is
+validated and ready for review but **not committed** -- needs its own
+explicit approval, separate from this documentation checkpoint.
+`pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json` still carries
+separate, unrelated, pre-existing uncommitted drift -- untouched, not in
+scope. `pipeline/agents/lena/50_prompt_builder/CURRENT_STATE.md` was
+identified as a secondary staleness gap (it wraps `lena_prompt_brain.py`,
+which received real committed changes in the `d082c170..9f5bcb7d` range)
+but was explicitly excluded from this checkpoint's scope -- still stale,
+not fixed here.
+
+### F. Next approved step
+None of the following is pre-approved -- each needs its own explicit
+instruction: (1) review and commit the multi-axis curator patch; (2) a
+Higgsfield executor skeleton, gated on separate CLI install/login approval
+first, unchanged from the prior entry; (3) optionally, a follow-up doc
+checkpoint for `50_prompt_builder/CURRENT_STATE.md`.
+
+### G. What must not be done
+Do not commit the curator patch without separate explicit approval. Do not
+touch `pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json`. Do not
+touch `pipeline/prompting/lena_prompt_brain.py`,
+`pipeline/agents/lena/50_prompt_builder/CURRENT_STATE.md`, prompt banks,
+Kling files, or anything in `pipeline/queue/`/publish/R2/`.env`. Do not
+render, call Higgsfield/Kling live, install/login, or touch the untracked
+dirty pile beyond what is already documented above.

@@ -9,7 +9,68 @@
 
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-07 (strategic pivot: content_bot reframed as horizontal media infrastructure; this file's own scope is now explicitly the Lena/R&D-lane sub-plan within that larger frame)
+**Last updated:** 2026-07-08 (continuity checkpoint: HEAD advanced to `9f5bcb7d`, 8 previously-undocumented Higgsfield commits recorded, multi-axis model-hook curator recorded as uncommitted WIP)
+
+> **CONTINUITY CHECKPOINT (2026-07-08, later session, read this before
+> assuming the pose/attitude + Higgsfield-pivot banner below is still
+> current):** HEAD is `9f5bcb7d`. Docs-only checkpoint -- no code, prompt
+> bank, queue, publish, R2, `.env`, install/login, or provider call happened
+> producing it. Full detail: `NEXT_SESSION_START.md`'s top banner and the
+> changelog's matching dated entry -- not restated here to avoid drift.
+> Summary only:
+> - Corrects a stale claim in the banner below: `tools/
+>   LEGACY_PROVIDER_SURFACES.md`'s reviewed drift is no longer "pending" --
+>   it was committed as `fa4b2b2c`.
+> - Records 8 commits that landed with zero continuity-doc entry until now:
+>   `fa4b2b2c`, `1b7f2a48`, `c5d5faf6`, `e8d2858b`, `9fc84356`, `b4e85687`,
+>   `fb13a12f`, `9f5bcb7d` -- the Higgsfield-native prompt-pack builder, Soul
+>   moved out of prompt text, crop-conflict fix, wardrobe/pose sanitization,
+>   AI-disclosure layer, photo-dump pack builder, and the bulk
+>   prompt-library dry-run tool (committed at 244 lines).
+> - Records a **multi-axis model-hook curator** (`--select-top`/
+>   `--show-selected-prompts`, 5-axis wardrobe/pose/expression/scene/camera
+>   scoring, lane/silhouette diversity caps) as **uncommitted WIP** on top
+>   of `9f5bcb7d` in
+>   `tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py` (603
+>   working-tree lines vs. 244 committed) -- validated dry-run only
+>   (`py_compile` clean, real 30-prompt library run, 5/5 selected passed
+>   hard validation), **not committed**. `pipeline/prompting/
+>   lena_prompt_brain.py` was not touched by this patch.
+> - Restates, unchanged: `pipeline/prompt_banks/lena/
+>   lena_wardrobe_catalog_v1.json` carries separate pre-existing
+>   uncommitted drift -- do not touch without explicit approval.
+
+> **POSE/ATTITUDE + ALLURE QA GATE + HIGGSFIELD PIVOT (2026-07-08, read this
+> before assuming the 2026-07-07 state below is current):** HEAD is
+> `d082c170`. Full detail in `pipeline/change_notes/NEXT_SESSION_START.md`'s
+> top banner and the changelog's matching dated entry -- not restated here to
+> avoid drift between the two. Summary only:
+> - Pose/body-language rotation (`9c53281e`) shipped, then two real proof
+>   renders found two real gaps: attempt 1 failed on wardrobe choice (loose
+>   pants hid the pose being tested), attempt 2 was technically clean but
+>   QA-failed on a major doctrine correction -- **technical coherence is not
+>   sufficient; Lena feed content must have allure/IT-girl/scroll-stopping
+>   energy** (saved as cross-session memory
+>   `project_lena_visual_hook_allure_doctrine.md`).
+> - Both gaps closed with real, validated patches: wardrobe/environment
+>   visual-hook weighting (`ef5dad4f`), pose/expression attitude weighting
+>   (`8f5261be`), and a QA schema-v3 hard gate (`5b53d7a3`,
+>   `allure_level`/`it_girl_energy` gating, `body_visibility_score`/
+>   `outfit_hook_score`/`pose_attitude_score`/`feed_worthy_reason` advisory).
+>   A 250-sample no-render audit confirmed the whole stack works together.
+> - **Nicolas has committed to Higgsfield as the forward generation
+>   provider.** Kling remains the only technically proven live executor
+>   until Higgsfield has a real executor and a QA-reviewed render --
+>   nothing about Kling's live status changes yet. Official-docs-only
+>   verification (no scraping/automation) established CLI over MCP as the
+>   integration route, documented real unresolved blockers (prompt-length
+>   limit, negative-prompt support, no native dry-run, Soul identity
+>   mismatch, NSFW moderation risk, others), and shipped a no-live-call
+>   dry-run diagnostic (`d082c170`,
+>   `tools/diagnostics/lena_higgsfield_payload_dryrun.py`).
+> - One reviewed-but-uncommitted item remains: `tools/LEGACY_PROVIDER_
+>   SURFACES.md`'s pre-existing 2026-07-05 drift (unrelated to Higgsfield,
+>   verified accurate, recommended for commit as-is, not yet committed).
 
 > **STRATEGIC PIVOT CONTEXT (2026-07-07, read this before assuming this file
 > describes the whole business):** `content_bot` is no longer Lena-only. It is
@@ -693,6 +754,32 @@ wardrobe/identity, improved on style/cartoon-drift. No further render on
 this or any slot is authorized without a new, separate, specific reason. No
 publishing has occurred or is authorized at any point in this project's
 history so far.
+
+> **Frame-logic + expression/gaze layers committed; reliability render found a
+> deeper compaction-budget problem; a redesign fix is implemented but
+> uncommitted (2026-07-07/08):** `pipeline/prompting/lena_prompt_brain.py` now
+> has two new committed layers, each with its own executor compaction floor --
+> `feat: add Lena frame logic prompt layer` (`b41495e6`) and `feat: add Lena
+> expression gaze rotation` (`93abc27c`). A reliability render on the repaired
+> `2026-07-05-01-photo` slot (task `903633841376596038`, one real Kling credit
+> spend, attempt 1's failed artifacts archived first) came back QA **fail**, but
+> confirmed both new layers work exactly as designed (alcohol non-focal,
+> frame-logic objects reflected, expression natural) -- the sole failure was
+> `body_shape_continuity`, root-caused to three separate, still-unfixed issues
+> (negative-prompt omitted from the reference-by-URL payload; the actual
+> APILENA reference image sent is likely a face/bust-oriented square crop, not
+> a full-body shot; the executor never reads `reference_mode`/
+> `reference_priority` at all) plus a **pre-existing, previously-undiscovered
+> compaction-budget saturation**: identity/eye-color content has never had a
+> reserved floor and was already silently failing in ~21% of sampled slots
+> before this investigation even started. A redesign (new core identity/
+> body-shape contract floor using four existing source sentences + three
+> trimmed existing floors, confined entirely to
+> `pipeline/kling_apilena_api_executor.py`) is implemented and validated
+> (200/200 on all 13 tracked markers, real function, real 200-slot test) but
+> **not committed** -- awaiting Nicolas's review. Attempt 2's render artifacts
+> are not yet archived. No attempt 3 approved. Full detail: the top banner of
+> `NEXT_SESSION_START.md` and the matching changelog entry dated 2026-07-07/08.
 
 ---
 
