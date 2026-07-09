@@ -2226,6 +2226,7 @@ def choose_pose_body_language_production(
     lane: str | None = None,
     reference_mode: str | None = None,
     recent_used: set[str] | None = None,
+    exclude_tags: set[str] | None = None,
 ) -> dict:
     """Selects one pose/body-language combo. Filters by lane-compatibility tag
     (never contradicts the scene's own action -- e.g. never picks a seated pose
@@ -2235,11 +2236,36 @@ def choose_pose_body_language_production(
     rather than hard-failing production over cosmetic variety -- same pattern
     as choose_expression_gaze_production(). Weights toward higher
     attitude_level entries additively (see _pose_attitude_weight) -- never
-    hard-bans neutral entries."""
+    hard-bans neutral entries.
+
+    exclude_tags (2026-07-09, Higgsfield pose-diversity Phase 1): optional,
+    defaults to None so the existing Kling call site is byte-identical in
+    behavior. When given (Higgsfield civilian lanes only, see
+    HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS), any combo carrying one of these
+    compatibility_tags is removed from the pool *before* every other filter
+    below, and -- unlike every other filter in this function -- this
+    exclusion is never relaxed by an "or" fallback. If exclusion would leave
+    zero combos, this raises rather than silently falling back to the
+    unfiltered pool, which would reintroduce an explicitly excluded
+    category (e.g. seated/in_motion) by accident. Cosmetic-variety filters
+    are allowed to relax; a hard content exclusion is not."""
     bank = load_pose_body_language_bank()
     combos = [dict(c) for c in bank.get("combos", [])]
     if not combos:
         raise SystemExit(f"[ABORT] Pose/body-language bank has no combos: {POSE_BODY_LANGUAGE_BANK_PATH}")
+
+    if exclude_tags:
+        eligible_after_exclusion = [
+            c for c in combos
+            if not exclude_tags.intersection(set(c.get("compatibility_tags") or []))
+        ]
+        if not eligible_after_exclusion:
+            raise SystemExit(
+                f"[ABORT] Pose/body-language bank has no combos left after excluding "
+                f"tags {sorted(exclude_tags)!r} -- refusing to silently fall back to "
+                f"the unfiltered pool, which would reintroduce an excluded category."
+            )
+        combos = eligible_after_exclusion
 
     allowed_tags = LANE_POSE_TAG_ALLOWLIST.get(str(lane or "").strip().lower(), set()) | {"universal"}
     tag_filtered = [
@@ -3667,6 +3693,22 @@ HIGGSFIELD_POSE_REINFORCEMENT_LINE = (
     "one knee softly bent, hand placed on the outside hip"
 )
 
+# Pose-diversity Phase 1 (2026-07-09): the fixed line above, plus the
+# separate pack-level 5-variant substitution it was paired with, is being
+# replaced for Higgsfield civilian lanes by the real 18-combo pose bank
+# (already wired to Kling, previously selected-but-discarded for
+# Higgsfield -- see choose_pose_body_language_production()'s exclude_tags
+# parameter). Motorcycle lanes are deliberately exempted and keep this
+# constant unchanged, since the bank has no moto-tagged combos at all.
+# Seated/in_motion are excluded this phase only because current Higgsfield
+# scene-action sanitization (HIGGSFIELD_SCENE_ACTION_TERM_REWRITES/
+# PHRASE_REWRITES) still rewrites sitting/walking scene language into
+# standing equivalents -- reintroducing those pose categories now would
+# recreate the exact scene/pose contradiction that sanitizer exists to
+# prevent. Bank data is untouched; both tags remain available for a later,
+# separate Phase 2 that also revisits that sanitizer.
+HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS = frozenset({"seated", "in_motion"})
+
 
 def _higgsfield_wardrobe_conflicts_with_hook(wardrobe_text: str) -> bool:
     lower = str(wardrobe_text or "").lower()
@@ -4553,10 +4595,25 @@ def generate_higgsfield_prompt_package(
 
     expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
     pose_body_language_entry = choose_pose_body_language_production(
-        rng, lane=scene["lane"], reference_mode=reference_mode
+        rng,
+        lane=scene["lane"],
+        reference_mode=reference_mode,
+        exclude_tags=None if is_moto_lane else HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS,
     )
 
-    pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
+    # Pose-diversity Phase 1 (2026-07-09): moto lanes keep the fixed
+    # reinforcement line unchanged (no moto-tagged bank combos exist yet,
+    # and the pack-level moto pose substitution below still depends on
+    # finding this exact line to replace). Civilian lanes now use the real
+    # selected bank text -- see HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS above
+    # for why seated/in_motion are excluded this phase.
+    if is_moto_lane:
+        pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
+    else:
+        pose_text = (
+            _clean_sentence_fragment(str(pose_body_language_entry.get("text", "")))
+            or HIGGSFIELD_POSE_REINFORCEMENT_LINE
+        )
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
     scene_action = _higgsfield_sanitize_scene_action(scene_action)
     expression_result = _higgsfield_safe_expression_text(scene_action, expression_gaze_entry)
@@ -4989,20 +5046,32 @@ def generate_higgsfield_photo_dump_pack(
                     )
                 break
 
-        # Photo-dump-only pose substitution: swap the single-image builder's
-        # fixed pose line for a scene-aware variant (see
-        # _higgsfield_photo_dump_pose_for_scene). The original
-        # pose_body_language_id/label metadata (from the pose bank draw) is
-        # left untouched for tracking; only the prompt text itself changes.
-        pose_variant = _higgsfield_photo_dump_pose_for_scene(
-            chosen_package.get("scene_action", ""), i
-        )
-        old_pose_line = f"Pose: {HIGGSFIELD_POSE_REINFORCEMENT_LINE}."
-        new_pose_line = f"Pose: {pose_variant}."
-        for text_key in ("image_prompt", "prompt", "positive_prompt"):
-            chosen_package[text_key] = chosen_package[text_key].replace(
-                old_pose_line, new_pose_line
+        # Pose-diversity Phase 1 (2026-07-09): the old photo-dump-only pose
+        # substitution (fixed line -> one of 5 hardcoded mirror/car/table/
+        # generic variants) is now moto-only. Civilian lanes get real,
+        # varied text directly from generate_higgsfield_prompt_package()
+        # (see HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS) -- HIGGSFIELD_POSE_
+        # REINFORCEMENT_LINE, the search string the old substitution
+        # depended on, is now only ever present in moto-lane prompt text, so
+        # applying it to civilian lanes would silently no-op while leaving
+        # a stale photo_dump_pose_variant label that no longer matches the
+        # real rendered Pose: text -- explicitly gated off instead. The real
+        # pose_body_language_id (now finally accurate for civilian lanes)
+        # is tracked under the same photo_dump_pose_variant key so existing
+        # pose_variant_distribution reporting keeps working, honestly.
+        lane_lower = str(chosen_package.get("lane", "")).strip().lower()
+        if lane_lower in HIGGSFIELD_MOTO_LANES:
+            pose_variant = _higgsfield_photo_dump_pose_for_scene(
+                chosen_package.get("scene_action", ""), i
             )
+            old_pose_line = f"Pose: {HIGGSFIELD_POSE_REINFORCEMENT_LINE}."
+            new_pose_line = f"Pose: {pose_variant}."
+            for text_key in ("image_prompt", "prompt", "positive_prompt"):
+                chosen_package[text_key] = chosen_package[text_key].replace(
+                    old_pose_line, new_pose_line
+                )
+        else:
+            pose_variant = chosen_package.get("pose_body_language_id")
         chosen_package["photo_dump_pose_variant"] = pose_variant
 
         # Photo-dump-only expression substitution (2026-07-09, Nicolas
@@ -5010,7 +5079,6 @@ def generate_higgsfield_photo_dump_pack(
         # images only get a seductive/pinup expression variant instead of
         # the single global neutral Expression line every other lane keeps.
         # Deterministic rotation by image index, same as pose.
-        lane_lower = str(chosen_package.get("lane", "")).strip().lower()
         if lane_lower in HIGGSFIELD_MOTO_LANES:
             expression_variant = HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO[
                 i % len(HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO)
@@ -5050,10 +5118,22 @@ def generate_higgsfield_photo_dump_pack(
         # Pose-scene match safety net: even though selection is now scene-
         # aware by construction, this re-checks the final text directly so a
         # gap in the sanitizer/keyword lists is reported, not silently
-        # shipped. Two known-bad combinations: (a) sitting/seated scene text
-        # next to standing/stance pose language, (b) the mirror-fit-check
-        # pose used when the scene itself never mentions a mirror/fit-check.
-        scene_lower = str(chosen_package.get("scene_action", "")).lower()
+        # shipped. Known-bad combination: sitting/seated scene text next to
+        # standing/stance pose language -- kept as a Phase 1 regression
+        # guard specifically because seated poses are supposed to be fully
+        # excluded from civilian Higgsfield prompts this phase (see
+        # HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS); if this ever fires, a
+        # seated combo leaked through the exclusion and must be
+        # investigated, not ignored.
+        #
+        # Pose-diversity Phase 1 (2026-07-09): the mirror-fit-check-specific
+        # check that used to live here is retired -- it depended on
+        # pose_variant equalling HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR,
+        # which civilian lanes (including "mirror outfit check" itself) no
+        # longer produce now that the old pack-level substitution is
+        # moto-only (see above). The mirror lane's pose behavior under the
+        # real bank is a validation watch-item for this phase, not something
+        # this check can still meaningfully evaluate.
         pose_scene_mismatch_reasons: list[str] = []
         has_sitting_language = any(
             term in final_lower for term in ("sitting at", "sitting in", "seated at")
@@ -5062,15 +5142,6 @@ def generate_higgsfield_photo_dump_pack(
         if has_sitting_language and has_standing_language:
             pose_scene_mismatch_reasons.append(
                 "sitting/seated scene text combined with standing/stance pose language"
-            )
-        if (
-            pose_variant == HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR
-            and not any(
-                k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS
-            )
-        ):
-            pose_scene_mismatch_reasons.append(
-                "mirror fit-check pose used without mirror/fit-check in scene"
             )
         chosen_package["photo_dump_pose_scene_match_pass"] = not pose_scene_mismatch_reasons
         chosen_package["photo_dump_pose_scene_mismatch_terms_found"] = pose_scene_mismatch_reasons
