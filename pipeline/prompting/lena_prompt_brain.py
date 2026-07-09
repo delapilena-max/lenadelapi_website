@@ -3474,14 +3474,17 @@ HIGGSFIELD_FRAMING_LINE = (
 # comes first, props and scenes are secondary. Does not use the word "avatar"
 # (stripped by BANNED_PUBLIC_TERMS).
 HIGGSFIELD_BODY_SILHOUETTE_ANCHOR = (
-    "Silhouette: Lena keeps her consistent reference identity with a pear-leaning hourglass figure: "
-    "narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than "
-    "her waist and ribcage, curvier upper thighs, a medium rounded butt with natural projection, "
-    "and a proportional full D-cup bust. Her lower body has visible outward hip flare even in a "
-    "mostly neutral standing pose; the shape comes from her underlying body structure, not only "
-    "from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, "
-    "and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing "
-    "blocking her hip line. Realistic adult proportions, attractive and curvy, not extreme."
+    "Silhouette: Lena keeps her consistent reference identity with a fit-curvy medium frame and "
+    "pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and "
+    "upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded "
+    "butt with natural projection, and a proportional full D-cup bust. She should not read as a "
+    "skinny runway-model body; her frame has slightly more softness and curve through the hips, "
+    "thighs, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has "
+    "visible outward hip flare even in a mostly neutral standing pose; the shape comes from her "
+    "underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the "
+    "small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips "
+    "visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult "
+    "curvy proportions, not extreme or cartoonish."
 )
 
 # Bug found during manual-test sample review (2026-07-08, same day): the

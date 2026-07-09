@@ -64,25 +64,26 @@ LEGACY_PROVIDER_STATUS = (
 # NOT imported from lena_prompt_brain.py -- this list is diagnostic-only and
 # never injected into any prompt.
 #
-# Reworked 2026-07-09 (Nicolas direction change, new evidence): on 2026-07-08
-# this list existed to confirm a forced heavy body/hip-geometry block stayed
-# removed, and included ordinary body-description terms like "wide hips" for
-# that purpose. Nicolas has since reversed that decision -- real motorcycle-
-# lane output showed Lena's hips/body silhouette drifting narrow, and a
-# reusable HIGGSFIELD_BODY_SILHOUETTE_ANCHOR (in lena_prompt_brain.py) is now
-# always present in every Higgsfield prompt, using exactly this kind of
-# language ("visibly wide hips", "fuller hip flare", "waist-to-hip curve",
-# etc.) on purpose. Only the one term that was a literal substring of the
-# approved anchor text ("wide hips", inside "visibly wide hips") is removed.
-# "fuller thighs" is kept -- it is not a substring of the anchor's "fuller
-# hip flare" wording, so it does not conflict and still catches genuine
-# unrelated thigh-overcorrection drift. This list now also detects genuine
+# Reworked 2026-07-09 (Nicolas direction change, new evidence), updated again
+# same day: on 2026-07-08 this list existed to confirm a forced heavy
+# body/hip-geometry block stayed removed, and included ordinary
+# body-description terms like "wide hips" for that purpose. Nicolas has since
+# reversed that decision -- real motorcycle-lane output showed Lena's
+# hips/body silhouette drifting narrow, and a reusable
+# HIGGSFIELD_BODY_SILHOUETTE_ANCHOR (in lena_prompt_brain.py) is now always
+# present in every Higgsfield prompt, using exactly this kind of language
+# ("visibly wide hips", "fuller hip flare", "waist-to-hip curve", etc.) on
+# purpose. "wide hips" was removed for this reason on 2026-07-09. Later the
+# same day, Nicolas's "fit-curvy medium frame" correction (target: not
+# skinny/runway-thin, not plus-size) added "fuller upper thighs"/"fuller
+# thighs" to the approved anchor itself, so "fuller thighs" is now removed
+# from this list too -- it is no longer overcorrection, it is the approved
+# target body language. This list now only detects genuine
 # anatomical-distortion/overcorrection language that was never part of the
 # approved anchor -- impossible or cartoonish anatomy, exaggerated/fake
 # proportions, extreme distortion, or fetishized wording -- not the normal,
 # expected, now-required body-shape description.
 HEAVY_BODY_OVERCORRECTION_TERMS = (
-    "fuller thighs",
     "strong waist-to-hip contrast",
     "not narrow",
     "not slim-hipped",
