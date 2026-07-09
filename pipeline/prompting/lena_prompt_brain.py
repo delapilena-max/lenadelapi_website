@@ -3640,19 +3640,27 @@ HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES = frozenset(
 # to guarantee, in code, that the bike always reads as real/parked/
 # stationary no matter what the scene bank text says.
 # Extended 2026-07-09 (Nicolas hard-QA correction, after the first real
-# visual test): two failure modes found -- fake/gibberish AI lettering on
-# background signage, and generic/inaccurate bike anatomy with invented
-# logos. This is the unnamed-model fallback (motorcycle street glam only,
+# visual test), then escalated same day (second correction, after
+# reviewing real renders): the first correction asked for "no readable
+# logo" but still allowed a small/blank badge to be visible; Nicolas's
+# final rule is stricter -- logos are never visible at all, hidden/
+# obscured/cropped/blocked by construction, not just left blank. Likewise
+# "blank/blurred signs" is replaced with "no sign objects at all" -- plain
+# surfaces only, nothing sign-shaped for the model to hallucinate text
+# onto. This is the unnamed-model fallback (motorcycle street glam only,
 # which intentionally has no real-model pool); the named-model version with
 # the anatomy-match clause lives in _higgsfield_moto_realism_clause() below.
 HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE = (
     "with a real parked motorcycle fully in frame -- visible chrome "
     "details, mirrors, a real seat, and the kickstand down, engine off, "
-    "completely stationary, no motion blur and no active riding; keep any "
-    "tank badge or logo small, blank, or not visible, no invented "
-    "motorcycle brand marks; no readable background text anywhere in "
-    "frame -- signs, posters, plates blank, aged, blurred, or out of "
-    "focus, no gibberish lettering"
+    "completely stationary, no motion blur and no active riding; any tank "
+    "badge or logo area is hidden, covered, or obscured -- turned away "
+    "from camera, cropped out, blocked by her hand or jacket, or lost in "
+    "shadow or glare; no visible motorcycle logo or readable brand text, "
+    "no invented motorcycle brand marks; no signs, posters, wall text, "
+    "license plate text, menus, labels, or readable text surfaces "
+    "anywhere in frame -- plain walls, tools, shelves, lights, concrete, "
+    "chrome, and out-of-focus colored light only, no gibberish lettering"
 )
 
 # Safety/style boundaries, revised 2026-07-09 (Nicolas correction, same
@@ -3748,10 +3756,13 @@ def _higgsfield_moto_realism_clause(scene_lane_lower: str, rng: random.Random) -
     HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE's unnamed wording for motorcycle
     street glam, which intentionally has no anchor pool. For named models,
     explicitly asks for anatomy (tank/engine/exhaust/wheels/seat/forks/
-    handlebars) to match the real bike, not just an unnamed "real
-    motorcycle" -- and, in both the named and unnamed cases, asks for no
-    invented brand marks and no readable/gibberish background text
-    anywhere in frame (background signs/posters/plates)."""
+    handlebars) to match the real bike's silhouette, not just an unnamed
+    "real motorcycle" -- but per Nicolas's final logo rule (2026-07-09,
+    second correction), the model anchor is for ANATOMY only, never a
+    visible badge: logos/emblems/decals/lettering must always be hidden,
+    covered, or obscured, real or invented, verified or not. Also asks, in
+    both the named and unnamed cases, for zero sign-shaped objects in frame
+    (not blank/blurred signs -- no sign objects at all)."""
     eligible_anchors = [
         anchor for anchor in HIGGSFIELD_MOTO_MODEL_ANCHORS if scene_lane_lower in anchor["lanes"]
     ]
@@ -3764,12 +3775,17 @@ def _higgsfield_moto_realism_clause(scene_lane_lower: str, rng: random.Random) -
         f"with a real parked {model}{noun} fully in frame -- visible chrome "
         f"details and mirrors, its tank shape, engine layout, exhaust "
         f"pipes, wheels/spokes, seat, forks, and handlebars visually "
-        f"matching a real {model}, kickstand down, engine off, completely "
-        "stationary, no motion blur and no active riding; no invented "
-        "motorcycle brand marks, prefer no visible tank badge over an "
-        "invented one; no readable background text anywhere in frame -- "
-        "signs, posters, plates blank, aged, blurred, or out of focus, no "
-        "gibberish lettering"
+        f"matching a real {model} silhouette, kickstand down, engine off, "
+        "completely stationary, no motion blur and no active riding; all "
+        "tank badges, brand logos, emblems, decals, and readable "
+        "motorcycle lettering are hidden, covered, or obscured -- turned "
+        "away from camera, cropped out, blocked by her hand, helmet, or "
+        "jacket, or lost in shadow or glare; no visible motorcycle logo or "
+        "readable brand text anywhere on the bike, no invented motorcycle "
+        "brand marks; no signs, posters, wall text, license plate text, "
+        "menus, labels, or readable text surfaces anywhere in frame -- "
+        "plain walls, tools, shelves, lights, concrete, chrome, and "
+        "out-of-focus colored light only, no gibberish lettering"
     )
 
 

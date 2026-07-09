@@ -95,36 +95,48 @@ def _motorcycle_model_anchor_present(lane: str, prompt_text: str) -> bool | None
 
 
 # Hard-QA correction (2026-07-09, Nicolas, after the first real visual
-# test): fake/gibberish AI lettering on background signage and generic/
-# inaccurate bike anatomy with invented logos were both real failures.
-# Three reporting-only checks (explicitly NOT added to HOOK_* scoring --
-# these are correctness constraints, not hotness cues, so folding them into
-# the curator's ranking would be a category error) confirm the new
-# authenticity/text-hygiene clause in _higgsfield_moto_realism_clause()
-# actually landed in the final prompt text. Applies to all 7 moto lanes,
-# including motorcycle street glam -- the text-hygiene/no-invented-marks
-# half of the clause applies there too, even without a named model.
+# test), then escalated same day (second correction, after reviewing real
+# renders): the first correction asked for "no readable logo" but still
+# allowed a small/blank badge; the final rule is stricter -- logos are
+# always hidden/covered/obscured by construction, never just "blank," and
+# "blank/blurred signs" became "no sign objects at all." The two checks
+# below (moto_logo_authenticity/background_text_hygiene) are replaced by
+# three checks matching the escalated clause's actual signature phrases;
+# fake_text_avoidance is unchanged (its signature phrase, "no gibberish
+# lettering," survived the rewrite unchanged). All reporting-only --
+# explicitly NOT added to HOOK_* scoring, since these are correctness
+# constraints, not hotness cues, and folding them into the curator's
+# ranking would be a category error. Applies to all 7 moto lanes, including
+# motorcycle street glam -- the logo-hidden/text-surface half of the clause
+# applies there too, even without a named model.
 MOTORCYCLE_ALL_LANES = MOTORCYCLE_VINTAGE_LANES | {"motorcycle street glam"}
 
 # Signature phrases lifted verbatim from the two realism-clause variants in
 # lena_prompt_brain.py (named-model and unnamed/street-glam) -- if either
 # ever drifts out of sync, these checks will start reporting false
 # negatives, which is the intended fail-loud behavior.
-MOTO_LOGO_AUTHENTICITY_SIGNATURE = "no invented motorcycle brand marks"
-BACKGROUND_TEXT_HYGIENE_SIGNATURE = "no readable background text"
+MOTO_LOGO_HIDDEN_SIGNATURE = "hidden, covered, or obscured"
+NO_VISIBLE_MOTORCYCLE_LOGO_SIGNATURE = "no visible motorcycle logo"
+NO_TEXT_SURFACES_SIGNATURE = "readable text surfaces"
 FAKE_TEXT_AVOIDANCE_SIGNATURE = "no gibberish lettering"
 
 
-def _moto_logo_authenticity_clause_present(lane: str, prompt_text: str) -> bool | None:
+def _moto_logo_hidden_clause_present(lane: str, prompt_text: str) -> bool | None:
     if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
         return None
-    return MOTO_LOGO_AUTHENTICITY_SIGNATURE in prompt_text.lower()
+    return MOTO_LOGO_HIDDEN_SIGNATURE in prompt_text.lower()
 
 
-def _background_text_hygiene_clause_present(lane: str, prompt_text: str) -> bool | None:
+def _no_visible_motorcycle_logo_clause_present(lane: str, prompt_text: str) -> bool | None:
     if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
         return None
-    return BACKGROUND_TEXT_HYGIENE_SIGNATURE in prompt_text.lower()
+    return NO_VISIBLE_MOTORCYCLE_LOGO_SIGNATURE in prompt_text.lower()
+
+
+def _no_text_surfaces_clause_present(lane: str, prompt_text: str) -> bool | None:
+    if str(lane or "").strip().lower() not in MOTORCYCLE_ALL_LANES:
+        return None
+    return NO_TEXT_SURFACES_SIGNATURE in prompt_text.lower()
 
 
 def _fake_text_avoidance_present(lane: str, prompt_text: str) -> bool | None:
@@ -197,12 +209,15 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
     motorcycle_anchor_checked = 0
     motorcycle_anchor_present = 0
     motorcycle_anchor_missing_slot_ids: list[str] = []
-    moto_logo_authenticity_checked = 0
-    moto_logo_authenticity_present = 0
-    moto_logo_authenticity_missing_slot_ids: list[str] = []
-    background_text_hygiene_checked = 0
-    background_text_hygiene_present = 0
-    background_text_hygiene_missing_slot_ids: list[str] = []
+    moto_logo_hidden_checked = 0
+    moto_logo_hidden_present = 0
+    moto_logo_hidden_missing_slot_ids: list[str] = []
+    no_visible_motorcycle_logo_checked = 0
+    no_visible_motorcycle_logo_present = 0
+    no_visible_motorcycle_logo_missing_slot_ids: list[str] = []
+    no_text_surfaces_checked = 0
+    no_text_surfaces_present = 0
+    no_text_surfaces_missing_slot_ids: list[str] = []
     fake_text_avoidance_checked = 0
     fake_text_avoidance_present = 0
     fake_text_avoidance_missing_slot_ids: list[str] = []
@@ -226,21 +241,31 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
                 else:
                     motorcycle_anchor_missing_slot_ids.append(image["slot_id"])
 
-            logo_result = _moto_logo_authenticity_clause_present(image["lane"], image["image_prompt"])
-            if logo_result is not None:
-                moto_logo_authenticity_checked += 1
-                if logo_result:
-                    moto_logo_authenticity_present += 1
+            logo_hidden_result = _moto_logo_hidden_clause_present(image["lane"], image["image_prompt"])
+            if logo_hidden_result is not None:
+                moto_logo_hidden_checked += 1
+                if logo_hidden_result:
+                    moto_logo_hidden_present += 1
                 else:
-                    moto_logo_authenticity_missing_slot_ids.append(image["slot_id"])
+                    moto_logo_hidden_missing_slot_ids.append(image["slot_id"])
 
-            hygiene_result = _background_text_hygiene_clause_present(image["lane"], image["image_prompt"])
-            if hygiene_result is not None:
-                background_text_hygiene_checked += 1
-                if hygiene_result:
-                    background_text_hygiene_present += 1
+            no_visible_logo_result = _no_visible_motorcycle_logo_clause_present(
+                image["lane"], image["image_prompt"]
+            )
+            if no_visible_logo_result is not None:
+                no_visible_motorcycle_logo_checked += 1
+                if no_visible_logo_result:
+                    no_visible_motorcycle_logo_present += 1
                 else:
-                    background_text_hygiene_missing_slot_ids.append(image["slot_id"])
+                    no_visible_motorcycle_logo_missing_slot_ids.append(image["slot_id"])
+
+            no_text_surfaces_result = _no_text_surfaces_clause_present(image["lane"], image["image_prompt"])
+            if no_text_surfaces_result is not None:
+                no_text_surfaces_checked += 1
+                if no_text_surfaces_result:
+                    no_text_surfaces_present += 1
+                else:
+                    no_text_surfaces_missing_slot_ids.append(image["slot_id"])
 
             fake_text_result = _fake_text_avoidance_present(image["lane"], image["image_prompt"])
             if fake_text_result is not None:
@@ -294,12 +319,15 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
         "motorcycle_anchor_checked": motorcycle_anchor_checked,
         "motorcycle_anchor_present": motorcycle_anchor_present,
         "motorcycle_anchor_missing_slot_ids": motorcycle_anchor_missing_slot_ids,
-        "moto_logo_authenticity_checked": moto_logo_authenticity_checked,
-        "moto_logo_authenticity_present": moto_logo_authenticity_present,
-        "moto_logo_authenticity_missing_slot_ids": moto_logo_authenticity_missing_slot_ids,
-        "background_text_hygiene_checked": background_text_hygiene_checked,
-        "background_text_hygiene_present": background_text_hygiene_present,
-        "background_text_hygiene_missing_slot_ids": background_text_hygiene_missing_slot_ids,
+        "moto_logo_hidden_checked": moto_logo_hidden_checked,
+        "moto_logo_hidden_present": moto_logo_hidden_present,
+        "moto_logo_hidden_missing_slot_ids": moto_logo_hidden_missing_slot_ids,
+        "no_visible_motorcycle_logo_checked": no_visible_motorcycle_logo_checked,
+        "no_visible_motorcycle_logo_present": no_visible_motorcycle_logo_present,
+        "no_visible_motorcycle_logo_missing_slot_ids": no_visible_motorcycle_logo_missing_slot_ids,
+        "no_text_surfaces_checked": no_text_surfaces_checked,
+        "no_text_surfaces_present": no_text_surfaces_present,
+        "no_text_surfaces_missing_slot_ids": no_text_surfaces_missing_slot_ids,
         "fake_text_avoidance_checked": fake_text_avoidance_checked,
         "fake_text_avoidance_present": fake_text_avoidance_present,
         "fake_text_avoidance_missing_slot_ids": fake_text_avoidance_missing_slot_ids,
@@ -337,18 +365,25 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
         print(f"  !! missing a real model anchor: {library['motorcycle_anchor_missing_slot_ids']}")
 
     print(
-        "moto logo authenticity clause present (all 7 moto lanes): "
-        f"{library['moto_logo_authenticity_present']}/{library['moto_logo_authenticity_checked']}"
+        "moto logo hidden clause present (all 7 moto lanes): "
+        f"{library['moto_logo_hidden_present']}/{library['moto_logo_hidden_checked']}"
     )
-    if library["moto_logo_authenticity_missing_slot_ids"]:
-        print(f"  !! missing the logo-authenticity clause: {library['moto_logo_authenticity_missing_slot_ids']}")
+    if library["moto_logo_hidden_missing_slot_ids"]:
+        print(f"  !! missing the logo-hidden clause: {library['moto_logo_hidden_missing_slot_ids']}")
 
     print(
-        "background text hygiene clause present (all 7 moto lanes): "
-        f"{library['background_text_hygiene_present']}/{library['background_text_hygiene_checked']}"
+        "no visible motorcycle logo clause present (all 7 moto lanes): "
+        f"{library['no_visible_motorcycle_logo_present']}/{library['no_visible_motorcycle_logo_checked']}"
     )
-    if library["background_text_hygiene_missing_slot_ids"]:
-        print(f"  !! missing the background-text-hygiene clause: {library['background_text_hygiene_missing_slot_ids']}")
+    if library["no_visible_motorcycle_logo_missing_slot_ids"]:
+        print(f"  !! missing the no-visible-logo clause: {library['no_visible_motorcycle_logo_missing_slot_ids']}")
+
+    print(
+        "no text surfaces clause present (all 7 moto lanes): "
+        f"{library['no_text_surfaces_present']}/{library['no_text_surfaces_checked']}"
+    )
+    if library["no_text_surfaces_missing_slot_ids"]:
+        print(f"  !! missing the no-text-surfaces clause: {library['no_text_surfaces_missing_slot_ids']}")
 
     print(
         "fake/gibberish text avoidance present (all 7 moto lanes): "
