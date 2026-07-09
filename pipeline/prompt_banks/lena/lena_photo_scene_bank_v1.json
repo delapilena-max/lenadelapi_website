@@ -244,6 +244,60 @@
       "camera": "low-angle candid street-fashion editorial photo, 35mm point-and-shoot feel, slight film grain, three-quarter to full-body framing",
       "lighting": "cool overhead garage light mixed with a warm streak of sodium light from the entrance, hard-edged realistic shadows",
       "caption": "borrowed the bike for the photo, kept the confidence for myself"
+    },
+    {
+      "lane": "heritage moto pinup",
+      "action": "standing beside a parked Indian-style heritage cruiser motorcycle, one hand resting on the tank and the other lightly touching her hip, giving the camera a warm, confident pinup smile",
+      "environment": "an old garage doorway at golden hour, weathered wood siding, warm low sunlight spilling across the concrete, a vintage neon shop sign softly blurred behind her",
+      "details": "a real stationary Indian-style heritage cruiser fully in frame, chrome fenders and a classic tank, tan leather seat, engine off, kickstand down, no motion blur",
+      "camera": "low-angle candid pinup-editorial street photo, 35mm lens, warm golden-hour glow, three-quarter to full-body framing",
+      "lighting": "warm golden-hour backlight with soft rim light, gentle film-like warmth",
+      "caption": "borrowed the bike, kept the sunset"
+    },
+    {
+      "lane": "antique cruiser editorial",
+      "action": "standing beside a parked antique Harley-style cruiser, one hand resting on the worn leather seat, looking at the camera with a calm, confident, detached expression",
+      "environment": "an old motorcycle repair shop bay, tool-lined brick walls, hanging work lights, oil-stained concrete floor, vintage Americana signage softly blurred behind her",
+      "details": "a real stationary antique Harley-style cruiser fully in frame, worn leather seat, spoked wheels, chrome details with patina, engine off, kickstand down, no motion blur",
+      "camera": "candid vintage-editorial street photo, 35mm lens, visible film grain, three-quarter to full-body framing",
+      "lighting": "warm overhead shop light mixed with a cool daylight streak from the open bay door, realistic film-grain texture",
+      "caption": "some things age better than the rest of us"
+    },
+    {
+      "lane": "custom chopper eye candy",
+      "action": "standing beside a beautiful custom chopper with a long fork, one hand resting on the handlebar, weight shifted onto one hip, confident editorial gaze toward the camera",
+      "environment": "a dramatic low-angle city curb at night, polished chrome catching streetlight, dark wet pavement reflecting neon signage softly blurred behind her",
+      "details": "a real stationary custom chopper fully in frame, long front fork, polished chrome throughout, low slung seat, engine off, kickstand down, no motion blur",
+      "camera": "dramatic low-angle editorial street photo, 35mm lens, high-contrast night lighting, three-quarter to full-body framing",
+      "lighting": "cool streetlight mixed with warm neon reflections, high-contrast dramatic shadows",
+      "caption": "the bike was the excuse, the shot was the point"
+    },
+    {
+      "lane": "garage grease glam",
+      "action": "standing in a repair garage beside a parked motorcycle, wiping her hands on a rag, giving the camera a confident, unbothered look",
+      "environment": "a real working motorcycle repair garage, tools hung on a pegboard, an engine block on a stand nearby, oil-stained concrete, a rolling tool cart in frame",
+      "details": "realistic garage clutter -- wrenches, a shop rag, a parts tray -- and a real stationary motorcycle partly visible in frame, engine off, no motion blur",
+      "camera": "candid garage-editorial photo, 35mm lens, natural work-light grain, three-quarter to full-body framing",
+      "lighting": "mixed fluorescent shop light and a warm shaft of daylight from the open garage door",
+      "caption": "grease under the nails, glam everywhere else"
+    },
+    {
+      "lane": "bike wash bikini",
+      "action": "standing beside a parked motorcycle with a hose in one hand, rinsing suds off the tank, glancing at the camera with a playful, confident smile",
+      "environment": "a sunny driveway on a summer afternoon, wet pavement reflecting the light, a soapy bucket and sponge nearby, a garden hose coiled at her feet",
+      "details": "a real stationary motorcycle fully in frame, suds and water beads on the chrome, engine off, kickstand down, no motion blur",
+      "camera": "candid summer street-fashion photo, 35mm lens, bright natural daylight, three-quarter to full-body framing",
+      "lighting": "bright midday sun with clean natural highlights, realistic water-drop sparkle",
+      "caption": "the bike did not need this many suds, but here we are"
+    },
+    {
+      "lane": "desert roadside cruiser",
+      "action": "standing beside a parked Indian-style cruiser on the shoulder of a quiet desert road, one hand resting on her hip, looking toward the camera with a calm, confident expression",
+      "environment": "a stretch of empty desert highway at sunset, a distant gas station sign silhouetted against the sky, dry cracked pavement, warm dust haze in the air",
+      "details": "a real stationary Indian-style cruiser fully in frame, dust on the chrome, worn leather saddlebags, engine off, kickstand down, no motion blur",
+      "camera": "cinematic Americana road photo, 35mm lens, warm sunset color, three-quarter to full-body framing",
+      "lighting": "warm desert sunset light, long shadows, dusty golden haze",
+      "caption": "stopped for gas, stayed for the light"
     }
   ],
   "production_blocked_lanes": [

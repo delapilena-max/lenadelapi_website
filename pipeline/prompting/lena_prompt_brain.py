@@ -1877,12 +1877,19 @@ LANE_ENVIRONMENT_ALLOWLIST: dict[str, set[str]] = {
     "elevator moment": {"car_elevator"},
     "gym cooldown": {"gym_glam"},
     "laundry day": {"apartment_elevated"},
-    # Added 2026-07-09 (motorsport/street-glam lane). Only affects which
-    # environment-catalog entry gets drawn for id/name metadata -- the
-    # actual rendered environment text always comes from the scene bank's
-    # own "environment" field (see build_environment_prompt_parts()), not
-    # from this catalog entry.
+    # Added 2026-07-09 (motorsport/street-glam lane, expanded same day into
+    # a 7-lane heritage-motorcycle pillar). Only affects which environment-
+    # catalog entry gets drawn for id/name metadata -- the actual rendered
+    # environment text always comes from the scene bank's own "environment"
+    # field (see build_environment_prompt_parts()), not from this catalog
+    # entry.
     "motorcycle street glam": {"street_glam", "editorial_flash"},
+    "heritage moto pinup": {"street_glam", "editorial_flash"},
+    "antique cruiser editorial": {"street_glam", "editorial_flash"},
+    "custom chopper eye candy": {"street_glam", "editorial_flash"},
+    "garage grease glam": {"street_glam", "editorial_flash"},
+    "bike wash bikini": {"street_glam", "editorial_flash"},
+    "desert roadside cruiser": {"street_glam", "editorial_flash"},
 }
 
 
@@ -3587,10 +3594,55 @@ def _higgsfield_safe_wardrobe_text(wardrobe_text: str, rng: random.Random) -> st
 # can never silently drop if the scene bank entry is edited later.
 HIGGSFIELD_MOTO_LANE = "motorcycle street glam"
 
+# Expanded 2026-07-09 (same day, breadth correction): a real 200-prompt
+# sample proved the plumbing works, but a single sport-bike/matte-black lane
+# was creatively too narrow -- it doesn't reflect Nicolas's actual direction
+# (Indian-style heritage cruisers, antique Harley-style bikes, custom
+# choppers, garage grease glam, bike-wash eye candy, desert-roadside
+# Americana). Six new lanes added alongside the original, all sharing the
+# same wardrobe-pool/pose-pool/safety-lock/realism-clause machinery below --
+# see lena_photo_scene_bank_v1.json for each lane's actual scene/environment
+# text.
+HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP = "heritage moto pinup"
+HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER = "antique cruiser editorial"
+HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER = "custom chopper eye candy"
+HIGGSFIELD_MOTO_LANE_GARAGE_GREASE = "garage grease glam"
+HIGGSFIELD_MOTO_LANE_BIKE_WASH = "bike wash bikini"
+HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE = "desert roadside cruiser"
+
+HIGGSFIELD_MOTO_LANES = frozenset(
+    {
+        HIGGSFIELD_MOTO_LANE,
+        HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+        HIGGSFIELD_MOTO_LANE_ANTIQUE_CRUISER,
+        HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+        HIGGSFIELD_MOTO_LANE_GARAGE_GREASE,
+        HIGGSFIELD_MOTO_LANE_BIKE_WASH,
+        HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+    }
+)
+
+# Lanes whose entire creative premise depends on a specific themed wardrobe
+# (grease-monkey coveralls, bike-wash bikini) -- for these two only, the
+# eligible wardrobe pool is restricted to variants explicitly tagged for
+# that lane, not blended with the generic pool. Every other moto lane still
+# draws from generic-plus-tagged (see the eligibility filter in
+# generate_higgsfield_prompt_package() below).
+HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES = frozenset(
+    {HIGGSFIELD_MOTO_LANE_GARAGE_GREASE, HIGGSFIELD_MOTO_LANE_BIKE_WASH}
+)
+
+# Generalized 2026-07-09 (was "sport motorcycle" only, wrong for cruiser/
+# chopper/antique lanes): applies uniformly across all 7 moto lanes,
+# regardless of bike style -- the lane-specific bike description (Indian-
+# style tank, long chopper fork, antique patina, etc.) lives in each scene's
+# own "details" field in the scene bank, not here. This clause exists only
+# to guarantee, in code, that the bike always reads as real/parked/
+# stationary no matter what the scene bank text says.
 HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE = (
-    "with a real parked sport motorcycle fully in frame -- visible chrome "
-    "exhaust, mirrors, a worn leather seat, and the kickstand down, engine "
-    "off, completely stationary, no motion blur and no active riding"
+    "with a real parked motorcycle fully in frame -- visible chrome "
+    "details, mirrors, a real seat, and the kickstand down, engine off, "
+    "completely stationary, no motion blur and no active riding"
 )
 
 # Safety/style boundaries (2026-07-09, explicit from Nicolas): no nudity, no
@@ -3605,11 +3657,18 @@ HIGGSFIELD_MOTO_SAFETY_LOCK = (
     "underage-coded styling."
 )
 
+# "lanes": frozenset() means usable across any moto lane; a non-empty
+# frozenset restricts the variant to only those lanes (used for
+# bike-wash/garage-specific wardrobe that would look wrong elsewhere, e.g.
+# a bikini in a repair-garage scene or coveralls at a pinup golden-hour
+# curb). rng.choice() is applied to the lane-filtered pool, not the whole
+# tuple -- see generate_higgsfield_prompt_package() below.
 HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
     {
         "outfit_id": "moto_w01",
         "name": "cropped leather jacket + bodysuit + denim",
         "silhouette_class": "moto_editorial_bodysuit",
+        "lanes": frozenset(),
         "prompt": (
             "cropped black leather moto jacket open over a fitted black "
             "bodysuit, low-rise dark denim, a silver hardware buckle belt, "
@@ -3621,6 +3680,7 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
         "outfit_id": "moto_w02",
         "name": "halter bodysuit + leather pants",
         "silhouette_class": "moto_editorial_bodysuit",
+        "lanes": frozenset(),
         "prompt": (
             "fitted white halter bodysuit under an open cropped moto "
             "jacket, low-rise black leather pants, a slim statement belt, "
@@ -3632,6 +3692,7 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
         "outfit_id": "moto_w03",
         "name": "mini skirt + racing top + moto jacket",
         "silhouette_class": "moto_editorial_mini",
+        "lanes": frozenset(),
         "prompt": (
             "sleek black mini skirt with a fitted ribbed racing-stripe top, "
             "a cropped moto jacket draped over one shoulder, thigh-high "
@@ -3642,6 +3703,7 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
         "outfit_id": "moto_w04",
         "name": "racing top + leather pants",
         "silhouette_class": "moto_editorial_pants",
+        "lanes": frozenset(),
         "prompt": (
             "fitted red racing-inspired zip-front top tucked into low-rise "
             "black leather pants, a cropped moto jacket tied at the waist, "
@@ -3652,10 +3714,84 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
         "outfit_id": "moto_w05",
         "name": "halter top + leather mini skirt",
         "silhouette_class": "moto_editorial_mini",
+        "lanes": frozenset(),
         "prompt": (
             "fitted black halter top under a cropped denim moto jacket, "
             "low-rise leather mini skirt, tall lace-up boots, a small "
             "crossbody bag"
+        ),
+    },
+    {
+        "outfit_id": "moto_w06",
+        "name": "halter top + low-rise jeans",
+        "silhouette_class": "moto_editorial_jeans",
+        "lanes": frozenset(),
+        "prompt": (
+            "fitted black halter top tucked into low-rise faded denim "
+            "jeans, a slim western-style statement belt, tall lace-up "
+            "boots, layered thin gold necklaces"
+        ),
+    },
+    {
+        "outfit_id": "moto_w07",
+        "name": "cut-off denim shorts + fitted tee + boots",
+        "silhouette_class": "moto_editorial_denim_shorts",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "fitted black ribbed tank tucked into high-waist cut-off denim "
+            "shorts, a slim leather belt, tall lace-up boots, aviator "
+            "sunglasses pushed into her hair"
+        ),
+    },
+    {
+        "outfit_id": "moto_w08",
+        "name": "greasy coveralls + suspenders, chest covered",
+        "silhouette_class": "moto_editorial_coveralls",
+        "lanes": frozenset({HIGGSFIELD_MOTO_LANE_GARAGE_GREASE}),
+        "prompt": (
+            "a fitted black tank top fully covering her chest, worn under "
+            "unbuttoned denim coveralls pulled down to the waist with the "
+            "sleeves tied at her hips, suspenders resting loosely over bare "
+            "shoulders on top of the tank, a shop rag tucked in one back "
+            "pocket, scuffed work boots"
+        ),
+    },
+    {
+        "outfit_id": "moto_w09",
+        "name": "bikini top + cut-off denim shorts + boots",
+        "silhouette_class": "moto_editorial_bikini_denim",
+        "lanes": frozenset(
+            {
+                HIGGSFIELD_MOTO_LANE_HERITAGE_PINUP,
+                HIGGSFIELD_MOTO_LANE_CUSTOM_CHOPPER,
+                HIGGSFIELD_MOTO_LANE_DESERT_ROADSIDE,
+                HIGGSFIELD_MOTO_LANE,
+            }
+        ),
+        "prompt": (
+            "a fitted triangle bikini top with high-waist cut-off denim "
+            "shorts, full-coverage bottoms underneath (not a thong), tall "
+            "lace-up boots, a thin gold anklet, sunglasses pushed into her "
+            "hair"
+        ),
+    },
+    {
+        "outfit_id": "moto_w10",
+        "name": "slim bikini (bike wash)",
+        "silhouette_class": "moto_editorial_bikini",
+        "lanes": frozenset({HIGGSFIELD_MOTO_LANE_BIKE_WASH}),
+        "prompt": (
+            "a fitted triangle bikini top and matching full-coverage "
+            "bikini bottoms (not a thong), a thin gold anklet, rubber pool "
+            "sandals, a small towel draped over one shoulder, sun-warmed "
+            "skin"
         ),
     },
 )
@@ -3846,10 +3982,23 @@ def generate_higgsfield_prompt_package(
     environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
     reference_mode = choose_reference_mode(media_type, scene)
 
-    is_moto_lane = str(scene.get("lane") or "").strip().lower() == HIGGSFIELD_MOTO_LANE
+    scene_lane_lower = str(scene.get("lane") or "").strip().lower()
+    is_moto_lane = scene_lane_lower in HIGGSFIELD_MOTO_LANES
     if is_moto_lane:
         environment_text = f"{environment_text}, {HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE}"
-        moto_variant = rng.choice(HIGGSFIELD_MOTO_WARDROBE_VARIANTS)
+        if scene_lane_lower in HIGGSFIELD_MOTO_EXCLUSIVE_WARDROBE_LANES:
+            eligible_moto_variants = [
+                variant
+                for variant in HIGGSFIELD_MOTO_WARDROBE_VARIANTS
+                if scene_lane_lower in variant["lanes"]
+            ]
+        else:
+            eligible_moto_variants = [
+                variant
+                for variant in HIGGSFIELD_MOTO_WARDROBE_VARIANTS
+                if not variant["lanes"] or scene_lane_lower in variant["lanes"]
+            ]
+        moto_variant = rng.choice(eligible_moto_variants)
         wardrobe_outfit_id = moto_variant["outfit_id"]
         wardrobe_outfit_name = moto_variant["name"]
         wardrobe_silhouette_class = moto_variant["silhouette_class"]
@@ -4029,6 +4178,15 @@ HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS = (
     "motorcycle",
     "sport bike",
     "leather",
+    # Added 2026-07-09 (heritage-motorcycle breadth expansion): the 6 new
+    # cruiser/chopper/pinup/garage/bike-wash/desert lanes.
+    "cruiser",
+    "chopper",
+    "harley-style",
+    "indian-style",
+    "chrome",
+    "garage",
+    "bikini",
 )
 
 # Pose-variety patch (2026-07-08, later same day): real photo-dump samples
@@ -4125,6 +4283,10 @@ HIGGSFIELD_PHOTO_DUMP_TABLE_SCENE_KEYWORDS = (
 )
 HIGGSFIELD_PHOTO_DUMP_MOTO_SCENE_KEYWORDS = (
     "motorcycle", "moto street", "sport bike", "parked bike",
+    # Added 2026-07-09 (heritage-motorcycle breadth expansion): the new
+    # cruiser/chopper/pinup/roadside lanes' action text says "cruiser" or
+    # "chopper" rather than the bare word "motorcycle" every time.
+    "cruiser", "chopper", "harley-style", "indian-style",
 )
 
 

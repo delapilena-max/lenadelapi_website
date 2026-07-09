@@ -258,6 +258,9 @@ HOOK_WARDROBE_TERMS = (
     # Added 2026-07-09 (motorsport/street-glam lane): terms from
     # HIGGSFIELD_MOTO_WARDROBE_VARIANTS not already covered above.
     "moto jacket", "leather pants", "bodysuit", "halter", "racing-stripe",
+    # Added 2026-07-09 (heritage-motorcycle breadth expansion): terms from
+    # the 6 new wardrobe variants (moto_w06-w10) not already covered above.
+    "leather seat", "suspenders", "coveralls", "bikini", "gloves", "helmet",
 )
 
 # Bank-label keywords, not prompt text -- see module comment above for why.
@@ -297,6 +300,11 @@ HOOK_SCENE_REWARD_TERMS = (
     "venue", "lounge",
     # Added 2026-07-09 (motorsport/street-glam lane).
     "motorcycle", "sport bike", "garage", "industrial",
+    # Added 2026-07-09 (heritage-motorcycle breadth expansion), per
+    # Nicolas's explicit reward-term list.
+    "indian-style", "heritage cruiser", "antique cruiser", "harley-style",
+    "custom chopper", "chrome", "engine block", "exhaust pipes",
+    "bike wash", "roadside", "gas station", "americana",
 )
 # Deliberately does NOT include record shop/night market/bodega/corner
 # shop/music venue/vintage shop/theater (2026-07-09, Nicolas direction):
@@ -382,6 +390,16 @@ LANE_ARCHETYPE_MAP: dict[str, str] = {
     # street-glam editorial lane, matching the new
     # "motorcycle street glam" entry in lena_photo_scene_bank_v1.json.
     "motorcycle street glam": "motorsport_street_glam",
+    # Expanded 2026-07-09 (same day, breadth correction): six more
+    # heritage-motorcycle lanes, each its own distinct archetype so the
+    # archetype cap (max 1 per --select-top run) treats them as genuinely
+    # different content, not five variations on one theme.
+    "heritage moto pinup": "heritage_moto_pinup",
+    "antique cruiser editorial": "antique_cruiser_editorial",
+    "custom chopper eye candy": "custom_chopper_eye_candy",
+    "garage grease glam": "garage_grease_glam",
+    "bike wash bikini": "bike_wash_bikini",
+    "desert roadside cruiser": "desert_roadside_cruiser",
 }
 DEFAULT_ARCHETYPE = "other"
 
@@ -411,10 +429,20 @@ LANE_BROAD_SCENE_GROUP_MAP: dict[str, str] = {
     "late kitchen snack": "apartment",
     "coffee shop": "cafe_brunch",
     "brunch patio": "cafe_brunch",
-    # Added 2026-07-09 (motorsport/street-glam lane): its own broad group,
-    # not folded into "car" or "street" -- a real parked motorcycle reads as
-    # a distinct editorial fantasy from a parked car or a generic sidewalk.
-    "motorcycle street glam": "motorsport_or_vehicle_editorial",
+    # Added/renamed 2026-07-09: all 7 motorcycle lanes share one broad
+    # group ("motorsport_or_heritage_motorcycle") -- not folded into "car"
+    # or "street" -- a real parked motorcycle (sport, cruiser, chopper, or
+    # antique) reads as a distinct editorial fantasy from a parked car or a
+    # generic sidewalk. Renamed from the original "motorsport_or_vehicle_
+    # editorial" now that the pillar covers heritage/cruiser content, not
+    # just the original sport-bike lane.
+    "motorcycle street glam": "motorsport_or_heritage_motorcycle",
+    "heritage moto pinup": "motorsport_or_heritage_motorcycle",
+    "antique cruiser editorial": "motorsport_or_heritage_motorcycle",
+    "custom chopper eye candy": "motorsport_or_heritage_motorcycle",
+    "garage grease glam": "motorsport_or_heritage_motorcycle",
+    "bike wash bikini": "motorsport_or_heritage_motorcycle",
+    "desert roadside cruiser": "motorsport_or_heritage_motorcycle",
 }
 DEFAULT_BROAD_SCENE_GROUP = "other"
 
@@ -437,6 +465,12 @@ _EFFECTIVE_WARDROBE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("maxi_silhouette", ("maxi dress", "maxi skirt")),
     ("midi_silhouette", ("midi dress", "midi skirt")),
     ("mini_or_short_silhouette", ("mini dress", "mini skirt")),
+    # Added 2026-07-09 (heritage-motorcycle breadth expansion): checked
+    # before jeans_based below, since "denim shorts"/"cut-off denim" would
+    # otherwise match jeans_based's bare "denim" term first.
+    ("bikini_silhouette", ("bikini",)),
+    ("coveralls_silhouette", ("coveralls",)),
+    ("denim_shorts_silhouette", ("denim shorts", "cut-off denim", "cut-off shorts")),
     # "leather pants"/generic "pants" added 2026-07-09 (motorsport lane):
     # HIGGSFIELD_MOTO_WARDROBE_VARIANTS uses "leather pants", which the
     # original trouser/jeans/denim terms below didn't cover, so it fell
