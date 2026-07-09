@@ -5450,3 +5450,71 @@ is now identified. Do not touch motorcycles, scene bank, or the curator
 from this entry. No render, no Higgsfield/Kling call, no publish, no
 queue/R2/.env, no install/login, no cleanup, no commit occurred producing
 this checkpoint.
+
+## 2026-07-09 (later in session) — Complete production benchmark locked: full-body rooftop black-dress render is a PASS
+
+### A. What happened
+The framing gap identified in the prior entry was fixed and committed as
+`9c787c17` (`fix: reinforce Lena full-body framing`) -- a new always-on
+`HIGGSFIELD_FRAMING_REINFORCEMENT` constant inserted after `Camera:` and
+before `Lighting:` in every Higgsfield prompt, giving full head-to-shoes
+framing a second, later mention in the prompt (the hip/waist message
+already had this redundancy via the wardrobe suffix; framing previously
+did not). Validated 50/50 on all hard-gating checks, byte-identical body
+anchor, zero motorcycle prompts, before commit.
+
+Nicolas then reviewed a real Higgsfield render on the same rooftop/black
+dress concept used throughout this session's body-testing and confirmed
+it a **PASS on every dimension at once**: full head-to-shoes framing,
+face/identity, hips reading clearly, the waist-to-hip curve, the
+fit-curvy medium frame, no runway-skinny read. This is the first render
+this session where body, framing, identity, outfit, and realism all
+worked together in one complete, publishable-shaped image -- not just
+one dimension in isolation on a test crop.
+
+### B. Two benchmarks, different purposes
+Nicolas explicitly distinguished these rather than treating one as
+simply "better": the earlier cropped neutral-stance black fitted
+mini/bodycon output (recorded in the prior entry) actually showed
+*slightly more dramatic* hip width when judged on body shape alone --
+but it was not publishable (head cropped) and only proved one
+dimension. The new rooftop black-dress render is the correct **complete
+production benchmark** going forward because every dimension works
+together in a real, usable image, which is what production content
+actually requires. The neutral-stance benchmark remains the sharper
+reference specifically for body-shape-in-isolation review, not for
+judging overall production readiness.
+
+### C. LOCKED -- do not re-tune without new evidence
+- `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` (commits `1a01add9` ->
+  `7ad7ac6a` -> `aa38b2ee` -> `13ed28f1` -> `1d7cf3c9`): body/hips/frame
+  = PASS, confirmed on a real complete render, not just dry-run
+  validation.
+- The framing reinforcement (`9c787c17`,
+  `HIGGSFIELD_FRAMING_REINFORCEMENT`): framing = PASS, no more head/foot
+  crop.
+- Explicit instruction: stop chasing tiny body/framing improvements
+  without new evidence of a real, specific problem. Five anchor
+  iterations plus one framing fix is enough for now.
+
+Unchanged, restated: Prompt Enhancer stays ON; Lena Soul stays selected
+in provider config/UI, never prompt text; negative prompt stays disabled
+by default; motorcycle lanes remain paused/opt-in only
+(`production_blocked_lanes`).
+
+### D. Next work direction
+Move beyond body/framing tuning into broader normal Lena content testing
+and production-readiness: varied scenes, wardrobe, and natural
+(non-neutral) fashion posing for real content, rather than continuing
+neutral-stance body-proof iteration. No specific next task chosen or
+approved by this entry -- this is a stopping-point checkpoint, not a new
+work order.
+
+### E. What must not be done
+Do not re-tune `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` or the framing
+reinforcement without a new, specific finding -- both are locked as
+working. Do not touch motorcycles, scene bank, wardrobe catalog, or the
+curator from this entry. No code was changed producing this checkpoint
+-- docs only. No render, no Higgsfield/Kling call, no publish, no
+queue/R2/.env, no install/login, no cleanup, no commit occurred
+producing this checkpoint.

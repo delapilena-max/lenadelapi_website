@@ -2,6 +2,45 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ COMPLETE PRODUCTION BENCHMARK LOCKED — BODY + FRAMING BOTH PASS TOGETHER (2026-07-09, later in session) — HEAD is now `9c787c17`; read this before assuming the banner below (`1d7cf3c9`) is still current
+>
+> The framing crop from the banner below is fixed and committed
+> (`9c787c17`, `HIGGSFIELD_FRAMING_REINFORCEMENT`, always-on, inserted
+> after `Camera:`/before `Lighting:`). Nicolas then confirmed a real
+> Higgsfield render (full-body rooftop black dress) is a **PASS on every
+> dimension at once**: full head-to-shoes framing, face/identity, hips
+> reading clearly, waist-to-hip curve, fit-curvy medium frame, no
+> runway-skinny read. This is the first render this session where body,
+> framing, identity, outfit, and realism all worked together in one
+> complete, publishable-shaped image.
+>
+> **This rooftop black-dress render is now the current complete Lena
+> production benchmark** -- distinct from (not simply better than) the
+> earlier cropped neutral-stance benchmark below, which still shows
+> slightly more dramatic hip width in isolation but isn't publishable and
+> only proved one dimension. Use the rooftop render as the production-
+> readiness reference; the neutral-stance one remains a secondary
+> body-shape-only reference.
+>
+> **LOCKED -- do not re-tune without new evidence:**
+> `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` (5 commits, `1a01add9` ->
+> `1d7cf3c9`) and the framing reinforcement (`9c787c17`). Stop chasing
+> tiny body/framing improvements without a new, specific problem.
+>
+> **Next work direction**: move beyond body/framing tuning into broader
+> normal Lena content testing and production-readiness -- varied scenes/
+> wardrobe/natural fashion poses for real content. No specific next task
+> chosen yet.
+>
+> Unchanged: Prompt Enhancer ON; Lena Soul selected in provider config/
+> UI, never prompt text; negative prompt disabled by default; motorcycle
+> lanes paused/opt-in only.
+>
+> No code changed producing this checkpoint. Full detail: the changelog's
+> "Complete production benchmark locked" entry and
+> `tools/LEGACY_PROVIDER_SURFACES.md`'s updated creative-benchmark
+> section.
+
 > ## ✅ LENA BODY TARGET CONFIRMED WORKING; FRAMING CROP IS THE NEXT OPEN ISSUE (2026-07-09, later in session) — HEAD is now `1d7cf3c9`; read this before assuming the banner below (`7ad7ac6a`) is still current
 >
 > After 5 iterative rounds on `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` this

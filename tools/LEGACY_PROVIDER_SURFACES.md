@@ -210,43 +210,55 @@ what a manual UI test should set today.
   the waist even in a neutral standing pose, not only via a hip-pushed
   pose.
 
-**Current creative benchmark (updated 2026-07-09, body test succeeded)**:
-the black fitted mini/bodycon, neutral-stance output produced under the
-`1d7cf3c9` "slightly thicker fit-curvy medium frame" anchor is now the
-reference standard for Lena's body/silhouette -- wide-set pelvis, hips
-clearly wider than the waist, fuller upper thighs, fit-curvy medium
-frame, not skinny/runway-thin, not plus-size, not cartoonish, and the
-shape reads even in a neutral stance with no hip-pop pose doing the
-work. This supersedes the prior rooftop velvet midi dress benchmark
-below (still valid as a secondary reference, just no longer the
-sharpest proof). **Body-shape target is CONFIRMED WORKING as of this
-anchor -- do not re-tune `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` without new
-evidence.**
+**Current creative benchmark (updated 2026-07-09, COMPLETE PRODUCTION PASS)**:
+the latest full-body rooftop black-dress render is now the current
+**complete Lena production benchmark** -- the first single image where
+identity, body, outfit, realism, AND framing all pass together at once.
+Confirmed by Nicolas: full head-to-shoes framing works, face/identity
+works, hips read clearly, the waist-to-hip curve works, the fit-curvy
+medium frame works, she no longer reads as runway-skinny. Nicolas
+considers this good enough to **lock and move forward**.
 
-Caveat: this specific benchmark image is **not publishable** -- the head
-is cropped out of frame. Use it as a body/silhouette reference only, not
-as a post asset. This exposes a separate, still-open problem: framing
-sometimes crops above the head despite `HIGGSFIELD_FRAMING_LINE` already
-stating "showing the complete outfit from head to shoes." Not yet
-diagnosed or patched -- no anchor/framing code change has been approved
-for this session.
+**Nuance on the two benchmarks**: the earlier cropped neutral-stance
+black fitted mini/bodycon output (recorded just below as the prior
+benchmark) actually showed slightly more dramatic hip width in
+isolation -- but the rooftop black-dress render is the better complete
+production benchmark precisely because every dimension (identity, body,
+outfit, realism, framing) works together in one publishable-shaped
+image, not just body-shape in isolation on a cropped/non-publishable
+test image.
 
-**Standing testing doctrine for future body-proof prompts** (docs-only,
-not yet wired into code): keep the current fit-curvy medium-frame
-anchor; use fitted bodycon mini dresses or fitted mini skirts, not loose
-wardrobe, for body tests; require full head-to-shoes framing, no crop
-above the head, no cut-off face; use a neutral or mostly-neutral stance
-for body proof (isolate body shape from pose, same discipline as the
-last several test rounds); once body/framing both pass, return to more
-natural, varied fashion poses for actual production content rather than
-staying in neutral-proof mode.
+**LOCKED as of this checkpoint -- do not re-tune without new evidence:**
+- `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` (commits `1a01add9` through
+  `1d7cf3c9`) -- body/hips/frame = PASS.
+- The framing reinforcement (commit `9c787c17`,
+  `HIGGSFIELD_FRAMING_REINFORCEMENT`) -- framing = PASS, no more crop.
+- Do not keep chasing tiny body/framing improvements without new
+  evidence of a real problem. Both are now confirmed working together on
+  a real render, not just in dry-run validation.
 
-Earlier benchmark (superseded above, kept for reference): the
-Prompt-Enhancer-ON rooftop velvet midi dress outputs -- narrow waist,
-hips clearly wider than the waist, visible outward hip flare, fitted
-wardrobe tracing the waist-to-hip curve, realistic but curvy, no prop
-blocking the hips.
+**Next work direction**: move beyond body/framing tuning into broader
+normal Lena content testing and production-readiness -- varied scenes,
+wardrobe, poses, natural (non-neutral) fashion posing for real content,
+not further neutral-stance body-proof iteration.
+
+Prior benchmark (superseded above as the *primary* reference, but kept
+-- it remains the sharper reference for body-shape-in-isolation, just
+not for complete-image production readiness): the black fitted
+mini/bodycon, neutral-stance output produced under the `1d7cf3c9`
+"slightly thicker fit-curvy medium frame" anchor -- wide-set pelvis,
+hips clearly wider than the waist, fuller upper thighs, fit-curvy medium
+frame, not skinny/runway-thin, not plus-size, not cartoonish, shape
+reads even in a neutral stance with no hip-pop pose doing the work. Not
+publishable (head cropped) -- silhouette reference only. The framing
+crop this image exposed is now fixed by `9c787c17`.
+
+Earlier benchmark (kept for reference only): the Prompt-Enhancer-ON
+rooftop velvet midi dress outputs -- narrow waist, hips clearly wider
+than the waist, visible outward hip flare, fitted wardrobe tracing the
+waist-to-hip curve, realistic but curvy, no prop blocking the hips.
 
 Full detail: `pipeline/change_notes/lena_agentic_pivot_changelog.md`'s
-2026-07-09 (later in session) entry and its follow-up "body test
-succeeded, framing crop found" entry.
+2026-07-09 (later in session) entry, its "body test succeeded, framing
+crop found" follow-up, and its "complete production benchmark locked"
+entry.
