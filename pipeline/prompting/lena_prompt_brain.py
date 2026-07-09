@@ -3474,10 +3474,13 @@ HIGGSFIELD_FRAMING_LINE = (
 # comes first, props and scenes are secondary. Does not use the word "avatar"
 # (stripped by BANNED_PUBLIC_TERMS).
 HIGGSFIELD_BODY_SILHOUETTE_ANCHOR = (
-    "Silhouette: Lena keeps her consistent reference identity with a natural hourglass figure, "
-    "narrow waist, visibly wide hips, fuller hip flare, curvy lower body, hips clearly wider than her waist, "
-    "and toned legs; realistic proportions, not cartoonish. Pose and wardrobe must frame the waist-to-hip curve, "
-    "with full hips visible and no jacket, bag, arm, or prop blocking her hip line."
+    "Silhouette: Lena's underlying body shape has a natural hourglass figure with a narrow waist "
+    "and naturally wide hips -- a structural trait of her body, not something created only by a "
+    "hip-pushed pose. Even standing straight in a neutral stance, her hips and upper thighs read "
+    "structurally fuller and wider than her waist, with a visible outward hip flare and curvy "
+    "lower body; her lower body must never look straight, narrow, or column-shaped. Fitted "
+    "wardrobe should clearly trace this waist-to-hip curve, with full hips visible and no jacket, "
+    "bag, arm, prop, or railing blocking her hip line. Realistic proportions, not cartoonish."
 )
 
 # Bug found during manual-test sample review (2026-07-08, same day): the
