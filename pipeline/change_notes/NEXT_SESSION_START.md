@@ -2,6 +2,119 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ NICOLAS-APPROVED PREFERRED LENA BODY BENCHMARK CHOSEN — 9:16 BLACK-BODYCON VERSION-B RENDER, ENHANCER OFF (2026-07-09, later session) — HEAD unchanged at `106be898`; read this before assuming the "BODY-CONSISTENCY QUESTION REOPENED" banner below fully describes current status
+>
+> **Narrows, does not close, the reopened body-consistency question below.**
+> Nicolas reviewed the two successful 9:16 Version-B control renders (the
+> ones that finally preserved full-head framing after the UI aspect ratio
+> was explicitly switched from 3:4 to 9:16) and explicitly selected the
+> **first of the two** over the second, in his own words: "Her body is
+> like perfect." / "I'd say this one is my favorite." **This is recorded
+> as Nicolas's verdict, not an independently re-derived body-shape
+> assessment** -- his visual judgment is authoritative here.
+>
+> **Nicolas-approved preferred Lena body benchmark:** narrow waist, clear
+> waist-to-hip contrast, naturally broad hip line, fit-curvy medium
+> frame, proportional full bust, realistic toned legs, and an overall
+> silhouette Nicolas considers the ideal Lena body. Neutral stance;
+> face/identity reads correctly as Lena.
+>
+> **Exact successful generation conditions:** Lena Soul selected; Prompt
+> Enhancer OFF; negative prompt OFF; Higgsfield UI aspect ratio explicitly
+> set to 9:16; Version B black-bodycon rooftop control prompt (repeated
+> final framing line included); current committed body anchor
+> (`HIGGSFIELD_BODY_SILHOUETTE_ANCHOR`) and framing wording both unchanged
+> from what's already in `lena_prompt_brain.py`.
+>
+> **New evidence on the aspect-ratio question opened two banners below:**
+> at 3:4, the Version B framing test failed full-head framing 2/2. After
+> switching the Higgsfield UI to 9:16, the next two Version B outputs both
+> preserved the full head; Nicolas selected the first over the second as
+> the preferred body result. **Do not overstate this**: 9:16 alone is not
+> claimed to have solved every prior body-variance issue, Enhancer OFF
+> alone is not claimed to guarantee the body, and prior failures are not
+> claimed to share one single cause. Earlier variance evidence (the 3
+> failed production-readiness renders) is not erased or retracted by this
+> checkpoint. What's recorded is the **strongest successful configuration
+> observed so far, and Nicolas's explicit preferred visual benchmark**:
+> Soul selected + Enhancer OFF + negative prompt OFF + UI aspect ratio
+> 9:16 + unchanged body anchor + unchanged framing text.
+>
+> **Decisions, standing:** do not rewrite or re-tune the body anchor; do
+> not change framing wording; do not replace this benchmark without
+> Nicolas's explicit approval; do not resume blind prompt-wording
+> experiments.
+>
+> No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`, no
+> install/login, no code change, no cleanup, no commit occurred producing
+> this checkpoint itself -- this records Nicolas's visual review of two
+> already-existing manual renders. Full detail: the changelog's matching
+> 2026-07-09 (later in session) "Nicolas-approved preferred body benchmark
+> chosen" entry and `tools/LEGACY_PROVIDER_SURFACES.md`'s updated
+> creative-benchmark section.
+
+> ## ⚠️ BODY-CONSISTENCY QUESTION REOPENED — 3/3 REAL PRODUCTION RENDERS FAILED (2026-07-09, later session) — HEAD is now `106be898`; read this before assuming the banner below (`9c787c17`) still describes current status
+>
+> **Two more real commits landed and are done, unrelated to the reopened
+> question below:**
+> - `fa8da078` `fix: wire Lena expression gaze variation into Higgsfield`
+>   -- real expression/gaze bank text now reaches the final prompt
+>   instead of one fixed line (12 distinct final Expression strings
+>   across a 120-prompt audit, up from 1).
+> - `106be898` `fix: prevent Lena scene expression gaze conflicts` -- a
+>   narrow, evidence-based fallback stops forward-gaze expressions from
+>   contradicting away-gaze scene text (e.g. museum "studying" a
+>   painting). Both validated 120/120; body anchor and framing
+>   reinforcement reconfirmed byte-identical both times.
+>
+> **Then the "complete production benchmark locked" verdict below was
+> reopened by real evidence.** A 5-prompt production-readiness set was
+> picked from a 120-candidate pool and manually rendered in Higgsfield.
+> **3 of 3 rendered so far FAILED body continuity** against the locked
+> rooftop black-dress benchmark (rooftop copper-bronze dress, coffee-shop
+> white mini skirt, brunch plum skirt -- all judged too narrow/
+> runway-slim through the pelvis and hips). The earlier benchmark pass is
+> not retracted -- that one render genuinely passed -- but **the body
+> target does not currently generalize reliably across varied production
+> content. Do not call body continuity production-ready.**
+>
+> **A careful, read-only diagnostic chain followed (no further body-anchor
+> edits):**
+> 1. Confirmed the body anchor's text and position are **byte-identical
+>    in every single Higgsfield prompt this system generates** -- rules
+>    out anchor wording/placement as the differentiator between the pass
+>    and the 3 fails.
+> 2. A controlled same-prompt 3x repeatability test (Enhancer ON) found
+>    **real body-geometry variance from identical input** -- plus real
+>    compositing/background artifacts (duplicated strips, collage
+>    blocks, color bands) in all 3 outputs.
+> 3. A controlled Enhancer ON-vs-OFF test found **OFF preserves body
+>    fullness better in 3/3** -- but introduces head-cropping (2/3) and
+>    wardrobe-type drift, e.g. mini dress rendering as a bodysuit (1/3).
+> 4. A controlled framing-sentence-repetition A/B test (Enhancer OFF, the
+>    existing framing sentence duplicated at the prompt's very end) found
+>    repetition **did not help and plausibly worsened** head-framing
+>    (1/2 full-head success -> 0/2).
+> 5. **Recommended next step, not yet started**: check whether Higgsfield
+>    exposes a real aspect-ratio/canvas control outside prompt text
+>    (near-zero cost, could explain both the cropping and the compositing
+>    artifacts) before any further prompt-wording experiment.
+>
+> **Standing rules going forward**: do not re-tune
+> `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` again -- every test this session held
+> it byte-identical and still found real variance, which argues against a
+> wording fix. Enhancer OFF is a **provisional test setting** for
+> body-consistency experiments only, not yet a production default change.
+> Do not run another blind prompt-wording variant without a specific,
+> evidence-based hypothesis. Full detail: the changelog's matching
+> "Expression/gaze wiring fixed... then real production-readiness renders
+> reopened the body-consistency question" entry.
+>
+> No render, no Higgsfield/Kling call by me, no publish, no queue/R2/.env,
+> no install/login, no cleanup occurred producing this checkpoint itself
+> (items 2-4 above were real manual Higgsfield renders Nicolas ran and
+> reported back, reviewed here read-only).
+
 > ## ✅ COMPLETE PRODUCTION BENCHMARK LOCKED — BODY + FRAMING BOTH PASS TOGETHER (2026-07-09, later in session) — HEAD is now `9c787c17`; read this before assuming the banner below (`1d7cf3c9`) is still current
 >
 > The framing crop from the banner below is fixed and committed
