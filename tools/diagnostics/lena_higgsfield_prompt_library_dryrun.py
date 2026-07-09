@@ -408,7 +408,8 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
                 print(
                     f"[{counter}] slot_id={image['slot_id']} lane={image['lane']!r} "
                     f"wardrobe={image['wardrobe_outfit_id']!r} "
-                    f"silhouette={image['wardrobe_silhouette_class']!r}"
+                    f"silhouette={image['wardrobe_silhouette_class']!r} "
+                    f"text_surface_risk={image.get('text_surface_risk_terms_found', [])!r}"
                 )
                 print(image["image_prompt"])
                 print()

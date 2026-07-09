@@ -3559,6 +3559,39 @@ def _higgsfield_safe_camera_text(camera_text: str) -> str:
     return camera_text
 
 
+# Higgsfield-only environment text-surface sanitizer (2026-07-09,
+# fake/gibberish-text workstream): exact-phrase substitutions only, no
+# regex, no broad deletion, no universal negative clause. Replaces the
+# handful of scene-bank environment phrases confirmed (2026-07-09
+# 120-candidate audit) to reach the real Higgsfield Scene: text and
+# explicitly invite fake/gibberish rendered text, with equally rich
+# non-text detail -- removes the positive invitation instead of asking
+# the provider to both render and not render the same object. Operates
+# only on the in-memory environment_text string inside
+# generate_higgsfield_prompt_package(); does not touch
+# lena_photo_scene_bank_v1.json (shared with Kling) or Kling's own
+# generate_prompt_package(), which reads that same scene-bank field
+# through a completely separate code path untouched by this function.
+HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS: dict[str, str] = {
+    "handwritten menu board and pastry case in the midground": (
+        "espresso machine and pastry case in the midground"
+    ),
+    "handwritten price signs": "wicker baskets and hanging string lights",
+    "menu stands": "small table lamps and folded linen napkins",
+    "gate signs blurred in the background": (
+        "distant gate structures blurred in the background"
+    ),
+    "posters on the wall": "framed album photography and abstract wall art",
+}
+
+
+def _higgsfield_safe_environment_text(environment_text: str) -> str:
+    text = str(environment_text or "")
+    for risky_phrase, replacement in HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS.items():
+        text = text.replace(risky_phrase, replacement)
+    return text
+
+
 # Framing reinforcement (2026-07-09): a real manual Higgsfield body-proof
 # render cropped above the head even though HIGGSFIELD_FRAMING_LINE already
 # says "full-body... from head to shoes" -- diagnosis found framing is
@@ -4478,6 +4511,7 @@ def generate_higgsfield_prompt_package(
     scene = choose_scene_production(production_scene_pool, rng)
     environment_entry = choose_environment_production(scene, rng)
     environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
+    environment_text = _higgsfield_safe_environment_text(environment_text)
     reference_mode = choose_reference_mode(media_type, scene)
 
     scene_lane_lower = str(scene.get("lane") or "").strip().lower()
@@ -4512,6 +4546,10 @@ def generate_higgsfield_prompt_package(
         wardrobe_text = _higgsfield_safe_wardrobe_text(wardrobe_text, rng)
 
     effective_wardrobe_silhouette_class = classify_effective_wardrobe_silhouette(wardrobe_text)
+
+    text_surface_risk_terms_found = [
+        phrase for phrase in HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS if phrase in environment_text
+    ]
 
     expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
     pose_body_language_entry = choose_pose_body_language_production(
@@ -4556,6 +4594,7 @@ def generate_higgsfield_prompt_package(
         "wardrobe_outfit_name": wardrobe_outfit_name,
         "wardrobe_silhouette_class": wardrobe_silhouette_class,
         "effective_wardrobe_silhouette_class": effective_wardrobe_silhouette_class,
+        "text_surface_risk_terms_found": text_surface_risk_terms_found,
         "environment_id": environment_entry.get("environment_id") if environment_entry else None,
         "environment_name": environment_entry.get("name") if environment_entry else None,
         "pose_body_language_id": pose_body_language_entry.get("pose_body_language_id"),

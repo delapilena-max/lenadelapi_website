@@ -302,6 +302,7 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
                 "wardrobe_outfit_name": package.get("wardrobe_outfit_name"),
                 "wardrobe_silhouette_class": package.get("wardrobe_silhouette_class"),
                 "effective_wardrobe_silhouette_class": package.get("effective_wardrobe_silhouette_class"),
+                "text_surface_risk_terms_found": package.get("text_surface_risk_terms_found", []),
                 "pose_body_language_id": package.get("pose_body_language_id"),
                 "pose_body_language_label": package.get("pose_body_language_label"),
                 "photo_dump_pose_variant": package.get("photo_dump_pose_variant"),
