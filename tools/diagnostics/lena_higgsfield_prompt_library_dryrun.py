@@ -255,6 +255,9 @@ HOOK_WARDROBE_TERMS = (
     "leather trousers", "body-skimming", "midi dress", "maxi dress",
     "thigh slit", "side slit", "metallic", "velvet", "lace", "sheer",
     "mini dress", "mini skirt", "heels", "boots", "corset-style",
+    # Added 2026-07-09 (motorsport/street-glam lane): terms from
+    # HIGGSFIELD_MOTO_WARDROBE_VARIANTS not already covered above.
+    "moto jacket", "leather pants", "bodysuit", "halter", "racing-stripe",
 )
 
 # Bank-label keywords, not prompt text -- see module comment above for why.
@@ -292,7 +295,16 @@ HOOK_SCENE_REWARD_TERMS = (
     "date night", "parked car", "parking garage", "hotel", "lobby",
     "elevator", "mirror", "night out", "city-night", "city night",
     "venue", "lounge",
+    # Added 2026-07-09 (motorsport/street-glam lane).
+    "motorcycle", "sport bike", "garage", "industrial",
 )
+# Deliberately does NOT include record shop/night market/bodega/corner
+# shop/music venue/vintage shop/theater (2026-07-09, Nicolas direction):
+# these casual-but-editorial real-world spaces should not be structurally
+# penalized just for the location -- if the wardrobe/pose/camera axes are
+# high-hook, the overall score should reflect that on its own merits, not
+# get capped by an automatic scene penalty. Only genuinely low-status/
+# errand-coded settings stay in this list.
 HOOK_SCENE_PENALTY_TERMS = (
     "coffee shop", "cafe", "brunch", "kitchen", "flower shop",
     "rainy street", "sidewalk",
@@ -302,6 +314,8 @@ HOOK_CAMERA_REWARD_TERMS = (
     "flash", "low-light", "golden-hour", "golden hour", "practical",
     "full-body fashion photo", "friend-shot", "candid", "grain",
     "night", "nightlife",
+    # Added 2026-07-09 (motorsport/street-glam lane).
+    "low-angle", "point-and-shoot", "editorial", "film grain",
 )
 HOOK_CAMERA_PENALTY_TERMS = (
     "overcast", "soft daylight", "bright but soft",
@@ -364,6 +378,10 @@ LANE_ARCHETYPE_MAP: dict[str, str] = {
     "late kitchen snack": "apartment_going_out",
     "coffee shop": "cafe_or_brunch_glam",
     "brunch patio": "cafe_or_brunch_glam",
+    # Added 2026-07-09 (Nicolas creative direction): motorsport/real-bike
+    # street-glam editorial lane, matching the new
+    # "motorcycle street glam" entry in lena_photo_scene_bank_v1.json.
+    "motorcycle street glam": "motorsport_street_glam",
 }
 DEFAULT_ARCHETYPE = "other"
 
@@ -393,6 +411,10 @@ LANE_BROAD_SCENE_GROUP_MAP: dict[str, str] = {
     "late kitchen snack": "apartment",
     "coffee shop": "cafe_brunch",
     "brunch patio": "cafe_brunch",
+    # Added 2026-07-09 (motorsport/street-glam lane): its own broad group,
+    # not folded into "car" or "street" -- a real parked motorcycle reads as
+    # a distinct editorial fantasy from a parked car or a generic sidewalk.
+    "motorcycle street glam": "motorsport_or_vehicle_editorial",
 }
 DEFAULT_BROAD_SCENE_GROUP = "other"
 
@@ -415,7 +437,11 @@ _EFFECTIVE_WARDROBE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("maxi_silhouette", ("maxi dress", "maxi skirt")),
     ("midi_silhouette", ("midi dress", "midi skirt")),
     ("mini_or_short_silhouette", ("mini dress", "mini skirt")),
-    ("trouser_based", ("trouser", "tailored pant")),
+    # "leather pants"/generic "pants" added 2026-07-09 (motorsport lane):
+    # HIGGSFIELD_MOTO_WARDROBE_VARIANTS uses "leather pants", which the
+    # original trouser/jeans/denim terms below didn't cover, so it fell
+    # through to the "other_modern_fashion" catch-all.
+    ("trouser_based", ("trouser", "tailored pant", "leather pants", "pants")),
     ("jeans_based", ("jeans", "denim")),
     ("bodysuit_based", ("bodysuit",)),
     # Generic "dress" catch, checked before the generic "skirt" catch and

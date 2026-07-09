@@ -1877,6 +1877,12 @@ LANE_ENVIRONMENT_ALLOWLIST: dict[str, set[str]] = {
     "elevator moment": {"car_elevator"},
     "gym cooldown": {"gym_glam"},
     "laundry day": {"apartment_elevated"},
+    # Added 2026-07-09 (motorsport/street-glam lane). Only affects which
+    # environment-catalog entry gets drawn for id/name metadata -- the
+    # actual rendered environment text always comes from the scene bank's
+    # own "environment" field (see build_environment_prompt_parts()), not
+    # from this catalog entry.
+    "motorcycle street glam": {"street_glam", "editorial_flash"},
 }
 
 
@@ -3565,6 +3571,96 @@ def _higgsfield_safe_wardrobe_text(wardrobe_text: str, rng: random.Random) -> st
     return f"{base}{HIGGSFIELD_WARDROBE_GLAM_SUFFIX}"
 
 
+# --- Motorsport / real-bike street-glam editorial lane (2026-07-09) ---------
+#
+# Nicolas creative direction, evidence-based from stronger real Higgsfield
+# photo-dump samples: a real parked motorcycle as high-hook fashion/editorial
+# content -- not biker cosplay. Wardrobe here is intentionally more revealing
+# than the average lane, so it is a dedicated in-code pool (not drawn from the
+# shared wardrobe catalog) so the explicit safety boundaries below stay under
+# direct code control rather than depending on catalog entries that don't
+# exist. Every variant gets HIGGSFIELD_MOTO_SAFETY_LOCK appended once, in
+# code (see generate_higgsfield_prompt_package()), not left to per-string
+# discipline. The bike itself must always read as parked/stationary -- see
+# HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE, appended to the environment text
+# independent of whatever the scene bank's own text says, so this constraint
+# can never silently drop if the scene bank entry is edited later.
+HIGGSFIELD_MOTO_LANE = "motorcycle street glam"
+
+HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE = (
+    "with a real parked sport motorcycle fully in frame -- visible chrome "
+    "exhaust, mirrors, a worn leather seat, and the kickstand down, engine "
+    "off, completely stationary, no motion blur and no active riding"
+)
+
+# Safety/style boundaries (2026-07-09, explicit from Nicolas): no nudity, no
+# sheer/see-through nipple or areola visibility, no thong/bare-buttocks
+# focus, no fetish language, no teen/schoolgirl/underage-coded wording,
+# clearly adult, editorial fashion framing not explicit sexual framing.
+HIGGSFIELD_MOTO_SAFETY_LOCK = (
+    " Editorial fashion styling only, not underwear or fetish wear; fully "
+    "opaque fabric throughout, no see-through material anywhere, no nipple "
+    "or areola visibility; no exposed thong or bare-buttocks framing; "
+    "confident adult model energy, clearly adult, never schoolgirl or "
+    "underage-coded styling."
+)
+
+HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
+    {
+        "outfit_id": "moto_w01",
+        "name": "cropped leather jacket + bodysuit + denim",
+        "silhouette_class": "moto_editorial_bodysuit",
+        "prompt": (
+            "cropped black leather moto jacket open over a fitted black "
+            "bodysuit, low-rise dark denim, a silver hardware buckle belt, "
+            "black leather gloves tucked into a back pocket, tall lace-up "
+            "boots"
+        ),
+    },
+    {
+        "outfit_id": "moto_w02",
+        "name": "halter bodysuit + leather pants",
+        "silhouette_class": "moto_editorial_bodysuit",
+        "prompt": (
+            "fitted white halter bodysuit under an open cropped moto "
+            "jacket, low-rise black leather pants, a slim statement belt, "
+            "black ankle boots, mirrored aviator sunglasses pushed up into "
+            "her hair"
+        ),
+    },
+    {
+        "outfit_id": "moto_w03",
+        "name": "mini skirt + racing top + moto jacket",
+        "silhouette_class": "moto_editorial_mini",
+        "prompt": (
+            "sleek black mini skirt with a fitted ribbed racing-stripe top, "
+            "a cropped moto jacket draped over one shoulder, thigh-high "
+            "boots, fingerless leather gloves"
+        ),
+    },
+    {
+        "outfit_id": "moto_w04",
+        "name": "racing top + leather pants",
+        "silhouette_class": "moto_editorial_pants",
+        "prompt": (
+            "fitted red racing-inspired zip-front top tucked into low-rise "
+            "black leather pants, a cropped moto jacket tied at the waist, "
+            "chunky combat-style boots, dark sunglasses"
+        ),
+    },
+    {
+        "outfit_id": "moto_w05",
+        "name": "halter top + leather mini skirt",
+        "silhouette_class": "moto_editorial_mini",
+        "prompt": (
+            "fitted black halter top under a cropped denim moto jacket, "
+            "low-rise leather mini skirt, tall lace-up boots, a small "
+            "crossbody bag"
+        ),
+    },
+)
+
+
 # Bug found during manual-test sample review (2026-07-08, later same day): the
 # scene bank's own "action" field (written for Kling, where a plain candid
 # moment like "pouring coffee" or "walking across" is normal) can directly
@@ -3749,14 +3845,28 @@ def generate_higgsfield_prompt_package(
     environment_entry = choose_environment_production(scene, rng)
     environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
     reference_mode = choose_reference_mode(media_type, scene)
-    wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+
+    is_moto_lane = str(scene.get("lane") or "").strip().lower() == HIGGSFIELD_MOTO_LANE
+    if is_moto_lane:
+        environment_text = f"{environment_text}, {HIGGSFIELD_MOTO_BIKE_REALISM_CLAUSE}"
+        moto_variant = rng.choice(HIGGSFIELD_MOTO_WARDROBE_VARIANTS)
+        wardrobe_outfit_id = moto_variant["outfit_id"]
+        wardrobe_outfit_name = moto_variant["name"]
+        wardrobe_silhouette_class = moto_variant["silhouette_class"]
+        wardrobe_text = f"{moto_variant['prompt']}.{HIGGSFIELD_MOTO_SAFETY_LOCK}"
+    else:
+        wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+        wardrobe_outfit_id = wardrobe_entry.get("outfit_id")
+        wardrobe_outfit_name = wardrobe_entry.get("name")
+        wardrobe_silhouette_class = catalog_outfit_silhouette_class(wardrobe_entry)
+        wardrobe_text = _clean_sentence_fragment(str(wardrobe_entry.get("prompt", "")))
+        wardrobe_text = _higgsfield_safe_wardrobe_text(wardrobe_text, rng)
+
     expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
     pose_body_language_entry = choose_pose_body_language_production(
         rng, lane=scene["lane"], reference_mode=reference_mode
     )
 
-    wardrobe_text = _clean_sentence_fragment(str(wardrobe_entry.get("prompt", "")))
-    wardrobe_text = _higgsfield_safe_wardrobe_text(wardrobe_text, rng)
     pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
     expression_text = HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
@@ -3788,9 +3898,9 @@ def generate_higgsfield_prompt_package(
         "soul_selection_mode": HIGGSFIELD_SOUL_SELECTION_MODE,
         "lane": scene["lane"],
         "activity": scene["lane"],
-        "wardrobe_outfit_id": wardrobe_entry.get("outfit_id"),
-        "wardrobe_outfit_name": wardrobe_entry.get("name"),
-        "wardrobe_silhouette_class": catalog_outfit_silhouette_class(wardrobe_entry),
+        "wardrobe_outfit_id": wardrobe_outfit_id,
+        "wardrobe_outfit_name": wardrobe_outfit_name,
+        "wardrobe_silhouette_class": wardrobe_silhouette_class,
         "environment_id": environment_entry.get("environment_id") if environment_entry else None,
         "environment_name": environment_entry.get("name") if environment_entry else None,
         "pose_body_language_id": pose_body_language_entry.get("pose_body_language_id"),
@@ -3912,6 +4022,13 @@ HIGGSFIELD_PHOTO_DUMP_HOOK_TERMS = (
     "corset",
     "heels",
     "metallic",
+    # Added 2026-07-09 (motorsport/street-glam lane): none of the terms
+    # above appear in the dedicated moto wardrobe pool
+    # (HIGGSFIELD_MOTO_WARDROBE_VARIANTS), so without these, every moto
+    # image would fail hook_pass despite being high-hook by design.
+    "motorcycle",
+    "sport bike",
+    "leather",
 )
 
 # Pose-variety patch (2026-07-08, later same day): real photo-dump samples
@@ -3965,6 +4082,31 @@ HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC = (
     "one hand brushing her hair, shoulders relaxed, confident direct gaze",
 )
 
+# Motorsport / real-bike lane pose variants (2026-07-09), per Nicolas's
+# explicit list: standing beside bike, leaning on bike, seated side-saddle
+# on parked bike, helmet-in-hand, hand on handlebar, fixing sunglasses,
+# jacket-zipper adjustment. The side-saddle variant is deliberately worded
+# as a fashion-editorial pose (both feet grounded, not a riding action) per
+# the "no active riding, fashion/editorial not pornographic" boundary.
+HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO = (
+    "standing beside the parked motorcycle angled toward the camera, one "
+    "hip pushed outward, one hand resting on the handlebar, full outfit "
+    "visible",
+    "leaning back against the parked motorcycle with arms loosely crossed, "
+    "one boot propped on the foot peg, confident detached gaze",
+    "seated side-saddle on the parked motorcycle seat, both feet grounded, "
+    "hands relaxed in her lap, fashion-editorial posture, not a riding pose",
+    "standing beside the motorcycle holding her helmet at her hip with one "
+    "hand, the other hand on her waist, direct confident gaze",
+    "standing close beside the motorcycle with one hand resting on the "
+    "handlebar grip, weight shifted onto one hip, full outfit visible",
+    "standing beside the motorcycle adjusting her sunglasses with one "
+    "hand, the other hand resting on the fuel tank, relaxed confident "
+    "posture",
+    "standing beside the motorcycle with one hand at her jacket zipper as "
+    "if adjusting it, weight on one hip, full outfit visible",
+)
+
 # Full set, exposed for the diagnostic's "is this a known pose variant"
 # membership check -- not used directly for selection (see
 # _higgsfield_photo_dump_pose_for_scene below).
@@ -3973,12 +4115,16 @@ HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS = (
     + (HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_CAR,)
     + (HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_TABLE,)
     + HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_GENERIC
+    + HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO
 )
 
 HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS = ("mirror", "fit-check", "fit check")
 HIGGSFIELD_PHOTO_DUMP_CAR_SCENE_KEYWORDS = ("car", "parking garage")
 HIGGSFIELD_PHOTO_DUMP_TABLE_SCENE_KEYWORDS = (
     "table", "bar", "patio", "restaurant", "brunch", "booth",
+)
+HIGGSFIELD_PHOTO_DUMP_MOTO_SCENE_KEYWORDS = (
+    "motorcycle", "moto street", "sport bike", "parked bike",
 )
 
 
@@ -3989,6 +4135,10 @@ def _higgsfield_photo_dump_pose_for_scene(scene_action: str, index: int) -> str:
     falsely trigger a category. Falls back to a deterministic rotation of
     generic full-body poses when no category matches."""
     scene_lower = str(scene_action or "").lower()
+    if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_MOTO_SCENE_KEYWORDS):
+        return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO[
+            index % len(HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO)
+        ]
     if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_MIRROR_SCENE_KEYWORDS):
         return HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_MIRROR
     if any(k in scene_lower for k in HIGGSFIELD_PHOTO_DUMP_CAR_SCENE_KEYWORDS):
