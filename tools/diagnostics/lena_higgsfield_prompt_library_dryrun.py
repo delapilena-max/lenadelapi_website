@@ -52,8 +52,6 @@ from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
-    HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE,
-    HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO,
 )
 
 DEFAULT_PACKS = 3
@@ -145,20 +143,19 @@ def _fake_text_avoidance_present(lane: str, prompt_text: str) -> bool | None:
     return FAKE_TEXT_AVOIDANCE_SIGNATURE in prompt_text.lower()
 
 
-# Correction (2026-07-09, Nicolas's moto-expression-pool patch): the
-# imported single-pack validator's expression_reinforcement_present check
-# only recognizes the single global HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
-# -- it predates HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO and doesn't
-# know about it (that file isn't in this patch's allowed scope). Left
-# uncorrected, every one of the ~38 moto-lane images in a typical library
-# run would be falsely reported as "missing" expression reinforcement, when
-# they actually carry a real (better, lane-appropriate) expression line.
-# Recomputed here at the library level, mirroring the exact "OR any known
-# variant" pattern pose_reinforcement_present already uses.
-def _expression_reinforcement_present(prompt_text: str) -> bool:
-    return HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE in prompt_text or any(
-        variant in prompt_text for variant in HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO
-    )
+# Corrected again (2026-07-09, expression/gaze wiring fix): the carve-out
+# below that used to recompute "expression_reinforcement_present" separately
+# (via a local _expression_reinforcement_present() checking only the retired
+# fixed HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE plus the moto variants) has
+# been removed. It is no longer needed: build_report() in
+# lena_higgsfield_photo_dump_dryrun.py now computes this key correctly per
+# image -- it compares the actual final "Expression:" text against the real
+# selected expression_gaze_entry["text"] (or the documented safe fallback for
+# a known pose-conflict ID), via real package metadata, not keyword matching
+# -- and already accounts for the moto expression-variant swap. This tool
+# reuses that per-image validation dict for every other key already (see the
+# aggregation loop below); "expression_reinforcement_present" now follows the
+# exact same path instead of a separate, stale recomputation.
 
 # The validation-count keys reported by build_report(), reused verbatim here
 # so the library aggregate matches the single-pack tool's own definitions.
@@ -167,7 +164,7 @@ VALIDATION_LABELS = {
     "wardrobe_casual_free": "wardrobe blocked casual/shape-hiding terms absent",
     "scene_action_conflict_free": "scene/action/expression conflict terms absent",
     "pose_reinforcement_present": "hip-forward pose reinforcement present",
-    "expression_reinforcement_present": "direct-gaze/confident expression reinforcement present",
+    "expression_reinforcement_present": "selected expression/gaze text (or safe fallback) reached final prompt",
     "soul_anchor_absent": "Soul prompt-text leak absent",
     "negative_prompt_disabled": "negative prompt disabled",
     "heavy_overcorrection_free": "heavy body-overcorrection terms absent",
@@ -188,16 +185,10 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
 
     total_prompts = sum(len(p["images"]) for p in pack_reports)
 
-    # "expression_reinforcement_present" is excluded from this pass and
-    # recomputed per-image in the loop below via _expression_reinforcement_
-    # present() -- see that function's docstring for why.
     aggregate_validation_counts = {}
     for key in VALIDATION_LABELS:
-        if key == "expression_reinforcement_present":
-            continue
         passed = sum(p["validation_counts"][key][0] for p in pack_reports)
         aggregate_validation_counts[key] = (passed, total_prompts)
-    expression_reinforcement_corrected = 0
 
     lane_distribution: Counter = Counter()
     silhouette_distribution: Counter = Counter()
@@ -275,9 +266,6 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
                 else:
                     fake_text_avoidance_missing_slot_ids.append(image["slot_id"])
 
-            if _expression_reinforcement_present(image["image_prompt"]):
-                expression_reinforcement_corrected += 1
-
         pack_summaries.append(
             {
                 "slot_prefix": pack_report["slot_prefix"],
@@ -291,11 +279,6 @@ def build_library_report(date_str: str, library_prefix: str, packs: int, count_p
                 "pose_scene_match_pass_count": pack_report["validation_counts"]["pose_scene_match_pass"],
             }
         )
-
-    aggregate_validation_counts["expression_reinforcement_present"] = (
-        expression_reinforcement_corrected,
-        total_prompts,
-    )
 
     prompt_text_counts = Counter(all_prompt_texts)
     duplicate_prompt_count = sum(c - 1 for c in prompt_text_counts.values() if c > 1)
@@ -510,12 +493,11 @@ HOOK_POSE_TEXT_TERMS = (
     "full outfit visible", "hand near", "hand resting",
 )
 
-# Bank-label keywords for expression. The assembled Expression LINE is
-# identical across every Higgsfield prompt in this system
-# (HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE is a fixed constant) -- so the
-# only real per-image expression signal is which expression-bank combo was
-# actually drawn, not the rendered text. Documented rather than silently
-# assumed.
+# Bank-label keywords for expression. Scored off the bank-selected label
+# (updated 2026-07-09: the assembled Expression: text now varies per image
+# too, using the real selected expression_gaze_entry["text"] -- see
+# _validate_image() in lena_higgsfield_photo_dump_dryrun.py -- but scoring
+# here is still keyed off the label for simplicity, unchanged by this patch).
 HOOK_EXPRESSION_LABEL_REWARD_TERMS = (
     "smirk", "confident", "playful", "amused", "eyebrow", "seductive",
 )

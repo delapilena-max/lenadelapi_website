@@ -4225,12 +4225,60 @@ def _higgsfield_sanitize_scene_action(scene_action: str) -> str:
 # Manual Higgsfield finding (2026-07-08, same corrective patch): expression/
 # gaze text drawn from the (Kling-tuned) expression bank can itself conflict
 # with the forced glam pose -- e.g. "glancing back over one shoulder mid-step"
-# fighting a confident three-quarter hip-forward stance. Same fixed-line
-# pattern already used for HIGGSFIELD_POSE_REINFORCEMENT_LINE: always used,
-# not conditional, not a paraphrase of any one bank combo.
+# fighting a confident three-quarter hip-forward stance. At the time, the fix
+# was to discard ALL bank text and always use this one fixed line instead.
+#
+# Reversed 2026-07-09 (Nicolas correction, real evidence from a 120-prompt
+# readiness audit): discarding all bank text meant every single Higgsfield
+# prompt got the identical Expression: line regardless of what
+# choose_expression_gaze_production() actually selected -- expression_gaze_id/
+# expression_gaze_label varied in metadata but never reached the real prompt,
+# and the fixed "direct eye contact" line directly contradicted scene actions
+# like "looking down at the flowers" or "studying [a painting]" in a real
+# sample. This constant is kept (still referenced by
+# HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO's swap logic and by other
+# diagnostic tools outside this patch's scope) but is no longer the default
+# Expression: text -- see _higgsfield_safe_expression_text() below, which now
+# supplies the real per-render text.
 HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE = (
     "faint smirk, relaxed eyes, composed confident look, direct eye contact"
 )
+
+# Narrow, evidence-based conflict list (2026-07-09): only expression_gaze_id
+# values with an actual, already-documented conflict against the fixed
+# HIGGSFIELD_POSE_REINFORCEMENT_LINE (a static hip-pop standing pose) are
+# included -- inspecting all 17 combos in lena_expression_gaze_bank_v1.json
+# found exactly one whose text implies body motion incompatible with a static
+# pose: expression_gaze_id "exp_g008" (label "over_shoulder_mid_step", text
+# "glancing back over one shoulder mid-step, natural candid motion" -- this
+# is the exact combo the 2026-07-08 comment above cites). Keyed by the stable
+# expression_gaze_id, not the label, per explicit instruction. No other combo
+# was found to conflict on inspection (the rest are head/eye/expression-only
+# descriptions compatible with a static stance), so no other ID is added
+# speculatively.
+HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS = {
+    "exp_g008",  # over_shoulder_mid_step
+}
+
+# Minimal, non-contradictory fallback -- used only for the conflict ID(s)
+# above or when the selected entry has no text. Deliberately does not force
+# direct eye contact (per Nicolas's explicit instruction) and is short enough
+# to not itself imply a gaze direction that could fight the scene action.
+HIGGSFIELD_EXPRESSION_SAFE_FALLBACK = "relaxed natural expression, composed face"
+
+
+def _higgsfield_safe_expression_text(expression_gaze_entry: dict) -> str:
+    """Returns the real selected expression/gaze text for Higgsfield prompts,
+    falling back to HIGGSFIELD_EXPRESSION_SAFE_FALLBACK only for the narrow,
+    evidence-based HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set or when the
+    selected entry carries no text. Does not otherwise alter, re-filter, or
+    re-select the entry -- choose_expression_gaze_production()'s lane-
+    compatibility and recency logic is trusted as-is."""
+    expression_gaze_id = str(expression_gaze_entry.get("expression_gaze_id") or "")
+    if expression_gaze_id in HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS:
+        return HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
+    text = _clean_sentence_fragment(str(expression_gaze_entry.get("text", "")))
+    return text or HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
 
 # Motorsport/heritage-motorcycle expression pool (2026-07-09, Nicolas
 # correction): the single global Expression line above is shared by every
@@ -4340,7 +4388,7 @@ def generate_higgsfield_prompt_package(
     )
 
     pose_text = HIGGSFIELD_POSE_REINFORCEMENT_LINE
-    expression_text = HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
+    expression_text = _higgsfield_safe_expression_text(expression_gaze_entry)
     scene_action = _clean_sentence_fragment(str(scene.get("action", "")))
     scene_action = _higgsfield_sanitize_scene_action(scene_action)
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
@@ -4381,6 +4429,13 @@ def generate_higgsfield_prompt_package(
         "pose_body_language_label": pose_body_language_entry.get("label"),
         "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
         "expression_gaze_label": expression_gaze_entry.get("label"),
+        # The actual Expression: text used in this render (real selected bank
+        # text, or HIGGSFIELD_EXPRESSION_SAFE_FALLBACK for the narrow
+        # HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set) -- exposed so callers
+        # like generate_higgsfield_photo_dump_pack() can find-and-replace the
+        # real current Expression: line (e.g. for the moto expression swap)
+        # instead of assuming it's always HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE.
+        "expression_text": expression_text,
         "reference_mode": reference_mode,
         # The final, already-sanitized scene-action text (post
         # _higgsfield_sanitize_scene_action) -- exposed so callers like
@@ -4780,7 +4835,13 @@ def generate_higgsfield_photo_dump_pack(
             expression_variant = HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO[
                 i % len(HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO)
             ]
-            old_expression_line = f"Expression: {HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE}."
+            # 2026-07-09: match whatever the real current Expression: text is
+            # (bank-selected or safe-fallback), not the retired always-on
+            # constant -- see the "expression_text" field comment above.
+            current_expression_text = chosen_package.get(
+                "expression_text", HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
+            )
+            old_expression_line = f"Expression: {current_expression_text}."
             new_expression_line = f"Expression: {expression_variant}."
             for text_key in ("image_prompt", "prompt", "positive_prompt"):
                 chosen_package[text_key] = chosen_package[text_key].replace(

@@ -39,15 +39,47 @@ if str(ROOT) not in sys.path:
 # same hard constraints as the rest of this script.
 from pipeline.prompting.lena_prompt_brain import (
     generate_higgsfield_photo_dump_pack,
+    load_expression_gaze_bank,
     HIGGSFIELD_FRAMING_LINE,
     HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS,
     HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS,
     HIGGSFIELD_POSE_REINFORCEMENT_LINE,
     HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE,
+    HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS,
+    HIGGSFIELD_EXPRESSION_SAFE_FALLBACK,
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
     HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS,
+)
+
+# 2026-07-09: real expression/gaze text now reaches the final prompt (see
+# _higgsfield_safe_expression_text() in lena_prompt_brain.py) instead of the
+# single fixed HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE. This lookup lets the
+# diagnostic independently verify, per image, that the actual Expression:
+# text in the prompt matches what choose_expression_gaze_production() really
+# selected (or the documented safe fallback) -- not just that *some* fixed
+# string is present, which is what the old (now-retired) check did.
+_EXPRESSION_GAZE_TEXT_BY_ID: dict[str, str] = {
+    str(combo.get("expression_gaze_id")): str(combo.get("text", ""))
+    for combo in load_expression_gaze_bank().get("combos", [])
+}
+
+# Small, independent heuristic (diagnostic-only, mirrors nothing in
+# lena_prompt_brain.py) for catching a real regression: the final Expression:
+# text claiming direct eye contact while the scene action itself describes
+# her gaze pointed somewhere else. This is exactly the class of contradiction
+# the 2026-07-09 readiness audit found (flower shop "looking down at the
+# flowers", car moment "looking out the window", museum "studying" a
+# painting) -- all three used the single forced "direct eye contact" line.
+EXPRESSION_GAZE_AWAY_SCENE_TERMS = (
+    "looking down",
+    "looking away",
+    "looking out the window",
+    "studying",
+    "glancing away",
+    "glancing toward the window",
+    "watching people pass",
 )
 
 # A photo-dump pack should show real pose variety, not one clone repeated
@@ -107,10 +139,24 @@ def _extract_wardrobe_segment(prompt: str) -> str:
     return match.group(1) if match else ""
 
 
+def _extract_scene_segment(prompt: str) -> str:
+    match = re.search(r"Scene:\s*(.*?)\s*Wardrobe:", prompt, flags=re.S)
+    return match.group(1) if match else ""
+
+
+def _extract_expression_segment(prompt: str) -> str:
+    """Isolate the actual 'Expression: ... .' text as rendered in the final
+    prompt -- the real per-image content, not assumed to be any fixed
+    constant (2026-07-09 fix)."""
+    match = re.search(r"Expression:\s*(.*?)\.\s*Camera:", prompt, flags=re.S)
+    return match.group(1) if match else ""
+
+
 def _validate_image(package: dict) -> dict:
     prompt = package["image_prompt"]
     lower = prompt.lower()
     wardrobe_segment_lower = _extract_wardrobe_segment(prompt).lower()
+    scene_segment_lower = _extract_scene_segment(prompt).lower()
 
     wardrobe_terms_found = [
         term for term in HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS if term in wardrobe_segment_lower
@@ -121,6 +167,47 @@ def _validate_image(package: dict) -> dict:
     heavy_terms_found = [
         term for term in HEAVY_BODY_OVERCORRECTION_TERMS if term in lower
     ]
+
+    # Expression/gaze check, rewritten 2026-07-09 -- the old check
+    # ("HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE in prompt") was tautological:
+    # it could only ever confirm the presence of the one fixed string that was
+    # *always* inserted, so it could never have caught the regression where
+    # expression_gaze_id/label varied per image but the real Expression: text
+    # never changed. This now independently recomputes what the final
+    # Expression: text *should* be (real bank text for the selected
+    # expression_gaze_id, or the documented safe fallback for the narrow
+    # HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set / a missing bank entry) and
+    # compares it against what actually landed in the prompt.
+    expression_gaze_id = str(package.get("expression_gaze_id") or "")
+    final_expression_text = _extract_expression_segment(prompt)
+    fallback_expected = (
+        expression_gaze_id in HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS
+        or not _EXPRESSION_GAZE_TEXT_BY_ID.get(expression_gaze_id)
+    )
+    expected_expression_text = (
+        HIGGSFIELD_EXPRESSION_SAFE_FALLBACK
+        if fallback_expected
+        else _EXPRESSION_GAZE_TEXT_BY_ID.get(expression_gaze_id, "")
+    )
+    # Photo-dump moto-lane images swap Expression: for one of
+    # HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO after this text is first
+    # assembled (see generate_higgsfield_photo_dump_pack()) -- that swap is
+    # untouched by this patch and is intentionally a different, real, variable
+    # line, so it also counts as "selected text reached the prompt" (it is
+    # never the discarded fixed HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE).
+    photo_dump_expression_variant = package.get("photo_dump_expression_variant")
+    expression_selected_text_reached_prompt = (
+        final_expression_text == expected_expression_text
+        or (
+            photo_dump_expression_variant is not None
+            and final_expression_text == photo_dump_expression_variant
+        )
+    )
+    expression_scene_gaze_conflict_terms_found = (
+        [term for term in EXPRESSION_GAZE_AWAY_SCENE_TERMS if term in scene_segment_lower]
+        if "direct eye contact" in final_expression_text.lower()
+        else []
+    )
 
     return {
         "framing_present": HIGGSFIELD_FRAMING_LINE in prompt,
@@ -137,7 +224,16 @@ def _validate_image(package: dict) -> dict:
             HIGGSFIELD_POSE_REINFORCEMENT_LINE in prompt
             or any(variant in prompt for variant in HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS)
         ),
-        "expression_reinforcement_present": HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE in prompt,
+        "expression_gaze_id": expression_gaze_id,
+        "final_expression_text": final_expression_text,
+        "expected_expression_text": expected_expression_text,
+        "expression_fallback_expected": fallback_expected,
+        "expression_selected_text_reached_prompt": expression_selected_text_reached_prompt,
+        "expression_scene_gaze_conflict_terms_found": expression_scene_gaze_conflict_terms_found,
+        # Renamed in meaning (2026-07-09): now verifies the real selected/
+        # fallback expression text reached the prompt, not just that a fixed
+        # string is present. Old name kept for report-label continuity.
+        "expression_reinforcement_present": expression_selected_text_reached_prompt,
         "soul_anchor_absent": "Use my trained Soul" not in prompt,
         "negative_prompt_disabled": package["negative_prompt_enabled"] is False,
         "heavy_overcorrection_free": not heavy_terms_found,
@@ -191,6 +287,33 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
     def _count(key: str) -> int:
         return sum(1 for item in per_image if item["validation"][key])
 
+    # 2026-07-09 regression catcher: the defect this patch fixes was
+    # invisible to every other metric here (expression_gaze_id/label varied
+    # fine; only the actual rendered Expression: text was frozen). Report the
+    # real distinct-string count directly so a future regression back to a
+    # single fixed line is immediately visible in this summary, not just in
+    # the per-image metadata.
+    unique_expression_texts = sorted(
+        {item["validation"]["final_expression_text"] for item in per_image}
+    )
+    expression_gaze_id_distribution: dict[str, int] = {}
+    expression_gaze_label_distribution: dict[str, int] = {}
+    for item in per_image:
+        gid = item["expression_gaze_id"] or "(none)"
+        glabel = item["expression_gaze_label"] or "(none)"
+        expression_gaze_id_distribution[gid] = expression_gaze_id_distribution.get(gid, 0) + 1
+        expression_gaze_label_distribution[glabel] = (
+            expression_gaze_label_distribution.get(glabel, 0) + 1
+        )
+    expression_fallback_used_count = sum(
+        1 for item in per_image if item["validation"]["expression_fallback_expected"]
+    )
+    expression_scene_gaze_conflict_count = sum(
+        1
+        for item in per_image
+        if item["validation"]["expression_scene_gaze_conflict_terms_found"]
+    )
+
     return {
         "date": date_str,
         "slot_prefix": slot_prefix,
@@ -219,6 +342,12 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
         "prompt_length_min": min(lengths) if lengths else 0,
         "prompt_length_avg": (sum(lengths) // n) if n else 0,
         "prompt_length_max": max(lengths) if lengths else 0,
+        "unique_expression_texts": unique_expression_texts,
+        "distinct_expression_text_count": len(unique_expression_texts),
+        "expression_gaze_id_distribution": expression_gaze_id_distribution,
+        "expression_gaze_label_distribution": expression_gaze_label_distribution,
+        "expression_fallback_used_count": expression_fallback_used_count,
+        "expression_scene_gaze_conflict_count": expression_scene_gaze_conflict_count,
         "validation_counts": {
             "framing_present": (_count("framing_present"), n),
             "wardrobe_casual_free": (_count("wardrobe_casual_free"), n),
@@ -274,7 +403,7 @@ def print_report(report: dict, show_prompts: bool) -> None:
         "wardrobe_casual_free": "wardrobe blocked casual/shape-hiding terms absent",
         "scene_action_conflict_free": "scene/action/expression conflict terms absent",
         "pose_reinforcement_present": "hip-forward pose reinforcement present",
-        "expression_reinforcement_present": "direct-gaze/confident expression reinforcement present",
+        "expression_reinforcement_present": "selected expression/gaze text (or safe fallback) reached final prompt",
         "soul_anchor_absent": "Soul prompt-text leak absent",
         "negative_prompt_disabled": "negative prompt disabled",
         "heavy_overcorrection_free": "heavy body-overcorrection terms absent",
@@ -283,7 +412,21 @@ def print_report(report: dict, show_prompts: bool) -> None:
     }
     for key, label in labels.items():
         count, total = report["validation_counts"][key]
-        print(f"  {label:<58}: {count}/{total}")
+        print(f"  {label:<70}: {count}/{total}")
+    print()
+    print("=== Expression/gaze wiring (2026-07-09 fix) ===")
+    print(f"distinct final Expression: strings in this pack : {report['distinct_expression_text_count']}")
+    for text in report["unique_expression_texts"]:
+        print(f"  - {text!r}")
+    print(f"expression_gaze_id distribution   : {report['expression_gaze_id_distribution']}")
+    print(f"expression_gaze_label distribution: {report['expression_gaze_label_distribution']}")
+    print(f"safe-fallback used (count)        : {report['expression_fallback_used_count']}/{n}")
+    print(f"expression/scene gaze-direction conflicts detected (count): "
+          f"{report['expression_scene_gaze_conflict_count']}/{n}")
+    if report["distinct_expression_text_count"] <= 1 and n > 1:
+        print("  !! WARNING: only one distinct Expression: string across this "
+              "pack -- this is the exact regression the 2026-07-09 fix "
+              "targeted (metadata varies, final prompt text does not).")
     print()
 
     print("per-image metadata:")
@@ -294,12 +437,15 @@ def print_report(report: dict, show_prompts: bool) -> None:
         print(f"      pose: {item['pose_body_language_id']} ({item['pose_body_language_label']!r}) "
               f"[bank draw, tracking only]")
         print(f"      photo-dump pose variant used in final prompt: {item['photo_dump_pose_variant']!r}")
-        print(f"      expression: {item['expression_gaze_id']} ({item['expression_gaze_label']!r})")
+        v = item["validation"]
+        print(f"      expression: {item['expression_gaze_id']} ({item['expression_gaze_label']!r}) "
+              f"fallback_expected={v['expression_fallback_expected']}")
+        print(f"      final Expression: text  : {v['final_expression_text']!r}")
+        print(f"      expected Expression: text: {v['expected_expression_text']!r}")
         print(f"      prompt_length={item['prompt_length']} chars, "
               f"negative_prompt_enabled={item['negative_prompt_enabled']}")
         print(f"      soul_name={item['soul_name']!r} soul_version={item['soul_version']!r} "
               f"soul_selection_mode={item['soul_selection_mode']!r}")
-        v = item["validation"]
         print(f"      validation: framing={v['framing_present']} "
               f"wardrobe_casual_free={v['wardrobe_casual_free']} "
               f"scene_conflict_free={v['scene_action_conflict_free']} "
@@ -322,6 +468,9 @@ def print_report(report: dict, show_prompts: bool) -> None:
             print(f"      !! heavy overcorrection terms found: {v['heavy_overcorrection_terms_found']}")
         if v["pose_scene_mismatch_terms_found"]:
             print(f"      !! pose/scene mismatch: {v['pose_scene_mismatch_terms_found']}")
+        if v["expression_scene_gaze_conflict_terms_found"]:
+            print(f"      !! expression/scene gaze conflict: Expression claims direct eye "
+                  f"contact but scene text found: {v['expression_scene_gaze_conflict_terms_found']}")
     print()
 
     if show_prompts:
