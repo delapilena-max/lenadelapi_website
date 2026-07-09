@@ -1433,6 +1433,42 @@ def catalog_outfit_silhouette_class(entry: dict | None) -> str:
     return "other_modern_fashion"
 
 
+# Effective-wardrobe classifier (2026-07-09, wardrobe-adherence workstream):
+# classifies the *final* wardrobe text actually sent to the provider (after
+# cleanup and any Higgsfield safe-wardrobe fallback substitution), not the
+# raw catalog entry. Deliberately separate from catalog_outfit_silhouette_class()
+# above, which must keep its current raw-catalog semantics unchanged --
+# confirmed downstream consumers (Kling sexy/skin-showing scoring, Kling
+# recency memory) depend on that field's exact legacy vocabulary. This is the
+# single source of truth for effective-wardrobe classification; originally
+# authored in tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py to
+# work around wardrobe_silhouette_class going stale after a fallback
+# substitution -- moved here so both prompt generation and diagnostics share
+# one implementation. Order matters: most-specific-garment-first.
+EFFECTIVE_WARDROBE_SILHOUETTE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("jumpsuit", ("jumpsuit",)),
+    ("maxi_silhouette", ("maxi dress", "maxi skirt")),
+    ("midi_silhouette", ("midi dress", "midi skirt")),
+    ("mini_or_short_silhouette", ("mini dress", "mini skirt")),
+    ("bikini_silhouette", ("bikini",)),
+    ("coveralls_silhouette", ("coveralls",)),
+    ("denim_shorts_silhouette", ("denim shorts", "cut-off denim", "cut-off shorts")),
+    ("trouser_based", ("trouser", "tailored pant", "leather pants", "pants")),
+    ("jeans_based", ("jeans", "denim")),
+    ("bodysuit_based", ("bodysuit",)),
+    ("dress_other_silhouette", (" dress",)),
+    ("skirt_set", (" skirt",)),
+)
+
+
+def classify_effective_wardrobe_silhouette(wardrobe_text: str) -> str:
+    text = str(wardrobe_text or "").lower()
+    for label, terms in EFFECTIVE_WARDROBE_SILHOUETTE_RULES:
+        if any(term in text for term in terms):
+            return label
+    return "other_modern_fashion"
+
+
 def _prompt_has_visible_public_torso_garment(prompt: str) -> bool:
     lower = prompt.lower()
     if any(term in lower for term in VISIBLE_TORSO_GARMENT_TERMS):
@@ -4475,6 +4511,8 @@ def generate_higgsfield_prompt_package(
         wardrobe_text = _clean_sentence_fragment(str(wardrobe_entry.get("prompt", "")))
         wardrobe_text = _higgsfield_safe_wardrobe_text(wardrobe_text, rng)
 
+    effective_wardrobe_silhouette_class = classify_effective_wardrobe_silhouette(wardrobe_text)
+
     expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
     pose_body_language_entry = choose_pose_body_language_production(
         rng, lane=scene["lane"], reference_mode=reference_mode
@@ -4517,6 +4555,7 @@ def generate_higgsfield_prompt_package(
         "wardrobe_outfit_id": wardrobe_outfit_id,
         "wardrobe_outfit_name": wardrobe_outfit_name,
         "wardrobe_silhouette_class": wardrobe_silhouette_class,
+        "effective_wardrobe_silhouette_class": effective_wardrobe_silhouette_class,
         "environment_id": environment_entry.get("environment_id") if environment_entry else None,
         "environment_name": environment_entry.get("name") if environment_entry else None,
         "pose_body_language_id": pose_body_language_entry.get("pose_body_language_id"),

@@ -52,6 +52,7 @@ from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
+    classify_effective_wardrobe_silhouette,
 )
 
 DEFAULT_PACKS = 3
@@ -679,45 +680,15 @@ def _broad_scene_group_for_lane(lane: str) -> str:
 
 # Effective-wardrobe classification, derived from the *final* Wardrobe:
 # segment text, not the catalog's wardrobe_silhouette_class field (see module
-# note above for why that field can be stale). Order matters: checked
-# most-specific-garment-first so e.g. "corset mini dress" classifies as a
-# mini/short silhouette rather than falling through to a generic bucket.
-_EFFECTIVE_WARDROBE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("jumpsuit", ("jumpsuit",)),
-    ("maxi_silhouette", ("maxi dress", "maxi skirt")),
-    ("midi_silhouette", ("midi dress", "midi skirt")),
-    ("mini_or_short_silhouette", ("mini dress", "mini skirt")),
-    # Added 2026-07-09 (heritage-motorcycle breadth expansion): checked
-    # before jeans_based below, since "denim shorts"/"cut-off denim" would
-    # otherwise match jeans_based's bare "denim" term first.
-    ("bikini_silhouette", ("bikini",)),
-    ("coveralls_silhouette", ("coveralls",)),
-    ("denim_shorts_silhouette", ("denim shorts", "cut-off denim", "cut-off shorts")),
-    # "leather pants"/generic "pants" added 2026-07-09 (motorsport lane):
-    # HIGGSFIELD_MOTO_WARDROBE_VARIANTS uses "leather pants", which the
-    # original trouser/jeans/denim terms below didn't cover, so it fell
-    # through to the "other_modern_fashion" catch-all.
-    ("trouser_based", ("trouser", "tailored pant", "leather pants", "pants")),
-    ("jeans_based", ("jeans", "denim")),
-    ("bodysuit_based", ("bodysuit",)),
-    # Generic "dress" catch, checked before the generic "skirt" catch and
-    # after every specific mini/midi/maxi-dress rule above -- catches dress
-    # styles not caught by those (slip dress, wrap dress, bodycon dress...).
-    # Ordering this before the skirt catch matters: the wardrobe-continuity
-    # guard sentence appended to many dress entries reads "...not a
-    # separated top/skirt", and a bare "skirt" substring check would
-    # misclassify a real dress as a skirt_set off that negation alone.
-    ("dress_other_silhouette", (" dress",)),
-    ("skirt_set", (" skirt",)),
-)
-
-
+# note above for why that field can be stale). Moved to
+# pipeline/prompting/lena_prompt_brain.py (2026-07-09, wardrobe-adherence
+# workstream) as classify_effective_wardrobe_silhouette() -- single source of
+# truth shared with prompt generation itself, which now also returns this
+# classification directly as effective_wardrobe_silhouette_class on every
+# Higgsfield package. This local name is kept only to avoid call-site churn
+# below; it delegates entirely to the shared implementation.
 def _classify_effective_wardrobe(wardrobe_text: str) -> str:
-    text = wardrobe_text.lower()
-    for label, terms in _EFFECTIVE_WARDROBE_RULES:
-        if any(term in text for term in terms):
-            return label
-    return "other_modern_fashion"
+    return classify_effective_wardrobe_silhouette(wardrobe_text)
 
 
 def _score_wardrobe(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
@@ -921,7 +892,16 @@ def curate_top_prompts(library: dict, select_top: int) -> dict:
             camera_score, camera_reasons = _score_camera(image, segments)
             total = wardrobe_score + pose_score + expression_score + scene_score + camera_score
 
-            effective_wardrobe_class = _classify_effective_wardrobe(segments["wardrobe"])
+            # Prefer the package-provided effective classification (computed
+            # once, at generation time, from the actual final wardrobe text --
+            # see effective_wardrobe_silhouette_class in
+            # generate_higgsfield_prompt_package()); only re-derive from text
+            # here for older packages that predate that field. Never fall
+            # back to the stale wardrobe_silhouette_class field as effective
+            # truth.
+            effective_wardrobe_class = image.get(
+                "effective_wardrobe_silhouette_class"
+            ) or _classify_effective_wardrobe(segments["wardrobe"])
             catalog_silhouette = image["wardrobe_silhouette_class"]
             effective_wardrobe_note = None
             if effective_wardrobe_class != catalog_silhouette:

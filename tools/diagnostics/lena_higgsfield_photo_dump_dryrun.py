@@ -301,6 +301,7 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
                 "wardrobe_outfit_id": package.get("wardrobe_outfit_id"),
                 "wardrobe_outfit_name": package.get("wardrobe_outfit_name"),
                 "wardrobe_silhouette_class": package.get("wardrobe_silhouette_class"),
+                "effective_wardrobe_silhouette_class": package.get("effective_wardrobe_silhouette_class"),
                 "pose_body_language_id": package.get("pose_body_language_id"),
                 "pose_body_language_label": package.get("pose_body_language_label"),
                 "photo_dump_pose_variant": package.get("photo_dump_pose_variant"),
@@ -493,7 +494,8 @@ def print_report(report: dict, show_prompts: bool) -> None:
     for item in report["images"]:
         print(f"  [{item['index']}] slot_id={item['slot_id']} lane={item['lane']!r}")
         print(f"      wardrobe: {item['wardrobe_outfit_id']} / {item['wardrobe_outfit_name']!r} "
-              f"(silhouette={item['wardrobe_silhouette_class']!r})")
+              f"(silhouette={item['wardrobe_silhouette_class']!r}, "
+              f"effective={item['effective_wardrobe_silhouette_class']!r})")
         print(f"      pose: {item['pose_body_language_id']} ({item['pose_body_language_label']!r}) "
               f"[bank draw, tracking only]")
         print(f"      photo-dump pose variant used in final prompt: {item['photo_dump_pose_variant']!r}")
