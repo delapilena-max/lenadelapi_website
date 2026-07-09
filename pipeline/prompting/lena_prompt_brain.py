@@ -3523,6 +3523,27 @@ def _higgsfield_safe_camera_text(camera_text: str) -> str:
     return camera_text
 
 
+# Framing reinforcement (2026-07-09): a real manual Higgsfield body-proof
+# render cropped above the head even though HIGGSFIELD_FRAMING_LINE already
+# says "full-body... from head to shoes" -- diagnosis found framing is
+# stated exactly once, at the very top of the prompt, with nothing
+# reinforcing it later (unlike the hip/waist message, which appears in both
+# HIGGSFIELD_BODY_SILHOUETTE_ANCHOR and the wardrobe suffix). The existing
+# HIGGSFIELD_SAFE_CAMERA_TEXT fallback only fires when a camera-conflict
+# term is detected, so a neutral (non-conflicting) scene camera line never
+# got any framing reinforcement at all. This constant is always-on,
+# independent of camera-conflict detection, and inserted once near the
+# Camera: portion of the assembled prompt (see
+# generate_higgsfield_prompt_package() below) so every Higgsfield prompt
+# gets a second, later mention of full head-to-shoes framing. Does not
+# touch HIGGSFIELD_BODY_SILHOUETTE_ANCHOR, HIGGSFIELD_CAMERA_CONFLICT_TERMS,
+# or any camera-conflict-sanitizer logic.
+HIGGSFIELD_FRAMING_REINFORCEMENT = (
+    "Framing: keep the complete head, full face, and entire body from top of hair to shoes "
+    "inside the frame, with visible space above the head and below the shoes; no head or feet cropped."
+)
+
+
 # Corrective patch (2026-07-08, same day): a real manual Higgsfield test on a
 # builder-selected "bodysuit + relaxed straight jeans + coat" street lane came
 # back low-hook -- hips hidden, low sex appeal, dated/casual styling. The
@@ -4334,6 +4355,7 @@ def generate_higgsfield_prompt_package(
         f"Pose: {pose_text}. "
         f"Expression: {expression_text}. "
         f"Camera: {camera_text}. "
+        f"{HIGGSFIELD_FRAMING_REINFORCEMENT} "
         f"Lighting: {lighting_text}. "
         f"Mood: {HIGGSFIELD_MOOD_HOOK}."
     )
