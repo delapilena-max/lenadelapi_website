@@ -4418,22 +4418,64 @@ HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS = (
     "glancing toward the window",
 )
 
+# Narrow, evidence-based away-vs-away extension (2026-07-09, third
+# correction): the forward-vs-away check above only ever inspects
+# HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS, so any other combo -- including
+# every "away" gaze expression -- was never checked against scene text at
+# all. A 120-prompt gazeaudit found this class is mostly harmless (soft
+# creative tension: a camera-adjacent/generic-away expression paired with
+# a camera-leaning scene reads as normal photographic variety, not a
+# contradiction -- deliberately NOT suppressed here). But exp_g013
+# ("looking down at an object in her hands") is a genuine exception: it
+# names a concrete, unconditional away-target (unlike exp_g007, which
+# resolves back to the camera in its own text), and 3/3 real occurrences
+# in the audit conflicted with the scene's own gaze target (car moment's
+# "looking out the window", brunch patio's "glancing toward the camera").
+# Deliberately excludes "looking down at the flowers" (flower shop) and
+# any bare "looking down"/"glancing down" scene phrasing -- the flowers
+# can plausibly BE the object in her hands, so that pairing is compatible,
+# not a conflict; no hard-conflict evidence justifies suppressing it.
+HIGGSFIELD_EXPRESSION_DOWNWARD_OBJECT_CONFLICT_IDS = {
+    "exp_g013",  # looking_down_at_object
+}
+
+HIGGSFIELD_EXPRESSION_DOWNWARD_OBJECT_CONFLICT_TERMS = (
+    "looking out the window",
+    "studying",
+    "watching people pass",
+    "toward the camera",
+    "at the camera",
+    "direct gaze",
+    "direct eye contact",
+)
+
 
 def _higgsfield_expression_scene_conflict_terms(
     scene_action: str, expression_gaze_entry: dict
 ) -> list[str]:
     """Returns the exact away-gaze scene terms that conflict with the
-    selected expression, or an empty list if there is no conflict. Only ever
-    inspects entries in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS -- any other
-    selected combo is assumed compatible with any scene action (no loose
-    mood inference, no lane-wide suppression, no retry/reselection)."""
+    selected expression, or an empty list if there is no conflict. Checks
+    two independent, narrow evidence-based cases -- HIGGSFIELD_EXPRESSION_
+    FORWARD_GAZE_IDS against HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS
+    (forward expression vs. away scene), and HIGGSFIELD_EXPRESSION_
+    DOWNWARD_OBJECT_CONFLICT_IDS against HIGGSFIELD_EXPRESSION_DOWNWARD_
+    OBJECT_CONFLICT_TERMS (downward-object expression vs. a scene naming a
+    different concrete target). Any other selected combo is assumed
+    compatible with any scene action (no loose mood inference, no
+    lane-wide suppression, no retry/reselection)."""
     expression_gaze_id = str(expression_gaze_entry.get("expression_gaze_id") or "")
-    if expression_gaze_id not in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS:
-        return []
     scene_lower = str(scene_action or "").lower()
-    return [
-        term for term in HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS if term in scene_lower
-    ]
+    if expression_gaze_id in HIGGSFIELD_EXPRESSION_FORWARD_GAZE_IDS:
+        return [
+            term for term in HIGGSFIELD_EXPRESSION_SCENE_AWAY_GAZE_TERMS if term in scene_lower
+        ]
+    if expression_gaze_id in HIGGSFIELD_EXPRESSION_DOWNWARD_OBJECT_CONFLICT_IDS:
+        return [
+            term
+            for term in HIGGSFIELD_EXPRESSION_DOWNWARD_OBJECT_CONFLICT_TERMS
+            if term in scene_lower
+        ]
+    return []
 
 
 def _higgsfield_safe_expression_text(scene_action: str, expression_gaze_entry: dict) -> dict:
