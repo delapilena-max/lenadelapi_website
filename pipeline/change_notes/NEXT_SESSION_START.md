@@ -2,6 +2,33 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ LENA BODY TARGET CONFIRMED WORKING; FRAMING CROP IS THE NEXT OPEN ISSUE (2026-07-09, later in session) — HEAD is now `1d7cf3c9`; read this before assuming the banner below (`7ad7ac6a`) is still current
+>
+> After 5 iterative rounds on `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` this
+> session (`1a01add9` -> `7ad7ac6a` -> `aa38b2ee` -> `13ed28f1` ->
+> `1d7cf3c9`), Nicolas confirmed a real manual Higgsfield test image
+> proves the body target: fit-curvy medium frame, wide-set pelvis, hips
+> clearly wider than the waist, fuller upper thighs -- not skinny/
+> runway-thin, not plus-size, not cartoonish -- and the shape reads even
+> in a neutral stance without a hip-pop pose. **The anchor is confirmed
+> working -- do not re-tune it without new evidence.**
+>
+> That same benchmark image is **not publishable** (head cropped out of
+> frame) -- benchmark/reference only, never a post asset. This exposes
+> the next open issue: **framing sometimes crops above the head** despite
+> `HIGGSFIELD_FRAMING_LINE` already saying "head to shoes." Not yet
+> diagnosed, not patched, no code change approved yet.
+>
+> New body-proof testing doctrine (docs-only, recorded not coded): fitted
+> bodycon mini dress/mini skirt wardrobe, full head-to-shoes framing, no
+> face/head crop, neutral-or-near-neutral stance for body proof; once
+> body AND framing both pass, return to natural varied fashion poses for
+> real production rather than staying in neutral-proof mode.
+>
+> No code changed producing this checkpoint. Full detail: the changelog's
+> matching 2026-07-09 "Body test succeeded..." entry and
+> `tools/LEGACY_PROVIDER_SURFACES.md`'s updated creative-benchmark section.
+
 > ## ✅ LENA BODY/SILHOUETTE ANCHOR COMMITTED, MOTORCYCLE PAUSED, HIGGSFIELD PROMPT ENHANCER DOCTRINE RECORDED (2026-07-09, later in session) — HEAD is now `7ad7ac6a`; read this before assuming the banner below (`a1639bb0`) is still current
 >
 > **Priority reset: Lena body/identity comes before props/scenes.** Two

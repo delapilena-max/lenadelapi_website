@@ -5392,3 +5392,61 @@ explicit instruction. Do not start Higgsfield executor code, CLI
 install/login, or any live provider call from this entry alone -- each
 remains separately gated per `tools/LEGACY_PROVIDER_SURFACES.md`'s
 future implementation sequence.
+
+## 2026-07-09 (later in session) — Body test succeeded on the medium-frame anchor; framing crop found as the next open issue
+
+### A. What happened
+After four iterative rounds on `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` this
+session (`1a01add9` -> `7ad7ac6a` -> `aa38b2ee` -> `13ed28f1` ->
+`1d7cf3c9`, the last being the "slightly thicker fit-curvy medium frame"
+tune), Nicolas reviewed a real manual Higgsfield test image and confirmed
+the body target is now working: a black fitted mini/bodycon dress,
+neutral standing pose, showing wide-set pelvis, hips clearly wider than
+the waist, fuller upper thighs, a fit-curvy medium frame -- not
+skinny/runway-thin, not plus-size, not cartoonish -- and, importantly,
+the shape reads correctly even without a hip-pop pose doing the work
+(the exact thing the last few anchor revisions were trying to prove).
+This is a docs-only checkpoint -- no code changed in producing this
+entry.
+
+### B. The catch: not publishable, benchmark only
+The same image that proves the body target has its head cropped out of
+frame, so it cannot be used as a post asset. Nicolas designated it a
+body/silhouette benchmark reference only. This surfaces a separate,
+previously-undiagnosed problem: `HIGGSFIELD_FRAMING_LINE` (`pipeline/
+prompting/lena_prompt_brain.py`) already states "showing the complete
+outfit from head to shoes with a little space below the shoes," yet a
+real render still cropped above the head. Not yet diagnosed (unclear
+whether this is a framing-line wording weakness, a Higgsfield
+Prompt-Enhancer interaction, or something else) and not patched -- no
+code change was approved this turn.
+
+### C. Standing doctrine, recorded (docs-only)
+1. **Anchor is confirmed working -- do not re-tune
+   `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` without new evidence.** Five
+   rounds of iteration on this exact constant is enough; further changes
+   need a real new finding, not a hunch.
+2. **Next open issue is framing, not body shape**: force full
+   head-to-shoes composition, no crop above the head, no cut-off face.
+   Still unpatched, still needs its own explicit approval before any
+   code change.
+3. **Future body-proof test doctrine**: use fitted bodycon mini dresses
+   or fitted mini skirts (not loose wardrobe); require full head-to-shoes
+   framing; neutral or mostly-neutral stance (isolates body shape from
+   pose, consistent with how the last several manual-test candidates in
+   this session were hand-picked); once body AND framing both pass,
+   return to more natural, varied fashion poses for actual production
+   content rather than staying in neutral-proof mode indefinitely.
+4. Full creative-benchmark update (superseding the prior rooftop velvet
+   midi dress reference, which remains valid as a secondary reference):
+   recorded in `tools/LEGACY_PROVIDER_SURFACES.md`'s "Higgsfield
+   provider-configuration doctrine" section.
+
+### D. What must not be done
+Do not touch `HIGGSFIELD_BODY_SILHOUETTE_ANCHOR` again without a new,
+specific finding -- it is confirmed working. Do not start a framing-line
+code patch without separate explicit approval, even though the problem
+is now identified. Do not touch motorcycles, scene bank, or the curator
+from this entry. No render, no Higgsfield/Kling call, no publish, no
+queue/R2/.env, no install/login, no cleanup, no commit occurred producing
+this checkpoint.
