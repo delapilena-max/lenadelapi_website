@@ -29,6 +29,7 @@ from __future__ import annotations
 #   python tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py --date 2026-07-08 --library-prefix july08 --packs 3 --count-per-pack 10 --show-prompts
 
 import argparse
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -206,6 +207,553 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
           "no Kling executor import/call, no file written. Dry-run only. ===")
 
 
+# --- Multi-axis "model hook curator" (2026-07-08) ---------------------------
+#
+# Corrective patch, same day: an earlier design implicitly treated "high-hook"
+# as "does the wardrobe/lane contain one of ~20 fixed keywords" (mini dress,
+# heels, metallic, ...). Nicolas's correction: sexy/high-hook is a *combined*
+# judgment across wardrobe, pose, expression, scene, and camera -- not a
+# wardrobe-only keyword search. This section scores each of those five axes
+# separately from the assembled prompt text (and, for pose/expression, from
+# the pose-bank/expression-bank draw metadata, since the Higgsfield builder's
+# actual Pose/Expression prompt LINES are themselves fixed/shared across every
+# prompt in the system -- see the notes on _score_pose/_score_expression
+# below for why bank-label metadata is the real per-image signal there).
+#
+# This is a read-only curation/reporting layer on top of already-generated,
+# already-hard-validated prompts. It does not change what gets generated, and
+# it does not touch pipeline/prompting/lena_prompt_brain.py.
+
+_SEGMENT_BOUNDS = [
+    ("scene", r"Scene:", r"Wardrobe:"),
+    ("wardrobe", r"Wardrobe:", r"Pose:"),
+    ("pose", r"Pose:", r"Expression:"),
+    ("expression", r"Expression:", r"Camera:"),
+    ("camera", r"Camera:", r"Lighting:"),
+    ("lighting", r"Lighting:", r"Mood:"),
+]
+
+
+def _extract_prompt_segments(prompt: str) -> dict[str, str]:
+    """Split an assembled Higgsfield prompt into its labeled sections
+    (Scene/Wardrobe/Pose/Expression/Camera/Lighting), lowercased. Used so
+    each hook-score axis only looks at its own section instead of the whole
+    prompt, avoiding cross-section false matches (e.g. camera's "no mirror"
+    text bleeding into a scene-based mirror check)."""
+    segments: dict[str, str] = {}
+    for name, start, end in _SEGMENT_BOUNDS:
+        match = re.search(rf"{start}\s*(.*?)\s*{end}", prompt, flags=re.S)
+        segments[name] = (match.group(1) if match else "").lower()
+    return segments
+
+
+# Deliberately broad and varied -- not just "mini dress". Uniform weight per
+# term so no single silhouette (e.g. mini dress) is structurally favored.
+HOOK_WARDROBE_TERMS = (
+    "fitted dress", "wrap dress", "slip dress", "satin", "corset", "bodice",
+    "waistcoat", "blazer dress", "tailored trousers", "leather skirt",
+    "leather trousers", "body-skimming", "midi dress", "maxi dress",
+    "thigh slit", "side slit", "metallic", "velvet", "lace", "sheer",
+    "mini dress", "mini skirt", "heels", "boots", "corset-style",
+)
+
+# Bank-label keywords, not prompt text -- see module comment above for why.
+# Higher-attitude pose-bank labels (2026-07-08 pose/expression attitude
+# layer) get more credit than plain/neutral ones.
+HOOK_POSE_LABEL_REWARD_TERMS = (
+    "confident", "hip_shift", "hand_on_hip", "hair_touch", "curve_visible",
+)
+HOOK_POSE_LABEL_NEUTRAL_TERMS = (
+    "relaxed_candid_stance", "shoulders_angled_face_back",
+)
+# The actual assembled Pose line itself (fixed per photo-dump category, see
+# HIGGSFIELD_PHOTO_DUMP_POSE_VARIANT_* in lena_prompt_brain.py) -- scored for
+# presence of concrete hook cues so category choice still matters a little.
+HOOK_POSE_TEXT_TERMS = (
+    "hip", "toward the camera", "brushing her hair", "leaning", "confident",
+    "full outfit visible", "hand near", "hand resting",
+)
+
+# Bank-label keywords for expression. The assembled Expression LINE is
+# identical across every Higgsfield prompt in this system
+# (HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE is a fixed constant) -- so the
+# only real per-image expression signal is which expression-bank combo was
+# actually drawn, not the rendered text. Documented rather than silently
+# assumed.
+HOOK_EXPRESSION_LABEL_REWARD_TERMS = (
+    "smirk", "confident", "playful", "amused", "eyebrow", "seductive",
+)
+HOOK_EXPRESSION_LABEL_NEUTRAL_TERMS = (
+    "relaxed_neutral_direct", "closed_mouth_smile_direct",
+)
+
+HOOK_SCENE_REWARD_TERMS = (
+    "rooftop", "cocktail bar", "wine bar", "restaurant", "date-night",
+    "date night", "parked car", "parking garage", "hotel", "lobby",
+    "elevator", "mirror", "night out", "city-night", "city night",
+    "venue", "lounge",
+)
+HOOK_SCENE_PENALTY_TERMS = (
+    "coffee shop", "cafe", "brunch", "kitchen", "flower shop",
+    "rainy street", "sidewalk",
+)
+
+HOOK_CAMERA_REWARD_TERMS = (
+    "flash", "low-light", "golden-hour", "golden hour", "practical",
+    "full-body fashion photo", "friend-shot", "candid", "grain",
+    "night", "nightlife",
+)
+HOOK_CAMERA_PENALTY_TERMS = (
+    "overcast", "soft daylight", "bright but soft",
+)
+
+# Basic defensive check only -- the wardrobe catalog is already platform-safe
+# by construction (doctrine-level, not something this diagnostic enforces);
+# this exists as a safety net, not the actual guardrail.
+#
+# "nude" deliberately excluded (2026-07-08, caught during validation): it is
+# an extremely common wardrobe color descriptor in this catalog ("nude
+# heels", "nude kitten heels", "nude sandals") and matching it as a bare
+# substring produced false-positive exclusions on completely safe, already-
+# validated prompts. Real explicit-content terms don't have that collision.
+UNSAFE_EXPLICIT_TERMS = (
+    "explicit", "nsfw", "topless", "lingerie", "underwear as outerwear",
+)
+
+
+# --- Content-archetype diversity layer (2026-07-08, second corrective patch) -
+#
+# The first curator patch above scored prompts on 5 hook axes but selected
+# purely by raw score with only a lane/silhouette repeat cap. On a real
+# 30-prompt run this produced a Top 5 of 2x "night out" + 2x "dinner booth" +
+# 1x "lobby cocktail bar" -- all nightlife/table/bar structures, and worse,
+# #1/#2 and #3/#4 were near-duplicate *scenes* (same entrance/table setup,
+# same pose, same camera) that only differed by wardrobe color/fabric. Raw
+# score alone can't see that, because two near-duplicate scenes with strong
+# wardrobe terms both score well independently.
+#
+# This layer adds two lane-derived classifications (content archetype, a
+# specific scene "shape"; and a broader scene group, for shape families) plus
+# an effective-wardrobe classifier that reads the actual final Wardrobe: text
+# instead of trusting the catalog's wardrobe_silhouette_class field, which can
+# go stale after a sanitizer/fallback substitution (e.g. an originally
+# jeans_based catalog entry gets swapped for a "corset mini dress" by the
+# high-hook fitted-wardrobe fallback in lena_prompt_brain.py, but the
+# recorded silhouette-class metadata is never updated to match). All three
+# drive diversity caps in curate_top_prompts() below -- this is a
+# selection-time diversity layer only; it does not change PHOTO_SCENES, the
+# catalog, or anything generated.
+
+LANE_ARCHETYPE_MAP: dict[str, str] = {
+    "night out": "night_out_entrance",
+    "dinner booth": "dinner_table",
+    "sidewalk dinner": "dinner_table",
+    "lobby cocktail bar": "cocktail_bar_lobby",
+    "wine bar patio": "wine_bar",
+    "rooftop sunset": "rooftop",
+    "car moment": "car",
+    "mirror outfit check": "mirror_fit_check",
+    "rainy street": "street_glam",
+    "city bench": "street_glam",
+    "flower shop": "street_glam",
+    "record store": "street_glam",
+    "apartment doorway": "apartment_going_out",
+    "morning apartment": "apartment_going_out",
+    "skincare evening": "apartment_going_out",
+    "studio desk": "apartment_going_out",
+    "late kitchen snack": "apartment_going_out",
+    "coffee shop": "cafe_or_brunch_glam",
+    "brunch patio": "cafe_or_brunch_glam",
+}
+DEFAULT_ARCHETYPE = "other"
+
+# Broader than archetype -- groups several archetypes/lanes into one family so
+# the diversity cap can also prevent e.g. several distinct table archetypes
+# (dinner_table/wine_bar/cocktail_bar_lobby) from all still reading as
+# "always at a table", even though each is a technically distinct archetype.
+# "night out" (an entrance/venue beat, no table) is deliberately kept
+# separate from "table_bar_restaurant" (literal seated-at-a-table/bar beats).
+LANE_BROAD_SCENE_GROUP_MAP: dict[str, str] = {
+    "night out": "nightlife",
+    "dinner booth": "table_bar_restaurant",
+    "sidewalk dinner": "table_bar_restaurant",
+    "lobby cocktail bar": "table_bar_restaurant",
+    "wine bar patio": "table_bar_restaurant",
+    "car moment": "car",
+    "rooftop sunset": "rooftop",
+    "mirror outfit check": "mirror",
+    "rainy street": "street",
+    "city bench": "street",
+    "flower shop": "street",
+    "record store": "street",
+    "apartment doorway": "apartment",
+    "morning apartment": "apartment",
+    "skincare evening": "apartment",
+    "studio desk": "apartment",
+    "late kitchen snack": "apartment",
+    "coffee shop": "cafe_brunch",
+    "brunch patio": "cafe_brunch",
+}
+DEFAULT_BROAD_SCENE_GROUP = "other"
+
+
+def _archetype_for_lane(lane: str) -> str:
+    return LANE_ARCHETYPE_MAP.get(str(lane or "").lower(), DEFAULT_ARCHETYPE)
+
+
+def _broad_scene_group_for_lane(lane: str) -> str:
+    return LANE_BROAD_SCENE_GROUP_MAP.get(str(lane or "").lower(), DEFAULT_BROAD_SCENE_GROUP)
+
+
+# Effective-wardrobe classification, derived from the *final* Wardrobe:
+# segment text, not the catalog's wardrobe_silhouette_class field (see module
+# note above for why that field can be stale). Order matters: checked
+# most-specific-garment-first so e.g. "corset mini dress" classifies as a
+# mini/short silhouette rather than falling through to a generic bucket.
+_EFFECTIVE_WARDROBE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("jumpsuit", ("jumpsuit",)),
+    ("maxi_silhouette", ("maxi dress", "maxi skirt")),
+    ("midi_silhouette", ("midi dress", "midi skirt")),
+    ("mini_or_short_silhouette", ("mini dress", "mini skirt")),
+    ("trouser_based", ("trouser", "tailored pant")),
+    ("jeans_based", ("jeans", "denim")),
+    ("bodysuit_based", ("bodysuit",)),
+    # Generic "dress" catch, checked before the generic "skirt" catch and
+    # after every specific mini/midi/maxi-dress rule above -- catches dress
+    # styles not caught by those (slip dress, wrap dress, bodycon dress...).
+    # Ordering this before the skirt catch matters: the wardrobe-continuity
+    # guard sentence appended to many dress entries reads "...not a
+    # separated top/skirt", and a bare "skirt" substring check would
+    # misclassify a real dress as a skirt_set off that negation alone.
+    ("dress_other_silhouette", (" dress",)),
+    ("skirt_set", (" skirt",)),
+)
+
+
+def _classify_effective_wardrobe(wardrobe_text: str) -> str:
+    text = wardrobe_text.lower()
+    for label, terms in _EFFECTIVE_WARDROBE_RULES:
+        if any(term in text for term in terms):
+            return label
+    return "other_modern_fashion"
+
+
+def _score_wardrobe(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
+    text = segments["wardrobe"]
+    hits = [term for term in HOOK_WARDROBE_TERMS if term in text]
+    score = len(hits)
+    reasons = [f"wardrobe term: {hit!r}" for hit in hits] or ["no recognized wardrobe hook term"]
+    return score, reasons
+
+
+def _score_pose(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
+    label = str(image.get("pose_body_language_label") or "").lower()
+    text = segments["pose"]
+    score = 0
+    reasons: list[str] = []
+
+    label_hits = [term for term in HOOK_POSE_LABEL_REWARD_TERMS if term in label]
+    score += len(label_hits)
+    reasons += [f"pose-bank label cue: {hit!r}" for hit in label_hits]
+
+    if any(term in label for term in HOOK_POSE_LABEL_NEUTRAL_TERMS):
+        score -= 1
+        reasons.append("pose-bank label reads as plain/neutral attitude (penalty)")
+
+    text_hits = [term for term in HOOK_POSE_TEXT_TERMS if term in text]
+    score += len(text_hits)
+    reasons += [f"pose line cue: {hit!r}" for hit in text_hits]
+
+    if not label_hits and not text_hits:
+        reasons.append("no recognized pose hook cue")
+    return score, reasons
+
+
+def _score_expression(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
+    label = str(image.get("expression_gaze_label") or "").lower()
+    score = 0
+    reasons: list[str] = []
+
+    label_hits = [term for term in HOOK_EXPRESSION_LABEL_REWARD_TERMS if term in label]
+    score += len(label_hits)
+    reasons += [f"expression-bank label cue: {hit!r}" for hit in label_hits]
+
+    if any(term in label for term in HOOK_EXPRESSION_LABEL_NEUTRAL_TERMS):
+        score -= 1
+        reasons.append("expression-bank label reads as plain/neutral (penalty)")
+
+    if not label_hits:
+        reasons.append(
+            "no recognized expression hook cue in bank label (rendered "
+            "Expression line itself is fixed/shared across all prompts)"
+        )
+    return score, reasons
+
+
+def _score_scene(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
+    text = segments["scene"]
+    lane = str(image.get("lane") or "").lower()
+    combined = f"{text} {lane}"
+    score = 0
+    reasons: list[str] = []
+
+    reward_hits = [term for term in HOOK_SCENE_REWARD_TERMS if term in combined]
+    score += len(reward_hits)
+    reasons += [f"scene/status cue: {hit!r}" for hit in reward_hits]
+
+    penalty_hits = [term for term in HOOK_SCENE_PENALTY_TERMS if term in combined]
+    score -= len(penalty_hits)
+    reasons += [f"low-status scene cue (penalty): {hit!r}" for hit in penalty_hits]
+
+    if not reward_hits and not penalty_hits:
+        reasons.append("neutral scene, no strong status cue either way")
+    return score, reasons
+
+
+def _score_camera(image: dict, segments: dict[str, str]) -> tuple[int, list[str]]:
+    text = f"{segments['camera']} {segments['lighting']}"
+    score = 0
+    reasons: list[str] = []
+
+    reward_hits = [term for term in HOOK_CAMERA_REWARD_TERMS if term in text]
+    score += len(reward_hits)
+    reasons += [f"camera/lighting cue: {hit!r}" for hit in reward_hits]
+
+    penalty_hits = [term for term in HOOK_CAMERA_PENALTY_TERMS if term in text]
+    score -= len(penalty_hits)
+    reasons += [f"flat/sterile camera-lighting cue (penalty): {hit!r}" for hit in penalty_hits]
+
+    if not reward_hits and not penalty_hits:
+        reasons.append("neutral camera/lighting, no strong cue either way")
+    return score, reasons
+
+
+def _hard_exclude_reasons(image: dict) -> list[str]:
+    """Hard exclusions only -- these are the same pass/fail signals the pack
+    builder and single-pack diagnostic already compute; this does not
+    recompute or loosen them, just reads them back for the curator's gate."""
+    v = image["validation"]
+    reasons = []
+    if not v["framing_present"]:
+        reasons.append("failed: full-body framing not present")
+    if not v["wardrobe_casual_free"]:
+        reasons.append(f"failed: wardrobe casual/shape-hiding terms found {v['wardrobe_casual_terms_found']}")
+    if not v["scene_action_conflict_free"]:
+        reasons.append(f"failed: scene/action conflict terms found {v['scene_action_conflict_terms_found']}")
+    if not v["soul_anchor_absent"]:
+        reasons.append("failed: Soul prompt-text leak present")
+    if not v["negative_prompt_disabled"]:
+        reasons.append("failed: negative prompt not disabled")
+    if not v["heavy_overcorrection_free"]:
+        reasons.append(f"failed: heavy body-overcorrection terms found {v['heavy_overcorrection_terms_found']}")
+    if not v["pose_scene_match_pass"]:
+        reasons.append(f"failed: pose/scene mismatch {v['pose_scene_mismatch_terms_found']}")
+    if v["low_hook_terms_found"]:
+        reasons.append(f"failed: low-hook filler terms found {v['low_hook_terms_found']}")
+    prompt_lower = image["image_prompt"].lower()
+    unsafe_hits = [term for term in UNSAFE_EXPLICIT_TERMS if term in prompt_lower]
+    if unsafe_hits:
+        reasons.append(f"failed: unsafe/explicit term(s) found {unsafe_hits}")
+    return reasons
+
+
+# Diversity caps applied during selection. "None" means uncapped. This is the
+# *starting* (strictest) cap set -- see DIVERSITY_RELAXATION_ORDER for what
+# happens if it can't fill --select-top.
+DEFAULT_DIVERSITY_CAPS: dict[str, int] = {
+    "archetype": 1,
+    "broad_group": 2,
+    "lane": 2,
+    "silhouette": 2,
+}
+
+# Relaxation order when the starting caps can't fill --select-top: silhouette
+# is dropped first (a wardrobe-class repeat is the least damaging kind of
+# repetition -- two different scenes in the same silhouette class still read
+# as different content), then broad scene group, then archetype, and lane is
+# relaxed last (a lane repeat is the most visible kind of repetition --
+# literally the same scene twice).
+DIVERSITY_RELAXATION_ORDER: tuple[str, ...] = ("silhouette", "broad_group", "archetype", "lane")
+
+
+def _greedy_select_with_caps(candidates: list[dict], select_top: int, caps: dict) -> tuple[list[dict], list[dict]]:
+    """One greedy pass over score-sorted candidates, applying the given caps.
+    Returns (selected, skipped) -- skipped entries carry the specific cap(s)
+    that blocked them, so near-duplicate-style skips can be reported directly
+    instead of inferred after the fact."""
+    selected: list[dict] = []
+    skipped: list[dict] = []
+    counts = {
+        "archetype": Counter(),
+        "broad_group": Counter(),
+        "lane": Counter(),
+        "silhouette": Counter(),
+    }
+    for cand in candidates:
+        if len(selected) >= select_top:
+            break
+        key_values = {
+            "archetype": cand["archetype"],
+            "broad_group": cand["broad_scene_group"],
+            "lane": cand["image"]["lane"],
+            "silhouette": cand["effective_wardrobe_class"],
+        }
+        blocking_reasons = [
+            f"{cap_name} cap ({key_values[cap_name]!r})"
+            for cap_name, cap_value in caps.items()
+            if cap_value is not None and counts[cap_name][key_values[cap_name]] >= cap_value
+        ]
+        if blocking_reasons:
+            skipped.append({"slot_id": cand["image"]["slot_id"], "reasons": blocking_reasons})
+            continue
+        selected.append(cand)
+        for cap_name in counts:
+            counts[cap_name][key_values[cap_name]] += 1
+    return selected, skipped
+
+
+def curate_top_prompts(library: dict, select_top: int) -> dict:
+    """Multi-axis model-hook curation over every prompt in the library, acting
+    as a creative director rather than a raw score sort: hard-excludes
+    anything failing existing safety/quality validation, scores survivors
+    across five independent hook axes (wardrobe, pose, expression, scene,
+    camera), then greedily selects the top N under content-archetype/
+    broad-scene-group/lane/effective-wardrobe diversity caps
+    (DEFAULT_DIVERSITY_CAPS), relaxing caps in DIVERSITY_RELAXATION_ORDER only
+    if the strict cap set can't fill select_top. Selection never re-scores or
+    loosens the hard-validation gate -- diversity only decides *which*
+    already-hot, already-valid prompts get picked."""
+    candidates = []
+    excluded_count = 0
+    for pack_report in library["pack_reports"]:
+        for image in pack_report["images"]:
+            exclude_reasons = _hard_exclude_reasons(image)
+            if exclude_reasons:
+                excluded_count += 1
+                continue
+            segments = _extract_prompt_segments(image["image_prompt"])
+            wardrobe_score, wardrobe_reasons = _score_wardrobe(image, segments)
+            pose_score, pose_reasons = _score_pose(image, segments)
+            expression_score, expression_reasons = _score_expression(image, segments)
+            scene_score, scene_reasons = _score_scene(image, segments)
+            camera_score, camera_reasons = _score_camera(image, segments)
+            total = wardrobe_score + pose_score + expression_score + scene_score + camera_score
+
+            effective_wardrobe_class = _classify_effective_wardrobe(segments["wardrobe"])
+            catalog_silhouette = image["wardrobe_silhouette_class"]
+            effective_wardrobe_note = None
+            if effective_wardrobe_class != catalog_silhouette:
+                effective_wardrobe_note = (
+                    f"final prompt wardrobe reads as {effective_wardrobe_class!r}; catalog "
+                    f"silhouette metadata says {catalog_silhouette!r} (stale/overridden by "
+                    "sanitizer or fallback -- effective_wardrobe_class is used for diversity "
+                    "capping, not the catalog field)"
+                )
+
+            candidates.append(
+                {
+                    "image": image,
+                    "total_score": total,
+                    "wardrobe_score": wardrobe_score,
+                    "wardrobe_reasons": wardrobe_reasons,
+                    "pose_score": pose_score,
+                    "pose_reasons": pose_reasons,
+                    "expression_score": expression_score,
+                    "expression_reasons": expression_reasons,
+                    "scene_score": scene_score,
+                    "scene_reasons": scene_reasons,
+                    "camera_score": camera_score,
+                    "camera_reasons": camera_reasons,
+                    "archetype": _archetype_for_lane(image["lane"]),
+                    "broad_scene_group": _broad_scene_group_for_lane(image["lane"]),
+                    "effective_wardrobe_class": effective_wardrobe_class,
+                    "effective_wardrobe_note": effective_wardrobe_note,
+                }
+            )
+
+    candidates.sort(key=lambda c: c["total_score"], reverse=True)
+
+    caps = dict(DEFAULT_DIVERSITY_CAPS)
+    selected, skipped = _greedy_select_with_caps(candidates, select_top, caps)
+
+    constraints_relaxed: list[str] = []
+    relax_idx = 0
+    while len(selected) < select_top and relax_idx < len(DIVERSITY_RELAXATION_ORDER):
+        cap_to_relax = DIVERSITY_RELAXATION_ORDER[relax_idx]
+        caps[cap_to_relax] = None
+        constraints_relaxed.append(cap_to_relax)
+        selected, skipped = _greedy_select_with_caps(candidates, select_top, caps)
+        relax_idx += 1
+
+    near_duplicate_skips = [s for s in skipped if any("archetype cap" in r for r in s["reasons"])]
+
+    return {
+        "select_top": select_top,
+        "candidate_count": len(candidates),
+        "excluded_count": excluded_count,
+        "selected": selected,
+        "final_caps": caps,
+        "constraints_relaxed": constraints_relaxed,
+        "skipped": skipped,
+        "near_duplicate_skip_count": len(near_duplicate_skips),
+    }
+
+
+def print_curation_report(curation: dict, show_selected_prompts: bool) -> None:
+    print("\n=== Multi-axis model-hook curation (with archetype diversity) ===\n")
+    print(f"candidates considered (passed hard validation): {curation['candidate_count']}")
+    print(f"hard-excluded (failed validation)              : {curation['excluded_count']}")
+    print(f"requested top-N                                : {curation['select_top']}")
+    print(f"actually selected                               : {len(curation['selected'])}")
+    print(f"diversity caps applied (final, after any relaxation): {curation['final_caps']}")
+    if curation["constraints_relaxed"]:
+        print(f"constraints relaxed, in order applied          : {curation['constraints_relaxed']}")
+    else:
+        print("constraints relaxed                             : none needed")
+    print(f"near-duplicate-style skips (blocked by archetype cap): {curation['near_duplicate_skip_count']}")
+    print()
+
+    archetypes_seen: list[str] = []
+    broad_groups_seen: list[str] = []
+    silhouettes_seen: list[str] = []
+    lanes_seen: list[str] = []
+
+    for rank, cand in enumerate(curation["selected"], start=1):
+        image = cand["image"]
+        archetypes_seen.append(cand["archetype"])
+        broad_groups_seen.append(cand["broad_scene_group"])
+        silhouettes_seen.append(cand["effective_wardrobe_class"])
+        lanes_seen.append(image["lane"])
+        print(
+            f"--- #{rank} slot_id={image['slot_id']} lane={image['lane']!r} "
+            f"archetype={cand['archetype']!r} broad_scene_group={cand['broad_scene_group']!r} "
+            f"effective_wardrobe={cand['effective_wardrobe_class']!r} total_score={cand['total_score']} ---"
+        )
+        if cand["effective_wardrobe_note"]:
+            print(f"    wardrobe note: {cand['effective_wardrobe_note']}")
+        print(f"    wardrobe_score={cand['wardrobe_score']}: {cand['wardrobe_reasons']}")
+        print(f"    pose_score={cand['pose_score']}: {cand['pose_reasons']}")
+        print(f"    expression_score={cand['expression_score']}: {cand['expression_reasons']}")
+        print(f"    scene_score={cand['scene_score']}: {cand['scene_reasons']}")
+        print(f"    camera_score={cand['camera_score']}: {cand['camera_reasons']}")
+        if show_selected_prompts:
+            print(f"    full prompt:")
+            print(f"    {image['image_prompt']}")
+        print()
+
+    print(
+        f"diversity summary: {len(set(archetypes_seen))} distinct archetype(s) "
+        f"{sorted(set(archetypes_seen))}, {len(set(broad_groups_seen))} distinct broad scene "
+        f"group(s) {sorted(set(broad_groups_seen))}, {len(set(silhouettes_seen))} distinct "
+        f"effective wardrobe class(es) {sorted(set(silhouettes_seen))}, {len(set(lanes_seen))} "
+        f"distinct lane(s) {sorted(set(lanes_seen))}"
+    )
+
+    print("\n=== RESULT: curation is read-only reporting over already-generated, "
+          "already-validated prompts. No render, no network, no Higgsfield call, "
+          "no write. ===")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", required=True, help="library date, e.g. 2026-07-08")
@@ -229,6 +777,17 @@ def main() -> int:
         help="also print full numbered prompt text for each image, grouped by pack "
              "(still stdout-only, no writes)",
     )
+    parser.add_argument(
+        "--select-top", type=int, dest="select_top", default=None,
+        help="run the multi-axis model-hook curator and select this many top prompts "
+             "across the whole library (wardrobe/pose/expression/scene/camera scoring, "
+             "not a wardrobe-only search)",
+    )
+    parser.add_argument(
+        "--show-selected-prompts", action="store_true", dest="show_selected_prompts",
+        help="with --select-top, also print full prompt text for each selected prompt "
+             "(still stdout-only, no writes)",
+    )
     args = parser.parse_args()
 
     if args.packs < 1:
@@ -237,6 +796,14 @@ def main() -> int:
 
     library = build_library_report(args.date, args.library_prefix, args.packs, args.count_per_pack)
     print_library_report(library, show_prompts=args.show_prompts)
+
+    if args.select_top is not None:
+        if args.select_top < 1:
+            print("[ABORT] --select-top must be at least 1")
+            return 1
+        curation = curate_top_prompts(library, args.select_top)
+        print_curation_report(curation, show_selected_prompts=args.show_selected_prompts)
+
     return 0
 
 
