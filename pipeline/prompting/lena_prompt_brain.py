@@ -3635,7 +3635,12 @@ def _higgsfield_safe_environment_text(environment_text: str) -> str:
 # or any camera-conflict-sanitizer logic.
 HIGGSFIELD_FRAMING_REINFORCEMENT = (
     "Framing: keep the complete head, full face, and entire body from top of hair to shoes "
-    "inside the frame, with visible space above the head and below the shoes; no head or feet cropped."
+    "inside the frame, with visible space above the head and below the shoes; no head or feet cropped. "
+    "Position her slightly lower within the vertical frame so there is clearly visible, comfortable "
+    "empty space above the highest point of her hair -- her hair and head must not approach or touch "
+    "the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition "
+    "with generous headroom, while still preserving her complete head, face, both eyes, full body, and "
+    "shoes entirely within frame."
 )
 
 
