@@ -49,6 +49,7 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     QUEUE_DRAFT_CAPTION_PLACEHOLDER,
     ResolveError,
     resolve_packet_inputs,
+    resolve_packet_inputs_higgsfield,
     resolve_packet_output_path,
     resolve_queue_draft_output_path,
 )
@@ -170,12 +171,22 @@ def check_publish_approval(
     platforms: List[str],
     out_dir: Optional[Path],
     queue_draft_path_override: Optional[str],
+    provider: str = "kling",
 ) -> Dict[str, Any]:
     """Read-only. Raises ApprovalCheckError on any hard-fail condition.
     Writes nothing, ever -- no approval artifact, no queue-draft edit, no
-    queue-directory write."""
+    queue-directory write.
+
+    Provider dispatch (2026-07-10), matching tools/lena_build_publish_packet_v1.py
+    and tools/lena_preflight.py's own established pattern: explicit
+    --provider only, default "kling" for backward compatibility, no
+    auto-detection, no silent cross-provider fallback. "higgsfield" reuses
+    the existing, unmodified resolve_packet_inputs_higgsfield() (which
+    itself still gates on the same unmodified Rule Zero/_resolve_qa()) --
+    resolver logic is not duplicated here."""
+    resolver = resolve_packet_inputs_higgsfield if provider == "higgsfield" else resolve_packet_inputs
     try:
-        resolved = resolve_packet_inputs(date_str, slot_id, out_dir)
+        resolved = resolver(date_str, slot_id, out_dir)
     except ResolveError as exc:
         raise ApprovalCheckError(f"packet-input resolution failed (QA not pass, or other resolver hard-fail): {exc}") from exc
 
@@ -283,6 +294,16 @@ def main() -> int:
     )
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
+    parser.add_argument(
+        "--provider",
+        choices=["kling", "higgsfield"],
+        default="kling",
+        help=(
+            "Explicit provider selector (default: kling, preserved for backward "
+            "compatibility). Never auto-detected, never falls back across "
+            "providers -- an invalid value is rejected by argparse itself."
+        ),
+    )
     parser.add_argument("--approved-caption", required=True, dest="approved_caption")
     parser.add_argument("--approved-by", required=True, dest="approved_by")
     parser.add_argument("--confirm", required=True, help=f"must exactly equal: {REQUIRED_CONFIRM_PHRASE!r}")
@@ -318,6 +339,7 @@ def main() -> int:
             platforms,
             out_dir,
             args.queue_draft_path,
+            provider=args.provider,
         )
     except ApprovalCheckError as exc:
         print(json.dumps(

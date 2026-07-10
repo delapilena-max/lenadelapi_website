@@ -2,6 +2,86 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ HIGGSFIELD PACKET/PREFLIGHT/APPROVAL CHAIN NOW PROVEN END-TO-END FOR CANDIDATE C, THROUGH REAL RECORDED HUMAN APPROVAL (2026-07-10, later session) -- read this before assuming the "DIRECTION CHANGE" banner below is the most recent checkpoint
+>
+> **Since the failure-memory checkpoint below, a long, carefully-staged
+> sequence of small, individually-approved-and-committed changes has taken
+> the Higgsfield path from "generation only" all the way to "one real
+> render with a real, recorded human publish approval," while leaving
+> live publish itself still fully gated.** Real commits, in order (HEAD is
+> now `e51f2f9f`, plus one further uncommitted change described below):
+> `cc1df305` (failure-memory), `f276492d` (recovered Candidate A historical
+> evidence), `0847452d` (Higgsfield-aware Rule Zero packet resolver),
+> `b6296408` (Higgsfield identity-verification evidence, real live
+> `higgsfield generate get`/`soul-id get` calls, once), `c71ac5f4`
+> (identity-aware preflight, network-free -- reads the evidence file
+> locally, never calls Higgsfield itself), `e2ebca76` (truthful
+> activity/pose queue-draft enrichment), `e51f2f9f` (truthful visual_style
+> persistence going forward + historical recovery for Candidate C via
+> deterministic regeneration + exact prompt-hash verification).
+>
+> **This session's newest work (uncommitted as of this checkpoint):**
+> Candidate C (`readypack0709-pack003-08-photo`, provider_job_id
+> `464465c9-85be-40a2-ac9f-49bf66532726`) now passes **every per-item
+> preflight check except the two legitimate daily-count requirements**:
+> provider dispatch, image-engine, `1152x2048` resolution, local
+> identity-evidence, `activity`, `pose`, `visual_style`, and now caption/
+> hashtags all pass. The remaining two failures
+> (`daily queue incomplete: requires at least 3 photo items, found 1` and
+> `required photo slots are missing and videos cannot substitute for
+> photos`) are the correct, expected, provider-agnostic daily-count gate --
+> not a defect, and deliberately not touched.
+>
+> **How the caption gate was closed, truthfully, not bypassed:** Candidate
+> C's real caption+hashtag candidate was recovered read-only (same
+> deterministic local regeneration + exact prompt-SHA-256 verification
+> method as the visual_style recovery) and **explicitly reviewed and
+> approved by Nicolas** in chat before anything was recorded: caption
+> `"stayed for the light\n\n#goldenhour #chicagostyle #citylights"`
+> (3 hashtags), `approved_by: "Nicolas"`, statement `"I approve this for
+> live publish"`. This was never auto-selected -- `pipeline/agents/lena/
+> 90_content_packet/RULES.md`'s "never auto-select a caption" doctrine was
+> treated as authoritative the whole way through.
+>
+> **`tools/lena_record_publish_approval_v1.py` gained the same
+> `--provider {kling,higgsfield}` dispatch pattern already used by
+> `tools/lena_build_publish_packet_v1.py`/`tools/lena_preflight.py`**
+> (default `kling`, unchanged Kling behavior proven via a real
+> byte-for-byte before/after diff; `higgsfield` reuses the existing,
+> unmodified `resolve_packet_inputs_higgsfield()` -- no resolver logic
+> duplicated, Rule Zero untouched). This was the missing piece: the tool
+> previously hardcoded the Kling-only resolver and could not resolve any
+> Higgsfield slot at all.
+>
+> **Real artifacts now on disk for Candidate C** (via the existing,
+> unmodified packet-builder/approval tools, not manual file creation):
+> `pipeline/publish_packets/lena/2026-07-09/
+> LENA_PUBLISH_PACKET_readypack0709-pack003-08-photo.md`, `...
+> _queue_draft.json` (`approved_for_live_publish: false`), and `...
+> _approval.json` (`promotion_status: "not_yet_promoted"`).
+>
+> **A real, confirmed, still-open wiring gap, explicitly not closed this
+> session:** nothing in the codebase automatically consumes
+> `_approval.json` to update the queue draft's actual `caption` field --
+> confirmed via a full-repo grep, zero other files reference it. The
+> approval record's own `promotion_instructions` field describes a fully
+> manual process (copy the draft into `pipeline/queue/`, hand-edit its
+> caption field, then run `tools/process_queue.py --live`). This is
+> consistent with, not a violation of, the "never auto-approve/auto-
+> promote" doctrine -- but it means promotion is still a deliberate manual
+> step, not implemented or scheduled.
+>
+> **Still not done, still gated, unrelated to this work:** daily-count
+> requirements, `pipeline/publisher/instagram_queue_bridge.py` (its own
+> separate, still-Kling-only contract check), any live publish/queue
+> promotion/R2 action, and the Anthropic vision-reviewer branch (still
+> parked, untracked, untouched at `pipeline/qa/lena_vision_reviewer.py`).
+> No generation, no live Higgsfield provider call, no publish, no queue
+> promotion, no R2, no `.env` change occurred producing any of this
+> session's work.
+>
+> Full detail: the changelog's matching 2026-07-10 (later session) entries.
+
 > ## ✅ DIRECTION CHANGE: ANTHROPIC AUTOMATED-VISION BRANCH PARKED; SMALLEST FAILURE-MEMORY FEEDBACK LOOP BUILT + WIRED INTO THE CURATOR INSTEAD (2026-07-10, later session) -- read this before assuming the "AUTOMATED VISION QA REVIEWER" banner below is still the active direction
 >
 > **Explicit decision, not a technical dead end:** after the Anthropic
