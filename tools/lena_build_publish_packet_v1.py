@@ -47,7 +47,25 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
 from pipeline.qa import lena_photo_qa  # noqa: E402
+
+# Reused, not reimplemented: the Higgsfield-aware resolver below builds on
+# the same manifest-loading/image-resolution helpers the existing Higgsfield
+# QA bridge already uses, so slot/manifest/image resolution logic for
+# Higgsfield lives in exactly one place. Aliased to avoid confusion with
+# this module's own ResolveError (same name, different module/meaning) --
+# every bridge-raised error is re-raised as *this* module's ResolveError so
+# callers only ever need to catch one exception type.
+from lena_higgsfield_qa_bridge_v1 import (  # noqa: E402
+    _manifest_path as _higgsfield_manifest_path,
+    _load_manifest as _load_higgsfield_manifest,
+    _resolve_image_path as _resolve_higgsfield_image_path,
+    ResolveError as _HiggsfieldBridgeResolveError,
+)
 
 WORKORDER_ROOT = ROOT / "pipeline" / "kling_workorders"
 APILENA_DEBUG_ROOT = ROOT / "pipeline" / "kling_debug" / "apilena_api"
@@ -231,6 +249,131 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "pose": slot.get("pose") or metadata.get("pose"),
         "reference_binding_mode": metadata.get("reference_binding_mode"),
         "avatar_nickname": avatar_nickname,
+        "image_engine": image_engine,
+        "image_prompt": image_prompt,
+        "debug_artifacts": debug_artifacts,
+        "intended_packet_output_path": str(intended_packet_path),
+        "intended_packet_output_already_exists": intended_packet_path.exists(),
+        "files_written_this_run": [],
+    }
+
+
+# --- Batch 4: Higgsfield-aware resolver (read-only, reuses Rule Zero) -------
+#
+# This is the ONLY Higgsfield-specific addition. It does not duplicate QA
+# gating (Rule zero) -- it calls the existing, unmodified _resolve_qa() --
+# and does not duplicate manifest/image resolution -- it reuses
+# lena_higgsfield_qa_bridge_v1.py's own helpers. Everything downstream
+# (caption assembly, Markdown packet, optional queue-draft JSON, the live-
+# queue guard) is the same provider-agnostic code the Kling path already
+# uses, fed from the same generic `resolved` dict shape produced above.
+#
+# Fails closed (raises ResolveError, this module's own exception type -- a
+# bridge-raised error is caught and re-raised as this type so callers only
+# ever handle one exception) on: missing/unparseable/non-object manifest,
+# a manifest whose own `slot_id` field does not exactly match the requested
+# slot_id (never trusts a mismatched manifest), a missing/non-existent saved
+# image, missing required provider/job/prompt metadata, or any Rule Zero
+# failure (missing/invalid/inconsistent QA, or overall != "pass"). Never
+# falls back to the Kling resolver for any reason.
+
+def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """Read-only. Higgsfield counterpart to resolve_packet_inputs(). Raises
+    ResolveError on any hard-fail condition. Writes nothing, ever."""
+    try:
+        manifest = _load_higgsfield_manifest(date_str, slot_id)
+    except _HiggsfieldBridgeResolveError as exc:
+        raise ResolveError(str(exc)) from exc
+
+    manifest_slot_id = manifest.get("slot_id")
+    if manifest_slot_id != slot_id:
+        raise ResolveError(
+            f"Higgsfield manifest slot_id {manifest_slot_id!r} does not match requested "
+            f"slot_id {slot_id!r} -- refusing to tie a mismatched manifest to this slot"
+        )
+
+    try:
+        image_path = _resolve_higgsfield_image_path(manifest)
+    except _HiggsfieldBridgeResolveError as exc:
+        raise ResolveError(str(exc)) from exc
+
+    # Required provider/job/prompt metadata -- sourced only from the real
+    # manifest, same "fix the source, don't fabricate a value" discipline
+    # the Kling resolver above already uses for avatar_nickname/image_engine/
+    # image_prompt.
+    provider = manifest.get("provider")
+    if not provider:
+        raise ResolveError(
+            f"Higgsfield manifest for slot '{slot_id}' is missing 'provider' -- "
+            "refusing to fabricate a value."
+        )
+    job_type = manifest.get("job_type")
+    if not job_type:
+        raise ResolveError(
+            f"Higgsfield manifest for slot '{slot_id}' is missing 'job_type' -- "
+            "refusing to fabricate a value."
+        )
+    cli_soul_name = manifest.get("cli_soul_name")
+    if not cli_soul_name:
+        raise ResolveError(
+            f"Higgsfield manifest for slot '{slot_id}' is missing 'cli_soul_name' -- "
+            "refusing to fabricate a value."
+        )
+    image_prompt = manifest.get("image_prompt")
+    if not image_prompt:
+        raise ResolveError(
+            f"Higgsfield manifest for slot '{slot_id}' is missing 'image_prompt' -- "
+            "refusing to fabricate a value."
+        )
+
+    # Rule zero -- the existing, unmodified gate. Not duplicated here.
+    qa_result = _resolve_qa(date_str, slot_id)
+
+    production_scoring = qa_result.get("production_scoring") or {}
+    intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
+
+    # Deterministic, non-fabricated image_engine value derived from the two
+    # real fields above -- never a Kling-compatible-looking value.
+    image_engine = f"higgsfield_{job_type}"
+
+    debug_artifacts = {
+        # Deliberately named distinctly from the Kling resolver's
+        # result_manifest_path/result_manifest_task_id -- provider_job_id is
+        # a real Higgsfield field, never presented as a Kling task_id.
+        "higgsfield_manifest_path": str(_higgsfield_manifest_path(date_str, slot_id)),
+        "higgsfield_manifest_exists": True,
+        "provider_job_id": manifest.get("provider_job_id"),
+        "provider_status": manifest.get("provider_status"),
+    }
+
+    return {
+        "date": date_str,
+        "slot_id": slot_id,
+        "provider": "higgsfield",
+        "image_path": str(image_path),
+        "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
+        "qa_overall": qa_result.get("overall"),
+        "qa_publish_ready": qa_result.get("publish_ready"),
+        "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),
+        "qa_hook_strength": production_scoring.get("hook_strength", {}).get("score"),
+        "qa_styling_sexy_platform_safe": production_scoring.get("styling_sexy_platform_safe", {}).get("status"),
+        # Higgsfield's manifest carries no operator-authored caption field --
+        # left None (known gap, matches the QA bridge's own doctrine), never
+        # invented. build_caption_options() already handles an empty/missing
+        # base caption gracefully.
+        "workorder_caption": manifest.get("workorder_caption"),
+        "wardrobe_outfit_id": manifest.get("wardrobe_outfit_id"),
+        "wardrobe_outfit_name": manifest.get("wardrobe_outfit_name"),
+        # Higgsfield's manifest has no environment_id/environment_name/activity
+        # fields (it has 'lane' instead) -- left None, same disclosed gap
+        # lena_higgsfield_qa_bridge_v1.py's own known_gaps already documents.
+        "environment_id": manifest.get("environment_id"),
+        "environment_name": manifest.get("environment_name"),
+        "lane": manifest.get("lane"),
+        "activity": manifest.get("activity"),
+        "pose": manifest.get("pose_text"),
+        "reference_binding_mode": manifest.get("reference_binding_mode"),
+        "avatar_nickname": cli_soul_name,
         "image_engine": image_engine,
         "image_prompt": image_prompt,
         "debug_artifacts": debug_artifacts,
@@ -570,6 +713,17 @@ def main() -> int:
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
     parser.add_argument(
+        "--provider",
+        choices=["kling", "higgsfield"],
+        default="kling",
+        help=(
+            "Explicit provider selector (default: kling, preserved for backward "
+            "compatibility). Never auto-detected from whichever manifest happens "
+            "to exist, and never falls back across providers -- an invalid value "
+            "is rejected by argparse itself."
+        ),
+    )
+    parser.add_argument(
         "--out-dir",
         default=None,
         help="Override the publish-packet output base directory (default: pipeline/publish_packets/lena).",
@@ -607,8 +761,9 @@ def main() -> int:
             print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
             return 1
 
+    resolver = resolve_packet_inputs_higgsfield if args.provider == "higgsfield" else resolve_packet_inputs
     try:
-        resolved = resolve_packet_inputs(args.date, args.slot_id, out_dir)
+        resolved = resolver(args.date, args.slot_id, out_dir)
     except ResolveError as exc:
         print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
         return 1
