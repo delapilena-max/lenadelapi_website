@@ -2,6 +2,96 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ APPROVAL NOW APPLIED TO CANDIDATE C'S REAL QUEUE DRAFT; READ-ONLY AUDIT FOUND THE REAL PROMOTION PATH DOES NOT EXIST YET (2026-07-10, later session) -- read this before assuming the "HIGGSFIELD PACKET/PREFLIGHT/APPROVAL CHAIN" banner below is the latest checkpoint
+>
+> **HEAD is now `d72cbeb4`.** One more real commit landed since the banner
+> below: `d72cbeb4` (`feat: add explicit Lena approval application`) --
+> `tools/lena_apply_publish_approval_v1.py`, a new, small, fail-closed
+> consumer of the already-recorded approval artifact. It validates the
+> immutable approval record and the target queue draft, then writes
+> **only** the queue draft's top-level `caption` field (every other field,
+> including all of `metadata`, is read back byte-identical). Defaults to
+> dry-run; `--apply` performs the one write. Idempotent (a second run with
+> the same caption already present reports success and writes nothing); a
+> different, non-placeholder caption already present fails closed rather
+> than being overwritten. Proven against Candidate C
+> (`readypack0709-pack003-08-photo`): its real queue draft at
+> `pipeline/publish_packets/lena/2026-07-09/
+> readypack0709-pack003-08-photo_queue_draft.json` now carries the
+> Nicolas-approved caption (`"stayed for the light\n\n#goldenhour
+> #chicagostyle #citylights"`, 3 hashtags) and still passes every per-item
+> preflight check, failing only on the two expected daily-count
+> requirements.
+>
+> **Read-only audit this session (no code changed, no commit): the real
+> promotion path from "approved queue draft" to "live queue item" does
+> not exist in code at all yet.** Key findings, all confirmed by direct
+> inspection, not assumption:
+> - **No explicit promotion tool exists anywhere in the repo.** The only
+>   documented procedure is the fully manual one embedded in the approval
+>   record's own `promotion_instructions` field: copy the draft into
+>   `pipeline/queue/`, hand-edit its caption (now automated by the apply
+>   tool above), then run `tools/process_queue.py --live`.
+> - **Nothing in the live pipeline checks `approved_for_live_publish` or
+>   `queue_draft_only` at all.** Confirmed via grep: these fields are
+>   referenced only inside the three tools built this session
+>   (`lena_build_publish_packet_v1.py`, `lena_record_publish_approval_v1.py`,
+>   `lena_apply_publish_approval_v1.py`). `pipeline/posting_manager.py`,
+>   `tools/process_queue.py`, and `pipeline/publisher/
+>   instagram_queue_bridge.py` never read either field -- today the entire
+>   gate is human discipline following the manual instructions, not a
+>   code-enforced check.
+> - **`tools/lena_preflight.py` and `tools/process_queue.py` are two
+>   entirely separate, non-integrated tools.** Preflight is only ever
+>   invoked (subprocess, always full daily-batch mode, never a per-item
+>   mode) from `tools/lena_autonomous_run.py` and
+>   `pipeline/lena_production_job.py` -- never from `process_queue.py`
+>   itself. There is currently no code path where promotion and preflight
+>   are connected.
+> - **`pipeline/publisher/instagram_queue_bridge.py` is the real,
+>   currently-configured publisher** (`pipeline/config/posting_config.json`:
+>   `publisher_backend: "module"`, `publisher_module:
+>   "pipeline.publisher.instagram_queue_bridge"` -- not hypothetical) and
+>   **still hardcodes `image_engine == "kling_image_3.0"`** in its own
+>   separate `_validate_contract()`, reading the same unchanged
+>   `required_media_specs.image_engine` key the provider-aware
+>   `image_engine_by_provider` map (added for preflight/approval tooling)
+>   never touched. This alone would reject Candidate C at real publish
+>   time, independent of and in addition to the daily-count gap.
+> - **R2/public-URL upload happens only at actual publish time**, inside
+>   `pipeline/publisher/instagram_graph_adapter.py`, strictly downstream of
+>   `instagram_queue_bridge._validate_contract()` -- not before promotion,
+>   not during preflight.
+> - **Per-item readiness and daily-batch completeness are currently
+>   inseparable** inside `tools/lena_preflight.py` -- no `--per-item-only`
+>   flag exists. Real, pre-existing doctrine (`"manual_one_off_confirmed"`
+>   in the approval schema; the one real historical publish explicitly
+>   framed as "a manual, one-off controlled post -- not batch, not
+>   scheduled, not auto") suggests a one-off manual post is already a
+>   recognized category distinct from the automated daily-cadence batch --
+>   but changing preflight's coupling is a real safety/product decision
+>   for Nicolas, not something to default to for convenience. Left
+>   explicitly undecided.
+>
+> **Recommended next increment (not started, needs separate approval):** a
+> new, small, dedicated promotion tool (e.g.
+> `tools/lena_promote_to_queue_v1.py`) that re-validates the approval
+> artifact + queue draft (reusing the exact checks
+> `lena_apply_publish_approval_v1.py` already proved) immediately before
+> writing the real file into `pipeline/queue/` -- the first code-enforced
+> gate this chain would ever have, still never publishing. Fixing
+> `instagram_queue_bridge.py`'s provider dispatch and deciding the
+> per-item-vs-daily-batch question both remain separate, independent,
+> not-yet-approved follow-ups.
+>
+> No generation, no Anthropic call, no live Higgsfield/provider call, no
+> publish, no queue promotion, no R2, no `.env` change, and no code change
+> occurred producing this checkpoint beyond the one already-described
+> `d72cbeb4` commit -- the promotion-path investigation was entirely
+> read-only.
+>
+> Full detail: the changelog's matching 2026-07-10 (later session) entries.
+
 > ## ✅ HIGGSFIELD PACKET/PREFLIGHT/APPROVAL CHAIN NOW PROVEN END-TO-END FOR CANDIDATE C, THROUGH REAL RECORDED HUMAN APPROVAL (2026-07-10, later session) -- read this before assuming the "DIRECTION CHANGE" banner below is the most recent checkpoint
 >
 > **Since the failure-memory checkpoint below, a long, carefully-staged
