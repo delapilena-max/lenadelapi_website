@@ -28,8 +28,25 @@ from typing import Any, Dict, List, Optional, Tuple
 # alluring/non-"Lena-feed-worthy" image to fail even when every original
 # checklist item and hook_strength/styling_sexy_platform_safe pass. See
 # 70_visual_qa/RULES.md's "Visual Hook / Allure hard gate" section.
+#
+# Schema v4 (2026-07-10, head framing safety margin): one new hard-gating
+# checklist field, head_framing_safety_margin -- added after a real live
+# incident (readypack0709-pack003-08-photo, published 2026-07-10, Instagram
+# media 18054323045770081): the source image's head was technically inside
+# frame (full head/hair/face/eyes all present) but with only ~2-3% headroom
+# margin, and the live post rendered with the head cut off. This field
+# judges the RENDERED SOURCE IMAGE ITSELF -- whether headroom is comfortably
+# safe, not merely technically non-clipped. It is deliberately separate from,
+# and does not duplicate or predict, the Instagram feed-photo aspect-ratio
+# gate added the same day in pipeline/publisher/instagram_queue_bridge.py
+# (which checks whether the image's *shape* is valid for Instagram feed
+# publishing, a platform-compatibility question). The two protections are
+# independent and both required: this field can fail a perfectly
+# feed-ratio-compatible image that still has unsafe framing, and the bridge
+# gate can fail a perfectly-framed image whose shape is simply the wrong
+# ratio for feed photos.
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "4"
 
 # schema_version values that predate the production_scoring block. Records
 # stamped with one of these are validated under the original (v1) rules only --
@@ -62,6 +79,22 @@ LEGACY_SCHEMA_VERSIONS_WITHOUT_ALLURE_GATE = {"1", "2"}
 # edit), it is still fully validated normally, including gating overall on
 # a "fail" status -- the exemption applies only to outright absence.
 LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE = {"1", "2"}
+
+# schema_version values that predate the head_framing_safety_margin
+# checklist field (2026-07-10, schema v4). Unlike
+# LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE (which only
+# needed to exempt "1"/"2" because no real "3" record existed yet with that
+# gap at the time it was added), real "3" records already exist on disk
+# (including the Candidate C incident record itself) without this new
+# field -- so "3" must be exempt here too, alongside "1" and "2". This is
+# why this addition bumps SCHEMA_VERSION to "4" rather than reusing the
+# same-day, no-bump pattern: only newly-built "4" records are required to
+# answer this field. Existing "1"/"2"/"3" QA files on disk are never
+# migrated or rewritten -- this only changes whether the field's outright
+# *absence* is treated as an error for them. If a legacy record happens to
+# already have this field, it is still fully validated normally, including
+# gating overall on a "fail" status -- the exemption covers absence only.
+LEGACY_SCHEMA_VERSIONS_WITHOUT_HEAD_FRAMING_SAFETY_MARGIN = {"1", "2", "3"}
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_REVIEW_ROOT = ROOT / "pipeline" / "asset_review" / "lena"
@@ -109,6 +142,31 @@ QA_CHECKLIST_FIELDS: Tuple[Tuple[str, str], ...] = (
     # LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE above and
     # its use in validate_qa_result() for the narrow fix.
     ("pose_action_scene_compliance", "Pose/action-scene compliance (rendered physical state/action must not contradict what the scene explicitly requires, e.g. seated vs standing, holding vs not holding, walking vs static, mirror/eating/driving logic)"),
+    # Added 2026-07-10 (schema v4), after a real live incident -- see the
+    # SCHEMA_VERSION comment block above and
+    # LEGACY_SCHEMA_VERSIONS_WITHOUT_HEAD_FRAMING_SAFETY_MARGIN. Hard-gating
+    # by construction: a plain member of QA_CHECKLIST_KEYS, not listed in
+    # DIAGNOSTIC_ONLY_CHECKLIST_KEYS, so it is automatically included in
+    # HARD_GATING_CHECKLIST_KEYS and in validate_qa_result()'s existing
+    # false-green loop below.
+    #
+    # PASS requires: full head visibly inside the frame; hair fully visible;
+    # face visible; both eyes visible when naturally expected from the pose;
+    # no accidental clipping of skull, hairline, or top of head; enough
+    # visible top margin that the framing is comfortably safe, not merely
+    # technically non-clipped.
+    #
+    # FAIL includes: top of head clipped; hair cut off by the frame edge;
+    # forehead/hairline cropped unintentionally; face outside frame; eyes
+    # outside frame; framing so tight against the top edge that there is
+    # effectively no safety margin; a composition that would obviously be
+    # unsafe for normal platform presentation.
+    #
+    # Judges the rendered source image itself -- deliberately NOT responsible
+    # for predicting undocumented Instagram crop behavior; that is the
+    # separate, independent job of the Instagram feed-photo aspect-ratio gate
+    # in pipeline/publisher/instagram_queue_bridge.py. Do not conflate the two.
+    ("head_framing_safety_margin", "Head framing safety margin (full head/hair/face/eyes inside frame with comfortable safety margin, not merely technically non-clipped)"),
 )
 QA_CHECKLIST_KEYS = tuple(key for key, _ in QA_CHECKLIST_FIELDS)
 
@@ -173,9 +231,9 @@ def build_qa_template(slot: Dict[str, Any], date_str: str) -> Dict[str, Any]:
     """Build an "unreviewed" scaffold for a slot. Does not judge anything -- every
     checklist field starts as "unreviewed" for a human (or Claude, looking at the
     actual rendered image) to fill in. Stamped with the current SCHEMA_VERSION
-    ("3"), which includes the production_scoring block plus the Visual Hook /
-    Allure Gate fields -- existing on-disk "1"/"2" files are never touched or
-    migrated."""
+    ("4"), which includes the production_scoring block, the Visual Hook /
+    Allure Gate fields, and the head_framing_safety_margin checklist field --
+    existing on-disk "1"/"2"/"3" files are never touched or migrated."""
     metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
     return {
         "schema_version": SCHEMA_VERSION,
@@ -251,6 +309,14 @@ def validate_qa_result(qa: Dict[str, Any]) -> Tuple[bool, List[str]]:
             # Legacy record predates this field entirely -- absence is not
             # an error. If the field IS present (even on a "1"/"2" record),
             # it falls through to normal validation below, including
+            # gating -- this exemption covers outright absence only.
+            continue
+        if entry is None and key == "head_framing_safety_margin" and (
+            schema_version in LEGACY_SCHEMA_VERSIONS_WITHOUT_HEAD_FRAMING_SAFETY_MARGIN
+        ):
+            # Legacy ("1"/"2"/"3") record predates this field entirely --
+            # absence is not an error. If the field IS present on a legacy
+            # record, it falls through to normal validation below, including
             # gating -- this exemption covers outright absence only.
             continue
         if not isinstance(entry, dict):
