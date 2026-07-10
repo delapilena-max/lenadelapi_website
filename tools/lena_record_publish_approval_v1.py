@@ -56,7 +56,21 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
 MAX_HASHTAGS_PER_CAPTION = 3
-REQUIRED_CONFIRM_PHRASE = "I approve this for live publish"
+
+# Two-field approval model (2026-07-10): caption approval and live-publish
+# authorization are two independent human decisions, previously conflated
+# into one required phrase. REQUIRED_CAPTION_CONFIRM_PHRASE authorizes only
+# recording the approved caption and applying it to the queue draft --
+# never promotion, never live queue placement, never publishing.
+# REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE remains required only for promotion
+# (tools/lena_promote_to_queue_v1.py) and is never inferred, auto-populated,
+# or copied from caption approval -- it must be absent/null/empty until
+# explicitly given. Legacy artifacts recorded before this split (a single
+# "approval_statement" field equal to the live-publish phrase) remain valid
+# under a read-only compatibility path in lena_apply_publish_approval_v1.py
+# and lena_promote_to_queue_v1.py -- never rewritten, never migrated.
+REQUIRED_CAPTION_CONFIRM_PHRASE = "I approve this caption"
+REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE = "I approve this for live publish"
 
 
 class ApprovalCheckError(Exception):
@@ -152,13 +166,26 @@ def _validate_caption(approved_caption: str) -> int:
     return hashtag_count
 
 
-def _validate_operator_fields(approved_by: str, confirm: str) -> None:
+def _validate_operator_fields(
+    approved_by: str, caption_confirm: str, live_publish_confirm: Optional[str]
+) -> None:
     if not approved_by or not approved_by.strip():
         raise ApprovalCheckError("--approved-by must not be empty -- operator approval must be attributed")
-    if confirm != REQUIRED_CONFIRM_PHRASE:
+    if caption_confirm != REQUIRED_CAPTION_CONFIRM_PHRASE:
         raise ApprovalCheckError(
-            f"--confirm did not exactly match the required phrase "
-            f"{REQUIRED_CONFIRM_PHRASE!r} -- unclear operator approval"
+            f"--confirm did not exactly match the required caption-approval phrase "
+            f"{REQUIRED_CAPTION_CONFIRM_PHRASE!r} -- unclear operator approval"
+        )
+    # live_publish_confirm is genuinely optional -- None/absent means live
+    # publish is not yet authorized, which is a valid, expected state for a
+    # caption-only approval, never an error. Only a *supplied-but-wrong*
+    # value is rejected -- fails closed rather than silently accepting a
+    # garbled live-publish claim.
+    if live_publish_confirm is not None and live_publish_confirm != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
+        raise ApprovalCheckError(
+            f"--live-publish-confirm was supplied but did not exactly match the required phrase "
+            f"{REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r} -- omit this flag entirely if live publish "
+            "is not yet authorized; never supply a near-miss value"
         )
 
 
@@ -167,12 +194,13 @@ def check_publish_approval(
     slot_id: str,
     approved_caption: str,
     approved_by: str,
-    confirm: str,
+    caption_confirm: str,
     platforms: List[str],
     out_dir: Optional[Path],
     queue_draft_path_override: Optional[str],
     provider: str = "kling",
     source_slot_id: Optional[str] = None,
+    live_publish_confirm: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read-only. Raises ApprovalCheckError on any hard-fail condition.
     Writes nothing, ever -- no approval artifact, no queue-draft edit, no
@@ -197,7 +225,16 @@ def check_publish_approval(
     _revalidate_with_resolver() docstring for the full rationale (same
     concept, same fallback discipline, mirrored here so an approval can be
     recorded under that same distinct identity in the first place). Never
-    auto-detected."""
+    auto-detected.
+
+    live_publish_confirm (2026-07-10, optional, default None): if supplied,
+    must exactly equal REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE. Recording an
+    approval NEVER requires this -- caption approval and live-publish
+    authorization are independent. When omitted, the artifact's
+    live_publish_statement field is written as null, meaning live publish
+    is not yet authorized; promotion (lena_promote_to_queue_v1.py) is the
+    only place that value is ever required to be the real phrase. Never
+    inferred from caption_confirm."""
     resolver = resolve_packet_inputs_higgsfield if provider == "higgsfield" else resolve_packet_inputs
     effective_source_slot_id = source_slot_id or slot_id
     try:
@@ -224,7 +261,7 @@ def check_publish_approval(
 
     queue_draft = _resolve_queue_draft(date_str, slot_id, out_dir, queue_draft_path_override)
     hashtag_count = _validate_caption(approved_caption)
-    _validate_operator_fields(approved_by, confirm)
+    _validate_operator_fields(approved_by, caption_confirm, live_publish_confirm)
 
     approval_output_path = resolve_approval_output_path(date_str, slot_id, out_dir)
 
@@ -239,7 +276,13 @@ def check_publish_approval(
         "hashtag_count": hashtag_count,
         "platforms": platforms,
         "approved_by": approved_by,
-        "approval_statement": confirm,
+        # Two-field model (2026-07-10): caption_approval_statement
+        # authorizes recording/applying the caption only.
+        # live_publish_statement is independent, never inferred/copied from
+        # caption_confirm, and null unless explicitly supplied -- only
+        # promotion requires it to be the real phrase.
+        "caption_approval_statement": caption_confirm,
+        "live_publish_statement": live_publish_confirm,
         "approved_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "manual_one_off_confirmed": True,
         "generated_by": "tools/lena_record_publish_approval_v1.py",
@@ -321,7 +364,24 @@ def main() -> int:
     )
     parser.add_argument("--approved-caption", required=True, dest="approved_caption")
     parser.add_argument("--approved-by", required=True, dest="approved_by")
-    parser.add_argument("--confirm", required=True, help=f"must exactly equal: {REQUIRED_CONFIRM_PHRASE!r}")
+    parser.add_argument(
+        "--confirm",
+        required=True,
+        help=(
+            f"Caption-approval confirmation, must exactly equal: {REQUIRED_CAPTION_CONFIRM_PHRASE!r}. "
+            "Authorizes recording/applying the caption only -- never promotion or live publish."
+        ),
+    )
+    parser.add_argument(
+        "--live-publish-confirm",
+        default=None,
+        dest="live_publish_confirm",
+        help=(
+            f"Optional. If supplied, must exactly equal: {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r}. "
+            "Omit entirely if live publish is not yet authorized -- this is the normal, expected "
+            "state for a caption-only approval. Only lena_promote_to_queue_v1.py ever requires this."
+        ),
+    )
     parser.add_argument("--platform", action="append", dest="platforms", default=None, help="repeatable; default instagram")
     parser.add_argument("--queue-draft-path", default=None, dest="queue_draft_path")
     parser.add_argument(
@@ -368,6 +428,7 @@ def main() -> int:
             args.queue_draft_path,
             provider=args.provider,
             source_slot_id=args.source_slot_id,
+            live_publish_confirm=args.live_publish_confirm,
         )
     except ApprovalCheckError as exc:
         print(json.dumps(

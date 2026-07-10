@@ -57,7 +57,8 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
 )
 from tools.lena_record_publish_approval_v1 import (  # noqa: E402
     MAX_HASHTAGS_PER_CAPTION,
-    REQUIRED_CONFIRM_PHRASE,
+    REQUIRED_CAPTION_CONFIRM_PHRASE,
+    REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE,
     _count_hashtags,
     resolve_approval_output_path,
 )
@@ -121,11 +122,27 @@ def check_apply_publish_approval(
     if not approved_by or not str(approved_by).strip():
         raise ApplyApprovalError("approval's approved_by is missing or empty")
 
-    approval_statement = approval.get("approval_statement")
-    if approval_statement != REQUIRED_CONFIRM_PHRASE:
+    # Two-field model (2026-07-10): applying the caption only ever requires
+    # caption approval -- never live_publish_statement, which is
+    # promotion's sole concern. Legacy compatibility, read-only: an
+    # artifact recorded before this split has no caption_approval_statement
+    # field at all; if its old, single "approval_statement" field equals
+    # the ORIGINAL, stricter live-publish phrase, that is accepted as
+    # satisfying this narrower caption-approval requirement (a real
+    # historical live-publish approval necessarily implied caption approval
+    # too) -- never a weakening, and the file itself is never rewritten.
+    caption_statement = approval.get("caption_approval_statement")
+    if caption_statement is None:
+        legacy_statement = approval.get("approval_statement")
+        if legacy_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
+            raise ApplyApprovalError(
+                "approval artifact has neither a valid caption_approval_statement nor a "
+                f"legacy approval_statement matching {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r}"
+            )
+    elif caption_statement != REQUIRED_CAPTION_CONFIRM_PHRASE:
         raise ApplyApprovalError(
-            f"approval_statement {approval_statement!r} does not exactly match "
-            f"the required phrase {REQUIRED_CONFIRM_PHRASE!r}"
+            f"approval's caption_approval_statement {caption_statement!r} does not exactly match "
+            f"the required phrase {REQUIRED_CAPTION_CONFIRM_PHRASE!r}"
         )
 
     # manual_one_off_confirmed is part of the established schema (see the

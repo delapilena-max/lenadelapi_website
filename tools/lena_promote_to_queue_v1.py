@@ -87,7 +87,8 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
 )
 from tools.lena_record_publish_approval_v1 import (  # noqa: E402
     MAX_HASHTAGS_PER_CAPTION,
-    REQUIRED_CONFIRM_PHRASE,
+    REQUIRED_CAPTION_CONFIRM_PHRASE,
+    REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE,
     _count_hashtags,
     resolve_approval_output_path,
 )
@@ -176,12 +177,45 @@ def _validate_approval(approval: Dict[str, Any], date_str: str, slot_id: str) ->
     if not approved_by or not str(approved_by).strip():
         raise PromoteError("approval's approved_by is missing or empty")
 
-    approval_statement = approval.get("approval_statement")
-    if approval_statement != REQUIRED_CONFIRM_PHRASE:
-        raise PromoteError(
-            f"approval_statement {approval_statement!r} does not exactly match "
-            f"the required phrase {REQUIRED_CONFIRM_PHRASE!r}"
-        )
+    # Two-field model (2026-07-10): promotion is the ONE place both caption
+    # approval AND live-publish authorization are required -- record/apply
+    # only ever needed caption approval. Legacy compatibility, read-only,
+    # never migrates a file: an artifact recorded before this split has
+    # neither caption_approval_statement nor live_publish_statement, only
+    # the old single "approval_statement" field. If that legacy field
+    # equals the ORIGINAL, stricter live-publish phrase, it is accepted as
+    # satisfying BOTH new requirements at once -- a real historical
+    # live-publish approval necessarily implied caption approval too. This
+    # is reading old, stricter proof as satisfying two newer, narrower
+    # requirements; never a weakening, and Candidate C's own approval file
+    # is never rewritten.
+    caption_statement = approval.get("caption_approval_statement")
+    live_publish_statement = approval.get("live_publish_statement")
+    legacy_statement = approval.get("approval_statement")
+    is_legacy = caption_statement is None and live_publish_statement is None and legacy_statement is not None
+
+    if is_legacy:
+        if legacy_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
+            raise PromoteError(
+                f"legacy approval_statement {legacy_statement!r} does not exactly match "
+                f"the required phrase {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r}"
+            )
+        effective_caption_statement = legacy_statement
+        effective_live_publish_statement = legacy_statement
+    else:
+        if caption_statement != REQUIRED_CAPTION_CONFIRM_PHRASE:
+            raise PromoteError(
+                f"approval's caption_approval_statement {caption_statement!r} does not exactly match "
+                f"the required phrase {REQUIRED_CAPTION_CONFIRM_PHRASE!r}"
+            )
+        if live_publish_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
+            raise PromoteError(
+                f"approval's live_publish_statement {live_publish_statement!r} does not exactly "
+                f"match the required phrase {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r} -- live publish "
+                "has not been explicitly authorized; caption approval alone is not sufficient to promote"
+            )
+        effective_caption_statement = caption_statement
+        effective_live_publish_statement = live_publish_statement
 
     # Same optional-but-enforced-if-present rule lena_apply_publish_approval_v1.py
     # already uses: not one of this checker's own required inputs, but if
@@ -200,7 +234,14 @@ def _validate_approval(approval: Dict[str, Any], date_str: str, slot_id: str) ->
         "approved_caption": approved_caption,
         "hashtag_count": actual_hashtag_count,
         "approved_by": approved_by,
-        "approval_statement": approval_statement,
+        # "approval_statement" kept present (backward-compatible key name --
+        # tools/lena_manual_one_off_preflight_v1.py reads
+        # approval_facts["approval_statement"] unchanged) populated with the
+        # caption-approval value; the two new keys are always also present
+        # for explicit access going forward.
+        "approval_statement": effective_caption_statement,
+        "caption_approval_statement": effective_caption_statement,
+        "live_publish_statement": effective_live_publish_statement,
         "approved_at_utc": approval.get("approved_at_utc"),
     }
 
@@ -464,6 +505,8 @@ def check_promote_to_queue(
         "approved_by": approval_facts["approved_by"],
         "approved_at_utc": approval_facts["approved_at_utc"],
         "approval_statement": approval_facts["approval_statement"],
+        "caption_approval_statement": approval_facts["caption_approval_statement"],
+        "live_publish_statement": approval_facts["live_publish_statement"],
         "caption_sha256": _sha256_text(approval_facts["approved_caption"]),
         "resolver_qa_overall": resolved.get("qa_overall"),
         "fields_that_would_change": fields_that_would_change,
