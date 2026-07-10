@@ -389,13 +389,21 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         "workorder_caption": manifest.get("workorder_caption"),
         "wardrobe_outfit_id": manifest.get("wardrobe_outfit_id"),
         "wardrobe_outfit_name": manifest.get("wardrobe_outfit_name"),
-        # Higgsfield's manifest has no environment_id/environment_name/activity
-        # fields (it has 'lane' instead) -- left None, same disclosed gap
+        # Higgsfield's manifest has no environment_id/environment_name field
+        # (it has 'lane' instead) -- left None, same disclosed gap
         # lena_higgsfield_qa_bridge_v1.py's own known_gaps already documents.
         "environment_id": manifest.get("environment_id"),
         "environment_name": manifest.get("environment_name"),
         "lane": manifest.get("lane"),
-        "activity": manifest.get("activity"),
+        # There is no separate manifest "activity" field for Higgsfield --
+        # pipeline/prompting/lena_prompt_brain.py's own
+        # generate_higgsfield_prompt_package() (and its Kling counterpart)
+        # already define activity as literally equal to the scene's lane
+        # (`"activity": scene["lane"]`), it just never reaches the saved
+        # manifest. Forwarding the manifest's real 'lane' value here matches
+        # that existing, already-established equivalence -- not a new or
+        # invented concept.
+        "activity": manifest.get("lane"),
         "pose": manifest.get("pose_text"),
         "reference_binding_mode": manifest.get("reference_binding_mode"),
         "avatar_nickname": cli_soul_name,
@@ -692,6 +700,21 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
         metadata["wardrobe_outfit_id"] = resolved["wardrobe_outfit_id"]
     if resolved.get("reference_binding_mode"):
         metadata["reference_binding_mode"] = resolved["reference_binding_mode"]
+    # Provider-agnostic enrichment forwarding (2026-07-10): both resolvers
+    # already carry real activity/pose values in `resolved` (Kling: from the
+    # real workorder slot's own metadata; Higgsfield: from the manifest's
+    # 'lane' and 'pose_text') -- this was simply never copied into the queue
+    # draft's metadata before now. No fabricated default: absent entirely if
+    # `resolved` doesn't have a real value. visual_style is deliberately NOT
+    # forwarded here -- no real source field exists for it in the Higgsfield
+    # manifest/package data (only Kling's package builder computes a
+    # distinct visual_style value; Higgsfield's camera/lighting text is never
+    # exposed as its own field anywhere), so it is not populated rather than
+    # invented.
+    if resolved.get("activity"):
+        metadata["activity"] = resolved["activity"]
+    if resolved.get("pose"):
+        metadata["pose"] = resolved["pose"]
     # Conditional, additive-only: absent entirely for the existing Kling path
     # (resolve_packet_inputs() never sets resolved["provider"]/
     # ["custom_reference_id"]/["resolution"], and debug_artifacts there never
