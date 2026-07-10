@@ -1,0 +1,107 @@
+{
+  "schema_version": "3",
+  "slot_id": "readypack0709-pack008-07-photo-recovered1",
+  "date": "2026-07-09",
+  "media_type": "photo",
+  "wardrobe_outfit_id": "wc_p082",
+  "environment_id": null,
+  "reviewed_by": "Claude (direct visual review of the rendered image pixels -- Read tool on the recovered/downloaded PNG artifact; no automated vision model was used). This record reviews a HISTORICAL RECOVERY of an already-existing, already-completed provider job (provider_job_id 3c669124-bb27-4ef3-bcb3-e1363708ab84, created_at 2026-07-10T00:47:56Z) -- the image itself was not newly generated for this review.",
+  "reviewed_at_utc": "2026-07-10T05:54:44+00:00",
+  "checklist": {
+    "identity_fidelity": {
+      "status": "pass",
+      "notes": "Consistent Lena identity, hair/face read as expected."
+    },
+    "face_realism_anti_generic_drift": {
+      "status": "pass",
+      "notes": "Natural expression (mid-laugh), no glossy/idealized drift."
+    },
+    "skin_realism_no_invented_marks": {
+      "status": "pass",
+      "notes": "Natural skin texture, no invented marks."
+    },
+    "wardrobe_class_fidelity": {
+      "status": "pass",
+      "notes": "White ribbed tank, black leather mini skirt, tall boots, sunglasses, gold hoops -- matches spec closely."
+    },
+    "public_scene_clothing_continuity": {
+      "status": "pass",
+      "notes": "No underwear/crop drift."
+    },
+    "outerwear_underlayer_correctness": {
+      "status": "not_applicable",
+      "notes": "No shell/outer layer in this outfit."
+    },
+    "body_shape_continuity": {
+      "status": "pass",
+      "notes": "Curvy waist-hip anchor honored, not runway-thin."
+    },
+    "hands_anatomy_sanity": {
+      "status": "pass",
+      "notes": "Left hand holds a coffee cup low at her side; the cup/hand contact reads somewhat ambiguous (a second, duplicate coffee cup also appears sitting separately on the ground near the bench leg -- a prop-duplication artifact, same defect class already documented on the sibling render). Ambiguous-but-not-clearly-broken, per doctrine this stays pass, not an automatic reject -- consistent with how the sibling render's own hand ambiguity was scored."
+    },
+    "environment_realism_scene_coherence": {
+      "status": "pass",
+      "notes": "City street/bench/trees/brownstones/bicycles coherent. Two background pedestrians present (a woman in magenta, a man in blue) -- plausible street scene, no hard incoherence. Duplicate coffee cup noted above is the one real environment-prop artifact."
+    },
+    "caption_scene_coherence": {
+      "status": "not_applicable",
+      "notes": "No caption exists for this recovered historical evidence record."
+    },
+    "pose_action_scene_compliance": {
+      "status": "fail",
+      "notes": "Scene explicitly requires 'sitting on a city bench' / pose_p012 'seated, turned slightly sideways rather than square-on.' The rendered image shows Lena STANDING in front of the bench, leaning back against it with one hand resting on the backrest, hip cocked -- not seated. This is the FIRST of the two real renders of this exact accepted prompt (prompt_sha256 4927a748eb54883962c351b385b98310e99784e23a12b4af08cf6365bddc9f7c) to produce this seated-vs-standing contradiction (this attempt: provider_job_id 3c669124-bb27-4ef3-bcb3-e1363708ab84, recovered historically; second attempt: provider_job_id a50fad42-90ab-4215-883f-465e6afb56f4, already recorded in readypack0709-pack008-07-photo_qa.json). Confirms persistent, not one-off stochastic, provider-side pose noncompliance for this scene/pose combination."
+    }
+  },
+  "production_scoring": {
+    "hook_strength": {
+      "score": "strong",
+      "notes": "Confident laughing expression, strong outfit, engaged candid energy."
+    },
+    "styling_sexy_platform_safe": {
+      "status": "pass",
+      "notes": "Fitted, high-hook, platform-safe."
+    },
+    "outfit_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "scene_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "allure_level": {
+      "level": "strong",
+      "notes": "Genuine IT-girl/main-character read."
+    },
+    "it_girl_energy": {
+      "status": "pass",
+      "notes": ""
+    },
+    "body_visibility_score": {
+      "score": "high",
+      "notes": "Legs/waist/hips clearly visible."
+    },
+    "outfit_hook_score": {
+      "score": "strong",
+      "notes": ""
+    },
+    "pose_attitude_score": {
+      "score": "strong",
+      "notes": "Confident even while standing, not the requested seated pose."
+    },
+    "feed_worthy_reason": "Visually this would stop a scroll -- strong identity, wardrobe, lighting, and confident attitude. It is rejected anyway because the rendered physical state contradicts the explicit seated instruction (pose_action_scene_compliance), which is a semantic-compliance failure, not a hook/quality failure -- identity, wardrobe, realism, and hook are not being falsely marked down to justify this reject. Same gating logic already applied to the sibling render."
+  },
+  "overall": "fail",
+  "failure_reasons": [
+    "pose_action_scene_compliance: rendered standing (leaning against the bench backrest, hand resting on it) despite the scene explicitly requiring seated -- this is the FIRST of two consecutive real renders of this exact prompt to show this contradiction; the second (already-recorded) render repeated it independently."
+  ],
+  "created_at_utc": "2026-07-10T05:54:44+00:00",
+  "recovery_provenance": {
+    "recovered_historical_evidence": true,
+    "original_provider_job_id": "3c669124-bb27-4ef3-bcb3-e1363708ab84",
+    "original_generation_timestamp_utc": "2026-07-10T00:47:56.173104Z",
+    "recovery_manifest_path": "pipeline\\higgsfield_debug\\2026-07-09\\readypack0709-pack008-07-photo-recovered1\\result_manifest.json",
+    "note": "This QA record judges an image that was NOT newly generated for this review -- it was downloaded read-only from an already-existing, already-completed Higgsfield job that predates this session's failure-memory work. See the recovery manifest for full identification evidence and chain of custody."
+  }
+}
