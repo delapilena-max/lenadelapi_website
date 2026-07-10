@@ -283,12 +283,13 @@ def _validate_queue_draft(
         raise PromoteError(f"queue draft media_path does not exist on disk: {media_path}")
 
     media_type = str(queue_draft.get("media_type") or "").lower().strip()
-    if media_type not in {"photo", "image"}:
+    if media_type not in {"photo", "image", "story", "stories"}:
         raise PromoteError(
             f"queue draft media_type {queue_draft.get('media_type')!r} is not supported by this "
-            "tool yet -- only photo/image queue drafts can be re-validated via the existing "
+            "tool yet -- only photo/image/story queue drafts can be re-validated via the existing "
             "packet resolvers (resolve_packet_inputs()/resolve_packet_inputs_higgsfield() have "
-            "no video path)"
+            "no video path). media_type itself is never rewritten/normalized here -- read back "
+            "byte-identical, same as every other field this tool never touches."
         )
 
     platforms = queue_draft.get("platforms")
@@ -308,21 +309,39 @@ def _revalidate_with_resolver(
     provider: str,
     queue_draft: Dict[str, Any],
     out_dir: Optional[Path],
+    source_slot_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Rule Zero / provider revalidation. Re-runs the existing, unmodified
     resolver (which itself re-runs the existing, unmodified _resolve_qa()
     gate) and cross-checks its real output against the queue draft's own
     metadata, field by field. Never trusts the draft's self-reported values
     alone. Raises PromoteError on any hard-fail condition, including any
-    single field mismatch."""
+    single field mismatch.
+
+    source_slot_id (2026-07-10, optional, explicit-only, default None):
+    the identity used to call the resolver. When omitted, defaults to
+    slot_id -- byte-identical to every call site and every queue item that
+    existed before this parameter, none of which have ever needed it.
+    Exists only for a queue item whose own promotion/approval identity
+    (slot_id) deliberately differs from the real generation it was
+    rendered from -- e.g. a Story repackaging of an existing photo slot,
+    kept under a distinct slot_id specifically so it can never collide
+    with a future feed-photo promotion of the same underlying render (see
+    pipeline/publisher/instagram_queue_bridge.py's feed-photo aspect-ratio
+    gate, which such a render would fail anyway, but the identity
+    separation is generic, not slot-specific). Never inferred/auto-detected
+    -- an operator or caller must explicitly assert it, same discipline as
+    --provider."""
     resolver = PROVIDER_RESOLVERS.get(provider)
     if resolver is None:
         raise PromoteError(
             f"unknown provider {provider!r} -- no resolver mapping (fails closed, never auto-detected)"
         )
 
+    effective_source_slot_id = source_slot_id or slot_id
+
     try:
-        resolved = resolver(date_str, slot_id, out_dir)
+        resolved = resolver(date_str, effective_source_slot_id, out_dir)
     except ResolveError as exc:
         raise PromoteError(f"Rule Zero / provider revalidation failed: {exc}") from exc
 
@@ -333,7 +352,20 @@ def _revalidate_with_resolver(
         if resolved_value != draft_value:
             mismatches.append(f"{label}: resolver={resolved_value!r} draft={draft_value!r}")
 
-    _check("slot_id", resolved.get("slot_id"), queue_draft.get("slot_id"))
+    # Compared against the queue draft's own self-reported
+    # metadata.source_slot_id, falling back to the top-level slot_id --
+    # for every existing queue item (Kling or Higgsfield, built via
+    # lena_build_publish_packet_v1.build_queue_draft(), which always sets
+    # metadata["source_slot_id"] = resolved["slot_id"]) these two values
+    # are always identical, so this fallback is a no-op there. Only a
+    # queue item whose slot_id was deliberately kept distinct from its
+    # generation source (and which must therefore carry a real, differing
+    # metadata.source_slot_id) exercises the non-fallback branch.
+    _check(
+        "slot_id",
+        resolved.get("slot_id"),
+        metadata.get("source_slot_id") or queue_draft.get("slot_id"),
+    )
     _check("image_engine", resolved.get("image_engine"), metadata.get("image_engine"))
     _check("media_path", resolved.get("image_path"), queue_draft.get("media_path"))
     _check("image_prompt", resolved.get("image_prompt"), metadata.get("image_prompt"))
@@ -364,10 +396,16 @@ def check_promote_to_queue(
     provider: str,
     out_dir: Optional[Path] = None,
     queue_root: Optional[Path] = None,
+    source_slot_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read-only. Raises PromoteError on any hard-fail condition. Writes
     nothing, ever. Returns a dict describing exactly what would change
-    (empty list if already promoted)."""
+    (empty list if already promoted).
+
+    source_slot_id: optional, explicit-only, default None (falls back to
+    slot_id -- see _revalidate_with_resolver()'s docstring). Never used for
+    approval_path/queue_draft_path/target_path -- those remain keyed by
+    slot_id exactly as before; only the resolver call is affected."""
     if not provider or provider not in PROVIDER_RESOLVERS:
         raise PromoteError(
             f"unknown provider {provider!r} -- must be one of {sorted(PROVIDER_RESOLVERS)} "
@@ -388,7 +426,7 @@ def check_promote_to_queue(
         approval_facts["hashtag_count"],
     )
 
-    resolved = _revalidate_with_resolver(date_str, slot_id, provider, queue_draft, out_dir)
+    resolved = _revalidate_with_resolver(date_str, slot_id, provider, queue_draft, out_dir, source_slot_id=source_slot_id)
 
     promoted_item = copy.deepcopy(queue_draft)
     promoted_item["approved_for_live_publish"] = True
@@ -487,6 +525,18 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--source-slot",
+        default=None,
+        dest="source_slot_id",
+        help=(
+            "Optional, explicit-only override for the identity used to call the Rule Zero "
+            "provider resolver. Defaults to --slot when omitted -- every existing item is "
+            "unaffected. Only needed when --slot (the queue item's own promotion identity) "
+            "deliberately differs from the real generation slot it was rendered from (e.g. a "
+            "Story repackaging of an existing photo render). Never auto-detected."
+        ),
+    )
+    parser.add_argument(
         "--promote",
         action="store_true",
         help="Write the promoted queue item. Without this flag, only a dry-run summary is printed.",
@@ -504,7 +554,9 @@ def main() -> int:
         queue_root = candidate if candidate.is_absolute() else (ROOT / candidate)
 
     try:
-        checked = check_promote_to_queue(args.date, args.slot_id, args.provider, out_dir, queue_root)
+        checked = check_promote_to_queue(
+            args.date, args.slot_id, args.provider, out_dir, queue_root, source_slot_id=args.source_slot_id
+        )
     except PromoteError as exc:
         print(json.dumps(
             {"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id, "files_written_this_run": []},

@@ -172,6 +172,7 @@ def check_publish_approval(
     out_dir: Optional[Path],
     queue_draft_path_override: Optional[str],
     provider: str = "kling",
+    source_slot_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read-only. Raises ApprovalCheckError on any hard-fail condition.
     Writes nothing, ever -- no approval artifact, no queue-draft edit, no
@@ -183,10 +184,24 @@ def check_publish_approval(
     auto-detection, no silent cross-provider fallback. "higgsfield" reuses
     the existing, unmodified resolve_packet_inputs_higgsfield() (which
     itself still gates on the same unmodified Rule Zero/_resolve_qa()) --
-    resolver logic is not duplicated here."""
+    resolver logic is not duplicated here.
+
+    source_slot_id (2026-07-10, optional, explicit-only, default None):
+    the identity used to call the resolver (and, consequently, to locate
+    the publish packet Markdown, since that path is derived inside the
+    same resolver call). Defaults to slot_id when omitted -- byte-identical
+    to every approval recorded before this parameter existed. Only needed
+    when slot_id (the approval/queue-draft identity being recorded) is
+    deliberately distinct from the real generation slot it was rendered
+    from -- see tools/lena_promote_to_queue_v1.py's
+    _revalidate_with_resolver() docstring for the full rationale (same
+    concept, same fallback discipline, mirrored here so an approval can be
+    recorded under that same distinct identity in the first place). Never
+    auto-detected."""
     resolver = resolve_packet_inputs_higgsfield if provider == "higgsfield" else resolve_packet_inputs
+    effective_source_slot_id = source_slot_id or slot_id
     try:
-        resolved = resolver(date_str, slot_id, out_dir)
+        resolved = resolver(date_str, effective_source_slot_id, out_dir)
     except ResolveError as exc:
         raise ApprovalCheckError(f"packet-input resolution failed (QA not pass, or other resolver hard-fail): {exc}") from exc
 
@@ -309,6 +324,18 @@ def main() -> int:
     parser.add_argument("--confirm", required=True, help=f"must exactly equal: {REQUIRED_CONFIRM_PHRASE!r}")
     parser.add_argument("--platform", action="append", dest="platforms", default=None, help="repeatable; default instagram")
     parser.add_argument("--queue-draft-path", default=None, dest="queue_draft_path")
+    parser.add_argument(
+        "--source-slot",
+        default=None,
+        dest="source_slot_id",
+        help=(
+            "Optional, explicit-only override for the identity used to call the Rule Zero "
+            "provider resolver (and locate the publish packet). Defaults to --slot when "
+            "omitted -- every existing approval is unaffected. Only needed when --slot (the "
+            "approval/queue-draft identity being recorded) deliberately differs from the real "
+            "generation slot it was rendered from. Never auto-detected."
+        ),
+    )
     parser.add_argument("--out-dir", default=None, help="Override the packet/queue-draft/approval output base directory.")
     parser.add_argument(
         "--record",
@@ -340,6 +367,7 @@ def main() -> int:
             out_dir,
             args.queue_draft_path,
             provider=args.provider,
+            source_slot_id=args.source_slot_id,
         )
     except ApprovalCheckError as exc:
         print(json.dumps(

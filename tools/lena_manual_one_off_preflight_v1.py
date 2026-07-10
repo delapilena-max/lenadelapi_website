@@ -195,12 +195,27 @@ def _validate_contract_per_item(
     provider: str,
     date_str: str,
     slot_id: str,
+    source_slot_id: Optional[str] = None,
 ) -> None:
     """The remaining per-item checks tools/lena_preflight.py's automated
     scan performs that lena_promote_to_queue_v1.py's reused validation does
     not already cover: avatar/platform exact match, generic-caption
     rejection, contract-driven image_engine allow-list, photo-resolution
-    allow-list, and provider identity evidence."""
+    allow-list, and provider identity evidence.
+
+    source_slot_id (2026-07-10, optional, explicit-only, default None):
+    used ONLY for the two generation-provenance evidence lookups at the
+    bottom of this function (Kling's submit_payload.json/
+    live_apilena_lookup_response.json, Higgsfield's
+    identity_verification.json) -- both are real records of what the
+    provider actually did at generation time, filed under the generation
+    slot, never the derived queue item's own bookkeeping identity. Falls
+    back to slot_id when omitted, matching every other check in this
+    function -- byte-identical behavior for every item validated before
+    this parameter existed. Every other check above (avatar/platform/
+    caption/image_engine/resolution) reads only queue_draft/metadata
+    fields, never a slot-keyed file path, so none of them are affected."""
+    effective_evidence_slot_id = source_slot_id or slot_id
     metadata = queue_draft.get("metadata") or {}
 
     if metadata.get("avatar_nickname") != REQUIRED_AVATAR:
@@ -247,9 +262,11 @@ def _validate_contract_per_item(
 
     media_path = Path(str(queue_draft.get("media_path") or ""))
     if provider == "kling":
-        _validate_kling_identity_evidence(queue_draft, date_str, slot_id, metadata)
+        _validate_kling_identity_evidence(queue_draft, date_str, effective_evidence_slot_id, metadata)
     elif provider == "higgsfield":
-        reasons = lena_higgsfield_identity.validate_local_identity_evidence(date_str, slot_id, media_path, metadata)
+        reasons = lena_higgsfield_identity.validate_local_identity_evidence(
+            date_str, effective_evidence_slot_id, media_path, metadata
+        )
         if reasons:
             raise ManualOneOffPreflightError("Higgsfield identity evidence failed: " + "; ".join(reasons))
 
@@ -259,12 +276,22 @@ def check_manual_one_off_preflight(
     slot_id: str,
     provider: str,
     out_dir: Optional[Path] = None,
+    source_slot_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read-only. Raises ManualOneOffPreflightError on any hard-fail
     condition. Never writes a file, under any condition. Validates exactly
     one named item end-to-end (approval, queue draft, Rule Zero / resolver
     revalidation, and every remaining per-item preflight-parity check) and
-    deliberately never evaluates the aggregate daily-count requirements."""
+    deliberately never evaluates the aggregate daily-count requirements.
+
+    source_slot_id (2026-07-10, optional, explicit-only, default None):
+    forwarded to _revalidate_with_resolver() (Rule Zero) AND to
+    _validate_contract_per_item() (Kling/Higgsfield generation-provenance
+    identity evidence) unchanged -- see their docstrings. Defaults to
+    slot_id in both; every item validated before this parameter existed is
+    unaffected. approval_path/queue_draft_path and every other identity
+    check in this function remain keyed by slot_id (the queue item's own
+    bookkeeping identity), never source_slot_id."""
     if "," in slot_id or ";" in slot_id:
         raise ManualOneOffPreflightError(
             f"exactly one slot_id is required; ambiguous multi-slot input is not supported: {slot_id!r}"
@@ -298,11 +325,13 @@ def check_manual_one_off_preflight(
         raise ManualOneOffPreflightError(str(exc)) from exc
 
     try:
-        resolved = _revalidate_with_resolver(date_str, slot_id, provider, queue_draft, out_dir)
+        resolved = _revalidate_with_resolver(
+            date_str, slot_id, provider, queue_draft, out_dir, source_slot_id=source_slot_id
+        )
     except PromoteError as exc:
         raise ManualOneOffPreflightError(str(exc)) from exc
 
-    _validate_contract_per_item(queue_draft, provider, date_str, slot_id)
+    _validate_contract_per_item(queue_draft, provider, date_str, slot_id, source_slot_id=source_slot_id)
 
     return {
         "ok": True,
@@ -351,6 +380,16 @@ def main() -> int:
         help="Explicit provider selector (default: kling). Never auto-detected.",
     )
     parser.add_argument("--out-dir", default=None, help="Override the packet/queue-draft/approval output base directory.")
+    parser.add_argument(
+        "--source-slot",
+        default=None,
+        dest="source_slot_id",
+        help=(
+            "Optional, explicit-only override for the identity used to call the Rule Zero "
+            "provider resolver. Defaults to --slot when omitted. Only needed when --slot "
+            "deliberately differs from the real generation slot it was rendered from."
+        ),
+    )
     args = parser.parse_args()
 
     out_dir: Optional[Path] = None
@@ -359,7 +398,9 @@ def main() -> int:
         out_dir = candidate if candidate.is_absolute() else (ROOT / candidate)
 
     try:
-        result = check_manual_one_off_preflight(args.date, args.slot_id, args.provider, out_dir)
+        result = check_manual_one_off_preflight(
+            args.date, args.slot_id, args.provider, out_dir, source_slot_id=args.source_slot_id
+        )
     except ManualOneOffPreflightError as exc:
         print(json.dumps(
             {
