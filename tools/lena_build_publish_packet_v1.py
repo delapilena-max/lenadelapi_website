@@ -43,6 +43,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Used only to measure the real, actual pixel dimensions of an already-saved
+# Higgsfield image (no manifest field currently records this -- see
+# resolve_packet_inputs_higgsfield() below). Never used to generate,
+# transform, or re-save an image.
+from PIL import Image
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -325,6 +331,12 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
             f"Higgsfield manifest for slot '{slot_id}' is missing 'image_prompt' -- "
             "refusing to fabricate a value."
         )
+    custom_reference_id = manifest.get("custom_reference_id")
+    if not custom_reference_id:
+        raise ResolveError(
+            f"Higgsfield manifest for slot '{slot_id}' is missing 'custom_reference_id' -- "
+            "refusing to fabricate a value."
+        )
 
     # Rule zero -- the existing, unmodified gate. Not duplicated here.
     qa_result = _resolve_qa(date_str, slot_id)
@@ -335,6 +347,19 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
     # Deterministic, non-fabricated image_engine value derived from the two
     # real fields above -- never a Kling-compatible-looking value.
     image_engine = f"higgsfield_{job_type}"
+
+    # The manifest itself carries no width/height/resolution field (only
+    # 'aspect_ratio', e.g. "9:16") -- measured directly from the real saved
+    # image file instead of guessing from aspect_ratio, and never labeled as
+    # a Kling resolution string (e.g. "1080x1920").
+    try:
+        with Image.open(image_path) as im:
+            actual_width, actual_height = im.size
+    except Exception as exc:
+        raise ResolveError(
+            f"could not read real pixel dimensions from {image_path}: {exc}"
+        ) from exc
+    resolution = f"{actual_width}x{actual_height}"
 
     debug_artifacts = {
         # Deliberately named distinctly from the Kling resolver's
@@ -376,6 +401,8 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         "avatar_nickname": cli_soul_name,
         "image_engine": image_engine,
         "image_prompt": image_prompt,
+        "custom_reference_id": custom_reference_id,
+        "resolution": resolution,
         "debug_artifacts": debug_artifacts,
         "intended_packet_output_path": str(intended_packet_path),
         "intended_packet_output_already_exists": intended_packet_path.exists(),
@@ -665,6 +692,20 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
         metadata["wardrobe_outfit_id"] = resolved["wardrobe_outfit_id"]
     if resolved.get("reference_binding_mode"):
         metadata["reference_binding_mode"] = resolved["reference_binding_mode"]
+    # Conditional, additive-only: absent entirely for the existing Kling path
+    # (resolve_packet_inputs() never sets resolved["provider"]/
+    # ["custom_reference_id"]/["resolution"], and debug_artifacts there never
+    # carries "provider_job_id"), so a Kling-built draft is byte-identical to
+    # before this change. Present, truthfully, only for a Higgsfield-built
+    # draft -- never a fabricated or Kling-relabeled value.
+    if resolved.get("provider"):
+        metadata["provider"] = resolved["provider"]
+    if debug_artifacts.get("provider_job_id"):
+        metadata["provider_job_id"] = debug_artifacts["provider_job_id"]
+    if resolved.get("custom_reference_id"):
+        metadata["custom_reference_id"] = resolved["custom_reference_id"]
+    if resolved.get("resolution"):
+        metadata["resolution"] = resolved["resolution"]
 
     return {
         "post_id": resolved["slot_id"],
