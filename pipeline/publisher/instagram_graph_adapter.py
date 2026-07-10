@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from datetime import datetime, timezone
 import json
 import mimetypes
@@ -222,6 +222,13 @@ def _request_json(method: str, url: str, *, params: Optional[Dict[str, Any]] = N
     return payload
 
 
+def _media_url_extension(media_url: str) -> str:
+    """Best-effort file extension (lowercase, with leading dot) from a
+    media URL's path component -- strips any query string/fragment first.
+    Pure, no I/O, no network. Returns "" if the URL has no extension."""
+    return Path(urlsplit(media_url).path).suffix.lower()
+
+
 def create_media_container(*, ig_user_id: str, access_token: str, media_url: str, media_type: str, caption: str) -> Dict[str, Any]:
     normalized = str(media_type or "photo").strip().lower()
     endpoint = f"{_api_base()}/{ig_user_id}/media"
@@ -233,15 +240,24 @@ def create_media_container(*, ig_user_id: str, access_token: str, media_url: str
     if normalized in {"photo", "image", "jpg", "jpeg", "png", "webp"}:
         data["image_url"] = media_url
     elif normalized in {"story", "stories"}:
-        # Instagram Story static-image branch (2026-07-10): a genuine
-        # third category, separate from feed IMAGE and from REELS video --
-        # never routes through either. Same image_url mechanism the feed
-        # branch uses (Instagram fetches the media by public HTTPS URL
-        # either way); the only difference sent to the Graph API is
-        # media_type=STORIES. Deliberately does not set video_url, does not
-        # set REELS media_type, and does not set share_to_feed (that flag is
-        # a REELS-only concept).
-        data["image_url"] = media_url
+        # Instagram Story branch (2026-07-10, extended same day to support
+        # video Stories -- tools/lena_prepare_story_video_v1.py composes a
+        # real music-backed MP4 Story asset). A Story can be a static image
+        # (the original, still-default behavior) or a real video; the only
+        # reliable discriminator available at this function's boundary is
+        # the media URL's own file extension -- this function receives no
+        # local Path, only the already-resolved media_url string. Reuses
+        # this module's own pre-existing VIDEO_EXTENSIONS set (defined
+        # above, previously unused) rather than inventing a new list or
+        # widening create_media_container()'s signature. Video Stories send
+        # video_url; image Stories are completely unchanged and still send
+        # image_url. Neither branch ever sets REELS media_type or
+        # share_to_feed -- those stay exclusive to the video/reel branch
+        # below, which this change does not touch.
+        if _media_url_extension(media_url) in VIDEO_EXTENSIONS:
+            data["video_url"] = media_url
+        else:
+            data["image_url"] = media_url
         data["media_type"] = "STORIES"
     elif normalized in {"video", "reel", "reels", "mp4", "mov", "m4v"}:
         data["video_url"] = media_url
