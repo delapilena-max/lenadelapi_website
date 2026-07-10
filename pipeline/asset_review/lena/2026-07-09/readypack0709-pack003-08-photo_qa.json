@@ -1,0 +1,98 @@
+{
+  "schema_version": "3",
+  "slot_id": "readypack0709-pack003-08-photo",
+  "date": "2026-07-09",
+  "media_type": "photo",
+  "wardrobe_outfit_id": "wc_p006",
+  "environment_id": null,
+  "reviewed_by": "Claude (direct visual review of the rendered image pixels -- Read tool on the saved PNG artifact; no automated vision model was used)",
+  "reviewed_at_utc": "2026-07-10T03:49:40+00:00",
+  "checklist": {
+    "identity_fidelity": {
+      "status": "pass",
+      "notes": "Strong, consistent Lena identity."
+    },
+    "face_realism_anti_generic_drift": {
+      "status": "pass",
+      "notes": "Natural, realistic face."
+    },
+    "skin_realism_no_invented_marks": {
+      "status": "pass",
+      "notes": "Natural skin texture, light authentic detail."
+    },
+    "wardrobe_class_fidelity": {
+      "status": "pass",
+      "notes": "Ivory one-shoulder mini dress rendered correctly, asymmetric neckline matches spec."
+    },
+    "public_scene_clothing_continuity": {
+      "status": "pass",
+      "notes": ""
+    },
+    "outerwear_underlayer_correctness": {
+      "status": "not_applicable",
+      "notes": "No shell layer."
+    },
+    "body_shape_continuity": {
+      "status": "pass",
+      "notes": "Reads leaner/softer hip flare than the fullest expression of the body anchor -- legs and waist are slender -- but a curvy identity is still present, not flat/runway-thin/contradictory. Minor softness, not enough to constitute a hard body-continuity failure."
+    },
+    "hands_anatomy_sanity": {
+      "status": "pass",
+      "notes": "Both hands relaxed at sides, clean, no defects."
+    },
+    "environment_realism_scene_coherence": {
+      "status": "pass",
+      "notes": "Rooftop, skyline, lounge furniture, planters -- coherent, matches scene text."
+    },
+    "caption_scene_coherence": {
+      "status": "not_applicable",
+      "notes": "No caption exists yet at this stage."
+    },
+    "pose_action_scene_compliance": {
+      "status": "pass",
+      "notes": "Scene requires 'squared confident posture, slight body angle, weight settled and sure' -- matches. Expression correctly shows the documented safe-fallback text ('relaxed natural expression, composed face') rather than a forward-gaze/away-scene contradiction -- confirms the exp_g013 downward-object gaze-conflict fix (13b82cf7) held in this real render too."
+    }
+  },
+  "production_scoring": {
+    "hook_strength": {
+      "score": "strong",
+      "notes": "Golden-hour lighting, confident stance, clean composition."
+    },
+    "styling_sexy_platform_safe": {
+      "status": "pass",
+      "notes": ""
+    },
+    "outfit_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "scene_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "allure_level": {
+      "level": "strong",
+      "notes": ""
+    },
+    "it_girl_energy": {
+      "status": "pass",
+      "notes": ""
+    },
+    "body_visibility_score": {
+      "score": "medium",
+      "notes": "Leaner read than the fullest body-anchor expression, but still curvy, not flat."
+    },
+    "outfit_hook_score": {
+      "score": "strong",
+      "notes": ""
+    },
+    "pose_attitude_score": {
+      "score": "strong",
+      "notes": ""
+    },
+    "feed_worthy_reason": "Cleanest technical execution of the three real renders -- strong identity, face, realism, wardrobe fidelity, coherent environment, correct pose, golden-hour hook. Genuinely postable as-is; only caveat is a minor body-anchor softness, not a hard defect."
+  },
+  "overall": "pass",
+  "failure_reasons": [],
+  "created_at_utc": "2026-07-10T03:48:39+00:00"
+}

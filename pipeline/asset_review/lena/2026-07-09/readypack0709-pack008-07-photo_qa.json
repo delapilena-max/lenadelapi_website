@@ -1,0 +1,100 @@
+{
+  "schema_version": "3",
+  "slot_id": "readypack0709-pack008-07-photo",
+  "date": "2026-07-09",
+  "media_type": "photo",
+  "wardrobe_outfit_id": "wc_p082",
+  "environment_id": null,
+  "reviewed_by": "Claude (direct visual review of the rendered image pixels -- Read tool on the saved PNG artifact; no automated vision model was used)",
+  "reviewed_at_utc": "2026-07-10T03:49:10+00:00",
+  "checklist": {
+    "identity_fidelity": {
+      "status": "pass",
+      "notes": "Consistent Lena identity, hair/face read as expected."
+    },
+    "face_realism_anti_generic_drift": {
+      "status": "pass",
+      "notes": "Natural expression, no glossy/idealized drift."
+    },
+    "skin_realism_no_invented_marks": {
+      "status": "pass",
+      "notes": "Natural skin texture, no invented marks."
+    },
+    "wardrobe_class_fidelity": {
+      "status": "pass",
+      "notes": "White ribbed tank, black leather mini skirt, tall boots, sunglasses -- matches spec closely."
+    },
+    "public_scene_clothing_continuity": {
+      "status": "pass",
+      "notes": "No underwear/crop drift."
+    },
+    "outerwear_underlayer_correctness": {
+      "status": "not_applicable",
+      "notes": "No shell/outer layer in this outfit."
+    },
+    "body_shape_continuity": {
+      "status": "pass",
+      "notes": "Curvy waist-hip anchor honored, not runway-thin."
+    },
+    "hands_anatomy_sanity": {
+      "status": "pass",
+      "notes": "Coffee-cup hand reads clean. Railing hand's grip is somewhat ambiguous/under-defined but not a confirmed hard defect -- ambiguous-but-not-clearly-broken, per doctrine this stays pass, not an automatic reject."
+    },
+    "environment_realism_scene_coherence": {
+      "status": "pass",
+      "notes": "City block/bench/trees/brownstones coherent. NOTE: a duplicate coffee cup appears -- one in her hand, a second sitting on the bench -- a real prop-duplication artifact, documented here but not treated as a second independent hard-gating reason for the reject (the pose contradiction alone is the disqualifying failure)."
+    },
+    "caption_scene_coherence": {
+      "status": "not_applicable",
+      "notes": "No caption exists yet at this stage."
+    },
+    "pose_action_scene_compliance": {
+      "status": "fail",
+      "notes": "Scene explicitly requires 'sitting on a city bench' / pose_p012 'seated, turned slightly sideways rather than square-on.' The rendered image shows Lena STANDING -- one boot propped on the bench seat, leaning back against the railing behind it -- not seated. This is the SECOND consecutive real render of this exact accepted prompt (prompt_sha256 4927a748eb54883962c351b385b98310e99784e23a12b4af08cf6365bddc9f7c) to produce this same seated-vs-standing contradiction (first attempt: this session, live job id not captured before the executor's canonical-URL bug was fixed; this attempt: provider_job_id a50fad42-90ab-4215-883f-465e6afb56f4). Evidence of persistent, not one-off stochastic, provider-side pose noncompliance for this scene/pose combination."
+    }
+  },
+  "production_scoring": {
+    "hook_strength": {
+      "score": "strong",
+      "notes": "Confident smile, strong outfit, engaged eye-line."
+    },
+    "styling_sexy_platform_safe": {
+      "status": "pass",
+      "notes": "Fitted, high-hook, platform-safe."
+    },
+    "outfit_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "scene_variety_vs_recent_posts": {
+      "status": "not_yet_measured",
+      "notes": ""
+    },
+    "allure_level": {
+      "level": "strong",
+      "notes": "Genuine IT-girl/main-character read."
+    },
+    "it_girl_energy": {
+      "status": "pass",
+      "notes": ""
+    },
+    "body_visibility_score": {
+      "score": "high",
+      "notes": "Legs/waist/hips clearly visible."
+    },
+    "outfit_hook_score": {
+      "score": "strong",
+      "notes": ""
+    },
+    "pose_attitude_score": {
+      "score": "strong",
+      "notes": "Confident even while standing, not the requested seated pose."
+    },
+    "feed_worthy_reason": "Visually this would stop a scroll -- strong identity, wardrobe, lighting, and confident attitude. It is rejected anyway because the rendered physical state contradicts the explicit seated instruction (pose_action_scene_compliance), which is a semantic-compliance failure, not a hook/quality failure -- identity, wardrobe, realism, and hook are not being falsely marked down to justify this reject."
+  },
+  "overall": "fail",
+  "failure_reasons": [
+    "pose_action_scene_compliance: rendered standing (one boot on the bench, leaning on the railing) despite the scene explicitly requiring seated -- second consecutive real render of this exact prompt with the same contradiction."
+  ],
+  "created_at_utc": "2026-07-10T03:48:38+00:00"
+}

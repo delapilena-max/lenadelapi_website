@@ -73,6 +73,22 @@ QA_CHECKLIST_FIELDS: Tuple[Tuple[str, str], ...] = (
     ("hands_anatomy_sanity", "Hands / anatomy sanity"),
     ("environment_realism_scene_coherence", "Environment realism / scene coherence"),
     ("caption_scene_coherence", "Caption-scene coherence (placeholder -- not a strong check yet)"),
+    # Added 2026-07-10 (Nicolas, explicit approval), first proven example: two
+    # consecutive real Higgsfield renders of the exact same accepted prompt
+    # ("sitting on a city bench," pose_p012) rendered Lena standing, not
+    # seated. General semantic-compliance field, not a special-cased
+    # "city_bench -> must be seated" rule: does the rendered physical state
+    # or action match what the intended scene explicitly requires, rather
+    # than merely looking stylistically similar (seated vs standing, holding
+    # an object vs not, walking vs a static contradictory pose, a mirror
+    # selfie without coherent mirror/phone logic, eating without coherent
+    # food/table interaction, driving without coherent car/seat/steering
+    # interaction, etc.). Hard-gating by construction: it is a plain member
+    # of QA_CHECKLIST_KEYS, not listed in DIAGNOSTIC_ONLY_CHECKLIST_KEYS, so
+    # it is automatically included in HARD_GATING_CHECKLIST_KEYS and in
+    # validate_qa_result()'s existing false-green loop below -- no separate
+    # validator change was needed for this field to gate.
+    ("pose_action_scene_compliance", "Pose/action-scene compliance (rendered physical state/action must not contradict what the scene explicitly requires, e.g. seated vs standing, holding vs not holding, walking vs static, mirror/eating/driving logic)"),
 )
 QA_CHECKLIST_KEYS = tuple(key for key, _ in QA_CHECKLIST_FIELDS)
 
