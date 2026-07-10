@@ -709,6 +709,20 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
 
     return {
         "post_id": resolved["slot_id"],
+        # tools/lena_preflight.py resolves an item's identity via
+        # `data.get("slot_id") or path.stem` -- for Kling this "just worked"
+        # by convention only, because Kling queue-item filenames happen to be
+        # date-prefixed to match slot_id exactly. Higgsfield slot IDs (e.g.
+        # "readypack0709-pack003-08-photo") don't follow that filename
+        # convention, so path.stem would resolve to the wrong identity and
+        # preflight's Higgsfield identity-evidence lookup would look in the
+        # wrong pipeline/higgsfield_debug/<date>/<slot_id>/ directory
+        # entirely. Writing the real, exact slot_id explicitly here (not
+        # derived from any filename, not a fallback, not post_id reused
+        # under a different key) makes preflight resolve the correct
+        # identity for either provider without relying on that filename
+        # coincidence.
+        "slot_id": resolved["slot_id"],
         "media_path": resolved["image_path"],
         "media_type": "photo",
         "platforms": ["instagram"],

@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from pipeline.env_loader import load_env_once
 from pipeline.identity import lena_identity
+from pipeline.identity import lena_higgsfield_identity
 
 load_env_once(ROOT)
 
@@ -36,6 +37,24 @@ if not caption_rules:
 
 REQUIRED_PLATFORM = daily.get("platforms", ["instagram"])
 REQUIRED_AVATAR = contract["persona"]["required_avatar_nickname"]
+# Provider-aware image-engine map (2026-07-10): "image_engine" stays
+# unchanged for backward compatibility with pipeline/publisher/
+# instagram_queue_bridge.py's own separate, still-Kling-only contract check
+# (out of scope for this change) -- IMAGE_ENGINES_BY_PROVIDER is the new,
+# additive key this script reads instead. A queue item with no
+# metadata.provider defaults to "kling" (existing items predate this
+# field); an explicit but unrecognized provider value is a hard fail, never
+# a silent fallback to Kling.
+IMAGE_ENGINES_BY_PROVIDER = required_specs["image_engine_by_provider"]
+# Photo-resolution allow-list, now per provider. Kling's set is unchanged.
+# Higgsfield's is the one real, measured resolution this pipeline has
+# actually verified so far (see pipeline/identity/lena_higgsfield_identity.py's
+# EXPECTED_WIDTH/EXPECTED_HEIGHT) -- never relabeled as a Kling resolution
+# string.
+ALLOWED_PHOTO_RESOLUTIONS_BY_PROVIDER = {
+    "kling": {"1080p", "1080x1920", "1920x1080"},
+    "higgsfield": {"1152x2048"},
+}
 IMAGE_ENGINE = required_specs["image_engine"]
 VIDEO_ENGINE = required_specs["video_engine"]
 VIDEO_RESOLUTION = required_specs["video_resolution"]
@@ -150,78 +169,114 @@ for path in sorted(QUEUE.glob(f"{PREFLIGHT_DATE}-*.json")):
     if media_type in {"photo", "image"}:
         photo_count += 1
 
-        require(str(meta.get("image_engine") or "").lower() == IMAGE_ENGINE, f"{path.name}: photo must use {IMAGE_ENGINE}")
+        # Provider dispatch (2026-07-10): an item with no metadata.provider
+        # predates this field and continues to behave exactly as before --
+        # defaults to "kling". An explicit but unrecognized provider value
+        # is a hard fail, never a silent fallback to Kling or anywhere else.
+        item_provider_raw = meta.get("provider")
+        item_provider = str(item_provider_raw).lower().strip() if item_provider_raw else "kling"
+        if item_provider not in IMAGE_ENGINES_BY_PROVIDER:
+            bad.append(
+                f"{path.name}: unsupported/unrecognized metadata.provider {item_provider_raw!r} -- "
+                "no image_engine mapping for this provider, refusing to silently fall back to Kling"
+            )
+
+        expected_engine = IMAGE_ENGINES_BY_PROVIDER.get(item_provider)
+        require(
+            expected_engine is not None
+            and str(meta.get("image_engine") or "").lower() == expected_engine.lower(),
+            f"{path.name}: photo must use {expected_engine or '<no mapping for provider ' + repr(item_provider) + '>'} "
+            f"(provider={item_provider!r})",
+        )
         require(bool(meta.get("image_prompt")), f"{path.name}: photo missing metadata.image_prompt")
-        require(str(meta.get("resolution") or "").lower() in {"1080p", "1080x1920", "1920x1080"}, f"{path.name}: photo resolution must be 1080p")
+        allowed_resolutions = ALLOWED_PHOTO_RESOLUTIONS_BY_PROVIDER.get(item_provider, set())
         require(
-            str(meta.get("photo_identity_binding") or "") in lena_identity.ALLOWED_PHOTO_IDENTITY_BINDINGS,
-            f"{path.name}: photo must be stamped with a validated Lena element binding",
-        )
-        require(
-            str(meta.get("reference_binding_mode") or "") == lena_identity.REQUIRED_REFERENCE_BINDING_MODE,
-            f"{path.name}: photo must use {lena_identity.REQUIRED_REFERENCE_BINDING_MODE} binding mode",
-        )
-        require(
-            str(meta.get("reference_source_policy") or "") == lena_identity.REQUIRED_REFERENCE_SOURCE_POLICY,
-            f"{path.name}: photo must declare {lena_identity.REQUIRED_REFERENCE_SOURCE_POLICY} reference policy",
-        )
-        require(
-            str(meta.get("reference_source_element_id_source") or "") == lena_identity.REQUIRED_REFERENCE_SOURCE_ELEMENT_ID_SOURCE,
-            f"{path.name}: photo must resolve from {lena_identity.REQUIRED_REFERENCE_SOURCE_ELEMENT_ID_SOURCE}",
-        )
-        require(
-            not meta.get("reference_image_path"),
-            f"{path.name}: photo must not carry legacy reference_image_path",
-        )
-        require(
-            str(meta.get("seed_source") or "") == lena_identity.REQUIRED_SEED_SOURCE,
-            f"{path.name}: photo must use {lena_identity.REQUIRED_SEED_SOURCE} seed source",
+            str(meta.get("resolution") or "").lower() in allowed_resolutions,
+            f"{path.name}: photo resolution must be one of {sorted(allowed_resolutions)} "
+            f"for provider {item_provider!r}",
         )
 
-        actual_photo_element = lena_identity.clean_element_id(meta.get("lena_element_ui_numeric_id"))
-        expected_photo_element = lena_identity.resolve_expected_photo_element()
-        if expected_photo_element:
-            expected_source, expected_element = expected_photo_element
+        if item_provider == "kling":
             require(
-                actual_photo_element == expected_element,
-                f"{path.name}: photo element mismatch, expected {expected_source}={expected_element}, got {actual_photo_element or '[missing]'}",
+                str(meta.get("photo_identity_binding") or "") in lena_identity.ALLOWED_PHOTO_IDENTITY_BINDINGS,
+                f"{path.name}: photo must be stamped with a validated Lena element binding",
             )
-        else:
-            warn.append(f"{path.name}: no KLING_LENA_* element id found in env for strict comparison")
-
-        forbidden_photo_elements = lena_identity.forbidden_photo_element_ids()
-        if actual_photo_element and actual_photo_element in forbidden_photo_elements:
             require(
-                False,
-                f"{path.name}: photo resolved to forbidden studio element {forbidden_photo_elements[actual_photo_element]}={actual_photo_element}",
+                str(meta.get("reference_binding_mode") or "") == lena_identity.REQUIRED_REFERENCE_BINDING_MODE,
+                f"{path.name}: photo must use {lena_identity.REQUIRED_REFERENCE_BINDING_MODE} binding mode",
+            )
+            require(
+                str(meta.get("reference_source_policy") or "") == lena_identity.REQUIRED_REFERENCE_SOURCE_POLICY,
+                f"{path.name}: photo must declare {lena_identity.REQUIRED_REFERENCE_SOURCE_POLICY} reference policy",
+            )
+            require(
+                str(meta.get("reference_source_element_id_source") or "") == lena_identity.REQUIRED_REFERENCE_SOURCE_ELEMENT_ID_SOURCE,
+                f"{path.name}: photo must resolve from {lena_identity.REQUIRED_REFERENCE_SOURCE_ELEMENT_ID_SOURCE}",
+            )
+            require(
+                not meta.get("reference_image_path"),
+                f"{path.name}: photo must not carry legacy reference_image_path",
+            )
+            require(
+                str(meta.get("seed_source") or "") == lena_identity.REQUIRED_SEED_SOURCE,
+                f"{path.name}: photo must use {lena_identity.REQUIRED_SEED_SOURCE} seed source",
             )
 
-        # Payload-truth verification: check what was actually submitted, not just
-        # the self-reported metadata stamps above. See containment memo 2026-07-05.
-        submit_payload_path = APILENA_DEBUG_ROOT / PREFLIGHT_DATE / slot_id / "submit_payload.json"
-        lookup_response_path = APILENA_DEBUG_ROOT / PREFLIGHT_DATE / slot_id / "live_apilena_lookup_response.json"
-        if submit_payload_path.exists():
-            try:
-                submit_payload = json.loads(submit_payload_path.read_text(encoding="utf-8-sig"))
-            except Exception:
-                submit_payload = None
-            if submit_payload is not None:
+            actual_photo_element = lena_identity.clean_element_id(meta.get("lena_element_ui_numeric_id"))
+            expected_photo_element = lena_identity.resolve_expected_photo_element()
+            if expected_photo_element:
+                expected_source, expected_element = expected_photo_element
                 require(
-                    not submit_payload.get("image_list"),
-                    f"{path.name}: submitted payload contains non-empty image_list, "
-                    f"element_list-only contract violated: {submit_payload_path}",
+                    actual_photo_element == expected_element,
+                    f"{path.name}: photo element mismatch, expected {expected_source}={expected_element}, got {actual_photo_element or '[missing]'}",
                 )
-            require(
-                lookup_response_path.exists(),
-                f"{path.name}: no live_apilena_lookup_response.json alongside submit_payload.json "
-                f"-- photo identity may have bypassed the live element lookup via a manual "
-                f"env image-source override: {submit_payload_path}",
+            else:
+                warn.append(f"{path.name}: no KLING_LENA_* element id found in env for strict comparison")
+
+            forbidden_photo_elements = lena_identity.forbidden_photo_element_ids()
+            if actual_photo_element and actual_photo_element in forbidden_photo_elements:
+                require(
+                    False,
+                    f"{path.name}: photo resolved to forbidden studio element {forbidden_photo_elements[actual_photo_element]}={actual_photo_element}",
+                )
+
+            # Payload-truth verification: check what was actually submitted, not just
+            # the self-reported metadata stamps above. See containment memo 2026-07-05.
+            submit_payload_path = APILENA_DEBUG_ROOT / PREFLIGHT_DATE / slot_id / "submit_payload.json"
+            lookup_response_path = APILENA_DEBUG_ROOT / PREFLIGHT_DATE / slot_id / "live_apilena_lookup_response.json"
+            if submit_payload_path.exists():
+                try:
+                    submit_payload = json.loads(submit_payload_path.read_text(encoding="utf-8-sig"))
+                except Exception:
+                    submit_payload = None
+                if submit_payload is not None:
+                    require(
+                        not submit_payload.get("image_list"),
+                        f"{path.name}: submitted payload contains non-empty image_list, "
+                        f"element_list-only contract violated: {submit_payload_path}",
+                    )
+                require(
+                    lookup_response_path.exists(),
+                    f"{path.name}: no live_apilena_lookup_response.json alongside submit_payload.json "
+                    f"-- photo identity may have bypassed the live element lookup via a manual "
+                    f"env image-source override: {submit_payload_path}",
+                )
+            else:
+                warn.append(
+                    f"{path.name}: no submit_payload.json found for payload-truth verification "
+                    f"at {submit_payload_path}; metadata claims above are unverified"
+                )
+
+        elif item_provider == "higgsfield":
+            # LOCAL ONLY -- no live Higgsfield provider call happens here or
+            # anywhere else in this script. Reads the durable evidence file
+            # a separate, earlier, explicitly-approved step
+            # (verify_and_record_higgsfield_identity()) already wrote.
+            higgsfield_identity_reasons = lena_higgsfield_identity.validate_local_identity_evidence(
+                PREFLIGHT_DATE, slot_id, media_path, meta
             )
-        else:
-            warn.append(
-                f"{path.name}: no submit_payload.json found for payload-truth verification "
-                f"at {submit_payload_path}; metadata claims above are unverified"
-            )
+            for reason in higgsfield_identity_reasons:
+                bad.append(f"{path.name}: {reason}")
 
     elif media_type in {"video", "reel"}:
         video_count += 1

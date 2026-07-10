@@ -12,32 +12,51 @@ from typing import Any, Dict, List
 # counterpart to the trust *concept* pipeline/identity/lena_identity.py
 # provides for Kling, deliberately architected the same way Kling's own
 # chain actually works: a real live-provider check happens ONCE, here, and
-# leaves a durable evidence file behind; nothing downstream (preflight or
-# otherwise) makes a live provider call itself. This module is not wired
-# into tools/lena_preflight.py yet -- that is a separate, later, explicitly
-# approved step.
+# leaves a durable evidence file behind. tools/lena_preflight.py reads and
+# validates that evidence file LOCALLY (validate_local_identity_evidence()
+# below) -- it never makes a live provider call itself.
 #
-# Verifies identity provenance for ONE already-existing, already-completed
-# Higgsfield render. Never generates, never spends credit, never retries a
-# job. Exactly two read-only provider CLI calls per verification:
-#   higgsfield generate get <provider_job_id> --json
-#   higgsfield soul-id get <custom_reference_id> --json
-# Neither call creates or mutates anything provider-side.
+# Two independent verification paths live in this module:
+#   1. verify_higgsfield_identity() / verify_and_record_higgsfield_identity()
+#      -- makes the real, one-time, read-only provider calls
+#      (`higgsfield generate get`, `higgsfield soul-id get`) and writes the
+#      evidence file. Never generates, never spends credit, never retries a
+#      job.
+#   2. validate_local_identity_evidence() -- LOCAL ONLY, zero network calls.
+#      Reads the evidence file (1) already wrote and checks it for internal
+#      consistency against this module's canonical expected Lena identity
+#      constants and the queue item's own claimed metadata. This is what
+#      tools/lena_preflight.py calls.
 #
-# Fails closed (raises HiggsfieldIdentityVerificationError) on any mismatch
-# or missing data -- never falls back to trusting self-reported local
-# metadata alone, and never silently downgrades a failed check into a
-# warning. Writes exactly one new evidence file
-# (pipeline/higgsfield_debug/<date>/<slot_id>/identity_verification.json);
-# never modifies the original generation manifest.
+# Both fail closed on any mismatch or missing data -- neither falls back to
+# trusting self-reported local metadata alone, and neither silently
+# downgrades a failed check into a warning. Path (1) writes exactly one new
+# evidence file; never modifies the original generation manifest. Path (2)
+# writes nothing, ever.
 
 HIGGSFIELD_CLI_BINARY = "higgsfield"
 EXPECTED_JOB_STATUS = "completed"
 EXPECTED_SOUL_STATUS = "completed"
 EXPECTED_SOUL_NAME = "Lena"
 EXPECTED_SOUL_TYPE = "soul_2"
+EXPECTED_JOB_TYPE = "text2image_soul_v2"
+EXPECTED_CUSTOM_REFERENCE_ID = "1f1200e4-1cc9-4504-ac1c-3304b687e3c1"
+# The one real, approved Higgsfield photo resolution proven so far -- see
+# tools/lena_build_publish_packet_v1.py's resolve_packet_inputs_higgsfield(),
+# which measures this from the real saved image rather than trusting a
+# manifest field. Not claimed to be the only resolution Higgsfield could
+# ever produce -- just the one this pipeline has actually verified.
+EXPECTED_WIDTH = 1152
+EXPECTED_HEIGHT = 2048
 
 SCHEMA_VERSION = "1"
+REQUIRED_EVIDENCE_FIELDS = (
+    "schema_version", "verified_at_utc", "provider", "date", "slot_id",
+    "provider_job_id", "provider_job_status", "job_type",
+    "custom_reference_id", "soul_name", "soul_type", "prompt_sha256",
+    "width", "height", "local_image_path", "local_image_sha256",
+    "verification_result", "checks_passed",
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 HIGGSFIELD_DEBUG_ROOT = ROOT / "pipeline" / "higgsfield_debug"
@@ -367,3 +386,153 @@ def verify_and_record_higgsfield_identity(
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False), encoding="utf-8")
     return evidence_path
+
+
+def validate_local_identity_evidence(
+    date_str: str,
+    slot_id: str,
+    media_path: Path,
+    meta: Dict[str, Any],
+) -> List[str]:
+    """Read-only, LOCAL ONLY -- makes zero network/provider calls. Reads the
+    already-written pipeline/higgsfield_debug/<date>/<slot_id>/
+    identity_verification.json evidence file (produced once, earlier, by
+    verify_and_record_higgsfield_identity()) and checks it for internal
+    consistency against this module's canonical expected Lena identity
+    constants and the queue item's own claimed metadata/media path.
+
+    Never raises -- returns a list of human-readable failure reasons (an
+    empty list means every check passed), matching
+    tools/lena_preflight.py's own accumulate-all-failures style (its
+    require()/bad list) rather than stopping at the first problem.
+
+    Does NOT re-verify against the live provider -- that already happened,
+    once, when the evidence file was written. This function only checks
+    that the evidence file (a) is well-formed, (b) recorded a real pass,
+    (c) matches the approved Lena identity constants, (d) is consistent
+    with what this specific queue item itself claims, and (e) the local
+    image file hasn't changed since verification (via a local re-hash,
+    which is NOT a check against the original provider-downloaded bytes --
+    see local_image_sha256_provenance in the evidence file itself)."""
+    reasons: List[str] = []
+    evidence_path = identity_verification_evidence_path(date_str, slot_id)
+
+    if not evidence_path.exists():
+        return [f"no Higgsfield identity_verification.json for this slot: {evidence_path}"]
+
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return [f"failed to parse {evidence_path}: {exc}"]
+
+    if not isinstance(evidence, dict):
+        return [f"{evidence_path} did not contain a JSON object"]
+
+    missing_keys = [k for k in REQUIRED_EVIDENCE_FIELDS if k not in evidence]
+    if missing_keys:
+        return [f"{evidence_path} is missing required field(s): {missing_keys}"]
+
+    if evidence.get("schema_version") != SCHEMA_VERSION:
+        reasons.append(
+            f"identity_verification.json schema_version {evidence.get('schema_version')!r} "
+            f"is not the expected {SCHEMA_VERSION!r}"
+        )
+
+    if evidence.get("verification_result") != "pass":
+        reasons.append(
+            f"identity_verification.json verification_result is "
+            f"{evidence.get('verification_result')!r}, not 'pass'"
+        )
+
+    if evidence.get("provider") != "higgsfield":
+        reasons.append(
+            f"identity_verification.json provider is {evidence.get('provider')!r}, expected 'higgsfield'"
+        )
+
+    if evidence.get("slot_id") != slot_id:
+        reasons.append(
+            f"identity_verification.json slot_id {evidence.get('slot_id')!r} does not match {slot_id!r}"
+        )
+
+    if evidence.get("job_type") != EXPECTED_JOB_TYPE:
+        reasons.append(
+            f"identity_verification.json job_type {evidence.get('job_type')!r} is not {EXPECTED_JOB_TYPE!r}"
+        )
+
+    if evidence.get("custom_reference_id") != EXPECTED_CUSTOM_REFERENCE_ID:
+        reasons.append(
+            f"identity_verification.json custom_reference_id {evidence.get('custom_reference_id')!r} "
+            f"is not the approved Lena reference id {EXPECTED_CUSTOM_REFERENCE_ID!r}"
+        )
+
+    if evidence.get("soul_name") != EXPECTED_SOUL_NAME:
+        reasons.append(
+            f"identity_verification.json soul_name {evidence.get('soul_name')!r} is not {EXPECTED_SOUL_NAME!r}"
+        )
+
+    if evidence.get("soul_type") != EXPECTED_SOUL_TYPE:
+        reasons.append(
+            f"identity_verification.json soul_type {evidence.get('soul_type')!r} is not {EXPECTED_SOUL_TYPE!r}"
+        )
+
+    if evidence.get("width") != EXPECTED_WIDTH or evidence.get("height") != EXPECTED_HEIGHT:
+        reasons.append(
+            f"identity_verification.json dimensions {evidence.get('width')}x{evidence.get('height')} "
+            f"do not match the approved Higgsfield resolution {EXPECTED_WIDTH}x{EXPECTED_HEIGHT}"
+        )
+
+    # Cross-check against the queue item's own self-reported metadata --
+    # ties this specific queue item to this specific evidence file, rather
+    # than trusting that any evidence file at this path is relevant to it.
+    meta_provider_job_id = meta.get("provider_job_id")
+    if meta_provider_job_id and evidence.get("provider_job_id") != meta_provider_job_id:
+        reasons.append(
+            f"identity_verification.json provider_job_id {evidence.get('provider_job_id')!r} does not "
+            f"match this queue item's own metadata.provider_job_id {meta_provider_job_id!r}"
+        )
+
+    meta_custom_reference_id = meta.get("custom_reference_id")
+    if meta_custom_reference_id and evidence.get("custom_reference_id") != meta_custom_reference_id:
+        reasons.append(
+            f"identity_verification.json custom_reference_id does not match this queue item's own "
+            f"metadata.custom_reference_id {meta_custom_reference_id!r}"
+        )
+
+    meta_image_prompt = meta.get("image_prompt")
+    if meta_image_prompt:
+        recomputed_prompt_sha256 = hashlib.sha256(str(meta_image_prompt).encode("utf-8")).hexdigest()
+        if recomputed_prompt_sha256 != evidence.get("prompt_sha256"):
+            reasons.append(
+                "this queue item's own metadata.image_prompt re-hashes to a different value than "
+                "identity_verification.json's recorded prompt_sha256 -- prompt text may have changed "
+                "since verification"
+            )
+
+    # Local image existence + current-content re-hash -- both purely local,
+    # zero network. Catches the file being swapped/modified after
+    # verification. This is NOT a check against the original
+    # provider-downloaded bytes (see the evidence file's own
+    # local_image_sha256_provenance disclosure) -- only against what the
+    # evidence itself recorded at verification time.
+    evidence_image_path = Path(str(evidence.get("local_image_path") or ""))
+    if not evidence_image_path.exists():
+        reasons.append(f"identity_verification.json's local_image_path does not exist: {evidence_image_path}")
+    else:
+        current_sha256 = hashlib.sha256(evidence_image_path.read_bytes()).hexdigest()
+        if current_sha256 != evidence.get("local_image_sha256"):
+            reasons.append(
+                "local image SHA-256 no longer matches the hash captured in identity_verification.json "
+                "-- the file may have been modified or replaced since verification"
+            )
+
+    try:
+        media_path_matches = evidence_image_path.resolve() == media_path.resolve()
+    except OSError:
+        media_path_matches = str(evidence_image_path) == str(media_path)
+    if not media_path_matches:
+        reasons.append(
+            f"identity_verification.json's local_image_path ({evidence_image_path}) does not match "
+            f"this queue item's own media_path ({media_path})"
+        )
+
+    return reasons

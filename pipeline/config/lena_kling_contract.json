@@ -84,6 +84,10 @@
   },
   "required_media_specs": {
     "image_engine": "kling_image_3.0",
+    "image_engine_by_provider": {
+      "kling": "kling_image_3.0",
+      "higgsfield": "higgsfield_text2image_soul_v2"
+    },
     "video_engine": "kling_video_3.0",
     "preferred_video_ui_model": "VIDEO 3.0 Turbo",
     "preferred_video_model_name_candidate": "kling-v2-1-master",
