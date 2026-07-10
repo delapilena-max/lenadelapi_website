@@ -9,12 +9,27 @@ import re
 from pathlib import Path
 from typing import Any, Dict
 
+from PIL import Image
+
 from pipeline.env_loader import load_env_once
 
 load_env_once()
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "pipeline" / "config" / "lena_kling_contract.json"
+
+# Instagram's own documented feed-photo aspect-ratio range (width/height),
+# per Meta's Content Publishing API reference
+# (developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media/)
+# and corroborated by third-party integrators: 4:5 (portrait) to 1.91:1
+# (landscape); square (1:1) is within range. An image outside this range is
+# unsafe to submit as a feed photo -- 2026-07-10's readypack0709-pack003-08-photo
+# live publish (1152x2048, 9:16 = 0.5625, ~2-3% headroom above the head) is the
+# real, confirmed incident this gate exists to prevent: the source image itself
+# was not defective, but its aspect ratio was far outside this range with no
+# margin to survive Instagram's own presentation, and the head was cut off.
+MIN_FEED_PHOTO_ASPECT_RATIO = 0.8
+MAX_FEED_PHOTO_ASPECT_RATIO = 1.91
 
 
 def _duration(path: Path) -> float | None:
@@ -92,6 +107,34 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
             )
         if not meta.get("image_prompt"):
             raise ValueError("Lena contract violation: photo missing image_prompt")
+
+        # Instagram-safe aspect-ratio gate (2026-07-10, added after a real live
+        # incident -- see the MIN/MAX_FEED_PHOTO_ASPECT_RATIO constants' comment
+        # above). Deliberately reads the ACTUAL image file's real pixel
+        # dimensions via PIL, never metadata.resolution alone -- metadata is
+        # self-reported and, for Kling items built through this pipeline's own
+        # queue-draft builder, is not even always present (see
+        # lena_build_publish_packet_v1.build_queue_draft()'s own documented
+        # asymmetry). Only ever reads the file; never resizes, crops, converts,
+        # or otherwise modifies it -- this is a validation gate, not a
+        # transformation. Fails closed if the image can't be opened at all
+        # (corrupt/unreadable/missing file), same as every other check in this
+        # function.
+        try:
+            with Image.open(media_path) as im:
+                img_width, img_height = im.size
+        except Exception as exc:
+            raise ValueError(f"Lena contract violation: could not read image dimensions from {media_path}: {exc}")
+        if img_width <= 0 or img_height <= 0:
+            raise ValueError(f"Lena contract violation: photo has invalid dimensions {img_width}x{img_height}")
+        aspect_ratio = img_width / img_height
+        if not (MIN_FEED_PHOTO_ASPECT_RATIO <= aspect_ratio <= MAX_FEED_PHOTO_ASPECT_RATIO):
+            raise ValueError(
+                f"Lena contract violation: photo dimensions {img_width}x{img_height} (aspect ratio "
+                f"{aspect_ratio:.4f}) are outside Instagram's accepted feed-photo range "
+                f"({MIN_FEED_PHOTO_ASPECT_RATIO}-{MAX_FEED_PHOTO_ASPECT_RATIO}) -- unsafe to publish, "
+                "Instagram may crop or reject this image"
+            )
         return
 
     if media_type in {"video", "reel"}:
