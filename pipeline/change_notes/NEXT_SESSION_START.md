@@ -2,6 +2,138 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ HEAD-FRAMING INCIDENT CLOSED THE LOOP: LIVE PUBLISH FAILURE -> HARD GATES -> PERMANENT PROMPT FIX -> TWO POST-FIX 9:16 RENDERS PASS, ONE VIA NORMAL PRODUCTION PATH (2026-07-10, later session) -- read this before assuming any banner below is the latest checkpoint
+>
+> **A. What changed.** After Candidate C (`readypack0709-pack003-08-photo`)
+> was live-published to the Instagram feed and found to have the head
+> cut off, this session built and committed, in order, four real,
+> individually-approved commits (HEAD is now `b465412f`):
+> - `fd5a36e3` `feat: track Instagram queue bridge with provider-aware
+>   image dispatch` (unrelated provider-dispatch fix, committed just
+>   before this incident was discovered).
+> - `652c1262` `fix: block unsafe Instagram feed photo aspect ratios` --
+>   `pipeline/publisher/instagram_queue_bridge.py::_validate_contract()`
+>   now opens the real image file with PIL and hard-fails any feed-photo
+>   payload outside Instagram's documented `0.8-1.91` aspect-ratio range.
+>   9:16 (`0.5625`) fails this gate unconditionally. Never trusts
+>   `metadata.resolution`; never crops/resizes/converts anything.
+> - `e0e92578` `feat: add hard-gating head framing safety QA` --
+>   `pipeline/qa/lena_photo_qa.py` `SCHEMA_VERSION` bumped `"3"` -> `"4"`,
+>   new hard-gating checklist field `head_framing_safety_margin`
+>   (full head/hair/face/both-eyes inside frame with *comfortable*
+>   margin, not merely technically non-clipped). New
+>   `LEGACY_SCHEMA_VERSIONS_WITHOUT_HEAD_FRAMING_SAFETY_MARGIN =
+>   {"1","2","3"}` exempts all 12 real pre-existing QA records (including
+>   Candidate C's own) from requiring the field -- none rewritten.
+> - `df5ce6c0` `feat: add Instagram Story routing for 9:16 images` --
+>   `pipeline/posting_manager.py` (`_infer_media_type()` now recognizes
+>   `story`/`stories` distinctly), `pipeline/publisher/
+>   instagram_queue_bridge.py` (new `story` contract branch, same
+>   provider/engine/prompt checks as feed photos, deliberately never
+>   applies the feed aspect-ratio gate), `pipeline/publisher/
+>   instagram_graph_adapter.py` (`create_media_container()` sends
+>   `image_url` + `media_type=STORIES`, never `video_url`/`REELS`/
+>   `share_to_feed`). This is the real, correct publishing surface for
+>   existing 9:16 Lena images -- Instagram Stories natively accept 9:16
+>   uncropped; feed photos do not.
+> - `b465412f` `fix: add safe Higgsfield headroom framing` --
+>   `pipeline/prompting/lena_prompt_brain.py`'s `HIGGSFIELD_FRAMING_
+>   REINFORCEMENT` constant (the single, only place in the repo that owns
+>   the `Framing:` sentence baked into every Higgsfield prompt) gained a
+>   permanent addendum: explicitly instructs the provider to position
+>   Lena slightly lower in frame with comfortable, clearly-visible space
+>   above the highest point of her hair, and that her head/hair must not
+>   approach or touch the top edge. This is the smallest possible fix --
+>   one constant, no new insertion point, no aspect-ratio change, no
+>   scene/wardrobe/pose/reference-binding change, confirmed via grep to
+>   be referenced nowhere else in the repo (Kling's own prompt builder,
+>   `generate_prompt_package()`, never touches it).
+>
+> **B. Real evidence, not just code.** Two 9:16 renders were generated
+> live after this fix, both scored honestly against the new gate:
+> - `readypack0709-pack005-01-photo` (generated **before** the permanent
+>   prompt fix, deliberately pose-selected to try to maximize headroom
+>   safety through pose choice alone) -- measured headroom ~2-3%, same
+>   danger-zone order of magnitude as Candidate C's incident render.
+>   **QA overall: fail**, sole reason `head_framing_safety_margin`. Rule
+>   Zero correctly blocks it (`resolve_packet_inputs_higgsfield()` raises
+>   `ResolveError`). This result is important evidence in its own right:
+>   it proved pose/scene selection alone cannot reliably control
+>   headroom, motivating the permanent prompt-level fix instead.
+> - `readypack0709-pack006-01-photo` -- a **controlled one-off test**,
+>   generated using an in-memory prompt addendum (the exact wording later
+>   made permanent) *before* `b465412f` was committed, to prove the
+>   wording itself worked before touching production code. Measured
+>   headroom ~180px/2048px ≈ **8.8%**. QA overall: pass,
+>   `head_framing_safety_margin`: pass, Rule Zero: pass, identity
+>   evidence valid, visual-style evidence valid.
+> - `readypack0709-pack007-00-photo` -- generated **after** `b465412f`
+>   was committed, through the **normal, unmodified production CLI**
+>   (`python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09
+>   --slot-id readypack0709-pack007-00-photo --live`), with **no
+>   in-memory override, no manual prompt-text insertion, no
+>   `--expected-prompt-file`.** The permanent doctrine reached the
+>   provider purely through the committed prompt pipeline. Measured
+>   headroom ~125-130px/2048px ≈ **6.1%**. QA overall: pass,
+>   `head_framing_safety_margin`: pass, Rule Zero: pass, identity
+>   evidence valid, visual-style evidence valid. Lane "sidewalk dinner",
+>   wardrobe "Royal Blue Fitted Square-Neck Knit Mini Dress", pose
+>   `pose_p003`. SHA-256
+>   `033d70d93091c77f8499a54adbe626ecef725e94e718a52a5229465ae462a71a`,
+>   prompt SHA-256
+>   `a91cbad2667bf79ad88a554a11f28322b39dbde728ac7c208148d5fd368bdbf6`,
+>   provider job ID `cb001db6-23dd-4fdb-9d1b-9fd795b9e2f5`.
+>
+> **C. Do not overstate this.** Two post-doctrine 9:16 renders passing
+> (one controlled, one genuine normal-production-path) is **strong
+> evidence** the permanent framing instruction materially improves
+> headroom -- it is **not** a large-sample reliability guarantee. Both
+> real headroom measurements (8.8% and 6.1%) are comfortably clear of the
+> ~2-3% danger zone, but sample size is 2. Do not claim more than that
+> without more renders.
+>
+> **D. Standing facts, current as of this checkpoint:**
+> - 9:16 remains the Lena generation standard. Do not pursue 1:1, 3:4, or
+>   4:5 as replacements -- 4:5 is confirmed **not** in Higgsfield Soul
+>   2.0's real `text2image_soul_v2` aspect_ratio enum (live CLI schema
+>   query, read-only, this session: `["1:1","16:9","9:16","4:3","3:4",
+>   "3:2","2:3"]`); 3:4 has real, documented framing-regression evidence
+>   from an earlier session; 1:1 is technically supported but has zero
+>   real quality/framing testing history for Lena.
+> - 9:16 feed-photo publishing remains hard-blocked by the committed
+>   aspect-ratio gate (`652c1262`).
+> - 9:16 Instagram Story routing (`df5ce6c0`) is the correct, real
+>   publishing path for existing/future 9:16 Lena images -- not yet
+>   exercised live (no Story has actually been published).
+> - QA schema v4 (`e0e92578`) hard-gates `head_framing_safety_margin` for
+>   every new record going forward.
+> - Candidate C (`readypack0709-pack003-08-photo`) remains historical and
+>   untouched -- still live on Instagram (permalink `https://www.
+>   instagram.com/p/DanplwglOlO/`, media ID `18054323045770081`), its own
+>   QA/approval/queue-draft/promoted artifacts unmodified. This is the
+>   incident that motivated the entire workstream above.
+>
+> **E. What must not be done.** No image was deleted, no post was
+> deleted, no republish/repair action was taken on Candidate C. No 1:1/
+> 3:4/4:5 generation path was added. No blind cropping was implemented
+> or recommended anywhere in this workstream. No Instagram Story has
+> actually been published yet -- Story routing is committed and locally
+> proven only. Publishing remains paused; no live publish has occurred
+> since Candidate C's original incident.
+>
+> **F. Next approved step:** none pre-approved beyond what's described
+> above. Do not generate another image, publish, or promote without a
+> new explicit instruction.
+>
+> No generation beyond the two renders described above, no Kling call, no
+> Anthropic call, no Instagram call, no R2 use, and no `.env` change
+> occurred producing this checkpoint beyond what's already described.
+>
+> Full detail: the changelog's matching 2026-07-10 (later session) entry
+> ("Head-framing incident closed the loop") and `70_visual_qa/
+> CURRENT_STATE.md`'s and `50_prompt_builder/CURRENT_STATE.md`'s updated
+> sections.
+
 > ## ✅ APPROVAL NOW APPLIED TO CANDIDATE C'S REAL QUEUE DRAFT; READ-ONLY AUDIT FOUND THE REAL PROMOTION PATH DOES NOT EXIST YET (2026-07-10, later session) -- read this before assuming the "HIGGSFIELD PACKET/PREFLIGHT/APPROVAL CHAIN" banner below is the latest checkpoint
 >
 > **HEAD is now `d72cbeb4`.** One more real commit landed since the banner
