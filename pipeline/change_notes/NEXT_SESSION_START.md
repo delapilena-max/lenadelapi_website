@@ -2,6 +2,185 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ DIRECTION CHANGE: ANTHROPIC AUTOMATED-VISION BRANCH PARKED; SMALLEST FAILURE-MEMORY FEEDBACK LOOP BUILT + WIRED INTO THE CURATOR INSTEAD (2026-07-10, later session) -- read this before assuming the "AUTOMATED VISION QA REVIEWER" banner below is still the active direction
+>
+> **Explicit decision, not a technical dead end:** after the Anthropic
+> credential could not be made visible to any tool process (checked
+> Bash env, PowerShell env, Windows User registry, and Windows System
+> registry -- all four came back absent, twice, across two separate
+> attempts to fix it), Nicolas explicitly changed direction rather than
+> continuing to debug the credential. **The objective is no longer "pay
+> an API to inspect every image."** It is now: prevent known-bad
+> generations upstream, and reserve visual review for exceptions --
+> "generate well -> learn from real failures -> stop repeating known bad
+> patterns -> review only when actually needed."
+>
+> **`pipeline/qa/lena_vision_reviewer.py` is PARKED, not deleted, not
+> touched.** No Anthropic API call was ever made (confirmed absent
+> credential at every scope checked). It remains uncommitted and
+> untouched, available if this direction is revisited later.
+>
+> **Built instead, this session, and validated against real data:** the
+> smallest possible failure-memory feedback loop, per Nicolas's explicit
+> evidence discipline (chat history is never machine evidence -- only
+> real, on-disk, schema-valid QA JSON counts):
+> - `pipeline/qa/lena_higgsfield_failure_memory.py` (new) -- a read-only
+>   aggregator. Correlates every real QA record under `pipeline/
+>   asset_review/lena/*/*_qa.json` to its Higgsfield generation manifest
+>   (`pipeline/higgsfield_debug/<date>/<slot_id>/result_manifest.json`) by
+>   date+slot_id, and counts pass/fail per `(lane, pose_body_language_id)`
+>   pattern key -- deliberately narrow, no wardrobe/expression/environment
+>   dimensions added without direct evidence they're needed. No new
+>   persisted file, no new schema, no database -- purely a correlation
+>   over two artifact types that already exist. Evidence discipline (all
+>   proven by focused tests, not just documented): 1 structured failure =
+>   soft-flag only, never excluded; 2+ failures with 0 passes = hard
+>   exclude; any real pass on a pattern means it's never hard-excluded
+>   regardless of fail count; a QA record with no matching Higgsfield
+>   manifest (e.g. Kling-era) is skipped with an explicit diagnostic, never
+>   guessed at; a QA record that fails `validate_qa_result()` is skipped,
+>   never counted as evidence.
+> - Wired into `tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py`'s
+>   `curate_top_prompts()` -- hard-excluded patterns are appended into the
+>   exact same `exclude_reasons` path an existing safety/quality failure
+>   uses; soft-flagged patterns are attached to the candidate as
+>   `failure_memory_flag` for visibility, never silently excluded. Does
+>   **not** touch `_hard_exclude_reasons()` itself, the Higgsfield
+>   executor, `lena_photo_qa.py`, or Rule Zero.
+> - **Validated against the real 3-record dataset**: `(city bench,
+>   pose_p012)` -> soft-flagged (exactly 1 real structured failure on
+>   disk today, even though the true observed history this session is
+>   2/2 -- the first failed live attempt was never formally saved/QA'd
+>   through the schema, so it correctly does NOT count as machine
+>   evidence). `(sidewalk dinner, pose_p003)` and `(rooftop sunset,
+>   pose_p018)` -> not flagged, not excluded. Zero hard-excludes produced
+>   from the current dataset, exactly as expected from n=1 evidence. Ran
+>   the real curator against the same 120-candidate pool used earlier this
+>   session -- identical validation counts/distributions confirm zero
+>   regression; the soft-flagged city-bench candidate is still selected in
+>   the top-10 output, with the flag visibly printed, proving downrank-by-
+>   visibility (not silent avoidance) actually works end-to-end.
+> - 6 focused tests, all passing, against synthetic fixture data (not the
+>   real repo data): 1 fail/0 pass -> soft flag; 2 fails/0 pass -> hard
+>   exclude; 2 fails/1 pass -> not hard-excluded; missing manifest ->
+>   explicit skip diagnostic; invalid QA record -> not treated as evidence;
+>   unrelated (non-Higgsfield) QA records do not contaminate other
+>   patterns' counts.
+>
+> **Real bug found -- FIXED this session (approved, narrow):** the 8
+> pre-existing Kling-era QA records (2026-07-04 through 2026-07-07) had
+> started failing `validate_qa_result()`, because
+> `pose_action_scene_compliance` (added earlier this session, `f0dbb03a`)
+> had no legacy-schema exemption the way `production_scoring`/the Allure
+> Gate fields do. **Fix:** a new
+> `LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE = {"1", "2"}`
+> constant (all 8 legacy records are stamped "1" or "2"; none are "3", so
+> no new `SCHEMA_VERSION` bump was needed) plus one narrow change to
+> `validate_qa_result()`'s checklist-presence loop: absence of this one
+> field is not an error for a "1"/"2"-stamped record, but if the field IS
+> present on a legacy record it is still fully validated and still gates
+> `overall` normally -- the exemption covers outright absence only.
+> Validated: a new (v3) record missing the field is still correctly
+> invalid; fail+pass is still correctly invalid; fail+fail is still
+> correctly valid; all 3 real Higgsfield records still validate; all 8
+> legacy records now validate cleanly (skip reason in the failure-memory
+> aggregator correctly changed from "invalid" to "not Higgsfield"); two
+> deliberately-broken sanity records (an unrelated missing field on both a
+> v3 and a legacy record) are still correctly rejected, proving the fix
+> isn't overly broad. Failure-memory's 6 focused tests and the real
+> 120-candidate curator regression check were both re-run after this fix
+> -- byte-identical results to before (soft-flag `[('city bench',
+> 'pose_p012')]`, hard-exclude `[]`, 120/120 across every gate). No new
+> `SCHEMA_VERSION`, no weakening of any other hard-gating field, no
+> silent rewrite of any on-disk legacy QA file.
+>
+> **Next approved step, not yet started:** none formally approved yet --
+> Nicolas should decide whether to (a) fix the legacy-QA-validation
+> regression just found, (b) extend failure-memory pattern keys beyond
+> `(lane, pose_body_language_id)` once more real evidence exists, (c) wire
+> Rule Zero to Higgsfield slots, or (d) something else. Do not assume any
+> of these are pre-approved.
+>
+> No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`
+> change, no Anthropic API call, no credential exposure, no unrelated edit,
+> and no commit occurred producing this checkpoint.
+
+> ## ⚠️ AUTOMATED VISION QA REVIEWER BUILT + VALIDATED, BLOCKED ON A MISSING `ANTHROPIC_API_KEY` -- ZERO LIVE ANTHROPIC CALLS MADE YET (2026-07-10, later session) -- read this before assuming the "FIRST REAL HIGGSFIELD LIVE EXECUTOR PROOF" banner below is the most recent checkpoint
+>
+> **Committed at `f0dbb03a`** (`feat: bridge Higgsfield outputs into Lena visual QA`):
+> one new hard-gating QA checklist field, `pose_action_scene_compliance`
+> (`pipeline/qa/lena_photo_qa.py`), generalizing the seated-vs-standing
+> failure proven twice on `readypack0709-pack008-07-photo` into "rendered
+> physical state/action must not contradict what the scene explicitly
+> requires" -- no special-cased city-bench rule, no validator change needed
+> (the existing hard-gating loop is already generic over the checklist-key
+> list). A new Higgsfield-aware QA bridge
+> (`tools/lena_higgsfield_qa_bridge_v1.py`) resolves a real
+> `pipeline/higgsfield_debug/<date>/<slot_id>/result_manifest.json` + saved
+> image into the same schema Kling slots already use -- no parallel QA
+> system. Real, validated QA verdicts recorded for the 3 Soul 2.0 images
+> generated this session: city bench = **fail** (pose contradiction, sole
+> gating reason), sidewalk dinner and rooftop sunset = **pass with
+> documented caveats** (hand ambiguity, wardrobe-cutout interpretation,
+> minor body-anchor softness), all produced by direct Claude visual review,
+> `reviewed_by` states this explicitly, not an automated judge.
+>
+> **Uncommitted, built and validated this session, NOT yet live-proven:**
+> `pipeline/qa/lena_vision_reviewer.py` -- a separate module (Higgsfield
+> executor, the QA bridge, `lena_photo_qa.py`, and Rule Zero all untouched)
+> automating exactly 3 of the 10 checklist fields --
+> `pose_action_scene_compliance`, `hands_anatomy_sanity`,
+> `environment_realism_scene_coherence` -- via one Anthropic
+> (`claude-sonnet-5`) vision call per image, using tool-use for strict
+> structured output. Identity/skin (require canonical Lena reference images
+> Higgsfield doesn't capture yet -- a real, disclosed gap) and all
+> `production_scoring` fields are deliberately left `unreviewed`. **Hard
+> design rule, proven in code, not just documented:** this module can never
+> produce `overall: "pass"` by itself -- only `"fail"` (real hard-gating
+> failure found) or `"unreviewed"` (record still incomplete), since 7 of 10
+> checklist fields and all of `production_scoring` remain unjudged after it
+> runs. Validated **only** against simulated (hand-written, not model-
+> generated) responses run through the real parser/merge/`validate_qa_result()`
+> path for all 3 known images -- proves the plumbing is correct, proves
+> nothing about real model behavior yet. One real bug found+fixed during
+> this validation: schema v3 requires a non-empty
+> `production_scoring.feed_worthy_reason` once `overall` is finalized; the
+> merge function now states honestly that hook/aesthetic quality "was not
+> assessed by this automated pass" rather than fabricating a judgment.
+>
+> **Crossed the install boundary, blocked at the credential boundary:**
+> `anthropic==0.116.0` is now installed in `C:\Python314` (system Python
+> 3.14.5, the same interpreter used for every Higgsfield/QA operation this
+> session -- none of the repo's special-purpose venvs are relevant here).
+> **`ANTHROPIC_API_KEY` is confirmed absent** -- checked three independent
+> ways (Bash tool process env, PowerShell tool process env, and the
+> Windows **User**-scope registry environment store directly via
+> `[System.Environment]::GetEnvironmentVariable(..., "User")`, which rules
+> out a subprocess-inheritance issue, not just a "restart didn't propagate"
+> guess). Presence was checked only -- the value was never printed, echoed,
+> logged, or exposed at any point. **Zero live Anthropic API calls have
+> been made.** Nicolas twice reported setting the key (once via unspecified
+> means, once explicitly as a persistent Windows User environment variable
+> with a Claude Code restart) and both times it was still not found at
+> registry level -- this remains genuinely unresolved, not a proven-fixed
+> issue, and the next session should not assume the key is now set without
+> re-checking presence first.
+>
+> **Next approved step, not yet done:** re-check `ANTHROPIC_API_KEY`
+> presence (User *and* System registry scope this time -- System scope was
+> never checked). If present, make exactly the one previously-approved live
+> call against `readypack0709-pack008-07-photo` only (no retry, no second
+> candidate, no batch), through the already-built, already-validated
+> `pipeline/qa/lena_vision_reviewer.py`, and report per the acceptance
+> criteria already specified (does the model correctly detect
+> standing-vs-seated and return `pose_action_scene_compliance: fail`).
+>
+> No render, no Higgsfield/Kling call, no publish, no queue/R2/`.env`
+> change (no `.env` file was created or modified at any point despite the
+> credential work), no unrelated edit, and no commit occurred producing
+> this checkpoint beyond the `f0dbb03a` commit already described above and
+> the `anthropic` package install.
+
 > ## ✅ FIRST REAL HIGGSFIELD LIVE EXECUTOR PROOF -- 1 REAL IMAGE, 2 EXECUTOR BUGS FOUND+FIXED, FREE-GENERATION BILLING LEFT EXPLICITLY UNRESOLVED (2026-07-10) -- read this before assuming any Higgsfield banner below is current
 >
 > **A dedicated, safety-gated Higgsfield CLI executor now exists and has been

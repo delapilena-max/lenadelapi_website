@@ -9,7 +9,47 @@
 
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-10 (checkpoint: a real, dry-run-default, safety-gated Higgsfield CLI executor was built, first committed at `3f7719a6`, then live-proven for the first time -- one real Lena image generated via `text2image_soul_v2`, confirmed via account transaction/job-list lookups. Two real executor bugs were found and fixed from that one live call: a Windows `subprocess`/`PATHEXT` executable-resolution failure (zero provider contact, zero spend), and a recursive result-URL-collection bug that mistook an unrelated style-preset thumbnail URL for a second generation output. The live image itself was visually strong on identity/wardrobe/environment/realism/hook but failed its own seated-pose stress test and showed a hand defect -- real visual QA on real renders remains mandatory. A full 83-transaction forensic investigation into the account's "2938 free Soul 2.0 generations" was run and every tested throttle/pacing/quota hypothesis was disproven by concrete counter-examples; the free-vs-paid billing mechanism remains explicitly unresolved, not solved, and is being treated as a separate provider-entitlement question, not an engineering gap. Full detail: `NEXT_SESSION_START.md`'s top banner.)
+**Last updated:** 2026-07-10, later session (direction change: after the Anthropic credential could not be found at any checked scope across two attempts, Nicolas explicitly parked the automated-vision branch and redirected to a prevention-first, evidence-driven approach. Built and validated this session: `pipeline/qa/lena_higgsfield_failure_memory.py`, a small read-only aggregator correlating existing QA records to existing Higgsfield generation manifests by `(lane, pose_body_language_id)`, wired into the real curator (`tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py`) so repeated real failures get excluded and one-off failures get flagged, not silently avoided. No new schema, no new persisted file, no database. `pipeline/qa/lena_vision_reviewer.py` remains parked, untouched, uncommitted -- no Anthropic API call was ever made. A real backward-compatibility bug found the same session was also fixed, narrowly, with explicit approval: `pose_action_scene_compliance` (added `f0dbb03a`) had broken `validate_qa_result()` for all 8 pre-existing Kling-era QA records (no legacy-schema exemption for the base checklist); a new `LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE = {"1","2"}` set fixes it without a new `SCHEMA_VERSION` bump, without weakening any other hard-gating field, and without rewriting any on-disk legacy file. Full detail: `NEXT_SESSION_START.md`'s top banner.)
+
+> **FAILURE-MEMORY FEEDBACK LOOP BUILT + WIRED INTO THE CURATOR; ANTHROPIC
+> BRANCH PARKED (2026-07-10, later session, read this before assuming the
+> "AUTOMATED VISION QA REVIEWER" entry below is still the active
+> direction):** Full detail: `NEXT_SESSION_START.md`'s top banner -- not
+> restated here to avoid drift. Summary only: the objective changed from
+> "pay an API to inspect every image" to "prevent known-bad generations
+> upstream, review only when actually needed." `pipeline/qa/lena_vision_
+> reviewer.py` is parked, not deleted -- zero Anthropic API calls were ever
+> made (credential confirmed absent at Bash env, PowerShell env, Windows
+> User registry, and Windows System registry, all four, twice). New:
+> `pipeline/qa/lena_higgsfield_failure_memory.py` -- read-only, no new
+> schema/file/database, correlates `pipeline/asset_review/lena/*/*_qa.json`
+> to `pipeline/higgsfield_debug/<date>/<slot_id>/result_manifest.json` by
+> `(lane, pose_body_language_id)`. Evidence discipline: 1 structured
+> failure = soft-flag only; 2+ failures with 0 passes = hard exclude; any
+> real pass disqualifies a hard exclude regardless of fail count; chat
+> history is never evidence, only real on-disk schema-valid QA JSON.
+> Wired into `curate_top_prompts()` -- hard excludes join the existing
+> `exclude_reasons` path, soft flags attach as `failure_memory_flag` for
+> visibility without blocking selection. Validated against the real
+> 3-record dataset (`(city bench, pose_p012)` -> soft-flagged only, exactly
+> matching the "true history is 2/2 but only 1 is formally on disk"
+> evidence rule) and against the real 120-candidate pool (zero regression,
+> soft-flagged candidate still selected with the flag visibly printed). 6
+> focused tests pass against synthetic fixtures covering the full
+> threshold matrix. Real bug found AND FIXED same session (explicit
+> approval, narrow): the 8 pre-existing Kling-era QA records had started
+> failing `validate_qa_result()` because the new checklist field had no
+> legacy-schema exemption -- fixed via `LEGACY_SCHEMA_VERSIONS_WITHOUT_
+> POSE_ACTION_SCENE_COMPLIANCE = {"1","2"}` (no new `SCHEMA_VERSION`
+> needed, since all 8 records are "1"/"2", none are "3"); absence of the
+> field is exempted only for those versions, presence still fully
+> validates/gates normally. Re-validated: new-record-missing-field still
+> invalid, fail+pass still invalid, fail+fail still valid, all 3 real
+> Higgsfield records still valid, all 8 legacy records now valid, two
+> deliberately-broken sanity checks still correctly rejected. Failure-
+> memory's 6 tests and the 120-candidate curator regression check were
+> both re-run after the fix -- byte-identical results. No next step is
+> pre-approved yet.
 
 > **FIRST REAL HIGGSFIELD LIVE EXECUTOR PROOF (2026-07-10, read this before
 > assuming the "HIGGSFIELD PRODUCTION-READINESS HARDENING" entry below is

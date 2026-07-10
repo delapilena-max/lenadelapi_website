@@ -47,6 +47,22 @@ LEGACY_SCHEMA_VERSIONS_WITHOUT_PRODUCTION_SCORING = {"1"}
 # must keep validating exactly as they did before this patch.
 LEGACY_SCHEMA_VERSIONS_WITHOUT_ALLURE_GATE = {"1", "2"}
 
+# schema_version values that predate the pose_action_scene_compliance
+# checklist field (2026-07-10). Backward-compatibility fix, found and
+# corrected the same day the field was added: the base `checklist` loop in
+# validate_qa_result() has never had a legacy-exemption mechanism the way
+# production_scoring/the Allure Gate fields do, so adding this field to
+# QA_CHECKLIST_FIELDS silently broke validation of every pre-existing QA
+# record on disk (8 real records, all schema_version "1" or "2" -- none are
+# "3", so no new SCHEMA_VERSION bump is needed; the existing "1"/"2"
+# boundary already exactly separates old from new). Existing "1"/"2" QA
+# files on disk are never migrated or rewritten -- this only changes
+# whether the field's *absence* is treated as an error for them. If a
+# legacy record happens to already have this field (e.g. a future manual
+# edit), it is still fully validated normally, including gating overall on
+# a "fail" status -- the exemption applies only to outright absence.
+LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE = {"1", "2"}
+
 ROOT = Path(__file__).resolve().parents[2]
 ASSET_REVIEW_ROOT = ROOT / "pipeline" / "asset_review" / "lena"
 
@@ -86,8 +102,12 @@ QA_CHECKLIST_FIELDS: Tuple[Tuple[str, str], ...] = (
     # interaction, etc.). Hard-gating by construction: it is a plain member
     # of QA_CHECKLIST_KEYS, not listed in DIAGNOSTIC_ONLY_CHECKLIST_KEYS, so
     # it is automatically included in HARD_GATING_CHECKLIST_KEYS and in
-    # validate_qa_result()'s existing false-green loop below -- no separate
-    # validator change was needed for this field to gate.
+    # validate_qa_result()'s existing false-green loop below. Correction
+    # (2026-07-10, same day): adding this field DID silently break
+    # validation of every pre-existing QA record on disk, since the base
+    # checklist-presence loop had no legacy-exemption mechanism -- see
+    # LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE above and
+    # its use in validate_qa_result() for the narrow fix.
     ("pose_action_scene_compliance", "Pose/action-scene compliance (rendered physical state/action must not contradict what the scene explicitly requires, e.g. seated vs standing, holding vs not holding, walking vs static, mirror/eating/driving logic)"),
 )
 QA_CHECKLIST_KEYS = tuple(key for key, _ in QA_CHECKLIST_FIELDS)
@@ -222,8 +242,17 @@ def validate_qa_result(qa: Dict[str, Any]) -> Tuple[bool, List[str]]:
         errors.append("missing or invalid 'checklist' object")
         checklist = {}
 
+    schema_version = qa.get("schema_version")
     for key in QA_CHECKLIST_KEYS:
         entry = checklist.get(key)
+        if entry is None and key == "pose_action_scene_compliance" and (
+            schema_version in LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE
+        ):
+            # Legacy record predates this field entirely -- absence is not
+            # an error. If the field IS present (even on a "1"/"2" record),
+            # it falls through to normal validation below, including
+            # gating -- this exemption covers outright absence only.
+            continue
         if not isinstance(entry, dict):
             errors.append(f"checklist.{key} is missing or not an object")
             continue

@@ -48,6 +48,18 @@ if str(DIAGNOSTICS_DIR) not in sys.path:
 # no file writes -- same hard constraints as the single-pack tool.
 from lena_higgsfield_photo_dump_dryrun import build_report  # noqa: E402
 
+# Read-only failure-memory feedback loop (2026-07-10), reusing only
+# already-existing, already-written artifacts (pipeline/asset_review/lena/
+# *_qa.json + pipeline/higgsfield_debug/.../result_manifest.json) -- no new
+# persisted file, no new schema, no database. See pipeline/qa/
+# lena_higgsfield_failure_memory.py's module docstring for the full
+# evidence discipline (1 fail = soft flag only, 2+ fails with 0 passes =
+# hard exclude, chat history is never evidence).
+from pipeline.qa.lena_higgsfield_failure_memory import (  # noqa: E402
+    compute_higgsfield_failure_memory,
+    pattern_key_for_image,
+)
+
 from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
@@ -876,14 +888,40 @@ def curate_top_prompts(library: dict, select_top: int) -> dict:
     (DEFAULT_DIVERSITY_CAPS), relaxing caps in DIVERSITY_RELAXATION_ORDER only
     if the strict cap set can't fill select_top. Selection never re-scores or
     loosens the hard-validation gate -- diversity only decides *which*
-    already-hot, already-valid prompts get picked."""
+    already-hot, already-valid prompts get picked.
+
+    Also consults the read-only Higgsfield failure-memory aggregator
+    (pipeline/qa/lena_higgsfield_failure_memory.py): a (lane,
+    pose_body_language_id) pattern with 2+ real structured QA failures and
+    zero passes is hard-excluded here, the same way an existing safety/
+    quality failure is -- reasons are appended into exclude_reasons, same
+    path, same accounting. A pattern with exactly 1 structured failure is
+    never excluded, only flagged (candidate["failure_memory_flag"]) so a
+    human/Claude reviewing the curation output can see it without the
+    curator silently avoiding it on a single data point."""
+    failure_memory = compute_higgsfield_failure_memory()
+    hard_excluded_patterns = set(failure_memory["hard_excluded_patterns"])
+    soft_flagged_patterns = set(failure_memory["soft_flagged_patterns"])
+
     candidates = []
     excluded_count = 0
+    failure_memory_excluded_count = 0
     for pack_report in library["pack_reports"]:
         for image in pack_report["images"]:
-            exclude_reasons = _hard_exclude_reasons(image)
+            exclude_reasons = list(_hard_exclude_reasons(image))
+            pattern_key = pattern_key_for_image(image)
+            if pattern_key is not None and pattern_key in hard_excluded_patterns:
+                lane, pose_id = pattern_key
+                counts = failure_memory["pattern_counts"].get(f"{lane}::{pose_id}", {})
+                exclude_reasons.append(
+                    f"failed: failure-memory hard exclude -- pattern (lane={lane!r}, "
+                    f"pose_body_language_id={pose_id!r}) has {counts.get('fail', '?')} real "
+                    f"structured QA failures and {counts.get('pass', '?')} passes"
+                )
             if exclude_reasons:
                 excluded_count += 1
+                if pattern_key is not None and pattern_key in hard_excluded_patterns:
+                    failure_memory_excluded_count += 1
                 continue
             segments = _extract_prompt_segments(image["image_prompt"])
             wardrobe_score, wardrobe_reasons = _score_wardrobe(image, segments)
@@ -913,6 +951,16 @@ def curate_top_prompts(library: dict, select_top: int) -> dict:
                     "capping, not the catalog field)"
                 )
 
+            failure_memory_flag = None
+            if pattern_key is not None and pattern_key in soft_flagged_patterns:
+                lane, pose_id = pattern_key
+                counts = failure_memory["pattern_counts"].get(f"{lane}::{pose_id}", {})
+                failure_memory_flag = (
+                    f"1 real structured QA failure on this exact pattern (lane={lane!r}, "
+                    f"pose_body_language_id={pose_id!r}), 0 passes -- not enough evidence "
+                    "to exclude, flagged for visibility only"
+                )
+
             candidates.append(
                 {
                     "image": image,
@@ -931,6 +979,7 @@ def curate_top_prompts(library: dict, select_top: int) -> dict:
                     "broad_scene_group": _broad_scene_group_for_lane(image["lane"]),
                     "effective_wardrobe_class": effective_wardrobe_class,
                     "effective_wardrobe_note": effective_wardrobe_note,
+                    "failure_memory_flag": failure_memory_flag,
                 }
             )
 
@@ -959,11 +1008,23 @@ def curate_top_prompts(library: dict, select_top: int) -> dict:
         "constraints_relaxed": constraints_relaxed,
         "skipped": skipped,
         "near_duplicate_skip_count": len(near_duplicate_skips),
+        "failure_memory_hard_excluded_patterns": sorted(hard_excluded_patterns),
+        "failure_memory_soft_flagged_patterns": sorted(soft_flagged_patterns),
+        "failure_memory_excluded_count": failure_memory_excluded_count,
+        "failure_memory_skipped_record_count": len(failure_memory["skipped"]),
     }
 
 
 def print_curation_report(curation: dict, show_selected_prompts: bool) -> None:
     print("\n=== Multi-axis model-hook curation (with archetype diversity) ===\n")
+    print(
+        f"failure memory: {curation['failure_memory_skipped_record_count']} pre-existing QA "
+        "record(s) not usable as Higgsfield evidence (non-Higgsfield or invalid, see "
+        "pipeline/qa/lena_higgsfield_failure_memory.py for reasons)"
+    )
+    print(f"failure memory: hard-excluded patterns (2+ fails, 0 passes): {curation['failure_memory_hard_excluded_patterns']}")
+    print(f"failure memory: soft-flagged patterns (1 fail, 0 passes)   : {curation['failure_memory_soft_flagged_patterns']}")
+    print(f"failure memory: candidates hard-excluded by this signal this run: {curation['failure_memory_excluded_count']}")
     print(f"candidates considered (passed hard validation): {curation['candidate_count']}")
     print(f"hard-excluded (failed validation)              : {curation['excluded_count']}")
     print(f"requested top-N                                : {curation['select_top']}")
@@ -994,6 +1055,8 @@ def print_curation_report(curation: dict, show_selected_prompts: bool) -> None:
         )
         if cand["effective_wardrobe_note"]:
             print(f"    wardrobe note: {cand['effective_wardrobe_note']}")
+        if cand.get("failure_memory_flag"):
+            print(f"    !! failure memory flag: {cand['failure_memory_flag']}")
         print(f"    wardrobe_score={cand['wardrobe_score']}: {cand['wardrobe_reasons']}")
         print(f"    pose_score={cand['pose_score']}: {cand['pose_reasons']}")
         print(f"    expression_score={cand['expression_score']}: {cand['expression_reasons']}")
