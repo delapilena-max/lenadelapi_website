@@ -315,6 +315,13 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
                 "soul_selection_mode": package["soul_selection_mode"],
                 "validation": validation,
                 "image_prompt": package["image_prompt"],
+                # Forwarded (2026-07-10), purely additive: the real
+                # camera_text/lighting_text generate_higgsfield_prompt_package()
+                # now exposes, so pipeline/higgsfield_lena_api_executor.py's
+                # resolve_prompt_source() -> build_manifest() chain can persist
+                # them without re-parsing image_prompt.
+                "camera_text": package.get("camera_text"),
+                "lighting_text": package.get("lighting_text"),
             }
         )
 

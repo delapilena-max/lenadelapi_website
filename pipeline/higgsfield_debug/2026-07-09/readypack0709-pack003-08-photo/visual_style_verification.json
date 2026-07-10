@@ -1,0 +1,24 @@
+{
+  "schema_version": "1",
+  "verified_at_utc": "2026-07-10T14:10:13+00:00",
+  "provider": "higgsfield",
+  "date": "2026-07-09",
+  "slot_id": "readypack0709-pack003-08-photo",
+  "recovery_method": "Deterministic local regeneration only -- pipeline.higgsfield_lena_api_executor.resolve_prompt_source() was called locally (no network, no Higgsfield CLI call, no credit spend, no image generation) to reproduce the exact accepted prompt package for this slot via the same seeded generator (generate_higgsfield_prompt_package()) originally used to build it. camera_text and lighting_text are accepted as real historical values ONLY because the regenerated image_prompt's SHA-256 matches the original committed manifest's prompt_sha256 exactly, byte-for-byte -- this is the same integrity pattern pipeline.higgsfield_lena_api_executor.validate_candidate()'s own prompt_matches_expected check already relies on elsewhere in this codebase. No heuristic parsing of the final prompt string was performed to obtain these values -- they came directly from the regenerated prompt package's own camera_text/lighting_text fields (pipeline/prompting/lena_prompt_brain.py's generate_higgsfield_prompt_package(), added 2026-07-10).",
+  "original_prompt_sha256": "d74a5638f7613d4d0329c54c1a9c65d4aa9c14a9e3723ffa749cceae2741631c",
+  "regenerated_prompt_sha256": "d74a5638f7613d4d0329c54c1a9c65d4aa9c14a9e3723ffa749cceae2741631c",
+  "prompt_hash_match": true,
+  "camera_text": "candid full-body fashion photo, 35mm or 50mm lens, vertical 9:16, natural friend-shot composition",
+  "lighting_text": "golden-hour backlight, warm rim light, soft face fill",
+  "visual_style": "candid full-body fashion photo, 35mm or 50mm lens, vertical 9:16, natural friend-shot composition; golden-hour backlight, warm rim light, soft face fill",
+  "verification_result": "pass",
+  "checks_passed": [
+    "original_manifest_exists_and_parses",
+    "prompt_source_regenerated_successfully",
+    "provider_matches_higgsfield",
+    "manifest_slot_id_matches_requested",
+    "regenerated_prompt_sha256_matches_original_exactly",
+    "camera_text_recovered",
+    "lighting_text_recovered"
+  ]
+}

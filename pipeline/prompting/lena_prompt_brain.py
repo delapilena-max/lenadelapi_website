@@ -4774,6 +4774,14 @@ def generate_higgsfield_prompt_package(
         # generate_higgsfield_photo_dump_pack() can make scene-aware
         # decisions (e.g. pose selection) without re-parsing image_prompt.
         "scene_action": scene_action,
+        # Exposed (2026-07-10) so callers can build a real, non-fabricated
+        # visual_style value (matching the Kling package builder's own
+        # f"{camera}; {lighting}" convention) without re-parsing the
+        # "Camera: .../Lighting: ..." sentences out of image_prompt. Purely
+        # additive -- these are the exact same local variables already used
+        # to build image_prompt above, not recomputed or reinterpreted.
+        "camera_text": camera_text,
+        "lighting_text": lighting_text,
         "image_prompt": image_prompt,
         "prompt": image_prompt,
         "positive_prompt": image_prompt,

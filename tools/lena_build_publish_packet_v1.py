@@ -253,6 +253,12 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "lane": metadata.get("lane"),
         "activity": slot.get("activity") or metadata.get("activity"),
         "pose": slot.get("pose") or metadata.get("pose"),
+        # Real Kling workorder slots already carry a genuine visual_style
+        # value (pipeline/prompting/lena_prompt_brain.py's workorder-building
+        # code sets both slot["visual_style"] and metadata["visual_style"]
+        # from the package's own f"{camera}; {lighting}" value) -- this was
+        # simply never read here before. Not a new/derived value.
+        "visual_style": slot.get("visual_style") or metadata.get("visual_style"),
         "reference_binding_mode": metadata.get("reference_binding_mode"),
         "avatar_nickname": avatar_nickname,
         "image_engine": image_engine,
@@ -282,6 +288,65 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
 # image, missing required provider/job/prompt metadata, or any Rule Zero
 # failure (missing/invalid/inconsistent QA, or overall != "pass"). Never
 # falls back to the Kling resolver for any reason.
+
+def _resolve_higgsfield_visual_style(manifest: Dict[str, Any], date_str: str, slot_id: str) -> Optional[str]:
+    """Read-only, local-only (no network, no provider call). Returns a real,
+    non-fabricated visual_style string (f"{camera_text}; {lighting_text}",
+    matching the Kling package builder's own convention), or None if no
+    truthful source exists. Preferred source order, no other fallback:
+
+    1. camera_text/lighting_text persisted directly in the manifest (renders
+       generated after 2026-07-10, once pipeline/higgsfield_lena_api_executor.py's
+       build_manifest() started persisting them).
+    2. For historical renders only, a local visual_style_verification.json
+       evidence file at pipeline/higgsfield_debug/<date>/<slot_id>/ --
+       independently re-validated here, never trusted blindly: provider,
+       date, and slot_id must match; the evidence's own
+       original_prompt_sha256 must match THIS manifest's real prompt_sha256
+       (ties the evidence to this exact render, not just a file that
+       happens to sit at the expected path); regenerated_prompt_sha256 must
+       equal original_prompt_sha256; prompt_hash_match must be True;
+       verification_result must be "pass".
+
+    No lane-based inference, no prompt-string parsing, no generic default --
+    returns None (never a fabricated value) if neither source is valid."""
+    camera_text = manifest.get("camera_text")
+    lighting_text = manifest.get("lighting_text")
+    if camera_text and lighting_text:
+        return f"{camera_text}; {lighting_text}"
+
+    evidence_path = ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "visual_style_verification.json"
+    if not evidence_path.exists():
+        return None
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return None
+    if not isinstance(evidence, dict):
+        return None
+
+    if evidence.get("provider") != "higgsfield":
+        return None
+    if evidence.get("date") != date_str:
+        return None
+    if evidence.get("slot_id") != slot_id:
+        return None
+    if evidence.get("original_prompt_sha256") != manifest.get("prompt_sha256"):
+        return None
+    if evidence.get("regenerated_prompt_sha256") != evidence.get("original_prompt_sha256"):
+        return None
+    if evidence.get("prompt_hash_match") is not True:
+        return None
+    if evidence.get("verification_result") != "pass":
+        return None
+
+    evidence_camera_text = evidence.get("camera_text")
+    evidence_lighting_text = evidence.get("lighting_text")
+    if not evidence_camera_text or not evidence_lighting_text:
+        return None
+
+    return f"{evidence_camera_text}; {evidence_lighting_text}"
+
 
 def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Dict[str, Any]:
     """Read-only. Higgsfield counterpart to resolve_packet_inputs(). Raises
@@ -405,6 +470,7 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         # invented concept.
         "activity": manifest.get("lane"),
         "pose": manifest.get("pose_text"),
+        "visual_style": _resolve_higgsfield_visual_style(manifest, date_str, slot_id),
         "reference_binding_mode": manifest.get("reference_binding_mode"),
         "avatar_nickname": cli_soul_name,
         "image_engine": image_engine,
@@ -701,20 +767,20 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
     if resolved.get("reference_binding_mode"):
         metadata["reference_binding_mode"] = resolved["reference_binding_mode"]
     # Provider-agnostic enrichment forwarding (2026-07-10): both resolvers
-    # already carry real activity/pose values in `resolved` (Kling: from the
-    # real workorder slot's own metadata; Higgsfield: from the manifest's
-    # 'lane' and 'pose_text') -- this was simply never copied into the queue
-    # draft's metadata before now. No fabricated default: absent entirely if
-    # `resolved` doesn't have a real value. visual_style is deliberately NOT
-    # forwarded here -- no real source field exists for it in the Higgsfield
-    # manifest/package data (only Kling's package builder computes a
-    # distinct visual_style value; Higgsfield's camera/lighting text is never
-    # exposed as its own field anywhere), so it is not populated rather than
-    # invented.
+    # already carry real activity/pose/visual_style values in `resolved`
+    # (Kling: from the real workorder slot's own metadata; Higgsfield: from
+    # the manifest's 'lane'/'pose_text', and visual_style from either the
+    # manifest's own camera_text/lighting_text or a validated historical
+    # visual_style_verification.json -- see
+    # _resolve_higgsfield_visual_style()) -- this was simply never copied
+    # into the queue draft's metadata before now. No fabricated default:
+    # absent entirely if `resolved` doesn't have a real value.
     if resolved.get("activity"):
         metadata["activity"] = resolved["activity"]
     if resolved.get("pose"):
         metadata["pose"] = resolved["pose"]
+    if resolved.get("visual_style"):
+        metadata["visual_style"] = resolved["visual_style"]
     # Conditional, additive-only: absent entirely for the existing Kling path
     # (resolve_packet_inputs() never sets resolved["provider"]/
     # ["custom_reference_id"]/["resolution"], and debug_artifacts there never

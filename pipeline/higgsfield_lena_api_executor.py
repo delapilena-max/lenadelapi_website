@@ -418,6 +418,15 @@ def build_manifest(
         "pose_body_language_id": image.get("pose_body_language_id"),
         "pose_body_language_label": image.get("pose_body_language_label"),
         "pose_text": _extract_pose_text(prompt),
+        # Persisted (2026-07-10) so a real, non-fabricated visual_style
+        # (f"{camera_text}; {lighting_text}", matching the Kling package
+        # builder's own convention) can be built later without re-parsing
+        # the "Camera: .../Lighting: ..." sentences out of image_prompt.
+        # None (not a fabricated default) if the source package predates
+        # this field -- same optional-field convention as pose_body_
+        # language_id/expression_gaze_id above.
+        "camera_text": image.get("camera_text"),
+        "lighting_text": image.get("lighting_text"),
         "expression_gaze_id": image.get("expression_gaze_id"),
         "expression_gaze_label": image.get("expression_gaze_label"),
         "expression_text": image["validation"]["final_expression_text"],
