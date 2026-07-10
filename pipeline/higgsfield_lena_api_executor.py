@@ -72,6 +72,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -279,25 +280,41 @@ def _sanitize_url(url: str) -> str:
     return f"{p.scheme}://{p.netloc}{p.path[:24]}...<redacted len={len(url)}>"
 
 
-def _collect_result_urls(obj: Any) -> list[str]:
-    """Generic walk collecting http(s) URL-shaped strings from the parsed
-    --json response, independent of exact key names -- the real response
-    schema for `generate create ... --wait --json` was not confirmed during
-    the read-only contract inspection (only `generate cost` was safely
-    exercised), so this does not assume a specific field name."""
-    urls: list[str] = []
+def _canonical_result_urls(obj: Any) -> list[str]:
+    """Extracts only the canonical top-level 'result_url' field(s) from a
+    completed Higgsfield job response -- never recurses into nested
+    structures. Evidence (2026-07-10, real completed text2image_soul_v2 job,
+    via the safe read-only `generate list --image --json` lookup): a job
+    object has exactly one real generation output, 'result_url' (the
+    full-res image), alongside 'min_result_url' (a thumbnail -- not treated
+    as a result) and an unrelated 'params.style.url' (the style preset's own
+    CDN thumbnail, not a generation output at all). The prior implementation
+    walked the entire JSON tree for any http(s)-looking string and counted
+    all three, incorrectly triggering the ">1 result URL" fail-closed path
+    on every successful job. This function reads only the top-level
+    'result_url' key -- 'min_result_url' and anything nested (params, style,
+    or otherwise) is never inspected, so it can never be mistaken for a
+    result.
 
-    def walk(value: Any) -> None:
-        if isinstance(value, dict):
-            for v in value.values():
-                walk(v)
-        elif isinstance(value, list):
-            for v in value:
-                walk(v)
-        elif isinstance(value, str) and value.startswith(("http://", "https://")):
+    The raw shape of `generate create ... --wait --json` itself was not
+    captured this session (the live run's stdout was not persisted before
+    the prior version aborted), so this defensively accepts either a single
+    job object or a list containing job objects (matching `generate list`'s
+    shape) -- but in both cases only ever reads 'result_url' at the top
+    level of each candidate object."""
+    if isinstance(obj, dict):
+        candidates = [obj]
+    elif isinstance(obj, list):
+        candidates = [item for item in obj if isinstance(item, dict)]
+    else:
+        candidates = []
+
+    urls: list[str] = []
+    for candidate in candidates:
+        value = candidate.get("result_url")
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
             urls.append(value)
 
-    walk(obj)
     seen: set[str] = set()
     deduped: list[str] = []
     for u in urls:
@@ -437,8 +454,32 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     prompt = image["image_prompt"]
     argv = build_provider_argv(prompt, custom_reference_id)
 
-    print(f"[LIVE] invoking: {_redacted_argv_for_display(argv, prompt)}")
-    result = subprocess.run(argv, capture_output=True, text=True, shell=False, check=False)
+    # Windows fix (2026-07-10): subprocess.run([...], shell=False) calls
+    # CreateProcess directly, which does not perform PATHEXT resolution the
+    # way a shell or shutil.which() does -- a bare "higgsfield" fails with
+    # FileNotFoundError ([WinError 2]) when the real executable on PATH is
+    # higgsfield.CMD. Resolve the actual executable path once, here, right
+    # at the subprocess boundary, and swap only argv[0] -- the logical
+    # provider command contract (build_provider_argv()) is unchanged.
+    resolved_binary = shutil.which(HIGGSFIELD_CLI_BINARY)
+    if not resolved_binary:
+        raise ProviderCallError(
+            f"Could not resolve {HIGGSFIELD_CLI_BINARY!r} via shutil.which() -- "
+            "the Higgsfield CLI does not appear to be on PATH."
+        )
+    resolved_argv = [resolved_binary, *argv[1:]]
+
+    print(f"[LIVE] resolved executable: {resolved_binary}")
+    print(f"[LIVE] invoking: {_redacted_argv_for_display(resolved_argv, prompt)}")
+    try:
+        result = subprocess.run(resolved_argv, capture_output=True, text=True, shell=False, check=False)
+    except OSError as exc:
+        # Narrow catch: only the process-spawn boundary itself, not the
+        # whole function. A spawn failure must fail through the executor's
+        # controlled error path, not surface as an uncaught traceback.
+        raise ProviderCallError(
+            f"Failed to spawn the Higgsfield CLI process ({resolved_binary!r}): {exc}"
+        ) from exc
 
     if result.returncode != 0:
         stderr_tail = (result.stderr or "").strip()[-2000:]
@@ -458,20 +499,21 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
 
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
     status = _find_first_str_field(parsed, ("status",))
-    result_urls = _collect_result_urls(parsed)
+    result_urls = _canonical_result_urls(parsed)
 
     if not result_urls:
         raise ProviderCallError(
-            "No result URL found in provider response -- refusing to "
-            "proceed. Provider response contained no http(s) URL anywhere "
-            "in its JSON structure."
+            "No canonical result_url found in provider response -- "
+            "refusing to proceed. Only the top-level 'result_url' field is "
+            "treated as a generation output; no other field (including "
+            "'min_result_url' or anything nested) is considered."
         )
     if len(result_urls) > 1:
         raise ProviderCallError(
-            f"Provider response contained {len(result_urls)} result URLs; "
-            "the contract for which one is primary was not confirmed "
-            "during the read-only inspection, so this executor refuses to "
-            "silently pick one. Manual review required."
+            f"Provider response contained {len(result_urls)} distinct "
+            "top-level result_url values where exactly one job (and "
+            "therefore exactly one result_url) was expected. This executor "
+            "refuses to silently pick one. Manual review required."
         )
 
     result_url = result_urls[0]

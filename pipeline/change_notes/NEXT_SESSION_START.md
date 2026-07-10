@@ -2,6 +2,86 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+> ## ✅ FIRST REAL HIGGSFIELD LIVE EXECUTOR PROOF -- 1 REAL IMAGE, 2 EXECUTOR BUGS FOUND+FIXED, FREE-GENERATION BILLING LEFT EXPLICITLY UNRESOLVED (2026-07-10) -- read this before assuming any Higgsfield banner below is current
+>
+> **A dedicated, safety-gated Higgsfield CLI executor now exists and has been
+> live-proven once.** `pipeline/higgsfield_lena_api_executor.py` (first
+> committed at `3f7719a6`, docs-only "no live call yet") was built against a
+> real, authenticated `higgsfield` CLI v1.1.10 contract inspection (job type
+> `text2image_soul_v2`; params `prompt`/`custom_reference_id`/`aspect_ratio`/
+> `quality`/`image_references`; Lena's confirmed Soul
+> `id=1f1200e4-1cc9-4504-ac1c-3304b687e3c1`, `name=Lena`, `type=soul_2`).
+> Dry-run is the default; `--live` requires the flag explicitly; one slot per
+> invocation; no batch; fail-closed on every provider/parse/download error.
+>
+> **First controlled live attempt (`readypack0709-pack008-07-photo`) failed
+> before any provider contact**: `subprocess.run(["higgsfield", ...],
+> shell=False)` on Windows does not perform `PATHEXT` resolution the way a
+> shell does, so it couldn't find `higgsfield.CMD`. Zero API contact, zero
+> job creation, zero credit spend on that attempt. Fixed narrowly by
+> resolving the binary via `shutil.which()` at the subprocess boundary only
+> (the logical provider-command contract in `build_provider_argv()` is
+> unchanged), with spawn failures routed through the existing
+> `ProviderCallError` path instead of an uncaught traceback.
+>
+> **Second controlled live attempt succeeded** -- confirmed via account
+> transaction history (`-0.12` credit deduction matching the `generate cost`
+> estimate) and `generate list --json` (real job
+> `3c669124-bb27-4ef3-bcb3-e1363708ab84`, `status: completed`, prompt/
+> `custom_reference_id`/`9:16` all byte/value-exact to the request). **This
+> is the first real pixel this entire Higgsfield build has ever produced.**
+> Visually: strong Lena identity, wardrobe, environment, realism, and hook --
+> but it **failed the seated-pose stress test it was chosen to prove**
+> (`pose_p012` did not visually land; she rendered standing, not seated) and
+> had a **real hand/anatomy defect**. Confirms real visual QA on real
+> renders remains mandatory -- prompt-side correctness does not guarantee
+> provider-side compliance.
+>
+> **That same successful response exposed a second, real executor bug**: the
+> original `_collect_result_urls()` walked the entire parsed JSON tree for
+> any http(s)-looking string and found 3 (the real `result_url`, a
+> `min_result_url` thumbnail, and an unrelated `params.style.url` style-preset
+> asset), incorrectly tripping the ">1 URL" fail-closed path on every
+> successful job. Fixed by reading only the top-level `result_url` field
+> (`_canonical_result_urls()`) -- `min_result_url` and anything nested are
+> never treated as a result. Both fixes validated: `py_compile` clean, a
+> focused in-process extraction test against the real (sanitized) response
+> shape, and a full dry-run re-run for the same slot -- prompt SHA-256
+> (`4927a748eb54883962c351b385b98310e99784e23a12b4af08cf6365bddc9f7c`),
+> `custom_reference_id`, and `job_type` all confirmed byte-identical
+> throughout every step.
+>
+> **Free-generation billing investigation -- deliberately left UNRESOLVED,
+> do not treat as solved:** the Higgsfield UI shows "2938 free Soul 2.0 gens
+> left"; the account's full 83-transaction history (71 Soul V2, 62 billed
+> `$0`, 9 billed `-0.12`) was forensically analyzed. **Confirmed, not
+> inferred:** a free job exists with `batch_size: 1`, conclusively disproving
+> a batch-size theory; free and paid jobs can be identical across every
+> visible recorded parameter; UI-originated activity has produced both free
+> and paid Soul V2 jobs, so "UI=free/CLI=paid" is not a valid rule either.
+> Every rolling-window (1/2/5/10/15/30/60 min), silence-gap, and same-day
+> cumulative-count rule tested was systematically disproven by concrete
+> counter-examples (including our own CLI call being the very first Soul V2
+> generation of its calendar day and still being billed). **No reliable
+> throttle rule can currently be encoded from historical evidence, and no
+> CLI/API-exposed control was found that determines free-vs-paid billing.**
+> There is currently no proven autonomous way to guarantee use of the 2,938
+> free Soul 2.0 generations through the existing CLI. This is an open
+> provider-entitlement question, not an engineering gap in this repo --
+> next step (not yet started) is direct Higgsfield support clarification,
+> not further inference from transaction timing.
+>
+> **Standing decision (Nicolas, 2026-07-10):** the one-shot executor stays
+> simple; billing/economics policy belongs above the executor in a future
+> orchestration/policy layer, never invented from contradictory evidence;
+> the free-generation question is a separate provider question and must not
+> block or freeze the main Lena pipeline indefinitely.
+>
+> No additional live generation, no publish, no queue/R2, no `.env` change,
+> no install/login change, and no credential exposure occurred producing
+> this checkpoint beyond the two live attempts and read-only investigation
+> already described above.
+
 > ## ✅ HIGGSFIELD PRODUCTION-READINESS HARDENING: 5 COMMITS (2026-07-09, later session) — HEAD is now `10f9b1d7`; read this before assuming the "BODY-CONSISTENCY WORKSTREAM CLOSED" banner below is the most recent checkpoint
 >
 > Five narrow, evidence-based fixes landed on the Higgsfield generation

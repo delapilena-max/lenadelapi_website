@@ -9,7 +9,33 @@
 
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-09 (checkpoint: HEAD advanced to `106be898`; expression/gaze wiring and scene-expression compatibility fixed and committed; then 3/3 real production-readiness renders failed body continuity, reopening the "body target is production-ready" question the 2026-07-09 earlier checkpoint had closed; then Nicolas explicitly selected a preferred gold-standard body benchmark from a controlled 9:16/Enhancer-OFF render, narrowing but not closing that question; then the body-consistency workstream was closed for now after a flower-shop three-run test, with the anchor/framing baseline frozen and other prompt-assembly work left open; then HEAD advanced to `10f9b1d7` across five more commits hardening Higgsfield production-readiness -- effective wardrobe metadata, environment text-risk substitutions, Phase 1 standing-safe pose-bank wiring, a downward-object gaze-conflict fix, and a narrow live-contradiction pose fix; broader Phase 2 seated/in-motion restoration remains separately scoped and unimplemented)
+**Last updated:** 2026-07-10 (checkpoint: a real, dry-run-default, safety-gated Higgsfield CLI executor was built, first committed at `3f7719a6`, then live-proven for the first time -- one real Lena image generated via `text2image_soul_v2`, confirmed via account transaction/job-list lookups. Two real executor bugs were found and fixed from that one live call: a Windows `subprocess`/`PATHEXT` executable-resolution failure (zero provider contact, zero spend), and a recursive result-URL-collection bug that mistook an unrelated style-preset thumbnail URL for a second generation output. The live image itself was visually strong on identity/wardrobe/environment/realism/hook but failed its own seated-pose stress test and showed a hand defect -- real visual QA on real renders remains mandatory. A full 83-transaction forensic investigation into the account's "2938 free Soul 2.0 generations" was run and every tested throttle/pacing/quota hypothesis was disproven by concrete counter-examples; the free-vs-paid billing mechanism remains explicitly unresolved, not solved, and is being treated as a separate provider-entitlement question, not an engineering gap. Full detail: `NEXT_SESSION_START.md`'s top banner.)
+
+> **FIRST REAL HIGGSFIELD LIVE EXECUTOR PROOF (2026-07-10, read this before
+> assuming the "HIGGSFIELD PRODUCTION-READINESS HARDENING" entry below is
+> the most recent Higgsfield checkpoint):** Full detail:
+> `NEXT_SESSION_START.md`'s top banner -- not restated here to avoid drift.
+> Summary only: `pipeline/higgsfield_lena_api_executor.py` (dry-run default,
+> `--live` explicit, one slot per invocation, fail-closed) is now live-proven
+> once against the real, authenticated `higgsfield` CLI (job type
+> `text2image_soul_v2`, Lena Soul `id=1f1200e4-1cc9-4504-ac1c-3304b687e3c1`).
+> Two real bugs found and fixed from that one call: a Windows executable-
+> resolution failure (`shutil.which()` fix, zero spend on the failed
+> attempt) and a recursive result-URL-collection bug (fixed to read only the
+> canonical top-level `result_url` field). The resulting image was strong on
+> identity/wardrobe/environment/realism/hook but failed the seated-pose
+> stress test it was chosen for and had a hand defect -- visual QA on real
+> renders remains mandatory. Free-generation billing (the account's "2938
+> free Soul 2.0 gens") was forensically investigated across the complete
+> 83-transaction history; every batch-size, rolling-window, silence-gap, and
+> daily-quota hypothesis tested was disproven by concrete counter-examples.
+> **No reliable throttle rule exists from historical evidence, and no
+> CLI/API-exposed control was found that determines free-vs-paid billing --
+> this remains an open, unresolved provider-entitlement question**, not
+> something to build a fake throttle around. Standing decision: the
+> executor stays simple/one-shot; billing/economics policy belongs in a
+> future layer above it; the free-generation question is separate and must
+> not freeze the main Lena pipeline.
 
 > **HIGGSFIELD PRODUCTION-READINESS HARDENING: 5 COMMITS (2026-07-09,
 > later session, read this before assuming the "BODY-CONSISTENCY
