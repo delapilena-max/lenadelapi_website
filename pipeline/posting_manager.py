@@ -250,6 +250,14 @@ class PostingManager:
         raw = data.get("media_type") or data.get("type") or data.get("kind") or data.get("content_type")
         if isinstance(raw, str):
             normalized = raw.strip().lower()
+            # Explicit Story classification (2026-07-10) -- must stay distinct
+            # from "photo", never collapsed into it. Only reachable via an
+            # explicit media_type/type/kind/content_type value; the
+            # extension-based fallback below is intentionally left
+            # photo/video-only, unchanged, so a bare .png with no explicit
+            # media_type still infers "photo" exactly as before.
+            if normalized in {"story", "stories"}:
+                return "story"
             if normalized in {"photo", "image", "jpg", "jpeg", "png", "webp"}:
                 return "photo"
             if normalized in {"video", "reel", "short", "mp4", "mov", "m4v", "webm"}:

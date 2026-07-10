@@ -54,6 +54,33 @@ def _duration(path: Path) -> float | None:
         return None
 
 
+def _validate_static_image_engine_and_prompt(meta: Dict[str, Any], specs: Dict[str, Any], media_type_label: str) -> None:
+    """Provider-aware image-engine dispatch + image_prompt presence check,
+    shared by any static-image media type (feed photo and Story). Never
+    touches aspect ratio -- that stays the sole responsibility of the
+    feed-photo branch in _validate_contract(). Same default/fail-closed
+    dispatch pattern tools/lena_preflight.py already established: an item
+    with no metadata.provider predates this field and defaults to "kling"
+    for backward compatibility; an explicit but unrecognized provider value
+    is a hard fail, never a silent fallback to Kling; provider is never
+    inferred from image_engine or auto-detected any other way."""
+    image_engines_by_provider = specs.get("image_engine_by_provider") or {}
+    provider_raw = meta.get("provider")
+    provider = str(provider_raw).lower().strip() if provider_raw else "kling"
+    if provider not in image_engines_by_provider:
+        raise ValueError(
+            f"Lena contract violation: unsupported/unrecognized metadata.provider {provider_raw!r} -- "
+            "no image_engine mapping for this provider, refusing to silently fall back to Kling"
+        )
+    expected_engine = image_engines_by_provider[provider]
+    if str(meta.get("image_engine") or "").lower() != str(expected_engine).lower():
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} must use {expected_engine} for provider {provider!r}"
+        )
+    if not meta.get("image_prompt"):
+        raise ValueError(f"Lena contract violation: {media_type_label} missing image_prompt")
+
+
 def _validate_contract(payload: Dict[str, Any]) -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
     specs = contract["required_media_specs"]
@@ -81,32 +108,7 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
     media_type = str(payload.get("media_type") or "").lower()
 
     if media_type in {"photo", "image"}:
-        # Provider-aware image-engine dispatch (2026-07-10): "image_engine" alone used
-        # to always mean Kling (specs["image_engine"], a flat single value). Real
-        # Higgsfield photos legitimately use a different, real engine string
-        # (higgsfield_text2image_soul_v2) -- the old flat check rejected every
-        # Higgsfield photo unconditionally, mislabeling it as a Kling contract
-        # violation. Reuses the same image_engine_by_provider map and default/fail-
-        # closed dispatch pattern tools/lena_preflight.py already established: an
-        # item with no metadata.provider predates this field and defaults to
-        # "kling" for backward compatibility; an explicit but unrecognized provider
-        # value is a hard fail, never a silent fallback to Kling; provider is never
-        # inferred from image_engine or auto-detected any other way.
-        image_engines_by_provider = specs.get("image_engine_by_provider") or {}
-        provider_raw = meta.get("provider")
-        provider = str(provider_raw).lower().strip() if provider_raw else "kling"
-        if provider not in image_engines_by_provider:
-            raise ValueError(
-                f"Lena contract violation: unsupported/unrecognized metadata.provider {provider_raw!r} -- "
-                "no image_engine mapping for this provider, refusing to silently fall back to Kling"
-            )
-        expected_engine = image_engines_by_provider[provider]
-        if str(meta.get("image_engine") or "").lower() != str(expected_engine).lower():
-            raise ValueError(
-                f"Lena contract violation: photo must use {expected_engine} for provider {provider!r}"
-            )
-        if not meta.get("image_prompt"):
-            raise ValueError("Lena contract violation: photo missing image_prompt")
+        _validate_static_image_engine_and_prompt(meta, specs, "photo")
 
         # Instagram-safe aspect-ratio gate (2026-07-10, added after a real live
         # incident -- see the MIN/MAX_FEED_PHOTO_ASPECT_RATIO constants' comment
@@ -135,6 +137,21 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
                 f"({MIN_FEED_PHOTO_ASPECT_RATIO}-{MAX_FEED_PHOTO_ASPECT_RATIO}) -- unsafe to publish, "
                 "Instagram may crop or reject this image"
             )
+        return
+
+    if media_type in {"story", "stories"}:
+        # Instagram Story-safe static-image contract (2026-07-10): a
+        # separate, explicit branch -- not a broad exception layered onto
+        # the feed-photo branch above -- so the feed aspect-ratio gate can
+        # never be accidentally bypassed for a payload that is actually a
+        # feed photo. Reuses the identical provider-aware engine/image_prompt
+        # checks the feed-photo branch uses, but deliberately never applies
+        # MIN_FEED_PHOTO_ASPECT_RATIO/MAX_FEED_PHOTO_ASPECT_RATIO: Instagram
+        # Stories natively accept the existing, unmodified 9:16 Lena asset --
+        # that range exists specifically for feed IMAGE posts, not Stories.
+        # No resize/crop/convert/mutation of any kind; media_path existence
+        # is already checked above, shared across every media type.
+        _validate_static_image_engine_and_prompt(meta, specs, "story")
         return
 
     if media_type in {"video", "reel"}:

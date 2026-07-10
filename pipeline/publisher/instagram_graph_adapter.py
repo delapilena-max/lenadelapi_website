@@ -232,6 +232,17 @@ def create_media_container(*, ig_user_id: str, access_token: str, media_url: str
 
     if normalized in {"photo", "image", "jpg", "jpeg", "png", "webp"}:
         data["image_url"] = media_url
+    elif normalized in {"story", "stories"}:
+        # Instagram Story static-image branch (2026-07-10): a genuine
+        # third category, separate from feed IMAGE and from REELS video --
+        # never routes through either. Same image_url mechanism the feed
+        # branch uses (Instagram fetches the media by public HTTPS URL
+        # either way); the only difference sent to the Graph API is
+        # media_type=STORIES. Deliberately does not set video_url, does not
+        # set REELS media_type, and does not set share_to_feed (that flag is
+        # a REELS-only concept).
+        data["image_url"] = media_url
+        data["media_type"] = "STORIES"
     elif normalized in {"video", "reel", "reels", "mp4", "mov", "m4v"}:
         data["video_url"] = media_url
         data["media_type"] = os.environ.get("CONTENT_BOT_IG_VIDEO_MEDIA_TYPE", "REELS")
