@@ -55,7 +55,7 @@ DEFAULT_CONFIG_PATH = PIPELINE_DIR / "config" / "posting_config.json"
 
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
-RESERVED_QUEUE_DIRS = {"published", "failed", "archive", "_archive", "__pycache__"}
+RESERVED_QUEUE_DIRS = {"published", "failed", "archive", "_archive", "in_flight", "__pycache__"}
 
 
 def utc_now() -> str:
@@ -89,6 +89,7 @@ def default_config() -> Dict[str, Any]:
         "queue_dir": "queue",
         "published_dir": "queue/published",
         "failed_dir": "queue/failed",
+        "in_flight_dir": "queue/in_flight",
         "receipt_dir": "queue/receipts",
         "feedback_file": "feedback/feedback.jsonl",
         "max_posts_per_run": 3,
@@ -177,6 +178,7 @@ class PostingManager:
         self.queue_dir = resolve_under_pipeline(str(self.config.get("queue_dir", "queue")))
         self.published_dir = resolve_under_pipeline(str(self.config.get("published_dir", "queue/published")))
         self.failed_dir = resolve_under_pipeline(str(self.config.get("failed_dir", "queue/failed")))
+        self.in_flight_dir = resolve_under_pipeline(str(self.config.get("in_flight_dir", "queue/in_flight")))
         self.receipt_dir = resolve_under_pipeline(str(self.config.get("receipt_dir", "queue/receipts")))
         feedback_file = self.config.get("feedback_file") or "feedback/feedback.jsonl"
         self.feedback = FeedbackCollector(feedback_file)
@@ -185,6 +187,7 @@ class PostingManager:
         self.queue_dir.mkdir(parents=True, exist_ok=True)
         self.published_dir.mkdir(parents=True, exist_ok=True)
         self.failed_dir.mkdir(parents=True, exist_ok=True)
+        self.in_flight_dir.mkdir(parents=True, exist_ok=True)
         self.receipt_dir.mkdir(parents=True, exist_ok=True)
 
     def list_post_files(self) -> List[Path]:
@@ -361,6 +364,56 @@ class PostingManager:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         return directory / f"{source.stem}.{stamp}{source.suffix}"
 
+    def _is_live_queue_path(self, post_file: Path) -> bool:
+        try:
+            return post_file.resolve().parent == self.queue_dir.resolve()
+        except Exception:
+            return False
+
+    def _claim_destination(self, post_file: Path) -> Path:
+        return self.in_flight_dir / post_file.name
+
+    def _claim_queue_item(self, post_file: Path) -> Dict[str, Any]:
+        source = post_file.resolve()
+        if not self._is_live_queue_path(source):
+            return {"status": "not_live_queue", "claimed_path": str(source)}
+
+        claimed_path = self._claim_destination(source)
+        claimed_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(str(source), str(claimed_path))
+        except FileNotFoundError:
+            return {
+                "status": "skipped",
+                "reason": "claimed_elsewhere" if claimed_path.exists() else "missing_queue_item",
+                "post_file": str(source),
+                "claimed_path": str(claimed_path) if claimed_path.exists() else None,
+            }
+        except FileExistsError:
+            return {
+                "status": "skipped",
+                "reason": "claimed_elsewhere",
+                "post_file": str(source),
+                "claimed_path": str(claimed_path),
+            }
+
+        try:
+            source.unlink()
+        except FileNotFoundError:
+            pass
+        except Exception:
+            try:
+                claimed_path.unlink()
+            except Exception:
+                pass
+            raise
+
+        return {
+            "status": "claimed",
+            "source_path": str(source),
+            "claimed_path": str(claimed_path),
+        }
+
     def _move_post(self, post: ValidatedPost, destination_dir: Path, receipt: Dict[str, Any]) -> Path:
         dest = self._safe_destination(destination_dir, post.post_file)
         shutil.move(str(post.post_file), str(dest))
@@ -522,10 +575,25 @@ class PostingManager:
 
     def process_one(self, post_file: Path, *, dry_run: bool, media_types: Optional[Iterable[str]] = None) -> Dict[str, Any]:
         media_type_filter = {m.lower() for m in media_types or []}
+        original_post_file = Path(post_file)
+        working_post_file = original_post_file
+
+        if not dry_run:
+            claim_result = self._claim_queue_item(original_post_file)
+            if claim_result.get("status") == "skipped":
+                return {
+                    "status": "skipped",
+                    "reason": claim_result.get("reason"),
+                    "post_file": str(original_post_file),
+                    "claimed_path": claim_result.get("claimed_path"),
+                }
+            if claim_result.get("status") == "claimed":
+                working_post_file = Path(str(claim_result["claimed_path"]))
+
         try:
-            post = self.validate_post(post_file)
+            post = self.validate_post(working_post_file)
             if media_type_filter and post.media_type not in media_type_filter:
-                return {"status": "skipped", "reason": "media_type_filter", "post_file": str(post_file), "media_type": post.media_type}
+                return {"status": "skipped", "reason": "media_type_filter", "post_file": str(original_post_file), "media_type": post.media_type}
             max_attempts = max(1, int(self.config.get("max_attempts", 3)))
             if post.attempts_so_far >= max_attempts:
                 raise PostValidationError(f"max attempts already reached ({post.attempts_so_far}/{max_attempts})")
@@ -578,7 +646,7 @@ class PostingManager:
             event = self.feedback.success(
                 event_type="post_published" if not dry_run else "post_dry_run",
                 post_id=post.post_id,
-                post_file=str(post_file),
+                post_file=str(original_post_file),
                 metadata={
                     **receipt,
                     "moved_to": str(moved_to) if moved_to else None,
@@ -588,7 +656,7 @@ class PostingManager:
             return {
                 "status": "success" if not dry_run else "dry_run",
                 "post_id": post.post_id,
-                "post_file": str(post_file),
+                "post_file": str(original_post_file),
                 "moved_to": str(moved_to) if moved_to else None,
                 "media_type": post.media_type,
                 "feedback_event_id": event["event_id"],
@@ -600,21 +668,21 @@ class PostingManager:
             moved_to = None
             if not dry_run:
                 try:
-                    self._record_failure_json(post_file, error)
-                    dest = self._safe_destination(self.failed_dir, post_file)
-                    shutil.move(str(post_file), str(dest))
+                    self._record_failure_json(working_post_file, error)
+                    dest = self._safe_destination(self.failed_dir, working_post_file)
+                    shutil.move(str(working_post_file), str(dest))
                     moved_to = str(dest)
                 except Exception as move_exc:
                     error = f"{error}; failed to move to failed/: {move_exc}"
             event = self.feedback.failure(
                 event_type="post_failed" if not dry_run else "post_dry_run_failed",
                 error=error,
-                post_file=str(post_file),
+                post_file=str(original_post_file),
                 metadata={"moved_to": moved_to, "traceback": traceback.format_exc(limit=8)},
             )
             return {
                 "status": "failed" if not dry_run else "dry_run_failed",
-                "post_file": str(post_file),
+                "post_file": str(original_post_file),
                 "error": error,
                 "moved_to": moved_to,
                 "feedback_event_id": event["event_id"],
