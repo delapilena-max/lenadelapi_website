@@ -137,23 +137,63 @@ def find_queue_item(receipt: Dict[str, Any], receipt_path: Path) -> Optional[Dic
     return None
 
 
-def resolve_canonical_provenance(date_str: str, slot_id: str) -> Dict[str, Optional[str]]:
+def resolve_canonical_provenance(
+    date_str: str, slot_id: str, source_slot_id: str = ""
+) -> Dict[str, Optional[str]]:
     """Read-only lookup of existing canonical artifacts reachable via
-    (date, slot_id) alone, using the same path conventions
+    (date, slot_id), using the same path conventions
     pipeline/qa/lena_photo_qa.py::qa_artifact_path() and
     tools/lena_record_publish_approval_v1.py::resolve_approval_output_path()
     already establish (mirrored here, not imported, to keep this tool
     fully self-contained and independent of the Reel-parity file set).
     Never invents a path; reports None for any artifact that doesn't
-    actually exist on disk rather than guessing one does."""
+    actually exist on disk rather than guessing one does.
+
+    QA provenance only (2026-07-11): a Story repackaging of an existing
+    photo render is deliberately kept under its own distinct slot_id (see
+    tools/lena_promote_to_queue_v1.py's source_slot_id doctrine), so its
+    real QA record lives under the TRUE source slot, not the output slot.
+    If the output slot's own QA artifact isn't found, and source_slot_id
+    is real and actually differs from slot_id, fall back to looking up QA
+    evidence under source_slot_id -- locating existing evidence only, never
+    changing which slot is the canonical identity of this row. Approval
+    records get no such fallback: an approval is always recorded against
+    the item that was actually approved for live publish, never inferred
+    from a different slot."""
     if not date_str or not slot_id:
         return {"qa_artifact_path": None, "approval_record_path": None}
     qa_path = ASSET_REVIEW_ROOT / date_str / f"{slot_id}_qa.json"
+    qa_artifact_path = str(qa_path) if qa_path.exists() else None
+    if qa_artifact_path is None and source_slot_id and source_slot_id != slot_id:
+        source_qa_path = ASSET_REVIEW_ROOT / date_str / f"{source_slot_id}_qa.json"
+        if source_qa_path.exists():
+            qa_artifact_path = str(source_qa_path)
     approval_path = APPROVAL_ROOT / date_str / f"{slot_id}_approval.json"
     return {
-        "qa_artifact_path": str(qa_path) if qa_path.exists() else None,
+        "qa_artifact_path": qa_artifact_path,
         "approval_record_path": str(approval_path) if approval_path.exists() else None,
     }
+
+
+def _historical_nested_instagram_media_id(receipt: Dict[str, Any]) -> str:
+    """Fallback only (2026-07-11): some older receipts (e.g.
+    2026-07-07-03-photo, predating the flat top-level instagram_media_id
+    field) only carry the real ID nested at publish_response.result.
+    instagram_result.instagram_media_id. Supports exactly that one known
+    historical shape -- no arbitrary recursive/deep search, no free-text
+    parsing, no guessing from permalink. Returns "" (never a guess) if
+    that exact path isn't a real string."""
+    publish_response = receipt.get("publish_response")
+    if not isinstance(publish_response, dict):
+        return ""
+    result = publish_response.get("result")
+    if not isinstance(result, dict):
+        return ""
+    instagram_result = result.get("instagram_result")
+    if not isinstance(instagram_result, dict):
+        return ""
+    value = instagram_result.get("instagram_media_id")
+    return value if isinstance(value, str) and value else ""
 
 
 def build_identity_fields(receipt: Dict[str, Any], receipt_path: Path) -> Dict[str, Any]:
@@ -186,7 +226,11 @@ def build_identity_fields(receipt: Dict[str, Any], receipt_path: Path) -> Dict[s
         "platform": platform,
         "media_type": media_type,
         "post_id": receipt.get("post_id") or "",
-        "instagram_media_id": receipt.get("instagram_media_id") or "",
+        "instagram_media_id": (
+            receipt.get("instagram_media_id")
+            or _historical_nested_instagram_media_id(receipt)
+            or ""
+        ),
         "permalink": receipt.get("permalink") or "",
         "source_slot_id": source_slot_id,
         "publish_receipt_path": str(receipt_path),
@@ -254,7 +298,9 @@ def sync_all(published_dir: Path, metrics_path: Path, apply: bool) -> Dict[str, 
             continue
 
         identity = build_identity_fields(receipt, receipt_path)
-        provenance = resolve_canonical_provenance(identity["date"], identity["slot_id"])
+        provenance = resolve_canonical_provenance(
+            identity["date"], identity["slot_id"], identity["source_slot_id"]
+        )
         metric_rows, is_new = upsert_metrics_row(metric_rows, identity)
         created += 1 if is_new else 0
         updated += 0 if is_new else 1

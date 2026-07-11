@@ -18,6 +18,7 @@ from tools.lena_sync_architecture_a_receipts_to_metrics_v1 import (
     upsert_metrics_row,
     read_csv,
     write_csv,
+    _historical_nested_instagram_media_id,
 )
 from tools.lena_meta_refresh_feedback_v1 import (
     candidate_posts,
@@ -343,3 +344,173 @@ def test_candidate_posts_uses_structured_precedence_end_to_end() -> None:
 # 13/14/15. no network call, no publish, no queue mutation -- structural
 # guarantee: sync_mod imports no `requests`/publisher/queue-processing
 # module, and every test above operates purely on tmp_path fixtures.
+
+
+def _real_receipt_with_nested_media_id(post_id: str, nested_id: str = "18154201054431808") -> dict:
+    """Shaped exactly like the real, already-committed historical receipt
+    (pipeline/queue/published/2026-07-07-03-photo.json.receipt.json): no
+    top-level instagram_media_id/permalink field at all, but the real
+    platform ID is present nested at publish_response.result.
+    instagram_result.instagram_media_id."""
+    return {
+        "caption": "test caption\n\n#test",
+        "media_path": "C:\\fake\\path\\seed.png",
+        "media_type": "photo",
+        "platforms": ["instagram"],
+        "post_file": "C:\\fake\\queue\\test.json",
+        "post_id": post_id,
+        "publish_response": {
+            "backend": "pipeline.publisher.instagram_queue_bridge",
+            "ok": True,
+            "result": {
+                "backend": "instagram_graph",
+                "instagram_result": {
+                    "backend": "instagram_graph",
+                    "instagram_media_id": nested_id,
+                    "media_type": "photo",
+                    "ok": True,
+                    "post_id": post_id,
+                },
+                "kind": "photo",
+                "ok": True,
+                "post_id": post_id,
+            },
+        },
+        "status": "published",
+        "timestamp_utc": "2026-07-07T17:00:17.789500+00:00",
+    }
+
+
+# 1. top-level instagram_media_id remains preferred when present
+def test_nested_media_id_fallback_never_overrides_top_level_field() -> None:
+    receipt = _real_receipt("test-nested-01-photo")  # has top-level instagram_media_id
+    receipt["publish_response"] = {
+        "result": {"instagram_result": {"instagram_media_id": "SHOULD_NOT_WIN"}}
+    }
+    assert build_identity_fields(receipt, Path("fake.json.receipt.json"))["instagram_media_id"] == "17879977575673516"
+
+
+# 2/6. historical nested instagram_media_id is used only when top-level is absent
+def test_historical_nested_media_id_used_only_when_top_level_absent(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "published" / "2026-07-07-03-photo.json.receipt.json"
+    receipt = _real_receipt_with_nested_media_id("2026-07-07-03-photo")
+    assert "instagram_media_id" not in receipt  # real shape: no top-level field at all
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["instagram_media_id"] == "18154201054431808"
+
+
+# 3. blank remains blank when neither ID path exists
+def test_media_id_stays_blank_when_neither_path_exists(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "published" / "test-nested-02-photo.json.receipt.json"
+    receipt = _real_receipt_with_nested_media_id("test-nested-02-photo")
+    del receipt["publish_response"]
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["instagram_media_id"] == ""
+
+
+# 4. no arbitrary deep-search fallback exists -- only the exact known
+# historical shape is supported, not any other nesting depth/key name
+def test_historical_nested_fallback_does_not_deep_search_arbitrary_shapes() -> None:
+    off_path_receipt = {
+        "publish_response": {"instagram_media_id": "WRONG_DEPTH"},  # missing .result
+    }
+    assert _historical_nested_instagram_media_id(off_path_receipt) == ""
+
+    wrong_key_receipt = {
+        "publish_response": {"result": {"some_other_result": {"instagram_media_id": "WRONG_KEY"}}},
+    }
+    assert _historical_nested_instagram_media_id(wrong_key_receipt) == ""
+
+    non_string_receipt = {
+        "publish_response": {"result": {"instagram_result": {"instagram_media_id": 12345}}},
+    }
+    assert _historical_nested_instagram_media_id(non_string_receipt) == ""
+
+
+# 5. output-slot QA artifact is preferred when present
+def test_qa_provenance_prefers_output_slot_over_source_slot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    asset_review_root = tmp_path / "asset_review" / "lena"
+    monkeypatch.setattr(sync_mod, "ASSET_REVIEW_ROOT", asset_review_root)
+    monkeypatch.setattr(sync_mod, "APPROVAL_ROOT", tmp_path / "publish_packets" / "lena")
+
+    date_str, slot_id, source_slot_id = "2026-07-09", "readypack0709-pack007-00-photo-story", "readypack0709-pack007-00-photo"
+    output_qa_path = asset_review_root / date_str / f"{slot_id}_qa.json"
+    source_qa_path = asset_review_root / date_str / f"{source_slot_id}_qa.json"
+    _write_json(output_qa_path, {"overall": "pass", "note": "output slot"})
+    _write_json(source_qa_path, {"overall": "pass", "note": "source slot"})
+
+    provenance = resolve_canonical_provenance(date_str, slot_id, source_slot_id)
+    assert provenance["qa_artifact_path"] == str(output_qa_path)
+
+
+# 6/9. source_slot_id QA artifact is used only when output-slot QA is
+# absent -- mirrors the real readypack0709-pack007-00-photo-story case
+def test_qa_provenance_falls_back_to_source_slot_when_output_slot_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    asset_review_root = tmp_path / "asset_review" / "lena"
+    monkeypatch.setattr(sync_mod, "ASSET_REVIEW_ROOT", asset_review_root)
+    monkeypatch.setattr(sync_mod, "APPROVAL_ROOT", tmp_path / "publish_packets" / "lena")
+
+    date_str, slot_id, source_slot_id = "2026-07-09", "readypack0709-pack007-00-photo-story", "readypack0709-pack007-00-photo"
+    source_qa_path = asset_review_root / date_str / f"{source_slot_id}_qa.json"
+    _write_json(source_qa_path, {"overall": "pass"})
+    # No QA artifact written under slot_id (the output/Story slot) at all.
+
+    provenance = resolve_canonical_provenance(date_str, slot_id, source_slot_id)
+    assert provenance["qa_artifact_path"] == str(source_qa_path)
+
+
+# 7/8/9. source-slot QA fallback never changes canonical output identity;
+# slot_id, post_id, and source_slot_id all stay exactly as resolved by
+# build_identity_fields, independent of which slot the QA evidence was
+# actually found under
+def test_source_slot_qa_fallback_does_not_alter_output_identity(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "published" / "readypack0709-pack007-00-photo-story.json.receipt.json"
+    queue_item_path = tmp_path / "published" / "readypack0709-pack007-00-photo-story.json"
+    receipt = _real_receipt("readypack0709-pack007-00-photo-story")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    queue_item = _promoted_queue_item("readypack0709-pack007-00-photo-story")
+    queue_item["metadata"]["source_slot_id"] = "readypack0709-pack007-00-photo"
+    _write_json(queue_item_path, queue_item)
+
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["slot_id"] == "readypack0709-pack007-00-photo-story"
+    assert identity["post_id"] == "readypack0709-pack007-00-photo-story"
+    assert identity["source_slot_id"] == "readypack0709-pack007-00-photo"
+
+
+# 10. missing QA evidence remains None rather than fabricated, even with
+# a real, differing source_slot_id supplied
+def test_qa_provenance_none_when_neither_output_nor_source_slot_has_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sync_mod, "ASSET_REVIEW_ROOT", tmp_path / "asset_review" / "lena")
+    monkeypatch.setattr(sync_mod, "APPROVAL_ROOT", tmp_path / "publish_packets" / "lena")
+    provenance = resolve_canonical_provenance("2026-07-09", "nonexistent-output-slot", "nonexistent-source-slot")
+    assert provenance["qa_artifact_path"] is None
+
+
+# 11. missing approval record remains absent -- no source-slot fallback
+# exists for approval records (only QA gets one), matching the real
+# 2026-07-07-03-photo gap
+def test_approval_record_has_no_source_slot_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    asset_review_root = tmp_path / "asset_review" / "lena"
+    approval_root = tmp_path / "publish_packets" / "lena"
+    monkeypatch.setattr(sync_mod, "ASSET_REVIEW_ROOT", asset_review_root)
+    monkeypatch.setattr(sync_mod, "APPROVAL_ROOT", approval_root)
+
+    date_str, slot_id, source_slot_id = "2026-07-09", "output-slot", "source-slot"
+    # An approval record exists only under the source slot -- must NOT be
+    # picked up for the output slot's approval_record_path.
+    _write_json(approval_root / date_str / f"{source_slot_id}_approval.json", {"post_id": source_slot_id})
+
+    provenance = resolve_canonical_provenance(date_str, slot_id, source_slot_id)
+    assert provenance["approval_record_path"] is None
+
+
+# 12. missing permalink remains blank -- matches the real
+# 2026-07-07-03-photo receipt, which has no permalink field anywhere
+def test_missing_permalink_stays_blank(tmp_path: Path) -> None:
+    receipt_path = tmp_path / "published" / "2026-07-07-03-photo.json.receipt.json"
+    receipt = _real_receipt_with_nested_media_id("2026-07-07-03-photo")
+    assert "permalink" not in receipt  # real shape: genuinely absent
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["permalink"] == ""
