@@ -40,6 +40,15 @@ try:  # package import
 except Exception:  # script/direct import fallback
     from feedback.collector import FeedbackCollector  # type: ignore
 
+try:  # package import
+    from .lena_job_state import apply_transition as apply_job_state_transition
+    from .lena_job_state import load_snapshot as load_job_state_snapshot
+    from .lena_job_state import save_snapshot as save_job_state_snapshot
+except Exception:  # script/direct import fallback
+    from lena_job_state import apply_transition as apply_job_state_transition  # type: ignore
+    from lena_job_state import load_snapshot as load_job_state_snapshot  # type: ignore
+    from lena_job_state import save_snapshot as save_job_state_snapshot  # type: ignore
+
 PIPELINE_DIR = Path(os.environ.get("CONTENT_BOT_PIPELINE_DIR", Path(__file__).resolve().parent)).resolve()
 REPO_ROOT = Path(os.environ.get("CONTENT_BOT_ROOT", PIPELINE_DIR.parent)).resolve()
 DEFAULT_CONFIG_PATH = PIPELINE_DIR / "config" / "posting_config.json"
@@ -364,6 +373,61 @@ class PostingManager:
                 shutil.move(str(post.media_path), str(media_dest))
         return dest
 
+    def _record_published_job_state_transition(
+        self,
+        post: ValidatedPost,
+        published_post_path: Path,
+        publish_response: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        try:
+            snapshot = load_job_state_snapshot(post.post_id)
+            if not isinstance(snapshot, dict):
+                return {"status": "skipped", "reason": "missing_snapshot", "post_id": post.post_id}
+
+            current_state = str(snapshot.get("current_state") or "")
+            if current_state != "queued":
+                return {
+                    "status": "skipped",
+                    "reason": "unexpected_state",
+                    "post_id": post.post_id,
+                    "current_state": current_state,
+                }
+
+            updated = apply_job_state_transition(
+                snapshot,
+                "published_pending_learning",
+                note="Successful publish receipt recorded by PostingManager.process_one().",
+            )
+
+            artifact_paths = dict(updated.get("artifact_paths") or {})
+            receipt_path = published_post_path.with_suffix(published_post_path.suffix + ".receipt.json")
+            artifact_paths["queue_item"] = str(published_post_path)
+            artifact_paths["publish_receipt"] = str(receipt_path)
+            updated["artifact_paths"] = artifact_paths
+
+            artifact_evidence = set(updated.get("artifact_evidence") or [])
+            artifact_evidence.update({"queue_item", "publish_receipt"})
+            updated["artifact_evidence"] = sorted(str(item) for item in artifact_evidence if str(item).strip())
+
+            ig_result = ((publish_response or {}).get("result") or {}).get("instagram_result") or {}
+            platform_media_id = ig_result.get("instagram_media_id")
+            if platform_media_id:
+                updated["platform_media_id"] = str(platform_media_id)
+
+            save_job_state_snapshot(updated)
+            return {
+                "status": "updated",
+                "post_id": post.post_id,
+                "canonical_job_id": updated.get("canonical_job_id"),
+                "current_state": updated.get("current_state"),
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "post_id": post.post_id,
+                "error": str(exc),
+            }
+
     def _write_local_receipt(self, post: ValidatedPost, dry_run: bool = False) -> Dict[str, Any]:
         payload = {
             "ok": True,
@@ -507,13 +571,19 @@ class PostingManager:
                 "timestamp_utc": utc_now(),
             }
             moved_to: Optional[Path] = None
+            job_state_result: Optional[Dict[str, Any]] = None
             if not dry_run:
                 moved_to = self._move_post(post, self.published_dir, receipt)
+                job_state_result = self._record_published_job_state_transition(post, moved_to, publish_response)
             event = self.feedback.success(
                 event_type="post_published" if not dry_run else "post_dry_run",
                 post_id=post.post_id,
                 post_file=str(post_file),
-                metadata={**receipt, "moved_to": str(moved_to) if moved_to else None},
+                metadata={
+                    **receipt,
+                    "moved_to": str(moved_to) if moved_to else None,
+                    "job_state_result": job_state_result,
+                },
             )
             return {
                 "status": "success" if not dry_run else "dry_run",
@@ -523,6 +593,7 @@ class PostingManager:
                 "media_type": post.media_type,
                 "feedback_event_id": event["event_id"],
                 "publish_response": publish_response,
+                "job_state_result": job_state_result,
             }
         except Exception as exc:
             error = str(exc)
