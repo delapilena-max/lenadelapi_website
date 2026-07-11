@@ -25,6 +25,28 @@ assessment: `NEXT_SESSION_START.md`'s standing objective section and its
 
 ---
 
+## 🔒 STANDING PUBLISH FREEZE (2026-07-10, imposed by Nicolas -- standing, not superseded by dated entries below, lifted only by a new explicit instruction from Nicolas)
+
+No live Lena publish of any kind (Instagram, Reel, Feed, Story), no R2
+upload for outward publishing, and no queue promotion into a
+live-publishable state may occur until the end-to-end clean-export path is
+validated and enforced: original preserved internally, privacy-clean
+derivative produced, derivative verified free of disallowed embedded
+AI-provenance/C2PA/IPTC/suspicious metadata, the publishing path proven to
+use only the verified clean derivative (never the raw provider original),
+and all of this proven against representative real Lena image AND video
+assets. This freeze stands independently of, and in addition to, every
+other approval/preflight/Rule Zero gate, and independently of which
+publishing architecture becomes canonical. It is not lifted by any
+technical milestone alone -- only by Nicolas's explicit confirmation that
+all conditions are met. Current status: `tools/lena_scrub_media_
+metadata_v1.py` exists, untracked/uncommitted, not wired into any
+publishing path, not yet validated against representative real assets --
+none of the conditions are met yet. Full detail: `NEXT_SESSION_START.md`'s
+matching standing section.
+
+---
+
 ## 0. Current State (Read This First)
 
 **Last updated:** 2026-07-10/11, later session (strategic correction from

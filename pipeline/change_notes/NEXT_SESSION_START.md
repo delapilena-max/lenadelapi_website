@@ -36,6 +36,46 @@ approval-policy enforcement; queueing; publishing; publish receipts and
 provenance; metrics ingestion; winner/loser analysis; creative mutation of
 winners; autonomous next-content decisions.
 
+## 🔒 STANDING PUBLISH FREEZE (2026-07-10, imposed by Nicolas -- not a dated checkpoint, does not get superseded by any banner below, and is NOT lifted by any technical milestone alone -- only by a new, explicit instruction from Nicolas confirming the conditions below are met)
+
+**No live Lena publish of any kind may occur until the end-to-end
+clean-export path is validated and enforced.** This is a hard gate that
+stands independently of, and in addition to, every other approval/
+preflight/Rule Zero gate already in the pipeline, and independently of
+which publishing architecture (see the architecture-fork banner below)
+eventually becomes canonical. A technically-ready publisher does NOT
+override this freeze.
+
+**Frozen until lifted, explicitly enumerated by Nicolas:**
+- No Instagram publish of any kind.
+- No Reel publish.
+- No Feed publish.
+- No Story publish.
+- No R2 upload for outward publishing.
+- No queue promotion into a live-publishable state.
+
+**The freeze lifts only once ALL five of the following are proven, not
+merely built:**
+1. The untouched original provider asset is preserved internally.
+2. A privacy-clean publish derivative is produced from it.
+3. The clean derivative is verified to contain no disallowed embedded
+   AI-provenance/C2PA/IPTC or other suspicious metadata.
+4. The actual outward-bound publishing path uses the verified clean
+   derivative -- never the raw provider original.
+5. This behavior is proven against representative REAL Lena image AND
+   video assets (not synthetic/fixture-only tests).
+
+**Current status toward lifting this freeze, as of this checkpoint** (full
+detail in the clean-export banner elsewhere in this file):
+`tools/lena_scrub_media_metadata_v1.py` exists on disk, is untracked and
+uncommitted, and implements the core PNG/video scrubbing logic -- but it is
+NOT wired into any publishing path and has NOT been validated against
+representative real assets. **None of the 5 conditions above are met yet.**
+
+Do not interpret a successful test, a passing dry-run, or a code review as
+lifting this freeze on its own -- it lifts only when Nicolas is told all
+five conditions are met and he confirms it explicitly.
+
 > ## ⚠️ STRATEGIC CORRECTION: THE GOAL IS ONE AUTONOMOUS LENA CONTENT LOOP, NOT PUBLISHER-CHOOSING; TWO COMPETING REEL-CAPABLE PUBLISHING ARCHITECTURES DISCOVERED; VIDEO-BACKED STORY GRAPH ROUTING SHIPPED; PRIVMETA-STYLE CLEAN-EXPORT METADATA SCRUBBING NOW DECIDED/REQUIRED (NOT YET VALIDATED OR INTEGRATED) (2026-07-10/11, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `2f76e73f`. Read the standing objective section above this banner first -- it is not dated and does not get superseded.
 >
 > **A. Real commit landed:** `2f76e73f` `feat: support video-backed Instagram

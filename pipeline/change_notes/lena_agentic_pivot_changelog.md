@@ -7171,6 +7171,103 @@ No publish without explicit authorization under current policy. No
 provider call (Higgsfield/Kling/Anthropic/Jamendo) unless approved. No
 `.env` change. No unrelated cleanup, no touching the unrelated dirty pile.
 No accidental queue mutation. No media file committed unless explicitly
-authorized. Do not resume building or wiring `tools/lena_scrub_media_
-metadata_v1.py` without a new, explicit conversation. Do not treat the
-architecture-fork question in B as resolved.
+authorized. Do not claim the clean-export metadata-scrubbing capability
+described in section C is already validated, integrated, wired into
+publishing, or live -- it is decided and required (see the standing
+publish-freeze entry below), but that work is not done yet. Do not treat
+the architecture-fork question in B as resolved.
+
+---
+
+## 2026-07-10 (later session) — Docs-only continuity checkpoint committed; read-only publishing-architecture fork audit; STANDING PUBLISH FREEZE imposed by Nicolas
+
+### A. Docs-only checkpoint committed
+Commit `75215779` (`docs: checkpoint autonomous Lena loop and clean-export
+requirement`) landed the corrected continuity state described in the
+2026-07-10/11 entry above -- exactly the three continuity files
+(`NEXT_SESSION_START.md`, `lena_filesystem_native_agent_pivot_master.md`,
+this changelog), staged and committed individually by explicit path, never
+via a broad add. `tools/lena_scrub_media_metadata_v1.py` remained
+untracked and untouched throughout. No production code, render,
+generation, publish, queue, R2, provider, or `.env` action occurred.
+
+### B. Read-only publishing-architecture fork audit (no code changed, no commit)
+A full read-only, code-level audit compared Architecture A
+(`posting_manager.py` -> `instagram_queue_bridge.py` ->
+`instagram_graph_adapter.py`) against Architecture B
+(`tools/publishers/lena_publish_instagram_reels_v2_8.py` +
+`lena_meta_publish_common_v2_9.py`) against 18 explicit criteria.
+**Recommendation: Architecture A becomes canonical, via a narrow additive
+migration porting specific proven mechanisms out of B** -- not a rewrite,
+not permanent dual systems. Confidence 70/100, explicitly held below 80
+because three B-side connectors
+(`lena_publish_instagram_feed_v2_8.py`/`lena_publish_facebook_page_v2_8.py`/
+`lena_publish_facebook_reels_v2_8.py`) and whatever tool builds
+`lena_approved_publish_queue_v2_8.json` were not read this audit.
+
+**New real finding, not previously documented:** Architecture B's real
+2026-06-12 batch (`pipeline/publishing/lena/approved_queue/2026-06-12/
+lena_approved_publish_queue_v2_8.json`) shows it also queued (not yet
+posted) real Facebook Page and Facebook Reels items alongside the proven
+Instagram Feed photo and Reel -- **B has real Facebook platform support
+that Architecture A has zero equivalent of today** (only `instagram_*`
+platforms/adapters exist in A). This is a genuine capability gap in A, not
+previously called out in the architecture-fork banner above.
+
+**Also newly confirmed by direct code read:** Architecture A's video/reel
+contract in `instagram_queue_bridge.py::_validate_contract()` hardcodes a
+Kling-only 7-second/30fps/1080p spec sourced from
+`lena_kling_contract.json` -- almost certainly the wrong shape for real
+Instagram Reels (which run far longer); and `lena_promote_to_queue_v1.py`
+(confirmed at its `media_type not in {"photo","image","story","stories"}`
+check) hard-rejects any video/reel item from ever being promoted, so A is
+not reel-capable in practice today regardless of the REELS branch already
+present in `instagram_graph_adapter.py::create_media_container()`.
+
+Full memo (executive recommendation, side-by-side 18-criteria table,
+recommended canonical end-state chain, what to preserve/retire from B, an
+8-step migration plan, and the single recommended next read-only slice)
+was delivered to Nicolas in-session; not yet copied into this file
+verbatim -- treat the in-session memo as the source of record until a
+future session condenses it here. **Nothing was implemented, migrated,
+quarantined, or deleted -- this was audit only.**
+
+### C. STANDING PUBLISH FREEZE imposed by Nicolas
+Immediately after the architecture audit, Nicolas imposed a hard, standing
+publish freeze, independent of and in addition to every other gate already
+in the pipeline (Rule Zero, two-phase approval, QA schema v4,
+`FINAL_PUBLISH_APPROVED_BY_NICOLAS`) and independent of which publishing
+architecture eventually becomes canonical: **no live Lena publish of any
+kind (Instagram/Reel/Feed/Story), no R2 upload for outward publishing, and
+no queue promotion into a live-publishable state** until the end-to-end
+clean-export path (preserve original internally, produce a privacy-clean
+derivative, verify it carries no disallowed embedded AI-provenance/C2PA/
+IPTC/suspicious metadata, prove the actual publishing path uses only the
+verified clean derivative -- never the raw provider original, all proven
+against representative REAL Lena image and video assets, not synthetic
+fixtures) is validated and enforced. This freeze is NOT lifted by any
+technical milestone alone -- only by Nicolas's own explicit confirmation
+that all conditions are met. Recorded as a new standing (non-dated)
+section at the top of `NEXT_SESSION_START.md` and
+`lena_filesystem_native_agent_pivot_master.md`, specifically so it is
+never superseded by a future dated checkpoint banner the way ordinary
+entries are. Current status toward lifting it: none of the five
+conditions are met yet -- `tools/lena_scrub_media_metadata_v1.py` remains
+untracked, uncommitted, unwired, and unvalidated against representative
+real assets.
+
+### D. What must not be done
+No Instagram/Reel/Feed/Story publish. No R2 upload for outward publishing.
+No queue promotion into a live-publishable state. No provider call
+(Higgsfield/Kling/Anthropic/Jamendo) unless separately approved. No
+`.env` change. No unrelated cleanup, no touching the unrelated dirty pile.
+No implementation of any migration step from the architecture audit in B
+without separate explicit approval. No modification of
+`tools/lena_scrub_media_metadata_v1.py` without explicit instruction. This
+publish freeze remains in force regardless of either publisher
+architecture's technical readiness.
+
+No render, generation, publish, queue mutation, R2 action, Meta/Instagram/
+Kling/provider call, `.env` access, or code change occurred producing this
+entry beyond the one already-described `75215779` commit -- the
+architecture audit and freeze recording were entirely read-only/docs-only.
