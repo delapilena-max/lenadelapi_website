@@ -8,7 +8,7 @@ import importlib
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from PIL import Image
 
@@ -39,6 +39,19 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
 # margin to survive Instagram's own presentation, and the head was cut off.
 MIN_FEED_PHOTO_ASPECT_RATIO = 0.8
 MAX_FEED_PHOTO_ASPECT_RATIO = 1.91
+
+# Reel duration ceiling -- provider-neutral policy owner (2026-07-11).
+# Deliberately None. The historical 7-second value this replaces
+# (pipeline/config/lena_kling_contract.json's max_video_duration_seconds)
+# was a Kling clip-length artifact, never a confirmed real Instagram Reels
+# duration policy -- keeping it would have wrongly rejected any genuine
+# Reel-length video. No real Instagram Reels duration limit is encoded
+# here: picking one requires explicit, separately-authorized confirmation
+# of Meta's actual current policy, not a guess made inside this change.
+# Until that number is confirmed and set here, duration is still measured
+# and required to be a valid, readable value (see the video branch below)
+# -- just not upper-bounded. Set to a real integer only once authorized.
+INSTAGRAM_REEL_MAX_DURATION_SECONDS: Optional[float] = None
 
 
 def _duration(path: Path) -> float | None:
@@ -260,29 +273,32 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
         return
 
     if media_type in {"video", "reel"}:
-        seed = Path(str(meta.get("seed_image_path") or ""))
-        if not seed.exists():
-            raise ValueError(f"Lena contract violation: missing seed image: {seed}")
-        if str(meta.get("seed_image_engine") or "").lower() != specs["image_engine"]:
-            raise ValueError("Lena contract violation: video seed must be Kling Image 3.0")
-        if str(meta.get("video_engine") or "").lower() != specs["video_engine"]:
-            raise ValueError("Lena contract violation: video must be Kling Video 3.0")
-        motion_confirmed = meta.get("motion_control") is True
-        motion_requested = meta.get("motion_control_requested") is True
-        if not motion_confirmed and not motion_requested:
-            raise ValueError("Lena contract violation: video must request or confirm motion control")
-        if int(meta.get("fps") or 0) != int(specs["video_fps"]):
-            raise ValueError("Lena contract violation: video must be 30fps")
-        if str(meta.get("resolution") or "").lower() not in {"1080p", "1080x1920", "1920x1080"}:
-            raise ValueError("Lena contract violation: video must be 1080p")
-        if not meta.get("image_prompt") or not meta.get("video_prompt"):
-            raise ValueError("Lena contract violation: video missing image_prompt or video_prompt")
+        # Provider-neutral video/Reel contract (2026-07-11) -- replaces the
+        # legacy Kling-coupled branch. Requires only fields the current,
+        # provider-neutral Rule Zero video resolver
+        # (tools/lena_build_publish_packet_v1.py::resolve_packet_inputs_video())
+        # actually produces. avatar_nickname is already checked above,
+        # universally, for every media type -- not re-checked here.
+        #
+        # Deliberately does NOT require seed_image_path, seed_image_engine,
+        # video_engine, motion_control, fps, or a specific resolution
+        # string. None of those are produced by the current canonical
+        # resolver; requiring them would silently resurrect a dependency on
+        # a historical, disconnected video mechanism this contract never
+        # actually validated real code against (confirmed by direct
+        # read-only audit: build_queue_draft() never set any of those
+        # fields for any provider).
+        if not meta.get("video_prompt"):
+            raise ValueError("Lena contract violation: video missing video_prompt")
 
         dur = _duration(media_path)
         if dur is None:
             raise ValueError("Lena contract violation: could not verify video duration")
-        if dur > int(specs["max_video_duration_seconds"]):
-            raise ValueError(f"Lena contract violation: video duration {dur:.2f}s exceeds max")
+        if INSTAGRAM_REEL_MAX_DURATION_SECONDS is not None and dur > INSTAGRAM_REEL_MAX_DURATION_SECONDS:
+            raise ValueError(
+                f"Lena contract violation: video duration {dur:.2f}s exceeds the "
+                f"configured Reel policy ceiling of {INSTAGRAM_REEL_MAX_DURATION_SECONDS}s"
+            )
         return
 
     raise ValueError(f"Lena contract violation: unsupported media_type={media_type!r}")

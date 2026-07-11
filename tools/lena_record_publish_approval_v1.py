@@ -50,6 +50,7 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     ResolveError,
     resolve_packet_inputs,
     resolve_packet_inputs_higgsfield,
+    resolve_packet_inputs_video,
     resolve_packet_output_path,
     resolve_queue_draft_output_path,
 )
@@ -235,7 +236,16 @@ def check_publish_approval(
     is not yet authorized; promotion (lena_promote_to_queue_v1.py) is the
     only place that value is ever required to be the real phrase. Never
     inferred from caption_confirm."""
-    resolver = resolve_packet_inputs_higgsfield if provider == "higgsfield" else resolve_packet_inputs
+    # Three-way provider dispatch (2026-07-11): "video" joins "higgsfield"
+    # as an explicit case, reusing the existing, unmodified
+    # resolve_packet_inputs_video() -- no resolver logic duplicated here.
+    # Everything else about this default-to-photo pattern is unchanged.
+    if provider == "higgsfield":
+        resolver = resolve_packet_inputs_higgsfield
+    elif provider == "video":
+        resolver = resolve_packet_inputs_video
+    else:
+        resolver = resolve_packet_inputs
     effective_source_slot_id = source_slot_id or slot_id
     try:
         resolved = resolver(date_str, effective_source_slot_id, out_dir)
@@ -354,7 +364,7 @@ def main() -> int:
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
     parser.add_argument(
         "--provider",
-        choices=["kling", "higgsfield"],
+        choices=["kling", "higgsfield", "video"],
         default="kling",
         help=(
             "Explicit provider selector (default: kling, preserved for backward "

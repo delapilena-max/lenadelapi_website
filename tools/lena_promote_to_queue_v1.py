@@ -108,6 +108,7 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     ResolveError,
     resolve_packet_inputs,
     resolve_packet_inputs_higgsfield,
+    resolve_packet_inputs_video,
     resolve_queue_draft_output_path,
 )
 from tools.lena_record_publish_approval_v1 import (  # noqa: E402
@@ -124,9 +125,17 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
 
 # Explicit provider -> resolver map. No auto-detection, no fallback: an
 # unrecognized provider string is simply not a key here and fails closed.
+#
+# "video" (2026-07-11) is a resolver-selection key, not a generation-provider
+# identity -- it selects resolve_packet_inputs_video(), the provider-neutral
+# video/Reel resolver. The real generation-provider identity (if any) for a
+# video asset is a separate, optional data field inside that resolver's own
+# output (resolved["provider"]), never conflated with this dispatch key, and
+# never defaulted to Kling or any other specific provider.
 PROVIDER_RESOLVERS = {
     "kling": resolve_packet_inputs,
     "higgsfield": resolve_packet_inputs_higgsfield,
+    "video": resolve_packet_inputs_video,
 }
 
 # The three original state-transition fields promotion changes. Order
@@ -354,10 +363,16 @@ def _validate_queue_draft(
                 f"queue draft metadata.provider {draft_provider!r} does not match "
                 f"requested --provider {provider!r}"
             )
-    elif provider != "kling":
+    elif provider not in {"kling", "video"}:
+        # "video" (2026-07-11) joins "kling" here for the same reason: the
+        # provider-neutral video resolver (resolve_packet_inputs_video())
+        # never requires metadata.provider either -- it's an optional,
+        # never-defaulted data field, not a dispatch requirement. A video
+        # draft with no metadata.provider is exactly as valid as a Kling
+        # draft with none.
         raise PromoteError(
             "queue draft has no metadata.provider, which is only valid for the "
-            f"implicit Kling default -- --provider {provider!r} was explicitly requested"
+            f"implicit kling/video default -- --provider {provider!r} was explicitly requested"
         )
 
     if not queue_draft.get("media_path"):
@@ -367,24 +382,33 @@ def _validate_queue_draft(
         raise PromoteError(f"queue draft media_path does not exist on disk: {media_path}")
 
     media_type = str(queue_draft.get("media_type") or "").lower().strip()
-    if media_type not in {"photo", "image", "story", "stories"}:
+    if media_type not in {"photo", "image", "story", "stories", "video", "reel"}:
         raise PromoteError(
             f"queue draft media_type {queue_draft.get('media_type')!r} is not supported by this "
-            "tool yet -- only photo/image/story queue drafts can be re-validated via the existing "
-            "packet resolvers (resolve_packet_inputs()/resolve_packet_inputs_higgsfield() have "
-            "no video path). media_type itself is never rewritten/normalized here -- read back "
-            "byte-identical, same as every other field this tool never touches."
+            "tool -- only photo/image/story/video/reel queue drafts can be re-validated via the "
+            "existing packet resolvers. media_type itself is never rewritten/normalized here -- "
+            "read back byte-identical, same as every other field this tool never touches."
         )
 
     platforms = queue_draft.get("platforms")
     if not isinstance(platforms, list) or not platforms:
         raise PromoteError(f"queue draft platforms must be a non-empty list, got {platforms!r}")
 
-    for required_meta in ("avatar_nickname", "image_engine", "image_prompt", "activity", "pose", "visual_style"):
-        if not metadata.get(required_meta):
-            raise PromoteError(f"queue draft metadata is missing required field: {required_meta}")
-    if provider == "higgsfield" and not metadata.get("resolution"):
-        raise PromoteError("queue draft metadata is missing required field: resolution")
+    if media_type in {"video", "reel"}:
+        # Provider-neutral video/Reel required fields (2026-07-11) -- matches
+        # exactly what resolve_packet_inputs_video()/build_queue_draft()'s
+        # video branch actually produce. Never requires image_engine/
+        # image_prompt/activity/pose/visual_style/resolution -- those are
+        # the photo/Higgsfield contract, not the video one.
+        for required_meta in ("avatar_nickname", "video_prompt"):
+            if not metadata.get(required_meta):
+                raise PromoteError(f"queue draft metadata is missing required field: {required_meta}")
+    else:
+        for required_meta in ("avatar_nickname", "image_engine", "image_prompt", "activity", "pose", "visual_style"):
+            if not metadata.get(required_meta):
+                raise PromoteError(f"queue draft metadata is missing required field: {required_meta}")
+        if provider == "higgsfield" and not metadata.get("resolution"):
+            raise PromoteError("queue draft metadata is missing required field: resolution")
 
 
 def _validate_clean_export(queue_draft: Dict[str, Any]) -> Dict[str, Any]:
@@ -484,19 +508,39 @@ def _revalidate_with_resolver(
         resolved.get("slot_id"),
         metadata.get("source_slot_id") or queue_draft.get("slot_id"),
     )
-    _check("image_engine", resolved.get("image_engine"), metadata.get("image_engine"))
-    _check("media_path", resolved.get("image_path"), queue_draft.get("media_path"))
-    _check("image_prompt", resolved.get("image_prompt"), metadata.get("image_prompt"))
-    _check("activity", resolved.get("activity"), metadata.get("activity"))
-    _check("pose", resolved.get("pose"), metadata.get("pose"))
-    _check("visual_style", resolved.get("visual_style"), metadata.get("visual_style"))
+    if provider == "video":
+        # Provider-neutral video/Reel cross-check (2026-07-11) -- compares
+        # against resolve_packet_inputs_video()'s own output shape
+        # (video_path, not image_path; video_prompt, not image_engine/
+        # image_prompt). image_prompt/provider/video_engine are optional in
+        # that resolver's output, so they're only cross-checked when the
+        # queue draft actually declares one -- an absent-on-both-sides value
+        # is not a mismatch.
+        _check("media_path", resolved.get("video_path"), queue_draft.get("media_path"))
+        _check("video_prompt", resolved.get("video_prompt"), metadata.get("video_prompt"))
+        _check("activity", resolved.get("activity"), metadata.get("activity"))
+        _check("pose", resolved.get("pose"), metadata.get("pose"))
+        _check("visual_style", resolved.get("visual_style"), metadata.get("visual_style"))
+        if metadata.get("image_prompt") or resolved.get("image_prompt"):
+            _check("image_prompt", resolved.get("image_prompt"), metadata.get("image_prompt"))
+        if metadata.get("provider") or resolved.get("provider"):
+            _check("provider", resolved.get("provider"), metadata.get("provider"))
+        if metadata.get("video_engine") or resolved.get("video_engine"):
+            _check("video_engine", resolved.get("video_engine"), metadata.get("video_engine"))
+    else:
+        _check("image_engine", resolved.get("image_engine"), metadata.get("image_engine"))
+        _check("media_path", resolved.get("image_path"), queue_draft.get("media_path"))
+        _check("image_prompt", resolved.get("image_prompt"), metadata.get("image_prompt"))
+        _check("activity", resolved.get("activity"), metadata.get("activity"))
+        _check("pose", resolved.get("pose"), metadata.get("pose"))
+        _check("visual_style", resolved.get("visual_style"), metadata.get("visual_style"))
 
-    if provider == "higgsfield":
-        _check("provider", resolved.get("provider"), metadata.get("provider"))
-        _check("custom_reference_id", resolved.get("custom_reference_id"), metadata.get("custom_reference_id"))
-        _check("resolution", resolved.get("resolution"), metadata.get("resolution"))
-        debug_artifacts = resolved.get("debug_artifacts") or {}
-        _check("provider_job_id", debug_artifacts.get("provider_job_id"), metadata.get("provider_job_id"))
+        if provider == "higgsfield":
+            _check("provider", resolved.get("provider"), metadata.get("provider"))
+            _check("custom_reference_id", resolved.get("custom_reference_id"), metadata.get("custom_reference_id"))
+            _check("resolution", resolved.get("resolution"), metadata.get("resolution"))
+            debug_artifacts = resolved.get("debug_artifacts") or {}
+            _check("provider_job_id", debug_artifacts.get("provider_job_id"), metadata.get("provider_job_id"))
 
     if mismatches:
         raise PromoteError(

@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -139,6 +141,66 @@ def _resolve_image_path(slot: Dict[str, Any]) -> Path:
     if not image_path.exists():
         raise ResolveError(f"rendered image does not exist on disk: {image_path}")
     return image_path
+
+
+def _resolve_video_path(slot: Dict[str, Any]) -> Path:
+    """Video counterpart to _resolve_image_path(), reusing the exact same
+    generic expected_assets slot convention -- only the asset-lookup key
+    names are new (video_path/final_video_path, mirroring
+    seed_image_path/final_photo_path). Never provider-specific; the daily
+    workorder manifest/slot shape itself is not Kling-specific, only the
+    historical photo asset-key names were."""
+    expected_assets = slot.get("expected_assets") if isinstance(slot.get("expected_assets"), dict) else {}
+    raw = expected_assets.get("video_path") or expected_assets.get("final_video_path")
+    if not raw:
+        raise ResolveError("slot has no expected_assets.video_path or final_video_path")
+    video_path = Path(str(raw))
+    if not video_path.exists():
+        raise ResolveError(f"rendered video does not exist on disk: {video_path}")
+    return video_path
+
+
+def _probe_video_metadata(video_path: Path) -> Dict[str, Any]:
+    """Read-only local ffprobe call (no network, no provider call) to
+    measure the video's real duration/width/height directly from the file
+    itself -- never inferred, never fabricated from a workorder value.
+    Matches the same "measure the real artifact, don't trust a claimed
+    value" discipline resolve_packet_inputs_higgsfield() already uses for
+    real pixel dimensions via PIL."""
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise ResolveError("ffprobe is not available on PATH -- cannot measure real video duration/dimensions")
+    try:
+        out = subprocess.check_output(
+            [
+                ffprobe, "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height",
+                "-show_entries", "format=duration",
+                "-of", "json", str(video_path),
+            ],
+            stderr=subprocess.STDOUT, text=True, timeout=20,
+        )
+        data = json.loads(out)
+    except Exception as exc:
+        raise ResolveError(f"could not probe video metadata from {video_path}: {exc}") from exc
+
+    streams = data.get("streams") or []
+    fmt = data.get("format") or {}
+    if not streams:
+        raise ResolveError(f"no video stream found in {video_path}")
+    width = streams[0].get("width")
+    height = streams[0].get("height")
+    if width is None or height is None:
+        raise ResolveError(f"could not read width/height from {video_path}")
+    duration_raw = fmt.get("duration")
+    if duration_raw is None:
+        raise ResolveError(f"could not read duration from {video_path}")
+    try:
+        duration_seconds = float(duration_raw)
+    except Exception as exc:
+        raise ResolveError(f"invalid duration value {duration_raw!r} from {video_path}") from exc
+
+    return {"width": int(width), "height": int(height), "duration_seconds": duration_seconds}
 
 
 def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
@@ -264,6 +326,89 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "image_engine": image_engine,
         "image_prompt": image_prompt,
         "debug_artifacts": debug_artifacts,
+        "intended_packet_output_path": str(intended_packet_path),
+        "intended_packet_output_already_exists": intended_packet_path.exists(),
+        "files_written_this_run": [],
+    }
+
+
+# --- Video/Reel resolver (read-only, reuses Rule Zero) ----------------------
+#
+# Provider-neutral (2026-07-11): resolves a video/Reel asset for a slot,
+# reusing the exact same generic daily-manifest/QA machinery
+# (_load_daily_manifest/_resolve_slot/_resolve_qa) the photo resolver
+# already uses -- none of which are Kling-specific in shape. Does not touch
+# or duplicate resolve_packet_inputs() or resolve_packet_inputs_higgsfield();
+# both remain byte-identical to before this addition.
+#
+# "provider" here is always read from the slot's own metadata if genuinely
+# present and is NEVER defaulted to any specific generation provider
+# (including Kling) -- an absent value stays absent, never fabricated. This
+# is deliberately decoupled from how this function is dispatched to (see
+# tools/lena_promote_to_queue_v1.py's PROVIDER_RESOLVERS -- the "video" key
+# there is a resolver-selection key, not a generation-provider identity).
+
+def resolve_packet_inputs_video(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """Read-only. Provider-neutral video/Reel counterpart to
+    resolve_packet_inputs(). Raises ResolveError on any hard-fail condition.
+    Writes nothing, ever -- no QA scaffold, no packet, no queue draft."""
+    manifest = _load_daily_manifest(date_str)
+    slot = _resolve_slot(manifest, slot_id)
+    video_path = _resolve_video_path(slot)
+    probed = _probe_video_metadata(video_path)
+    qa_result = _resolve_qa(date_str, slot_id)
+
+    metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
+    production_scoring = qa_result.get("production_scoring") or {}
+    intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
+
+    # Same "fix the source, don't fabricate a value" discipline the photo
+    # resolver already uses for avatar_nickname/image_engine/image_prompt.
+    avatar_nickname = metadata.get("avatar_nickname")
+    if not avatar_nickname:
+        raise ResolveError(
+            f"slot '{slot_id}' metadata is missing avatar_nickname -- refusing to "
+            "fabricate a value. Fix the workorder, don't patch the queue draft."
+        )
+    video_prompt = metadata.get("video_prompt")
+    if not video_prompt:
+        raise ResolveError(
+            f"slot '{slot_id}' metadata is missing video_prompt -- refusing to "
+            "fabricate a value. Fix the workorder, don't patch the queue draft."
+        )
+
+    width = probed["width"]
+    height = probed["height"]
+    aspect_ratio = round(width / height, 4) if height else None
+
+    return {
+        "date": date_str,
+        "slot_id": slot_id,
+        "media_kind": "video",
+        "video_path": str(video_path),
+        "duration_seconds": probed["duration_seconds"],
+        "width": width,
+        "height": height,
+        "aspect_ratio": aspect_ratio,
+        "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
+        "qa_overall": qa_result.get("overall"),
+        "qa_publish_ready": qa_result.get("publish_ready"),
+        "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),
+        "qa_hook_strength": production_scoring.get("hook_strength", {}).get("score"),
+        "qa_styling_sexy_platform_safe": production_scoring.get("styling_sexy_platform_safe", {}).get("status"),
+        "workorder_caption": slot.get("caption"),
+        "lane": metadata.get("lane"),
+        "activity": slot.get("activity") or metadata.get("activity"),
+        "pose": slot.get("pose") or metadata.get("pose"),
+        "visual_style": slot.get("visual_style") or metadata.get("visual_style"),
+        "avatar_nickname": avatar_nickname,
+        "video_prompt": video_prompt,
+        # Optional -- a video generation may or may not have had a distinct
+        # still-image seed prompt of its own; never required for video.
+        "image_prompt": metadata.get("image_prompt"),
+        # Optional, never defaulted/fabricated -- see module comment above.
+        "provider": metadata.get("provider"),
+        "video_engine": metadata.get("video_engine"),
         "intended_packet_output_path": str(intended_packet_path),
         "intended_packet_output_already_exists": intended_packet_path.exists(),
         "files_written_this_run": [],
@@ -581,10 +726,17 @@ def build_packet_markdown(resolved: Dict[str, Any]) -> str:
     )
     lines.append("")
 
-    # 2. Image
-    lines.append("## 1. Image")
-    lines.append("")
-    lines.append(f"- **Path:** `{resolved['image_path']}`")
+    # 2. Image (or Video, 2026-07-11: media-kind-aware, additive only --
+    # the rest of this section's fields already use .get()-with-fallback and
+    # need no change for either media kind).
+    if resolved.get("media_kind") == "video":
+        lines.append("## 1. Video")
+        lines.append("")
+        lines.append(f"- **Path:** `{resolved['video_path']}`")
+    else:
+        lines.append("## 1. Image")
+        lines.append("")
+        lines.append(f"- **Path:** `{resolved['image_path']}`")
     lines.append(f"- **Lane / scene:** {resolved.get('lane') or 'unknown'}")
     if resolved.get("activity"):
         lines.append(f"- **Activity:** {resolved['activity']}")
@@ -742,8 +894,67 @@ def _assert_not_inside_live_queue(path: Path) -> None:
 def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dict[str, Any]:
     """Pure function, no I/O. Builds the queue-shaped draft dict. Always
     approved_for_live_publish: false, always a placeholder caption -- never
-    an auto-selected one (RULES.md: never auto-select a caption)."""
+    an auto-selected one (RULES.md: never auto-select a caption).
+
+    media_type/media_path are derived from what `resolved` actually
+    represents (2026-07-11) -- no longer unconditionally hardcoded to
+    "photo". A photo-resolved input (resolved.get("media_kind") is anything
+    other than "video") produces byte-identical output to before this
+    change; a video-resolved input (resolved["media_kind"] == "video", from
+    resolve_packet_inputs_video()) produces a genuinely new, additive
+    video-shaped draft -- never a hand-authored stopgap."""
     debug_artifacts = resolved.get("debug_artifacts") or {}
+    is_video = resolved.get("media_kind") == "video"
+
+    if is_video:
+        # Contract fields required by instagram_queue_bridge._validate_contract()'s
+        # provider-neutral video branch. resolve_packet_inputs_video() already
+        # hard-fails if avatar_nickname/video_prompt are missing, so they are
+        # always present here -- never a fabricated default.
+        metadata: Dict[str, Any] = {
+            "avatar_nickname": resolved["avatar_nickname"],
+            "video_prompt": resolved["video_prompt"],
+            "publish_packet_path": str(packet_output_path),
+            "qa_path": resolved.get("qa_path"),
+            "qa_overall": resolved.get("qa_overall"),
+            "source_date": resolved.get("date"),
+            "source_slot_id": resolved.get("slot_id"),
+            "generated_by": "tools/lena_build_publish_packet_v1.py",
+            "queue_draft_only": True,
+            "duration_seconds": resolved.get("duration_seconds"),
+            "width": resolved.get("width"),
+            "height": resolved.get("height"),
+            "aspect_ratio": resolved.get("aspect_ratio"),
+        }
+        if resolved.get("lane"):
+            metadata["lane"] = resolved["lane"]
+        if resolved.get("activity"):
+            metadata["activity"] = resolved["activity"]
+        if resolved.get("pose"):
+            metadata["pose"] = resolved["pose"]
+        if resolved.get("visual_style"):
+            metadata["visual_style"] = resolved["visual_style"]
+        # Optional, never fabricated -- see resolve_packet_inputs_video()'s
+        # own comment on why these stay decoupled from a specific provider.
+        if resolved.get("image_prompt"):
+            metadata["image_prompt"] = resolved["image_prompt"]
+        if resolved.get("provider"):
+            metadata["provider"] = resolved["provider"]
+        if resolved.get("video_engine"):
+            metadata["video_engine"] = resolved["video_engine"]
+
+        return {
+            "post_id": resolved["slot_id"],
+            "slot_id": resolved["slot_id"],
+            "media_path": resolved["video_path"],
+            "media_type": "video",
+            "platforms": ["instagram"],
+            "caption": QUEUE_DRAFT_CAPTION_PLACEHOLDER,
+            "approved_for_live_publish": False,
+            "operator_review_required": True,
+            "metadata": metadata,
+        }
+
     metadata: Dict[str, Any] = {
         # Contract fields required by instagram_queue_bridge._validate_contract()
         # at live-publish time. resolve_packet_inputs() already hard-fails if any
@@ -858,7 +1069,7 @@ def main() -> int:
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
     parser.add_argument(
         "--provider",
-        choices=["kling", "higgsfield"],
+        choices=["kling", "higgsfield", "video"],
         default="kling",
         help=(
             "Explicit provider selector (default: kling, preserved for backward "
@@ -905,7 +1116,12 @@ def main() -> int:
             print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
             return 1
 
-    resolver = resolve_packet_inputs_higgsfield if args.provider == "higgsfield" else resolve_packet_inputs
+    if args.provider == "higgsfield":
+        resolver = resolve_packet_inputs_higgsfield
+    elif args.provider == "video":
+        resolver = resolve_packet_inputs_video
+    else:
+        resolver = resolve_packet_inputs
     try:
         resolved = resolver(args.date, args.slot_id, out_dir)
     except ResolveError as exc:
