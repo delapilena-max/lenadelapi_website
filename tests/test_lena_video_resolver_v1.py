@@ -269,3 +269,196 @@ def test_build_queue_draft_emits_video(tmp_path: Path, isolated_roots) -> None:
     assert draft["metadata"]["duration_seconds"] == pytest.approx(3.0, abs=0.3)
     assert draft["metadata"]["width"] == 640
     assert draft["metadata"]["height"] == 1136
+
+
+# --- pose_body_language_id / expression_gaze_id forwarding (2026-07-11) ----
+#
+# Photo (Kling-workorder-shaped) and video paths both read these two IDs
+# only from the real workorder slot's own metadata -- never from the
+# free-text `pose` field, never from image_prompt/video_prompt. Historical
+# workorders (every real one on disk today) genuinely lack both fields;
+# that must remain a clean, non-fabricated None, not a hard-fail.
+
+def _write_photo_workorder_with_provenance(
+    workorder_root: Path,
+    date_str: str,
+    slot_id: str,
+    image_path: Path,
+    pose_body_language_id=None,
+    expression_gaze_id=None,
+) -> None:
+    metadata = {
+        "avatar_nickname": "Lena",
+        "image_engine": "kling_image_3.0",
+        "image_prompt": "a real test prompt mentioning weight_shift_one_hip pose casually",
+    }
+    if pose_body_language_id is not None:
+        metadata["pose_body_language_id"] = pose_body_language_id
+    if expression_gaze_id is not None:
+        metadata["expression_gaze_id"] = expression_gaze_id
+    manifest = {
+        "date": date_str,
+        "slots": [
+            {
+                "slot_id": slot_id,
+                "caption": "test caption\n\n#test",
+                "activity": "test activity",
+                # Deliberately contains text that overlaps a real pose/expression
+                # ID's label, to prove forwarding never parses this field.
+                "pose": "weight shift onto one hip, closed mouth smile direct",
+                "visual_style": "test visual style",
+                "expected_assets": {"seed_image_path": str(image_path)},
+                "metadata": metadata,
+            }
+        ],
+    }
+    out_path = workorder_root / date_str / "daily_workorders.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
+# 9. pose_body_language_id is forwarded (photo/Kling-shaped path) when present.
+# 10. expression_gaze_id is forwarded (photo/Kling-shaped path) when present.
+# 11. Both exact values survive into resolve_packet_inputs()'s output.
+def test_photo_resolution_forwards_pose_and_expression_ids_when_present(tmp_path: Path, isolated_roots) -> None:
+    from PIL import Image
+
+    date_str = "2026-07-11"
+    slot_id = "2026-07-11-07-photo"
+    image_path = tmp_path / "assets" / "seed7.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(image_path, format="PNG")
+
+    _write_photo_workorder_with_provenance(
+        isolated_roots["workorder_root"], date_str, slot_id, image_path,
+        pose_body_language_id="pose_p001", expression_gaze_id="exp_g001",
+    )
+    _write_qa_pass(isolated_roots["asset_review_root"], date_str, slot_id)
+
+    resolved = resolve_packet_inputs(date_str, slot_id)
+    assert resolved["pose_body_language_id"] == "pose_p001"
+    assert resolved["expression_gaze_id"] == "exp_g001"
+
+
+# 4/5/8. Missing fields remain genuinely None -- historical workorders
+# (every real one on disk today) build successfully without either field.
+def test_photo_resolution_leaves_pose_and_expression_ids_none_when_absent(tmp_path: Path, isolated_roots) -> None:
+    from PIL import Image
+
+    date_str = "2026-07-11"
+    slot_id = "2026-07-11-08-photo"
+    image_path = tmp_path / "assets" / "seed8.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(image_path, format="PNG")
+
+    # Uses the pre-existing helper -- its workorder has no
+    # pose_body_language_id/expression_gaze_id at all, matching every real
+    # historical workorder in the repo today.
+    _write_photo_workorder(isolated_roots["workorder_root"], date_str, slot_id, image_path)
+    _write_qa_pass(isolated_roots["asset_review_root"], date_str, slot_id)
+
+    resolved = resolve_packet_inputs(date_str, slot_id)
+    assert resolved["pose_body_language_id"] is None
+    assert resolved["expression_gaze_id"] is None
+    # Historical compatibility: build_queue_draft() still succeeds and the
+    # keys are absent entirely from metadata, never written as None/"".
+    draft = build_queue_draft(resolved, Path("dummy_packet.md"))
+    assert "pose_body_language_id" not in draft["metadata"]
+    assert "expression_gaze_id" not in draft["metadata"]
+
+
+# 6/7. No inference from the free-text pose field or image_prompt, even
+# when that text happens to overlap a real pose/expression label.
+def test_photo_resolution_never_infers_ids_from_pose_text_or_prompt(tmp_path: Path, isolated_roots) -> None:
+    from PIL import Image
+
+    date_str = "2026-07-11"
+    slot_id = "2026-07-11-09-photo"
+    image_path = tmp_path / "assets" / "seed9.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(image_path, format="PNG")
+
+    # No pose_body_language_id/expression_gaze_id passed -- but the
+    # free-text `pose` field and image_prompt (set inside the helper)
+    # deliberately contain real pose/expression label text.
+    _write_photo_workorder_with_provenance(
+        isolated_roots["workorder_root"], date_str, slot_id, image_path,
+    )
+    _write_qa_pass(isolated_roots["asset_review_root"], date_str, slot_id)
+
+    resolved = resolve_packet_inputs(date_str, slot_id)
+    assert resolved["pose"] == "weight shift onto one hip, closed mouth smile direct"
+    assert resolved["pose_body_language_id"] is None
+    assert resolved["expression_gaze_id"] is None
+
+
+# 2/3/11. expression_gaze_id/pose_body_language_id forwarded on the video
+# path when present, and both exact values survive into build_queue_draft().
+@requires_ffmpeg
+def test_video_resolution_forwards_and_preserves_pose_and_expression_ids(tmp_path: Path, isolated_roots) -> None:
+    date_str = "2026-07-11"
+    slot_id = "2026-07-11-10-video"
+    video_path = _make_test_video(tmp_path / "assets" / "clip10.mp4", duration=3.0, width=640, height=1136)
+
+    manifest = {
+        "date": date_str,
+        "slots": [{
+            "slot_id": slot_id,
+            "caption": "test video caption\n\n#test",
+            "activity": "test activity",
+            "pose": "test pose text",
+            "visual_style": "test visual style",
+            "expected_assets": {"video_path": str(video_path)},
+            "metadata": {
+                "avatar_nickname": "Lena",
+                "video_prompt": "a real test video prompt",
+                "lane": "test_lane",
+                "pose_body_language_id": "pose_p001",
+                "expression_gaze_id": "exp_g001",
+            },
+        }],
+    }
+    out_path = isolated_roots["workorder_root"] / date_str / "daily_workorders.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    _write_qa_pass(isolated_roots["asset_review_root"], date_str, slot_id)
+
+    resolved = resolve_packet_inputs_video(date_str, slot_id)
+    assert resolved["pose_body_language_id"] == "pose_p001"
+    assert resolved["expression_gaze_id"] == "exp_g001"
+
+    draft = build_queue_draft(resolved, Path("dummy_packet.md"))
+    assert draft["metadata"]["pose_body_language_id"] == "pose_p001"
+    assert draft["metadata"]["expression_gaze_id"] == "exp_g001"
+
+
+# 9/10/11/12/13. build_queue_draft() (photo path) preserves the two new
+# fields exactly, and every pre-existing identity/creative field
+# (wardrobe_outfit_id N/A here since not set by this fixture; source_slot_id,
+# slot_id, post_id, activity, media_type) remains unchanged.
+def test_build_queue_draft_photo_preserves_pose_and_expression_ids_and_existing_identity(tmp_path: Path, isolated_roots) -> None:
+    from PIL import Image
+
+    date_str = "2026-07-11"
+    slot_id = "2026-07-11-11-photo"
+    image_path = tmp_path / "assets" / "seed11.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(image_path, format="PNG")
+
+    _write_photo_workorder_with_provenance(
+        isolated_roots["workorder_root"], date_str, slot_id, image_path,
+        pose_body_language_id="pose_p001", expression_gaze_id="exp_g001",
+    )
+    _write_qa_pass(isolated_roots["asset_review_root"], date_str, slot_id)
+
+    resolved = resolve_packet_inputs(date_str, slot_id)
+    draft = build_queue_draft(resolved, Path("dummy_packet.md"))
+
+    assert draft["metadata"]["pose_body_language_id"] == "pose_p001"
+    assert draft["metadata"]["expression_gaze_id"] == "exp_g001"
+    # Pre-existing identity/creative fields unchanged by this slice.
+    assert draft["slot_id"] == slot_id
+    assert draft["post_id"] == slot_id
+    assert draft["metadata"]["source_slot_id"] == slot_id
+    assert draft["metadata"]["activity"] == "test activity"
+    assert draft["media_type"] == "photo"

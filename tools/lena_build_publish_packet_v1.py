@@ -315,6 +315,13 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "lane": metadata.get("lane"),
         "activity": slot.get("activity") or metadata.get("activity"),
         "pose": slot.get("pose") or metadata.get("pose"),
+        # Structured creative-provenance IDs (2026-07-11): sourced only from
+        # the real workorder slot's own metadata -- never inferred from the
+        # free-text `pose` field above, never from image_prompt. Historical
+        # Kling workorders predate these banks and will genuinely have
+        # neither field; left None (never fabricated), not a hard-fail.
+        "pose_body_language_id": metadata.get("pose_body_language_id"),
+        "expression_gaze_id": metadata.get("expression_gaze_id"),
         # Real Kling workorder slots already carry a genuine visual_style
         # value (pipeline/prompting/lena_prompt_brain.py's workorder-building
         # code sets both slot["visual_style"] and metadata["visual_style"]
@@ -400,6 +407,13 @@ def resolve_packet_inputs_video(date_str: str, slot_id: str, out_dir: Optional[P
         "lane": metadata.get("lane"),
         "activity": slot.get("activity") or metadata.get("activity"),
         "pose": slot.get("pose") or metadata.get("pose"),
+        # Structured creative-provenance IDs (2026-07-11): same sourcing
+        # discipline as resolve_packet_inputs() -- real workorder slot
+        # metadata only, never inferred from the free-text `pose` field
+        # above. Absent for every real video slot today (no evidence of
+        # these fields existing yet on the video path); left None.
+        "pose_body_language_id": metadata.get("pose_body_language_id"),
+        "expression_gaze_id": metadata.get("expression_gaze_id"),
         "visual_style": slot.get("visual_style") or metadata.get("visual_style"),
         "avatar_nickname": avatar_nickname,
         "video_prompt": video_prompt,
@@ -615,6 +629,14 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         # invented concept.
         "activity": manifest.get("lane"),
         "pose": manifest.get("pose_text"),
+        # Structured creative-provenance IDs (2026-07-11): read only from
+        # the real, authoritative Higgsfield generation manifest's own
+        # pose_body_language_id/expression_gaze_id fields -- never inferred
+        # from pose_text (free-text description) or image_prompt. Historical
+        # renders that predate these two banks will genuinely lack one or
+        # both; left None (never fabricated, never guessed).
+        "pose_body_language_id": manifest.get("pose_body_language_id"),
+        "expression_gaze_id": manifest.get("expression_gaze_id"),
         "visual_style": _resolve_higgsfield_visual_style(manifest, date_str, slot_id),
         "reference_binding_mode": manifest.get("reference_binding_mode"),
         "avatar_nickname": cli_soul_name,
@@ -932,6 +954,15 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
             metadata["activity"] = resolved["activity"]
         if resolved.get("pose"):
             metadata["pose"] = resolved["pose"]
+        # Structured creative-provenance IDs (2026-07-11): forwarded only
+        # when the resolver actually returned a real value from the
+        # authoritative manifest/workorder-metadata -- absent entirely
+        # otherwise, matching the existing activity/pose/visual_style
+        # forwarding pattern immediately above/below.
+        if resolved.get("pose_body_language_id"):
+            metadata["pose_body_language_id"] = resolved["pose_body_language_id"]
+        if resolved.get("expression_gaze_id"):
+            metadata["expression_gaze_id"] = resolved["expression_gaze_id"]
         if resolved.get("visual_style"):
             metadata["visual_style"] = resolved["visual_style"]
         # Optional, never fabricated -- see resolve_packet_inputs_video()'s
@@ -990,6 +1021,15 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
         metadata["activity"] = resolved["activity"]
     if resolved.get("pose"):
         metadata["pose"] = resolved["pose"]
+    # Structured creative-provenance IDs (2026-07-11): forwarded only when
+    # the resolver actually returned a real value from the authoritative
+    # manifest/workorder-metadata -- absent entirely otherwise (e.g. every
+    # historical Kling-path draft, which predate these two banks; byte-
+    # identical to before this change in that case).
+    if resolved.get("pose_body_language_id"):
+        metadata["pose_body_language_id"] = resolved["pose_body_language_id"]
+    if resolved.get("expression_gaze_id"):
+        metadata["expression_gaze_id"] = resolved["expression_gaze_id"]
     if resolved.get("visual_style"):
         metadata["visual_style"] = resolved["visual_style"]
     # Conditional, additive-only: absent entirely for the existing Kling path
