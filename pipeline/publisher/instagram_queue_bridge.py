@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import importlib
 import re
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -17,6 +18,14 @@ load_env_once()
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "pipeline" / "config" / "lena_kling_contract.json"
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.lena_verify_clean_export_v1 import (  # noqa: E402
+    CleanExportVerificationError,
+    verify_clean_export,
+)
 
 # Instagram's own documented feed-photo aspect-ratio range (width/height),
 # per Meta's Content Publishing API reference
@@ -81,6 +90,95 @@ def _validate_static_image_engine_and_prompt(meta: Dict[str, Any], specs: Dict[s
         raise ValueError(f"Lena contract violation: {media_type_label} missing image_prompt")
 
 
+def _validate_downstream_clean_export(payload: Dict[str, Any]) -> None:
+    """Fail-closed downstream clean-export gate (2026-07-11). Runs before
+    any media-type-specific branch in _validate_contract(), for every media
+    type -- clean-export is a universal outward-publishing requirement, not
+    a photo-only or Story-only one.
+
+    Does NOT merely trust metadata.clean_export_verified:true as a claim.
+    Independently re-verifies, right now, against the real files on disk,
+    by calling the exact same tools/lena_verify_clean_export_v1.py::
+    verify_clean_export() the promotion step already uses -- every hash is
+    recomputed fresh here, never carried over from promotion time. This
+    catches both tampering (the clean derivative file was modified after
+    promotion) and staleness (the metadata claims are stale/wrong), not
+    just absence.
+
+    Also independently confirms the queue item's actual media_path equals
+    the freshly-recomputed clean derivative path -- this is what prevents
+    "metadata claims clean but media_path points elsewhere" from ever
+    reaching a provider/upload call.
+
+    Raises ValueError (this module's existing contract-violation exception
+    shape -- no new exception type introduced) on any hard-fail condition.
+    There is no code path in this function that falls back to the raw
+    source; a failure here always means "do not publish this payload",
+    never "publish the raw source instead"."""
+    meta = payload.get("metadata") or {}
+
+    if meta.get("clean_export_verified") is not True:
+        raise ValueError(
+            "Lena contract violation: metadata.clean_export_verified is not the literal "
+            f"boolean true (got {meta.get('clean_export_verified')!r}) -- refusing to publish"
+        )
+
+    source_asset_path_raw = meta.get("source_asset_path")
+    if not source_asset_path_raw:
+        raise ValueError(
+            "Lena contract violation: metadata.source_asset_path is missing -- cannot "
+            "independently re-verify the clean-export contract"
+        )
+    source_asset_path = Path(str(source_asset_path_raw))
+
+    media_path_raw = payload.get("media_path")
+    if not media_path_raw:
+        raise ValueError("Lena contract violation: media_path is missing")
+    queued_media_path = Path(str(media_path_raw)).resolve()
+
+    # Independent, fresh re-verification against the real files on disk.
+    # verify_clean_export() itself already enforces: source exists, media
+    # type supported, derivative path != source path, derivative exists,
+    # sidecar exists/parses, sidecar source_sha256/output_sha256 match the
+    # recomputed hashes, verified_clean_after_scrub is literal true. No
+    # part of this is re-implemented here -- reusing the one existing gate
+    # rather than duplicating its logic.
+    try:
+        facts = verify_clean_export(source_asset_path)
+    except CleanExportVerificationError as exc:
+        raise ValueError(
+            f"Lena contract violation: downstream clean-export re-verification failed: {exc}"
+        ) from exc
+
+    if Path(facts["clean_derivative_path"]).resolve() != queued_media_path:
+        raise ValueError(
+            "Lena contract violation: queue media_path does not equal the independently "
+            f"re-verified clean derivative path (media_path={queued_media_path}, "
+            f"re-verified derivative={facts['clean_derivative_path']}) -- refusing, no "
+            "fallback to the raw source"
+        )
+
+    # Cross-check the queue item's own recorded claims against the fresh
+    # re-verification -- catches metadata that was correct at promotion
+    # time but has since gone stale or been tampered with, even in cases
+    # where the files on disk right now would otherwise still pass
+    # verify_clean_export() on their own.
+    stored_source_sha256 = meta.get("source_asset_sha256")
+    if stored_source_sha256 and stored_source_sha256 != facts["source_sha256"]:
+        raise ValueError(
+            "Lena contract violation: metadata.source_asset_sha256 "
+            f"{stored_source_sha256!r} does not match the recomputed source hash "
+            f"{facts['source_sha256']!r}"
+        )
+    stored_derivative_sha256 = meta.get("clean_export_derivative_sha256")
+    if stored_derivative_sha256 and stored_derivative_sha256 != facts["clean_derivative_sha256"]:
+        raise ValueError(
+            "Lena contract violation: metadata.clean_export_derivative_sha256 "
+            f"{stored_derivative_sha256!r} does not match the recomputed derivative hash "
+            f"{facts['clean_derivative_sha256']!r}"
+        )
+
+
 def _validate_contract(payload: Dict[str, Any]) -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
     specs = contract["required_media_specs"]
@@ -93,6 +191,13 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
     media_path = Path(str(payload.get("media_path") or ""))
     if not media_path.exists():
         raise ValueError(f"Lena contract violation: media_path missing: {media_path}")
+
+    # Fail-closed clean-export gate (2026-07-11) -- universal across every
+    # media type, runs before any type-specific branch below and before any
+    # media-staging/upload/Graph API call happens anywhere downstream of
+    # this function. See _validate_downstream_clean_export()'s own
+    # docstring for exactly what it independently re-verifies and why.
+    _validate_downstream_clean_export(payload)
 
     caption = str(payload.get("caption") or "")
     hashtag_count = len(re.findall(r"(?<!\\w)#[A-Za-z0-9_]+", caption))
