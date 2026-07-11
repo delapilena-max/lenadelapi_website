@@ -465,8 +465,31 @@ def meta_ready_for(platform: str, status: dict) -> bool:
     return False
 
 
-def candidate_posts(post_rows: list[dict], days_back: int, max_posts: int) -> list[dict]:
+def _post_log_key(row: dict) -> tuple:
+    return (row.get("date", ""), row.get("slot_id", ""), row.get("platform", ""))
+
+
+def resolve_structured_post_id(post_row: dict, metric_index: dict) -> str:
+    """Structured identity precedence (2026-07-11): prefers the real
+    instagram_media_id already attached to this post's metrics row (via
+    tools/lena_sync_architecture_a_receipts_to_metrics_v1.py, itself
+    sourced from a real Architecture A publish receipt -- never a
+    fabricated value) over the historical free-text 'post_id:<id>' notes
+    convention. Falls back to the legacy notes regex ONLY when no
+    structured value exists for this (date, slot_id, platform) key --
+    historical rows that only ever had the notes convention keep working
+    exactly as before, unweakened."""
+    metric_row = metric_index.get(_post_log_key(post_row))
+    if metric_row:
+        structured = (metric_row.get("instagram_media_id") or "").strip()
+        if structured:
+            return structured
+    return parse_post_id(post_row.get("notes", ""))
+
+
+def candidate_posts(post_rows: list[dict], metric_rows: list[dict], days_back: int, max_posts: int) -> list[dict]:
     cutoff = date.today() - timedelta(days=days_back)
+    metric_index = {_post_log_key(row): row for row in metric_rows}
     candidates = []
     for row in post_rows:
         family = platform_family(row.get("platform", ""))
@@ -475,7 +498,7 @@ def candidate_posts(post_rows: list[dict], days_back: int, max_posts: int) -> li
         row_date = parse_date(row.get("date", ""))
         if row_date and row_date < cutoff:
             continue
-        post_id = parse_post_id(row.get("notes", ""))
+        post_id = resolve_structured_post_id(row, metric_index)
         if not post_id:
             continue
         if not row.get("post_url", ""):
@@ -522,7 +545,7 @@ def main() -> int:
     post_rows = read_csv(post_log_path)
     metric_rows = read_csv(metrics_path)
     engagement_rows = read_csv(engagement_path)
-    candidates = candidate_posts(post_rows, args.days_back, args.max_posts)
+    candidates = candidate_posts(post_rows, metric_rows, args.days_back, args.max_posts)
 
     processed_comment_ids = state.setdefault("processed_comment_ids", {})
     last_metrics_pull = state.setdefault("last_metrics_pull_by_post_key", {})
