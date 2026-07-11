@@ -7,9 +7,69 @@
 
 ---
 
+## Primary Product Objective (standing -- not superseded by dated entries below)
+
+`content_bot` is being built as an autonomous media engine. For Lena, the
+goal is one coherent, minimally-supervised loop: strategy -> creative
+concept -> hook -> generation -> QA -> repair/retry decision -> approved
+asset -> caption/content package -> privacy-clean publish derivative ->
+queue -> autonomous publish -> receipt/provenance -> metrics ingestion ->
+learning -> next content decision. Reels are the primary growth lane, Feed
+second, Stories third. Every technical decision should be evaluated
+against: does this move Lena closer to autonomously generating and
+posting high-quality content without Nicolas manually orchestrating each
+step? Proving one publish, or choosing a publisher backend, is a
+subproblem, not the goal. Full detail and the honest current-autonomy
+assessment: `NEXT_SESSION_START.md`'s standing objective section and its
+2026-07-10/11 (later session) banner.
+
+---
+
 ## 0. Current State (Read This First)
 
-**Last updated:** 2026-07-10, later session (head-framing incident closed the loop: Candidate C (`readypack0709-pack003-08-photo`) was published live to the Instagram feed and found to have her head cut off. Root-caused to a real gap, not a bad source image: 9:16 images were being published as Instagram feed photos, a format Instagram does not natively support. Four commits landed in response, HEAD is now `b465412f`: a hard Instagram feed-photo aspect-ratio gate (`652c1262`, `pipeline/publisher/instagram_queue_bridge.py`), a new hard-gating QA schema-v4 field `head_framing_safety_margin` (`e0e92578`, `pipeline/qa/lena_photo_qa.py`), a real Instagram Story routing path for 9:16 images (`df5ce6c0`, `pipeline/posting_manager.py` + `pipeline/publisher/instagram_queue_bridge.py` + `pipeline/publisher/instagram_graph_adapter.py`), and a permanent headroom-framing addendum to the single Higgsfield `Framing:` prompt constant (`b465412f`, `pipeline/prompting/lena_prompt_brain.py`'s `HIGGSFIELD_FRAMING_REINFORCEMENT`). Two 9:16 renders generated after the framing-doctrine commit both pass the new gate -- one controlled one-off proof (`readypack0709-pack006-01-photo`, ~8.8% headroom) and one genuine normal-production-path proof with no manual override (`readypack0709-pack007-00-photo`, ~6.1% headroom) -- strong evidence, not yet a large-sample reliability guarantee. 9:16 remains the Lena generation standard; 4:5 is confirmed absent from Higgsfield's real aspect-ratio enum, 3:4 has documented framing regressions, 1:1 is unproven. Publishing remains paused; Candidate C remains historical and untouched; no Story has actually been published yet. Full detail: `NEXT_SESSION_START.md`'s top banner.)
+**Last updated:** 2026-07-10/11, later session (strategic correction from
+Nicolas: the actual goal is one autonomous Lena content loop, not
+publisher-choosing -- see "Primary Product Objective" above. This session's
+work is a subproblem within that loop, not the loop itself. HEAD is now
+`2f76e73f` (`feat: support video-backed Instagram Stories` --
+`instagram_graph_adapter.py::create_media_container()`'s Story branch now
+sends `video_url` when the media URL's extension is a known video type,
+reusing the file's own pre-existing unused `VIDEO_EXTENSIONS` constant;
+18/18 mocked validation, unproven live). A read-only Reel-pipeline audit
+found a major structural fact: **two disconnected, both-partially-proven
+Reel-capable publishing architectures exist** -- everything built this
+session (`posting_manager.py`/`instagram_queue_bridge.py`/
+`instagram_graph_adapter.py`, two-phase approval) has never touched a
+Reel, while a separate, older system
+(`tools/publishers/lena_publish_instagram_reels_v2_8.py` +
+`lena_meta_publish_common_v2_9.py`, its own `FINAL_PUBLISH_APPROVED_
+BY_NICOLAS` sidecar gate, its own `pipeline/publishing/lena/approved_
+queue/` format) already published a real Reel live on 2026-06-12
+(`instagram.com/reel/DZgWreqiECe/`) and was active as late as 2026-06-30 --
+and is undocumented in `tools/LEGACY_PROVIDER_SURFACES.md`. Which system is
+canonical going forward is an open decision, not resolved. Separately,
+**metadata-clean export is now DECIDED/REQUIRED, superseding the earlier
+"declined" framing**: Nicolas has explicitly required a PrivMeta-style
+(`https://github.com/DScaife/privmeta`) privacy-clean publish derivative --
+stripped of embedded AI-provenance/C2PA/IPTC metadata -- for all
+outward-bound Lena media, with the original provider asset and internal
+provenance/hashes always preserved internally, and outward-bound publishing
+eventually requiring the clean derivative rather than the raw original.
+`tools/lena_scrub_media_metadata_v1.py` exists on disk, untracked and
+uncommitted, and already implements the core PNG/video scrubbing logic, but
+is not wired into any publishing path and not yet fully validated against
+representative real Lena assets -- an earlier attempt this session paused
+mid-validation over a since-superseded concern, which is historical only
+and does not mean the capability is declined or unauthorized. Remaining
+open questions are technical (correctness/validation, immutable-original
+preservation, where the mandatory enforcement gate sits, how it works
+across whichever publishing architecture becomes canonical), not
+strategic. Full detail, including the honest 20-capability autonomy-state
+assessment: `NEXT_SESSION_START.md`'s matching banner.)
+
+**Earlier entry, still relevant (2026-07-10, later session, first real live Lena Story published end-to-end, two-phase caption/live-publish approval proven in production, music-backed Story preparation built. HEAD is now `2a2b6609`. Six real commits since the head-framing checkpoint below: `a13cf2ac` source-aware Story promotion (`--source-slot` threaded through record/promote/preflight, backward-compatible default), `cae3557d` splitting the single `approval_statement` into independent `caption_approval_statement` (required to record/apply a caption) and `live_publish_statement` (required only for promotion, null until explicitly given, legacy single-field artifacts like Candidate C's still accepted read-only, never rewritten), and `2a2b6609` `tools/lena_music_pool_v1.py` + `tools/lena_prepare_story_video_v1.py` (deterministic approved-track selection + 20s image+audio MP4 Story composition with a verified 19.0-20.0s fade-out). Production milestone: Nicolas explicitly approved a caption via the exact phrase `"I approve this caption"`, preflight correctly failed closed (no live authorization yet), Nicolas then explicitly gave `"I approve this for live publish"` (Claude refused an inexact phrasing first), and `readypack0709-pack007-00-photo-story` was promoted and published live -- real Instagram media ID `17879977575673516`, permalink `https://www.instagram.com/stories/lenadelapineapple.official/3938443513776354906`. New standing requirement from Nicolas: Stories/Reels require music going forward (feed photos exempt); this live Story predates that requirement and must not be deleted/altered/republished or treated as precedent for a future silent Story. A real gap was found and reported, not fixed: `instagram_queue_bridge.py`'s Reel/video branch doesn't actually verify a video stream exists (an audio-only file passes its duration check). A 15-track approved royalty-free audio pool was built (`assets/royaltyfree audio/`, Nicolas's explicit operator attestation for licensing, entirely uncommitted). Also uncommitted, parked mid-task: `tools/lena_prepare_feed_derivative_v1.py` (9:16->4:5 feed-safe derivative, visually good, gate-proof unfinished) and the real Story-video proof artifacts. Full detail: `NEXT_SESSION_START.md`'s top banner.)
+
+**Earlier entry, still relevant (2026-07-10, later session, head-framing incident closed the loop: Candidate C (`readypack0709-pack003-08-photo`) was published live to the Instagram feed and found to have her head cut off. Root-caused to a real gap, not a bad source image: 9:16 images were being published as Instagram feed photos, a format Instagram does not natively support. Four commits landed in response, HEAD is now `b465412f`: a hard Instagram feed-photo aspect-ratio gate (`652c1262`, `pipeline/publisher/instagram_queue_bridge.py`), a new hard-gating QA schema-v4 field `head_framing_safety_margin` (`e0e92578`, `pipeline/qa/lena_photo_qa.py`), a real Instagram Story routing path for 9:16 images (`df5ce6c0`, `pipeline/posting_manager.py` + `pipeline/publisher/instagram_queue_bridge.py` + `pipeline/publisher/instagram_graph_adapter.py`), and a permanent headroom-framing addendum to the single Higgsfield `Framing:` prompt constant (`b465412f`, `pipeline/prompting/lena_prompt_brain.py`'s `HIGGSFIELD_FRAMING_REINFORCEMENT`). Two 9:16 renders generated after the framing-doctrine commit both pass the new gate -- one controlled one-off proof (`readypack0709-pack006-01-photo`, ~8.8% headroom) and one genuine normal-production-path proof with no manual override (`readypack0709-pack007-00-photo`, ~6.1% headroom) -- strong evidence, not yet a large-sample reliability guarantee. 9:16 remains the Lena generation standard; 4:5 is confirmed absent from Higgsfield's real aspect-ratio enum, 3:4 has documented framing regressions, 1:1 is unproven. Publishing remains paused; Candidate C remains historical and untouched; no Story has actually been published yet. Full detail: `NEXT_SESSION_START.md`'s top banner.)
 
 **Earlier entry, still relevant (2026-07-10, direction change: after the Anthropic credential could not be found at any checked scope across two attempts, Nicolas explicitly parked the automated-vision branch and redirected to a prevention-first, evidence-driven approach. Built and validated this session: `pipeline/qa/lena_higgsfield_failure_memory.py`, a small read-only aggregator correlating existing QA records to existing Higgsfield generation manifests by `(lane, pose_body_language_id)`, wired into the real curator (`tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py`) so repeated real failures get excluded and one-off failures get flagged, not silently avoided. No new schema, no new persisted file, no database. `pipeline/qa/lena_vision_reviewer.py` remains parked, untouched, uncommitted -- no Anthropic API call was ever made. A real backward-compatibility bug found the same session was also fixed, narrowly, with explicit approval: `pose_action_scene_compliance` (added `f0dbb03a`) had broken `validate_qa_result()` for all 8 pre-existing Kling-era QA records (no legacy-schema exemption for the base checklist); a new `LEGACY_SCHEMA_VERSIONS_WITHOUT_POSE_ACTION_SCENE_COMPLIANCE = {"1","2"}` set fixes it without a new `SCHEMA_VERSION` bump, without weakening any other hard-gating field, and without rewriting any on-disk legacy file. Full detail: `NEXT_SESSION_START.md`'s top banner.)
 

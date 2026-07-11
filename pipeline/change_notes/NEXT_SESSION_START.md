@@ -2,6 +2,323 @@
 
 **Do not begin work until you've read the files below. Do not rely on chat memory.**
 
+## 🎯 PRIMARY PRODUCT OBJECTIVE (standing, not a dated checkpoint -- read this before any dated banner below, and re-read it every session, because it does not get superseded the way checkpoint banners do)
+
+**`content_bot` is being built as an autonomous media engine. For Lena
+specifically, "done" is not any single feature -- it is one coherent,
+minimally-supervised loop:**
+
+> strategy -> creative concept -> hook -> generation -> QA -> repair/retry
+> decision -> approved asset -> caption/content package -> privacy-clean
+> publish derivative -> queue -> autonomous publish -> receipt/provenance
+> -> metrics ingestion -> learning -> next content decision
+
+Reels are the primary growth lane. Feed is second. Stories are third.
+**Every technical decision should be evaluated against one question:**
+does this move Lena closer to correctly generating and posting
+high-quality content autonomously, without Nicolas manually orchestrating
+each step? Proving one Story publish, proving one Reel publish, or
+choosing a publisher backend are **subproblems**, not the goal. Do not let
+a publishing-architecture question (see the 2026-07-10/11 banner below)
+become the project itself -- it matters only because autonomous operation
+needs one coherent execution path, not disconnected publishing systems.
+
+The 20 real sub-capabilities autonomy requires, for tracking purposes only
+(this is not a checklist to complete in order, and most of these are still
+partial or missing -- see "Current autonomy truth" in the matching dated
+banner below for the honest, evidence-based state of each):
+strategy/content planning; creative direction; Reel concept generation;
+hook generation/selection; visual/video generation; identity continuity;
+scene/world coherence; video and image QA; hard-stop vs. retryable-failure
+classification; automated repair/retry where safely allowed; caption and
+content-package generation; privacy-clean publish-derivative preparation;
+approval-policy enforcement; queueing; publishing; publish receipts and
+provenance; metrics ingestion; winner/loser analysis; creative mutation of
+winners; autonomous next-content decisions.
+
+> ## ⚠️ STRATEGIC CORRECTION: THE GOAL IS ONE AUTONOMOUS LENA CONTENT LOOP, NOT PUBLISHER-CHOOSING; TWO COMPETING REEL-CAPABLE PUBLISHING ARCHITECTURES DISCOVERED; VIDEO-BACKED STORY GRAPH ROUTING SHIPPED; PRIVMETA-STYLE CLEAN-EXPORT METADATA SCRUBBING NOW DECIDED/REQUIRED (NOT YET VALIDATED OR INTEGRATED) (2026-07-10/11, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `2f76e73f`. Read the standing objective section above this banner first -- it is not dated and does not get superseded.
+>
+> **A. Real commit landed:** `2f76e73f` `feat: support video-backed Instagram
+> Stories` -- `pipeline/publisher/instagram_graph_adapter.py::
+> create_media_container()`'s Story branch now sends `video_url` (not
+> `image_url`) when the media URL's file extension is a known video type
+> (reusing this same file's own pre-existing, previously-unused
+> `VIDEO_EXTENSIONS` constant -- no new parameter, no signature change).
+> Image Stories, feed photos, and the Reel/video branch are all confirmed
+> byte-for-byte unchanged (18/18 mocked validation checks, zero real
+> network/Graph calls). **Not yet proven against the real Instagram API.**
+>
+> **B. Major finding: two disconnected, both-partially-proven Reel-capable
+> publishing architectures exist in this repo.** A read-only audit (full
+> detail: changelog's matching entry) found that everything built this
+> session and recently (`posting_manager.py` -> `instagram_queue_bridge.py`
+> -> `instagram_graph_adapter.py`, `pipeline/queue/*.json`, the two-phase
+> caption/live-publish approval chain) has never touched a Reel. But a
+> completely separate, older system --
+> `tools/publishers/lena_publish_instagram_reels_v2_8.py` +
+> `tools/publishers/lena_meta_publish_common_v2_9.py`, its own
+> `FINAL_PUBLISH_APPROVED_BY_NICOLAS` sidecar-file approval gate, its own
+> queue format under `pipeline/publishing/lena/approved_queue/` -- **already
+> published a real Instagram Reel live on 2026-06-12**
+> (`https://www.instagram.com/reel/DZgWreqiECe/`, real post/container IDs,
+> real R2 upload, verified via its own real dispatch report). This system
+> was still active as late as 2026-06-30 (real Kling video + lip-sync
+> generation, `task_status: "succeed"`, never published) and is **not
+> mentioned anywhere in `tools/LEGACY_PROVIDER_SURFACES.md`**, the doc this
+> whole project has treated as the authority on what's legacy vs. current.
+> Neither architecture has metrics ingestion, video QA, or a
+> learning-feedback loop. **Which one is canonical going forward is an
+> open decision, not resolved by this audit or this checkpoint.**
+>
+> **C. SUPERSEDES the paragraph that used to stand here: metadata-clean
+> export is now a DECIDED, REQUIRED standing architecture element of
+> Lena's autonomous publishing pipeline -- it is NOT an unresolved
+> product/policy question and it is NOT declined.** Nicolas has explicitly
+> required that a privacy-clean publish derivative (stripped of embedded
+> AI-provenance/C2PA/IPTC metadata) be produced for every piece of
+> outward-bound Lena media, and that outward-bound publishing eventually
+> require that clean derivative -- never the raw provider original. The
+> required architecture: (1) the original provider/source asset is always
+> preserved internally, untouched; (2) internal provenance and hashes are
+> always preserved internally; (3) a privacy-clean derivative is produced
+> from the original before anything leaves the pipeline; (4) outward-bound
+> publishing (R2/Instagram) will eventually be required to use only the
+> clean derivative. Intended long-term flow: `strategy -> generation -> QA
+> -> repair/retry -> final media preparation -> clean export -> clean-export
+> verification -> approval/policy gate -> queue -> R2 -> publish -> receipt
+> -> metrics -> learning`. Reference implementation to adapt (image/video
+> metadata-cleaning technique only, not the surrounding Next.js app) into
+> this repo's existing Python/FFmpeg environment: PrivMeta,
+> `https://github.com/DScaife/privmeta`.
+> **Current real, code-verified status:** `tools/lena_scrub_media_
+> metadata_v1.py` exists on disk, is untracked and uncommitted (confirmed
+> via `git status`), implements PNG re-encode-to-strip-ancillary-chunks and
+> ffmpeg stream-copy-with-`-map_metadata -1` for video, fails closed if
+> suspicious metadata remains, and never mutates the source file -- but it
+> is a standalone utility only: it is **not wired into any publishing
+> path**, **not yet a mandatory enforcement gate anywhere in code**, and
+> **not yet fully validated against a representative sample of real Lena
+> assets**. An earlier attempt this session paused mid-validation over a
+> since-superseded concern (full history: changelog's matching entry) --
+> that pause is historical only and must not be read as the capability
+> being declined, unauthorized, or still undecided. **Status: DECIDED /
+> REQUIRED, but NOT YET VALIDATED OR INTEGRATED.** The real open questions
+> now are technical, not strategic: is the existing scrubber implementation
+> correct and PrivMeta-equivalent for images/videos; does it reliably
+> preserve source originals immutably; does it produce and verify clean
+> derivatives correctly at scale; where should the mandatory enforcement
+> gate sit so no outward-bound Lena media can reach R2/Instagram without
+> passing it; and how that gate should work across whichever publishing
+> architecture (see B) becomes canonical. None of these are resolved yet.
+>
+> **D. Current autonomy truth (honest, evidence-based, as of this
+> checkpoint) -- see the standing objective section above for the full
+> 20-capability frame this maps against:**
+> - **Fully autonomous end-to-end: none.** No stage of the Lena pipeline
+>   runs unattended from a strategy decision through a published, measured
+>   post without a human touchpoint.
+> - **Partially automated, real code, human-gated by design:** image
+>   generation (Higgsfield/Kling, real, CLI-invoked); the two-phase
+>   caption/live-publish approval chain (real, tested, proven live once --
+>   intentionally human-gated, not a bug to remove without a real
+>   autonomy-safety redesign); promotion/publish (real, proven live once
+>   for a photo-as-Story via the new architecture, real and proven live
+>   once for a Reel via the old v2.8 architecture).
+> - **Structurally implemented, unproven live:** video-backed Story Graph
+>   routing (this session, mocked-only); music-backed Story-video
+>   composition (this session, local ffmpeg proof only, never wired into
+>   any queue/publish path); Reel promotion through the new architecture
+>   (blocked -- `lena_promote_to_queue_v1.py`'s media_type allowlist
+>   excludes video/reel today).
+> - **Missing entirely:** any automated strategy/hook decision-maker that
+>   picks Reel concepts without a human seeding the workorder; any metrics
+>   ingestion from real Instagram Insights/performance data; any learning
+>   loop connecting actual published-post performance to future generation
+>   choices (`pipeline/qa/lena_higgsfield_failure_memory.py` learns from
+>   QA pass/fail patterns only, never from real audience performance --
+>   the closest existing analog, still a real gap); any video-specific QA
+>   (confirmed zero video/reel/duration/fps/motion fields anywhere in
+>   `lena_photo_qa.py`); a single unified production path (see B).
+> - **Not verified this session, needs a direct look before being
+>   described either way:** `pipeline/agents/lena/80_repair/` (the
+>   folder-native slice presumably covering repair/retry decisions) was
+>   not inspected this session -- do not assume it is either built or
+>   empty without checking.
+>
+> **E. Evaluation of the two publishing architectures against autonomy
+> criteria (evidence-based, not a recommendation to switch):** the v2.8
+> system has real, structured, already-proven-live dispatch/receipt
+> infrastructure (`dry_run`-aware, per-item `state_after`, a real
+> `approved_queue` batch format) that looks more built-for unattended batch
+> dispatch by design -- but it is undocumented in this team's own legacy
+> registry, meaning its current maintenance/understanding status is
+> genuinely unclear. The new architecture has the more rigorously-tested,
+> more explicit fail-closed approval chain (this session's two-phase split,
+> Rule Zero identity verification, extensive scratch-fixture validation
+> discipline) but currently excludes video/reel from promotion entirely and
+> has a simpler, less battle-tested receipt shape. **Neither has metrics
+> ingestion or a learning loop -- a wash on the dimension that matters most
+> for the actual product goal.** This comparison is deliberately not
+> resolved into a recommendation here -- picking the canonical path is a
+> real decision for Nicolas, not something to infer from code quality
+> alone.
+>
+> **F. Next approved step:** none pre-approved. Per Nicolas's explicit
+> strategic correction, the next real technical work (not yet started)
+> should be selected by asking: what is the single biggest blocker to Lena
+> autonomously creating a good Reel, QAing it, preparing it, safely
+> publishing it, recording the result, and learning from it -- not by
+> continuing Story-only feature work. Do not spend further session time on
+> Story-specific features unless they directly serve that larger loop.
+>
+> **G. What must not be done.** No publish without explicit authorization
+> under current policy. No provider call (Higgsfield/Kling/Anthropic/
+> Jamendo) unless approved. No `.env` change. No unrelated cleanup, no
+> touching the unrelated dirty pile. No accidental queue mutation. No media
+> file committed unless explicitly authorized. Do not claim the clean-export
+> metadata-scrubbing capability described in C is already validated,
+> integrated, wired into publishing, live, or a fail-closed production gate
+> -- it is decided and required, but that work is not done yet. Do not
+> treat the architecture-fork question in B as resolved -- it isn't.
+>
+> Full detail: the changelog's matching 2026-07-10/11 (later session)
+> entries.
+
+> ## ✅ FIRST REAL LIVE LENA STORY PUBLISHED; TWO-PHASE CAPTION/LIVE-PUBLISH APPROVAL PROVEN END-TO-END IN PRODUCTION; MUSIC-BACKED STORY PREPARATION BUILT (2026-07-10, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `2a2b6609`.
+>
+> **A. What changed, in order, six real commits since the head-framing
+> checkpoint below:**
+> - `a13cf2ac` `feat: support source-aware Lena Story promotion` --
+>   `tools/lena_promote_to_queue_v1.py`, `tools/lena_record_publish_approval_v1.py`,
+>   `tools/lena_manual_one_off_preflight_v1.py` all gained an optional,
+>   explicit-only `source_slot_id`/`--source-slot` parameter (defaults to
+>   the item's own slot_id when omitted -- byte-identical for every
+>   pre-existing item). This lets a queue item whose own promotion identity
+>   deliberately differs from its real generation slot (e.g. a Story
+>   repackaging of an existing photo render, kept under a distinct slot_id
+>   so it can never collide with a future feed-photo promotion of the same
+>   render) still resolve Rule Zero and Higgsfield/Kling identity evidence
+>   against the TRUE source slot. Also widened the promotion media_type
+>   allowlist from `{photo,image}` to `{photo,image,story,stories}`.
+> - `cae3557d` `feat: separate caption approval from live publish
+>   authorization` -- the approval-artifact schema, previously one single
+>   `approval_statement` field required to equal `"I approve this for live
+>   publish"` just to record ANY approval (even a caption-only one), is now
+>   two independent fields: `caption_approval_statement` (required phrase
+>   `"I approve this caption"`, authorizes recording + applying the caption
+>   only) and `live_publish_statement` (required phrase `"I approve this
+>   for live publish"`, null/absent until explicitly given, required ONLY
+>   by promotion). Legacy single-field artifacts (e.g. Candidate C's) are
+>   accepted under a read-only compatibility path -- never rewritten,
+>   confirmed byte-identical before/after.
+> - `2a2b6609` `feat: add music-backed Lena Story preparation` --
+>   `tools/lena_music_pool_v1.py` (eligibility filtering against
+>   `assets/royaltyfree audio/manifest.json` -- re-verifies
+>   `commercial_use_allowed`/`license_type`/`license_proof_reference`/local
+>   file existence/real SHA-256 match/readable audio stream per track,
+>   never trusts the manifest alone; deterministic `sha256(slot_id) mod
+>   len(eligible)` track selection, never random) and
+>   `tools/lena_prepare_story_video_v1.py` (composes an approved 9:16 image
+>   + the deterministically-selected track into a 20.0s MP4 Story video,
+>   1152x2048, h264/aac, with a deterministic 1.0s audio fade-out from
+>   19.0s-20.0s -- objectively verified via windowed `volumedetect`, not
+>   just claimed). Neither tool is wired into live publishing yet --
+>   explicit standing instruction not to.
+>
+> **B. Real production milestone -- the first genuine, fully-authorized
+> live publish this pipeline has ever completed end-to-end.** Nicolas
+> explicitly approved a caption (`"the light stayed on for us\n\n
+> #sidewalkdinner #chicagonights #datenight"`) for `readypack0709-pack007-
+> 00-photo-story` (Story repackaging of the already-QA-passed
+> `readypack0709-pack007-00-photo` source slot) via the exact required
+> phrase `"I approve this caption"` -- recorded, applied to the queue
+> draft, confirmed non-promotional (approved_for_live_publish/
+> operator_review_required/queue_draft_only all unchanged). Preflight
+> correctly failed at that point (`live_publish_statement` was null) --
+> this was proven as CORRECT fail-closed behavior, not a bug. Nicolas then
+> separately, explicitly gave the exact phrase `"I approve this for live
+> publish"` (Claude refused a near-miss phrasing first and asked for the
+> literal required phrase) -- recorded, preflight then passed, promotion
+> dry-run then succeeded. Nicolas explicitly instructed "do not ask for
+> another confirmation" and to proceed. Real promotion
+> (`tools/lena_promote_to_queue_v1.py --promote`) wrote exactly one file to
+> `pipeline/queue/`; real publish
+> (`tools/process_queue.py --live --date readypack0709-pack007-00-photo-
+> story --max-posts 1`, filename-prefix-targeted, scanned 11 real queue
+> items, skipped the other 10 untouched) went live via the real Graph API
+> path (`instagram_queue_bridge.py` -> `instagram_graph_adapter.py`,
+> `media_type=STORIES`, `image_url`, never `video_url`/`REELS`/
+> `share_to_feed`). **Real result:** Instagram media ID
+> `17879977575673516`, permalink `https://www.instagram.com/stories/
+> lenadelapineapple.official/3938443513776354906`, R2 media URL
+> `https://pub-ee462a06dda9471ca44720da4c8597b5.r2.dev/lena/queue-media/
+> 2026-07-10/readypack0709-pack007-00-photo-story.png`, queue item moved to
+> `pipeline/queue/published/`. Source image
+> (`readypack0709-pack007-00-photo_seed.png`, sha256
+> `033d70d93091c77f8499a54adbe626ecef725e94e718a52a5229465ae462a71a`)
+> confirmed byte-unchanged throughout.
+>
+> **C. New standing product requirement from Nicolas, this session:**
+> Lena Stories and Reels require music -- a silent Story/Reel must not be
+> treated as production-complete going forward. (Feed photos are NOT
+> required to have music.) A read-only audit found two real gaps: (1) the
+> live Story published in B above had NO music (it predates this
+> requirement -- explicitly NOT to be deleted, altered, or republished,
+> and explicitly NOT to be used as precedent for future silent Stories);
+> (2) `instagram_queue_bridge.py`'s Reel/video contract branch only checks
+> that ffprobe can read *some* `format=duration` value -- empirically
+> confirmed this also succeeds on an audio-only MP3 with no video stream
+> at all, meaning the existing gate does not actually verify a video
+> stream is present. This gap was found and reported, NOT fixed this
+> session (out of scope; flagging for a future task).
+>
+> **D. Approved royalty-free audio pool, built and licensed this session
+> (Nicolas's explicit operator attestation, not any external license
+> document/URL):** `assets/royaltyfree audio/` -- 15 real MP3 files, all
+> valid/stereo/44100Hz, zero duplicate SHA-256s, indexed in
+> `manifest.json`/`manifest.csv` with `commercial_use_allowed: true`,
+> `license_type: "free use"`, `license_proof_reference: "operator
+> attestation"` on all 15. `artist`/`source`/`bpm`/`mood_tags` deliberately
+> left `null` -- never invented. The 20 ChatGPT-generated clips in the
+> same original request were explicitly rejected and never used. This
+> folder (audio files + both manifests) is entirely **uncommitted**.
+>
+> **E. Also uncommitted, parked mid-task, do not resume without explicit
+> instruction:** `tools/lena_prepare_feed_derivative_v1.py` (destination-
+> aware 9:16->4:5 feed-safe derivative composer -- contain-fit foreground +
+> blurred/darkened cover-fit background, both from the same source pixels,
+> no black bars, no crop) plus its real proof output
+> (`readypack0709-pack007-00-photo_feed.png` + provenance JSON) --
+> visually inspected and judged genuinely good (full head/hair/body/shoes
+> visible, professional-looking blurred pillarbox), but the remaining gate-
+> proof steps (feed-gate pass/fail comparison, Story-routing
+> reconfirmation, Reel-rejection reconfirmation) were never finished before
+> Nicolas redirected to the music-requirement work. Also uncommitted: the
+> real Story-video proof artifacts themselves
+> (`readypack0709-pack007-00-photo_story.mp4` + provenance,
+> 1152x2048/20.0s/h264+aac, fade-verified).
+>
+> **F. Next approved step:** none pre-approved beyond what's described
+> above. Do not wire the music-pool/Story-video tools into live publishing.
+> Do not resume the feed-derivative gate-proof work without explicit
+> instruction. Do not generate, publish, or promote anything further
+> without new explicit instruction.
+>
+> **G. What must not be done.** Do not delete, alter, or republish the
+> live Story from B (silent, pre-dates the music requirement, historical).
+> Do not treat it as justification for a future silent Story. Do not
+> rewrite or migrate Candidate C's (or any) legacy single-field approval
+> artifact. Do not invent `artist`/`source`/license facts for any of the
+> 15 audio tracks beyond the explicit operator attestation already
+> recorded. Do not fabricate a live-publish authorization phrase -- it
+> must always be the operator's own exact words. No Higgsfield/Kling/
+> Anthropic/Jamendo call, no R2 use beyond the one real publish in B, no
+> `.env` change, occurred anywhere in this session beyond what's already
+> described.
+>
+> Full detail: the changelog's matching 2026-07-10 (later session) entries
+> and the master pivot doc's §0 update.
+
 > ## ✅ HEAD-FRAMING INCIDENT CLOSED THE LOOP: LIVE PUBLISH FAILURE -> HARD GATES -> PERMANENT PROMPT FIX -> TWO POST-FIX 9:16 RENDERS PASS, ONE VIA NORMAL PRODUCTION PATH (2026-07-10, later session) -- read this before assuming any banner below is the latest checkpoint
 >
 > **A. What changed.** After Candidate C (`readypack0709-pack003-08-photo`)
