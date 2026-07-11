@@ -10,6 +10,7 @@ import tools.lena_sync_architecture_a_receipts_to_metrics_v1 as sync_mod
 from tools.lena_sync_architecture_a_receipts_to_metrics_v1 import (
     METRIC_FIELDS,
     LEGACY_METRIC_FIELDS,
+    NEW_CREATIVE_PROVENANCE_FIELDS,
     build_identity_fields,
     derive_date,
     derive_platform_label,
@@ -514,3 +515,241 @@ def test_missing_permalink_stays_blank(tmp_path: Path) -> None:
     assert "permalink" not in receipt  # real shape: genuinely absent
     identity = build_identity_fields(receipt, receipt_path)
     assert identity["permalink"] == ""
+
+
+# --- creative-provenance propagation (2026-07-11) ---------------------------
+#
+# wardrobe_outfit_id / pose_body_language_id / expression_gaze_id / lane
+# sourced only from the real queue-item metadata that
+# tools/lena_build_publish_packet_v1.py's build_queue_draft() already
+# writes -- never inferred from image_prompt/pose text/caption, never
+# fuzzy-matched, never recipe_id.
+
+def _promoted_queue_item_with_provenance(
+    post_id: str,
+    wardrobe_outfit_id=None,
+    pose_body_language_id=None,
+    expression_gaze_id=None,
+    activity=None,
+) -> dict:
+    metadata = {
+        "avatar_nickname": "Lena",
+        "source_date": "2026-07-11",
+        "source_slot_id": post_id,
+        # Deliberately contains text overlapping real pose/expression
+        # labels, to prove propagation never parses this field.
+        "pose": "weight shift onto one hip, closed mouth smile direct",
+        "image_prompt": "a real test prompt: weight_shift_one_hip, closed_mouth_smile_direct",
+    }
+    if wardrobe_outfit_id is not None:
+        metadata["wardrobe_outfit_id"] = wardrobe_outfit_id
+    if pose_body_language_id is not None:
+        metadata["pose_body_language_id"] = pose_body_language_id
+    if expression_gaze_id is not None:
+        metadata["expression_gaze_id"] = expression_gaze_id
+    if activity is not None:
+        metadata["activity"] = activity
+    return {
+        "post_id": post_id,
+        "slot_id": post_id,
+        "media_path": "C:\\fake\\assets\\raw_seed.png",
+        "media_type": "photo",
+        "platforms": ["instagram"],
+        "caption": "test caption\n\n#test",
+        "approved_for_live_publish": True,
+        "operator_review_required": False,
+        "metadata": metadata,
+    }
+
+
+# 1. wardrobe_outfit_id propagates from queue metadata into metrics row.
+# 2. pose_body_language_id propagates from queue metadata into metrics row.
+# 3. expression_gaze_id propagates from queue metadata into metrics row.
+# 4. metadata.activity propagates into the existing metrics `lane` column.
+def test_creative_provenance_propagates_when_present(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-cp-01-photo.json.receipt.json"
+    queue_item_path = published_dir / "test-cp-01-photo.json"
+    receipt = _real_receipt("test-cp-01-photo")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    _write_json(
+        queue_item_path,
+        _promoted_queue_item_with_provenance(
+            "test-cp-01-photo",
+            wardrobe_outfit_id="wc_p006",
+            pose_body_language_id="pose_p018",
+            expression_gaze_id="exp_g013",
+            activity="rooftop sunset",
+        ),
+    )
+
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["wardrobe_outfit_id"] == "wc_p006"
+    assert identity["pose_body_language_id"] == "pose_p018"
+    assert identity["expression_gaze_id"] == "exp_g013"
+    assert identity["lane"] == "rooftop sunset"
+
+
+# 6. Missing wardrobe_outfit_id remains blank.
+# 7. Missing pose_body_language_id remains blank.
+# 8. Missing expression_gaze_id remains blank.
+# 9. No pose ID is inferred from pose free text.
+# 10. No expression ID is inferred from prompt text.
+def test_creative_provenance_stays_blank_when_absent_and_never_inferred(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-cp-02-photo.json.receipt.json"
+    queue_item_path = published_dir / "test-cp-02-photo.json"
+    receipt = _real_receipt("test-cp-02-photo")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    # No wardrobe_outfit_id/pose_body_language_id/expression_gaze_id/activity
+    # passed -- but metadata.pose and metadata.image_prompt both contain
+    # real pose/expression label text (see helper above).
+    _write_json(queue_item_path, _promoted_queue_item_with_provenance("test-cp-02-photo"))
+
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["wardrobe_outfit_id"] == ""
+    assert identity["pose_body_language_id"] == ""
+    assert identity["expression_gaze_id"] == ""
+    assert identity["lane"] == ""
+
+
+# 11. No recipe_id is introduced.
+def test_creative_provenance_never_introduces_recipe_id() -> None:
+    assert "recipe_id" not in METRIC_FIELDS
+    assert "recipe_id" not in NEW_CREATIVE_PROVENANCE_FIELDS
+
+
+# 5. Existing nonblank historical lane values are preserved (never
+# overwritten, even with a different real value from queue metadata).
+def test_upsert_never_overwrites_nonblank_historical_lane(tmp_path: Path) -> None:
+    rows = [{
+        "date": "2026-07-11", "slot_id": "test-cp-03-photo", "platform": "Instagram Feed",
+        "lane": "coffee",  # real, pre-existing historical value
+    }]
+    identity = {
+        "date": "2026-07-11", "slot_id": "test-cp-03-photo", "platform": "Instagram Feed",
+        "media_type": "photo", "lane": "rooftop sunset",  # different real value
+        "wardrobe_outfit_id": "", "pose_body_language_id": "", "expression_gaze_id": "",
+        "post_id": "", "instagram_media_id": "", "permalink": "",
+        "source_slot_id": "", "publish_receipt_path": "", "source_asset_path": "",
+        "clean_derivative_path": "", "source_asset_sha256": "", "clean_export_derivative_sha256": "",
+        "clean_export_verified": "false",
+    }
+    rows, is_new = upsert_metrics_row(rows, identity)
+    assert is_new is False
+    assert rows[0]["lane"] == "coffee"  # untouched, not overwritten
+
+
+# Blank historical lane IS filled in from real queue metadata.
+def test_upsert_fills_blank_historical_lane(tmp_path: Path) -> None:
+    rows = [{
+        "date": "2026-07-11", "slot_id": "test-cp-04-photo", "platform": "Instagram Feed",
+        "lane": "",
+    }]
+    identity = {
+        "date": "2026-07-11", "slot_id": "test-cp-04-photo", "platform": "Instagram Feed",
+        "media_type": "photo", "lane": "rooftop sunset",
+        "wardrobe_outfit_id": "wc_p006", "pose_body_language_id": "pose_p018", "expression_gaze_id": "exp_g013",
+        "post_id": "", "instagram_media_id": "", "permalink": "",
+        "source_slot_id": "", "publish_receipt_path": "", "source_asset_path": "",
+        "clean_derivative_path": "", "source_asset_sha256": "", "clean_export_derivative_sha256": "",
+        "clean_export_verified": "false",
+    }
+    rows, is_new = upsert_metrics_row(rows, identity)
+    assert is_new is False
+    assert rows[0]["lane"] == "rooftop sunset"
+    assert rows[0]["wardrobe_outfit_id"] == "wc_p006"
+    assert rows[0]["pose_body_language_id"] == "pose_p018"
+    assert rows[0]["expression_gaze_id"] == "exp_g013"
+
+
+# 12. Existing structured identity behavior remains unchanged.
+# 13/14. Existing clean-export provenance behavior remains unchanged.
+def test_creative_provenance_slice_preserves_existing_identity_and_clean_export(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-cp-05-photo.json.receipt.json"
+    queue_item_path = published_dir / "test-cp-05-photo.json"
+    receipt = _real_receipt("test-cp-05-photo")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    _write_json(queue_item_path, _promoted_queue_item("test-cp-05-photo", clean_export_verified=False))
+
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["post_id"] == "test-cp-05-photo"
+    assert identity["slot_id"] == "test-cp-05-photo"
+    assert identity["source_slot_id"] == "test-cp-05-photo"
+    assert identity["instagram_media_id"] == "17879977575673516"
+    assert identity["permalink"] == "https://www.instagram.com/stories/lenadelapineapple.official/123"
+    assert identity["publish_receipt_path"] == str(receipt_path)
+    assert identity["clean_export_verified"] == "false"
+    assert identity["source_asset_path"] == ""
+    assert identity["clean_derivative_path"] == ""
+    assert identity["source_asset_sha256"] == ""
+    assert identity["clean_export_derivative_sha256"] == ""
+
+
+# 15. Existing historical rows load successfully when the new creative
+# columns are absent from the CSV header (legacy-only header, no
+# wardrobe_outfit_id/pose_body_language_id/expression_gaze_id columns at all).
+# 16. Existing historical legacy-field values remain semantically unchanged
+# after a write.
+# 17. No duplicate rows are created.
+def test_historical_csv_without_creative_columns_loads_and_survives_upsert(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "metrics.csv"
+    with metrics_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=LEGACY_METRIC_FIELDS)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-06-24", "slot_id": "2026-06-24-01-photo", "platform": "Instagram Feed",
+            "media_type": "photo", "growth_bucket": "engagement", "lane": "coffee",
+            "hook_category": "coffee_walk", "post_url": "https://example.com/p/abc",
+            "audio_name": "", "reach": "0", "likes": "0", "saves": "0", "shares": "0",
+            "comments": "0", "follows": "0", "profile_visits": "0", "completion_rate": "0.0",
+            "replay_rate": "0.0", "score": "0.0", "classification": "weak",
+            "notes": "Auto-synced from posted queue q_abc; historical row.",
+        })
+
+    rows = read_csv(metrics_path)
+    assert len(rows) == 1
+    assert rows[0]["lane"] == "coffee"  # loads fine with a legacy-only header
+
+    identity = {
+        "date": "2026-07-11", "slot_id": "different-slot", "platform": "Instagram Feed",
+        "media_type": "photo", "post_id": "different-slot", "instagram_media_id": "999",
+        "permalink": "", "source_slot_id": "different-slot", "publish_receipt_path": "",
+        "source_asset_path": "", "clean_derivative_path": "", "source_asset_sha256": "",
+        "clean_export_derivative_sha256": "", "clean_export_verified": "false",
+        "lane": "rooftop sunset", "wardrobe_outfit_id": "wc_p006",
+        "pose_body_language_id": "pose_p018", "expression_gaze_id": "exp_g013",
+    }
+    rows, is_new = upsert_metrics_row(rows, identity)
+    assert is_new is True
+    assert len(rows) == 2  # no duplicate -- exactly one new row appended
+
+    write_csv(metrics_path, rows)
+    reloaded = read_csv(metrics_path)
+    assert len(reloaded) == 2
+    historical = next(r for r in reloaded if r["slot_id"] == "2026-06-24-01-photo")
+    # Every original legacy value preserved byte-identical; new creative
+    # columns present but blank for the untouched historical row.
+    assert historical["lane"] == "coffee"
+    assert historical["classification"] == "weak"
+    assert historical["notes"] == "Auto-synced from posted queue q_abc; historical row."
+    assert historical.get("wardrobe_outfit_id", "") == ""
+    assert historical.get("pose_body_language_id", "") == ""
+    assert historical.get("expression_gaze_id", "") == ""
+
+    new_row = next(r for r in reloaded if r["slot_id"] == "different-slot")
+    assert new_row["lane"] == "rooftop sunset"
+    assert new_row["wardrobe_outfit_id"] == "wc_p006"
+    assert new_row["pose_body_language_id"] == "pose_p018"
+    assert new_row["expression_gaze_id"] == "exp_g013"
+
+
+# 18/19/20. No network call, no Meta call, no real CSV mutation during
+# tests -- structural guarantee: this module imports no requests/Meta/
+# publisher surface, and every test above operates purely on tmp_path
+# fixtures, never pipeline/analytics/lena_post_metrics_v1_6_1.csv or any
+# other real repo path.

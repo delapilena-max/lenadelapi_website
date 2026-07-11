@@ -61,7 +61,22 @@ NEW_IDENTITY_FIELDS = [
     "clean_export_derivative_sha256",
     "clean_export_verified",
 ]
-METRIC_FIELDS = LEGACY_METRIC_FIELDS + NEW_IDENTITY_FIELDS
+# Creative-provenance columns (2026-07-11): sourced only from the real
+# Architecture A queue-item metadata that tools/lena_build_publish_packet_v1.py
+# already forwards there (never inferred from prompt/pose/caption text, never
+# fuzzy-matched, never a recipe_id). Brand-new columns -- no historical row
+# has ever had real data here, so they follow the exact same additive,
+# never-overwrite-nonempty-with-blank convergence semantics as
+# NEW_IDENTITY_FIELDS. `lane` is deliberately NOT listed here: it is a
+# pre-existing LEGACY_METRIC_FIELDS column that may already carry real
+# hand-entered historical data, so it gets its own, stricter
+# fill-only-when-blank handling in upsert_metrics_row() instead.
+NEW_CREATIVE_PROVENANCE_FIELDS = [
+    "wardrobe_outfit_id",
+    "pose_body_language_id",
+    "expression_gaze_id",
+]
+METRIC_FIELDS = LEGACY_METRIC_FIELDS + NEW_IDENTITY_FIELDS + NEW_CREATIVE_PROVENANCE_FIELDS
 
 DATE_PREFIX_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
@@ -225,6 +240,20 @@ def build_identity_fields(receipt: Dict[str, Any], receipt_path: Path) -> Dict[s
         "slot_id": slot_id,
         "platform": platform,
         "media_type": media_type,
+        # Creative provenance (2026-07-11): sourced only from the real
+        # queue-item metadata that tools/lena_build_publish_packet_v1.py's
+        # build_queue_draft() already writes -- never inferred from
+        # image_prompt/pose text/caption, never fuzzy-matched, never
+        # recipe_id. `lane` reads metadata.activity specifically: the prior
+        # audit confirmed build_queue_draft() forwards the resolver's real
+        # lane/scene value into metadata["activity"] (naming drift, not
+        # loss) -- there is no separate metadata["lane"] key written by any
+        # current provider path. Absent entirely on historical
+        # pre-provenance queue items; left "" (never guessed).
+        "lane": metadata.get("activity") or "",
+        "wardrobe_outfit_id": metadata.get("wardrobe_outfit_id") or "",
+        "pose_body_language_id": metadata.get("pose_body_language_id") or "",
+        "expression_gaze_id": metadata.get("expression_gaze_id") or "",
         "post_id": receipt.get("post_id") or "",
         "instagram_media_id": (
             receipt.get("instagram_media_id")
@@ -256,11 +285,20 @@ def upsert_metrics_row(
     for idx, row in enumerate(metric_rows):
         if metric_key(row) == key:
             updated = dict(row)
-            for field in NEW_IDENTITY_FIELDS:
+            for field in NEW_IDENTITY_FIELDS + NEW_CREATIVE_PROVENANCE_FIELDS:
                 if identity.get(field):
                     updated[field] = identity[field]
             if identity.get("media_type") and not updated.get("media_type"):
                 updated["media_type"] = identity["media_type"]
+            # `lane` is a pre-existing legacy column that may already carry
+            # real historical data (hand-entered or from an earlier real
+            # ingestion path) -- stricter than the identity/creative-
+            # provenance fields above: fill it in only when the existing
+            # row's lane is genuinely blank, and never touch (let alone
+            # overwrite) an already-nonblank historical value, even with a
+            # different real value from queue metadata.
+            if identity.get("lane") and not (updated.get("lane") or "").strip():
+                updated["lane"] = identity["lane"]
             metric_rows[idx] = updated
             return metric_rows, False
 
