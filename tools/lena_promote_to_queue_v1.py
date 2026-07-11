@@ -31,13 +31,38 @@ from __future__ import annotations
 #      draft's own metadata, field by field. A queue draft can never promote
 #      on self-reported metadata alone; any drift between the resolver's
 #      real answer and the draft's stored answer fails closed.
+#   4. Re-verifies the clean-export contract (2026-07-11,
+#      tools/lena_verify_clean_export_v1.py::verify_clean_export()) against
+#      the queue draft's raw media_path: a verified clean derivative +
+#      provenance sidecar must exist and match (every hash recomputed from
+#      disk, never trusted from the sidecar alone). This is what makes the
+#      clean derivative -- never the raw provider/source asset -- eligible
+#      to become the queue item's publish media path.
 #
-# The ONLY three fields this tool ever changes, on an otherwise byte-for-byte
-# copy of the queue draft:
+# Fields this tool changes, on an otherwise byte-for-byte copy of the queue
+# draft:
 #   approved_for_live_publish: false -> true
 #   operator_review_required:  true  -> false
 #   metadata.queue_draft_only: true  -> false
-# Caption, post_id, slot_id, media_path, media_type, platforms, provider,
+#   media_path: raw source asset path -> verified clean-export derivative
+#     path (2026-07-11, clean-export contract). ONLY changed after
+#     tools/lena_verify_clean_export_v1.py::verify_clean_export() proves, by
+#     recomputing every hash from the real files on disk, that a clean
+#     derivative + provenance sidecar for the draft's raw media_path exist
+#     and match. If that verification fails for any reason, promotion fails
+#     closed -- media_path is never left pointing at the raw source, there
+#     is no bypass flag, and the raw source is never silently treated as
+#     already clean.
+#   metadata.source_asset_path / metadata.source_asset_sha256 /
+#   metadata.clean_export_derivative_sha256 /
+#   metadata.clean_export_sidecar_path / metadata.clean_export_verified /
+#   metadata.clean_export_generated_by / metadata.clean_export_created_at_utc:
+#     new provenance fields (2026-07-11) recording the raw source asset
+#     separately, so it remains internally traceable even though it is no
+#     longer the queue item's publish media path. Only fields the scrubber's
+#     own sidecar schema actually produces are surfaced here -- no fabricated
+#     "scrubber version" field, since the current sidecar schema has none.
+# Caption, post_id, slot_id, media_type, platforms, provider,
 # provider_job_id, custom_reference_id, resolution, activity, pose,
 # visual_style, image_prompt, image_engine, avatar identity fields, and every
 # other existing key are read back byte-identical and never touched.
@@ -92,6 +117,10 @@ from tools.lena_record_publish_approval_v1 import (  # noqa: E402
     _count_hashtags,
     resolve_approval_output_path,
 )
+from tools.lena_verify_clean_export_v1 import (  # noqa: E402
+    CleanExportVerificationError,
+    verify_clean_export,
+)
 
 # Explicit provider -> resolver map. No auto-detection, no fallback: an
 # unrecognized provider string is simply not a key here and fails closed.
@@ -100,12 +129,26 @@ PROVIDER_RESOLVERS = {
     "higgsfield": resolve_packet_inputs_higgsfield,
 }
 
-# The exact, and only, three fields promotion ever changes. Order matches
-# the order they're described everywhere else in this module/docs.
+# The three original state-transition fields promotion changes. Order
+# matches the order they're described everywhere else in this module/docs.
 PROMOTED_STATE_FIELDS: tuple = (
     "approved_for_live_publish",
     "operator_review_required",
     "metadata.queue_draft_only",
+)
+
+# Clean-export contract fields (2026-07-11) promotion additionally changes,
+# only after verify_clean_export() passes. See the module docstring above
+# for exactly what each field means and why media_path is included here.
+CLEAN_EXPORT_PROMOTED_FIELDS: tuple = (
+    "media_path",
+    "metadata.source_asset_path",
+    "metadata.source_asset_sha256",
+    "metadata.clean_export_derivative_sha256",
+    "metadata.clean_export_sidecar_path",
+    "metadata.clean_export_verified",
+    "metadata.clean_export_generated_by",
+    "metadata.clean_export_created_at_utc",
 )
 
 
@@ -344,6 +387,40 @@ def _validate_queue_draft(
         raise PromoteError("queue draft metadata is missing required field: resolution")
 
 
+def _validate_clean_export(queue_draft: Dict[str, Any]) -> Dict[str, Any]:
+    """Read-only. Re-derives and re-verifies the clean-export derivative +
+    provenance sidecar for the queue draft's raw media_path via
+    tools/lena_verify_clean_export_v1.py::verify_clean_export() -- every
+    hash is recomputed from the real files on disk, never trusted from the
+    sidecar alone. Raises PromoteError (not the lower-level
+    CleanExportVerificationError) so promotion has one single error-handling
+    surface, matching every other validation step in this module. No bypass
+    flag exists; there is no code path that skips this check."""
+    media_path = Path(str(queue_draft.get("media_path") or ""))
+    try:
+        return verify_clean_export(media_path)
+    except CleanExportVerificationError as exc:
+        raise PromoteError(f"clean-export verification failed: {exc}") from exc
+
+
+def _apply_clean_export_fields(promoted_item: Dict[str, Any], clean_export_facts: Dict[str, Any]) -> None:
+    """Mutates promoted_item in place: points media_path at the verified
+    clean derivative and records the raw source separately as provenance
+    metadata. Pure field assignment, no I/O, no validation -- callers must
+    have already run _validate_clean_export()/verify_clean_export()
+    successfully before calling this. Split out from check_promote_to_queue()
+    so this exact contract (queue media path == clean derivative; raw
+    source preserved only as provenance) is independently unit-testable."""
+    promoted_item["media_path"] = clean_export_facts["clean_derivative_path"]
+    promoted_item["metadata"]["source_asset_path"] = clean_export_facts["source_path"]
+    promoted_item["metadata"]["source_asset_sha256"] = clean_export_facts["source_sha256"]
+    promoted_item["metadata"]["clean_export_derivative_sha256"] = clean_export_facts["clean_derivative_sha256"]
+    promoted_item["metadata"]["clean_export_sidecar_path"] = clean_export_facts["clean_provenance_sidecar_path"]
+    promoted_item["metadata"]["clean_export_verified"] = True
+    promoted_item["metadata"]["clean_export_generated_by"] = clean_export_facts["generated_by"]
+    promoted_item["metadata"]["clean_export_created_at_utc"] = clean_export_facts["created_at_utc"]
+
+
 def _revalidate_with_resolver(
     date_str: str,
     slot_id: str,
@@ -469,16 +546,23 @@ def check_promote_to_queue(
 
     resolved = _revalidate_with_resolver(date_str, slot_id, provider, queue_draft, out_dir, source_slot_id=source_slot_id)
 
+    clean_export_facts = _validate_clean_export(queue_draft)
+
     promoted_item = copy.deepcopy(queue_draft)
     promoted_item["approved_for_live_publish"] = True
     promoted_item["operator_review_required"] = False
     promoted_item["metadata"]["queue_draft_only"] = False
+    # Clean-export contract (2026-07-11): the queue item's publish media
+    # path becomes the verified clean derivative, never the raw source. The
+    # raw source is preserved separately as provenance metadata -- see the
+    # module docstring for the full invariant this enforces.
+    _apply_clean_export_fields(promoted_item, clean_export_facts)
 
     target_path = resolve_promoted_queue_output_path(slot_id, queue_root)
 
     already_promoted = False
     would_write = True
-    fields_that_would_change: List[str] = list(PROMOTED_STATE_FIELDS)
+    fields_that_would_change: List[str] = list(PROMOTED_STATE_FIELDS) + list(CLEAN_EXPORT_PROMOTED_FIELDS)
 
     if target_path.exists():
         existing = _load_json_object(target_path, "existing target queue item")
@@ -509,6 +593,7 @@ def check_promote_to_queue(
         "live_publish_statement": approval_facts["live_publish_statement"],
         "caption_sha256": _sha256_text(approval_facts["approved_caption"]),
         "resolver_qa_overall": resolved.get("qa_overall"),
+        "clean_export": clean_export_facts,
         "fields_that_would_change": fields_that_would_change,
         "would_write": would_write,
         "already_promoted": already_promoted,
@@ -540,10 +625,12 @@ def main() -> int:
             "queue item under pipeline/queue/. Re-validates the immutable approval artifact, "
             "the queue draft, and re-runs the existing provider resolver (Rule Zero) before "
             "writing -- never trusts the draft's self-reported metadata alone. Defaults to "
-            "dry-run (writes nothing); --promote performs the one write. Only three fields "
-            "ever change: approved_for_live_publish, operator_review_required, "
-            "metadata.queue_draft_only. Idempotent; fails closed on any existing, "
-            "non-identical target."
+            "dry-run (writes nothing); --promote performs the one write. Also re-verifies the "
+            "clean-export contract (tools/lena_verify_clean_export_v1.py) and, only on success, "
+            "points media_path at the verified clean derivative instead of the raw source, "
+            "preserving the raw source separately as provenance metadata. Idempotent; fails "
+            "closed on any existing, non-identical target, or if clean-export verification "
+            "fails."
         )
     )
     parser.add_argument("--date", required=True, help="YYYY-MM-DD")
