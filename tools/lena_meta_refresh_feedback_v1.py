@@ -569,10 +569,79 @@ def resolve_structured_post_id(post_row: dict, metric_index: dict) -> str:
     return parse_post_id(post_row.get("notes", ""))
 
 
+def metrics_row_actionable_post_id(metric_row: dict) -> str:
+    structured = (metric_row.get("instagram_media_id") or "").strip()
+    return structured
+
+
+def build_metrics_candidate_row(metric_row: dict) -> dict:
+    return {
+        "date": metric_row.get("date", ""),
+        "posted_at": "",
+        "platform": metric_row.get("platform", ""),
+        "slot_id": metric_row.get("slot_id", ""),
+        "asset_path": "",
+        "media_type": metric_row.get("media_type", ""),
+        "lane": metric_row.get("lane", ""),
+        "growth_bucket": metric_row.get("growth_bucket", ""),
+        "hook_category": metric_row.get("hook_category", ""),
+        "post_url": metric_row.get("post_url", "") or metric_row.get("permalink", ""),
+        "audio_name": metric_row.get("audio_name", ""),
+        "caption": "",
+        "pinned_comment": "",
+        "post_poll": "",
+        "story_poll": "",
+        "music_selected": "",
+        "manual_publish_approved": "",
+        "notes": metric_row.get("notes", ""),
+        "_post_id": metrics_row_actionable_post_id(metric_row),
+    }
+
+
 def candidate_posts(post_rows: list[dict], metric_rows: list[dict], days_back: int, max_posts: int) -> list[dict]:
     cutoff = date.today() - timedelta(days=days_back)
     metric_index = {_post_log_key(row): row for row in metric_rows}
-    candidates = []
+    candidates_by_key: dict[tuple, dict] = {}
+
+    def register_candidate(row: dict) -> None:
+        key = _post_log_key(row)
+        existing = candidates_by_key.get(key)
+        if existing is None:
+            candidates_by_key[key] = row
+            return
+
+        # Prefer the richer manual-log row when both sources describe the
+        # same canonical post identity. Preserve the already-resolved
+        # canonical platform post ID either way.
+        merged = dict(existing)
+        merged["_post_id"] = row.get("_post_id", "") or existing.get("_post_id", "")
+        for field in (
+            "posted_at",
+            "asset_path",
+            "caption",
+            "pinned_comment",
+            "post_poll",
+            "story_poll",
+            "music_selected",
+            "manual_publish_approved",
+            "notes",
+        ):
+            if row.get(field):
+                merged[field] = row[field]
+        for field in (
+            "media_type",
+            "lane",
+            "growth_bucket",
+            "hook_category",
+            "post_url",
+            "audio_name",
+        ):
+            if not merged.get(field) and row.get(field):
+                merged[field] = row[field]
+        if row.get("posted_at"):
+            merged["posted_at"] = row["posted_at"]
+        candidates_by_key[key] = merged
+
     for row in post_rows:
         family = platform_family(row.get("platform", ""))
         if not family:
@@ -583,9 +652,21 @@ def candidate_posts(post_rows: list[dict], metric_rows: list[dict], days_back: i
         post_id = resolve_structured_post_id(row, metric_index)
         if not post_id:
             continue
-        if not row.get("post_url", ""):
+        register_candidate(dict(row, _post_id=post_id))
+
+    for row in metric_rows:
+        family = platform_family(row.get("platform", ""))
+        if not family:
             continue
-        candidates.append(dict(row, _post_id=post_id))
+        row_date = parse_date(row.get("date", ""))
+        if row_date and row_date < cutoff:
+            continue
+        post_id = metrics_row_actionable_post_id(row)
+        if not post_id:
+            continue
+        register_candidate(build_metrics_candidate_row(row))
+
+    candidates = list(candidates_by_key.values())
     candidates.sort(key=lambda row: (row.get("date", ""), row.get("posted_at", "")), reverse=True)
     return candidates[:max_posts]
 
