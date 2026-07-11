@@ -26,6 +26,17 @@ Important: Instagram's API fetches media by public HTTPS URL. If the queue JSON
 already contains a public URL, this adapter uses it. Otherwise it stages a copy
 under CONTENT_BOT_PUBLIC_MEDIA_ROOT and constructs a URL from
 CONTENT_BOT_PUBLIC_MEDIA_BASE_URL. That root still must be served publicly.
+
+Clean-export defense-in-depth (2026-07-11): publish_post() independently
+re-verifies the clean-export contract (tools/lena_verify_clean_export_v1.py)
+before doing anything else -- including before resolving a public media URL
+or building any Meta request. This is a deliberate second gate: the
+canonical path (pipeline/publisher/instagram_queue_bridge.py::
+_validate_contract()) already enforces this, but this module's functions
+are public and importable directly (a real, present example:
+tools/instagram_publish_smoke.py calls publish_post() here without going
+through the bridge at all). See _validate_clean_export_before_publish()'s
+own docstring for exactly what it checks and why. There is no bypass flag.
 """
 from __future__ import annotations
 
@@ -37,9 +48,19 @@ import json
 import mimetypes
 import os
 import shutil
+import sys
 import time
 
 import requests
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.lena_verify_clean_export_v1 import (  # noqa: E402
+    CleanExportVerificationError,
+    verify_clean_export,
+)
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
@@ -340,8 +361,62 @@ def publish_media_container(*, ig_user_id: str, access_token: str, creation_id: 
     raise InstagramPublishError(f"Instagram media publish failed after retries: {last_error}")
 
 
+def _validate_clean_export_before_publish(payload: Dict[str, Any]) -> None:
+    """Fail-closed defense-in-depth gate (2026-07-11). The lowest-level
+    chokepoint in this module -- runs as the very first thing publish_post()
+    does, before any env var is read, before resolve_public_media_url() is
+    called, and before create_media_container() can ever be reached. This is
+    the last line of defense for any caller that reaches publish_post()
+    directly, without going through pipeline/publisher/
+    instagram_queue_bridge.py's own _validate_contract()/
+    _validate_downstream_clean_export() first -- a real, present example
+    being tools/instagram_publish_smoke.py.
+
+    Does NOT treat metadata.clean_export_verified as sufficient evidence on
+    its own -- reuses the same tools/lena_verify_clean_export_v1.py::
+    verify_clean_export() every other clean-export gate in this repo uses,
+    which recomputes every hash from the real files on disk right now. No
+    hashing or sidecar logic is reimplemented here.
+
+    Raises InstagramPublishError (this module's own existing exception type
+    -- no new exception type introduced) on any hard-fail condition. There
+    is no fallback to a raw source or to an unverified media_url/public URL
+    anywhere in this function, and no bypass flag exists."""
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+
+    source_asset_path_raw = metadata.get("source_asset_path")
+    if not source_asset_path_raw:
+        raise InstagramPublishError(
+            "clean-export verification failed: metadata.source_asset_path is missing -- "
+            "cannot independently verify this payload's media before publishing"
+        )
+    source_asset_path = Path(str(source_asset_path_raw))
+
+    media_path_raw = payload.get("media_path")
+    if not media_path_raw:
+        raise InstagramPublishError(
+            "clean-export verification failed: media_path is missing -- refusing to "
+            "resolve a public URL for unverifiable media"
+        )
+    queued_media_path = Path(str(media_path_raw)).resolve()
+
+    try:
+        facts = verify_clean_export(source_asset_path)
+    except CleanExportVerificationError as exc:
+        raise InstagramPublishError(f"clean-export verification failed: {exc}") from exc
+
+    if Path(facts["clean_derivative_path"]).resolve() != queued_media_path:
+        raise InstagramPublishError(
+            "clean-export verification failed: media_path does not equal the "
+            f"independently re-verified clean derivative path (media_path="
+            f"{queued_media_path}, re-verified derivative={facts['clean_derivative_path']}) "
+            "-- refusing, no fallback to raw source"
+        )
+
+
 def publish_post(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Publish one content_bot queue payload to Instagram."""
+    _validate_clean_export_before_publish(payload)
     access_token = _required_env("INSTAGRAM_GRAPH_ACCESS_TOKEN")
     ig_user_id = _required_env("INSTAGRAM_GRAPH_USER_ID")
     media_type = str(payload.get("media_type") or payload.get("type") or "photo")
