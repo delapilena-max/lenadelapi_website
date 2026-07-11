@@ -132,6 +132,73 @@ def score_model() -> dict:
     return {"weights": {}, "classification": {"winner": 75, "strong": 50, "neutral": 25}}
 
 
+def scoring_required_fields(model: dict | None = None) -> set[str]:
+    active_model = model or score_model()
+    weights = active_model.get("weights", {})
+    required = {field for field, weight in weights.items() if numeric(weight) > 0}
+    # score_row() always uses reach as the denominator for weighted engagement rates.
+    required.add("reach")
+    return required
+
+
+def metric_success(value) -> dict:
+    return {"ok": True, "value": numeric(value)}
+
+
+def metric_failure(reason: str) -> dict:
+    return {"ok": False, "reason": reason}
+
+
+def metric_result_value(result: dict) -> float | None:
+    if isinstance(result, dict) and result.get("ok"):
+        return numeric(result.get("value"))
+    return None
+
+
+def format_metric_value(field: str, value: float) -> str:
+    if field in {"completion_rate", "replay_rate"}:
+        return str(float(value))
+    return str(int(value))
+
+
+def merge_metric_field(existing_value, fetched_result: dict, field: str, is_new_row: bool) -> str:
+    value = metric_result_value(fetched_result)
+    if value is not None:
+        return format_metric_value(field, value)
+    if is_new_row:
+        return ""
+    return "" if existing_value is None else str(existing_value)
+
+
+def row_has_unknown_scoring_inputs(row: dict, model: dict | None = None) -> bool:
+    for field in scoring_required_fields(model):
+        if str(row.get(field, "")).strip() == "":
+            return True
+    return False
+
+
+def apply_fetched_metrics(row: dict, fetched: dict, is_new_row: bool) -> dict:
+    metric_results = fetched.get("metric_results", {})
+    for field in (
+        "reach",
+        "likes",
+        "saves",
+        "shares",
+        "comments",
+        "profile_visits",
+        "completion_rate",
+        "replay_rate",
+    ):
+        row[field] = merge_metric_field(row.get(field, ""), metric_results.get(field, {}), field, is_new_row)
+
+    if row_has_unknown_scoring_inputs(row):
+        row["score"] = ""
+        row["classification"] = "pending"
+    else:
+        row["score"], row["classification"] = score_row(row)
+    return row
+
+
 def score_row(row: dict) -> tuple[float, str]:
     model = score_model()
     weights = model.get("weights", {})
@@ -276,16 +343,17 @@ def graph_platform(platform: str) -> str:
     return platform
 
 
-def extract_insight_value(payload: dict, metric_name: str) -> float:
+def extract_insight_value(payload: dict, metric_name: str) -> dict:
     if not isinstance(payload, dict):
-        return 0.0
+        return metric_failure("invalid_payload")
     for entry in payload.get("data", []):
         if entry.get("name") != metric_name:
             continue
         values = entry.get("values") or []
         if values:
-            return numeric(values[0].get("value"))
-    return 0.0
+            return metric_success(values[0].get("value"))
+        return metric_failure("missing_values")
+    return metric_failure("metric_unavailable")
 
 
 def fetch_instagram_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
@@ -301,17 +369,19 @@ def fetch_instagram_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
     if not isinstance(summary, dict):
         raise RuntimeError("instagram_media_summary_unavailable")
     out = {
-        "reach": 0.0,
-        "likes": numeric(summary.get("like_count")),
-        "comments": numeric(summary.get("comments_count")),
-        "saves": 0.0,
-        "shares": 0.0,
-        "profile_visits": 0.0,
-        "completion_rate": 0.0,
-        "replay_rate": 0.0,
         "source_permalink": summary.get("permalink", ""),
         "raw_summary": summary,
         "resolved_post_id": resolved_post_id,
+        "metric_results": {
+            "likes": metric_success(summary.get("like_count")),
+            "comments": metric_success(summary.get("comments_count")),
+            "reach": metric_failure("insight_unavailable"),
+            "saves": metric_failure("insight_unavailable"),
+            "shares": metric_failure("insight_unavailable"),
+            "profile_visits": metric_failure("metric_unavailable"),
+            "completion_rate": metric_failure("metric_unavailable"),
+            "replay_rate": metric_failure("metric_unavailable"),
+        },
         "insight_metrics": {},
     }
     for metric in policy.get("insight_metrics", []):
@@ -320,12 +390,17 @@ def fetch_instagram_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
                 data = graph_get(f"/{resolved_post_id}/insights", {"metric": metric}, ig_cfg, platform=platform)
             except Exception:
                 data = graph_get(f"/{resolved_post_id}/insights", {"metric": metric}, cfg, platform=platform)
-            out["insight_metrics"][metric] = extract_insight_value(data, metric)
+            result = extract_insight_value(data, metric)
+            out["insight_metrics"][metric] = result
         except Exception as exc:
-            out["insight_metrics"][metric] = f"error:{exc}"
-    out["reach"] = numeric(out["insight_metrics"].get("reach"))
-    out["saves"] = numeric(out["insight_metrics"].get("saved"))
-    out["shares"] = numeric(out["insight_metrics"].get("shares"))
+            result = metric_failure(f"error:{exc}")
+            out["insight_metrics"][metric] = result
+        if metric == "reach":
+            out["metric_results"]["reach"] = result
+        elif metric == "saved":
+            out["metric_results"]["saves"] = result
+        elif metric == "shares":
+            out["metric_results"]["shares"] = result
     return out
 
 
@@ -336,26 +411,33 @@ def fetch_facebook_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
     comments = ((summary.get("comments") or {}).get("summary") or {}).get("total_count", 0)
     shares = (summary.get("shares") or {}).get("count", 0)
     out = {
-        "reach": 0.0,
-        "likes": numeric(reactions),
-        "comments": numeric(comments),
-        "saves": 0.0,
-        "shares": numeric(shares),
-        "profile_visits": 0.0,
-        "completion_rate": 0.0,
-        "replay_rate": 0.0,
         "source_permalink": summary.get("permalink_url", ""),
         "raw_summary": summary,
+        "metric_results": {
+            "likes": metric_success(reactions),
+            "comments": metric_success(comments),
+            "shares": metric_success(shares),
+            "reach": metric_failure("insight_unavailable"),
+            "saves": metric_failure("metric_unavailable"),
+            "profile_visits": metric_failure("metric_unavailable"),
+            "completion_rate": metric_failure("metric_unavailable"),
+            "replay_rate": metric_failure("metric_unavailable"),
+        },
         "insight_metrics": {},
     }
     for metric in policy.get("insight_metrics", []):
         try:
             data = graph_get(f"/{post_id}/insights", {"metric": metric}, cfg, platform=platform)
-            value = extract_insight_value(data, metric)
-            out["insight_metrics"][metric] = value
+            result = extract_insight_value(data, metric)
+            out["insight_metrics"][metric] = result
         except Exception as exc:
-            out["insight_metrics"][metric] = f"error:{exc}"
-    out["reach"] = numeric(out["insight_metrics"].get("post_impressions_unique")) or numeric(out["insight_metrics"].get("post_impressions"))
+            result = metric_failure(f"error:{exc}")
+            out["insight_metrics"][metric] = result
+        if metric == "post_impressions_unique":
+            out["metric_results"]["reach"] = result
+        elif metric == "post_impressions":
+            if not out["metric_results"]["reach"].get("ok"):
+                out["metric_results"]["reach"] = result
     return out
 
 
@@ -581,6 +663,7 @@ def main() -> int:
                     fetched = fetch_facebook_metrics(post_row["_post_id"], cfg, policy["facebook"])
 
                 idx = metric_row_index(metric_rows, post_row)
+                is_new_row = idx < 0
                 if idx >= 0:
                     row = dict(metric_rows[idx])
                 else:
@@ -594,10 +677,6 @@ def main() -> int:
                         "hook_category": post_row.get("hook_category", ""),
                         "post_url": post_row.get("post_url", ""),
                         "audio_name": post_row.get("audio_name", ""),
-                        "follows": 0,
-                        "profile_visits": 0,
-                        "completion_rate": 0,
-                        "replay_rate": 0,
                     }
 
                 row["post_url"] = post_row.get("post_url", "") or fetched.get("source_permalink", "") or row.get("post_url", "")
@@ -605,15 +684,7 @@ def main() -> int:
                 row["growth_bucket"] = post_row.get("growth_bucket", "") or row.get("growth_bucket", "")
                 row["lane"] = post_row.get("lane", "") or row.get("lane", "")
                 row["hook_category"] = post_row.get("hook_category", "") or row.get("hook_category", "")
-                row["reach"] = str(int(fetched.get("reach", 0)))
-                row["likes"] = str(int(fetched.get("likes", 0)))
-                row["saves"] = str(int(fetched.get("saves", 0)))
-                row["shares"] = str(int(fetched.get("shares", 0)))
-                row["comments"] = str(int(fetched.get("comments", 0)))
-                row["profile_visits"] = str(int(fetched.get("profile_visits", numeric(row.get("profile_visits")))))
-                row["completion_rate"] = str(float(fetched.get("completion_rate", numeric(row.get("completion_rate")))))
-                row["replay_rate"] = str(float(fetched.get("replay_rate", numeric(row.get("replay_rate")))))
-                row["score"], row["classification"] = score_row(row)
+                row = apply_fetched_metrics(row, fetched, is_new_row=is_new_row)
                 row["notes"] = append_note(row.get("notes", ""), f"auto_meta_metrics_refresh:{datetime.now().strftime('%Y-%m-%d')}")
 
                 if idx >= 0:
