@@ -1,7 +1,52 @@
 # Current State -- 95_publish_gate
 
-**Last verified:** 2026-07-07, after both batches of the first real tool
-were committed.
+**Last verified:** 2026-07-12, later session, after the first real Lena
+Reel published through this gate under a one-action publish-freeze
+exception. Everything below this point in the file up to "## What exists
+right now" describes the 2026-07-07 design/state and is now historical --
+see the 2026-07-12 update immediately below for current reality.
+
+## 2026-07-12 update: clean-export enforcement wired in; first real Reel promoted and published (one-action freeze exception)
+
+Since the 2026-07-10 live-publish milestone (see the changelog for the
+full history of `tools/lena_promote_to_queue_v1.py` and the two-phase
+approval schema), `tools/lena_promote_to_queue_v1.py` gained mandatory
+clean-export re-verification
+(`tools/lena_verify_clean_export_v1.py::verify_clean_export()`) before any
+write: it re-verifies the clean derivative, then points the promoted
+item's `media_path` at the verified clean derivative (never the raw
+source), while preserving the raw source path/hash as provenance
+metadata. `pipeline/publisher/instagram_queue_bridge.py` independently
+re-verifies the same clean-export contract again at publish time
+(`_validate_downstream_clean_export()`), never trusting the promoted
+item's self-reported `clean_export_verified` flag alone. A new
+`higgsfield_derived_shortform` provider resolver was also added so a
+derived Reel/Story video (prepared from an already-approved photo slot,
+no new generation) can be promoted under its own distinct `slot_id` while
+Rule Zero still resolves identity against the true source generation
+slot via `--source-slot`.
+
+Nicolas explicitly, narrowly lifted the standing publish freeze (see
+`NEXT_SESSION_START.md`) for exactly one item,
+`readypack0709-pack007-00-photo-reel` -- a one-action exception, not a
+general lift. `tools/lena_promote_to_queue_v1.py --provider
+higgsfield_derived_shortform --source-slot
+readypack0709-pack007-00-photo --promote` re-validated the approval
+artifact and clean-export contract and wrote exactly one file to
+`pipeline/queue/`. `tools/process_queue.py --live --media-type reel
+--max-posts 1` (date-prefix-targeted) then published it, skipping the
+other 10 real queue items untouched. **Real result:** Instagram media ID
+`18114662917723939`, permalink
+`https://www.instagram.com/reel/DatBbJdkjzD/`, published at
+`2026-07-12T18:49:44+0000`, container polling reached `FINISHED`, Graph
+`video_url` payload used the verified clean derivative (sha256
+`59aa5a6cf864a6d707af80e027755a45b2fec4dc5efff63f4c19b0311f006928`), never
+the raw provider original. Receipt: `pipeline/queue/published/
+readypack0709-pack007-00-photo-reel.json.receipt.json`. The approval
+record was not rewritten; the receipt is the authoritative post-publish
+record. The standing publish freeze remains fully in force for every
+other item. Full detail: the changelog's matching 2026-07-12 (later
+session) entry.
 
 ## Status: first real tool complete -- read-only checker + approval-record writer
 

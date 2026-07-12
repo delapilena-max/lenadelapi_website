@@ -76,6 +76,79 @@ Do not interpret a successful test, a passing dry-run, or a code review as
 lifting this freeze on its own -- it lifts only when Nicolas is told all
 five conditions are met and he confirms it explicitly.
 
+> ## ✅ FIRST REAL LENA REEL PUBLISHED THROUGH THE CLEAN-EXPORT-GATED PATH -- ONE-ACTION PUBLISH-FREEZE EXCEPTION COMPLETE; FREEZE OTHERWISE STILL FULLY IN FORCE (2026-07-12, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is unchanged at `0445161d` (no code committed this session -- documentation only).
+>
+> **A. What this records.** Nicolas explicitly, narrowly lifted the
+> standing publish freeze above for exactly one item:
+> `readypack0709-pack007-00-photo-reel`. This was a one-action exception
+> only -- the standing publish freeze remains in full force for every
+> other promotion, R2 outward-publishing action, and live publish until
+> Nicolas explicitly lifts it again. This checkpoint is documentation
+> only: no code changed, no queue item processed beyond the one
+> authorized item, no further promotion or publish occurred.
+>
+> **B. Real result.** `tools/lena_promote_to_queue_v1.py --date
+> 2026-07-09 --slot readypack0709-pack007-00-photo-reel --provider
+> higgsfield_derived_shortform --source-slot
+> readypack0709-pack007-00-photo --promote` re-validated the existing
+> approval artifact (caption + live-publish statements both already given
+> by Nicolas, `approved_at_utc: 2026-07-12T05:04:45+00:00`), re-verified
+> the clean-export contract, and wrote exactly one file to
+> `pipeline/queue/readypack0709-pack007-00-photo-reel.json`. Then
+> `tools/process_queue.py --live --date
+> readypack0709-pack007-00-photo-reel --media-type reel --max-posts 1`
+> scanned all 11 real queue items, explicitly skipped the other 10
+> (`reason: date_prefix_filter`, untouched), and published exactly one
+> Reel. **Instagram media ID `18114662917723939`, permalink
+> `https://www.instagram.com/reel/DatBbJdkjzD/`, published at
+> `2026-07-12T18:49:44+0000`, Reel container polling reached
+> `FINISHED`.** The Graph `video_url` payload pointed at the verified
+> clean derivative (`readypack0709-pack007-00-photo_story_clean.mp4`,
+> sha256
+> `59aa5a6cf864a6d707af80e027755a45b2fec4dc5efff63f4c19b0311f006928`) --
+> never the raw Higgsfield/provider original. Receipt artifact:
+> `pipeline/queue/published/
+> readypack0709-pack007-00-photo-reel.json.receipt.json`. The queue item
+> itself moved from `pipeline/queue/` to `pipeline/queue/published/`.
+>
+> **C. Prior code already on HEAD that made this possible, not
+> previously reflected in this file.** These continuity docs had fallen
+> two commits behind real HEAD. The clean-export enforcement described as
+> "not yet wired into any publishing path" in the 2026-07-10/11 banner
+> below was, in fact, already committed: `1cc9467d` (`feat: enforce
+> verified clean derivative at queue promotion`), `fd765daa` (`feat:
+> enforce clean export at Instagram publisher bridge`), `5555d0f8`
+> (`feat: add canonical Reel video parity to Architecture A`),
+> `d4d56ef1` (`feat: make music-backed short-form video first-class for
+> Reels and Stories`), and `0445161d` (`feat: validate derived
+> music-backed Reels through Rule Zero`). Together these wired
+> clean-export verification into both queue promotion (`tools/
+> lena_promote_to_queue_v1.py`) and the Instagram publisher bridge
+> (`pipeline/publisher/instagram_queue_bridge.py`), gave the
+> `higgsfield_derived_shortform` provider its own Rule Zero resolver for
+> a derived Reel/Story video, and made Reels first-class throughout.
+> This checkpoint does not claim these commits satisfy all five standing
+> -freeze conditions project-wide -- only that, for this one specific
+> asset, the clean derivative already existed and was independently
+> re-verified true before publish.
+>
+> **D. Doctrine explicitly preserved.** The approval record
+> (`readypack0709-pack007-00-photo-reel_approval.json`) is an immutable
+> pre-publish signoff artifact and was NOT rewritten after publish. The
+> authoritative post-publish record is the queue receipt named in B,
+> which carries the real media ID and permalink. Do not reconcile the
+> approval record to match the receipt, or vice versa.
+>
+> **E. What must not be done.** No further promotion, publish, R2
+> action, render, regeneration, `.env` change, or approval-record edit
+> occurred or is authorized beyond the single item in B. The standing
+> publish freeze above remains fully in force for everything else. Do
+> not treat this one exception as a general lift, a precedent for future
+> silent exceptions, or evidence that all five freeze conditions are now
+> met project-wide.
+>
+> Full detail: the changelog's matching 2026-07-12 (later session) entry.
+
 > ## ✅ LEGACY-ZERO PLACEHOLDER REPAIR COMPLETED AND CANONICAL METRICS STATE RESTORED (2026-07-12) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `db50fcbd`.
 >
 > **A. What this closes.** The 2026-07-11 Meta-refresh incident (two

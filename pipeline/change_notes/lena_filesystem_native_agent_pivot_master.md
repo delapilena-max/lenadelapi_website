@@ -49,7 +49,47 @@ matching standing section.
 
 ## 0. Current State (Read This First)
 
-**Newest update (2026-07-12): legacy-zero placeholder repair completed and
+**Newest update (2026-07-12, later session): first real Lena Reel
+published through the clean-export-gated path -- a one-action publish-
+freeze exception, now complete.** Nicolas explicitly, narrowly lifted the
+standing publish freeze above for exactly one item:
+`readypack0709-pack007-00-photo-reel`. `tools/lena_promote_to_queue_v1.py
+--provider higgsfield_derived_shortform --source-slot
+readypack0709-pack007-00-photo --promote` re-validated the existing
+approval artifact and clean-export contract and wrote exactly one file to
+`pipeline/queue/`; `tools/process_queue.py --live --date
+readypack0709-pack007-00-photo-reel --media-type reel --max-posts 1`
+scanned all 11 real queue items, skipped the other 10 untouched, and
+published exactly one Reel. **Instagram media ID `18114662917723939`,
+permalink `https://www.instagram.com/reel/DatBbJdkjzD/`, published at
+`2026-07-12T18:49:44+0000`, container polling reached `FINISHED`.** The
+Graph `video_url` payload used the verified clean derivative
+(`readypack0709-pack007-00-photo_story_clean.mp4`, sha256
+`59aa5a6cf864a6d707af80e027755a45b2fec4dc5efff63f4c19b0311f006928`), never
+the raw provider original. Receipt: `pipeline/queue/published/
+readypack0709-pack007-00-photo-reel.json.receipt.json`. This also
+surfaced that these continuity docs had fallen two real commits behind
+HEAD: `1cc9467d` (`feat: enforce verified clean derivative at queue
+promotion`), `fd765daa` (`feat: enforce clean export at Instagram
+publisher bridge`), `5555d0f8` (`feat: add canonical Reel video parity to
+Architecture A`), `d4d56ef1` (`feat: make music-backed short-form video
+first-class for Reels and Stories`), and `0445161d` (`feat: validate
+derived music-backed Reels through Rule Zero`) were already committed and
+had wired clean-export enforcement into both queue promotion and the
+Instagram publisher bridge before this session began. **This was a
+one-action exception only** -- the standing publish freeze above remains
+fully in force for every other promotion, R2 action, and live publish
+until Nicolas explicitly lifts it again; this checkpoint does not claim
+the freeze's five conditions are met project-wide, only that this one
+asset's clean derivative was independently re-verified true before
+publish. The approval record remains an immutable pre-publish signoff
+artifact and was not rewritten -- the queue receipt above is the
+authoritative post-publish record. No code changed, no other queue item
+touched, no `.env` change, no render/regeneration. Full detail:
+`NEXT_SESSION_START.md`'s matching banner and the changelog's matching
+2026-07-12 (later session) entry.
+
+**Earlier entry, still relevant (2026-07-12): legacy-zero placeholder repair completed and
 canonical metrics state restored.** HEAD is now `db50fcbd`. The 2026-07-11
 Meta-refresh incident left four real, pre-existing Architecture A metrics
 rows carrying literal `"0"` placeholders in `follows`/`profile_visits`/

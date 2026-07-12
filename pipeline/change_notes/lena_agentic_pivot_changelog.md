@@ -4,6 +4,83 @@ Append-only. Add a new dated entry per change batch; never rewrite or delete pri
 
 ---
 
+## 2026-07-12 (later session) - Batch: first real Lena Reel published through the clean-export-gated path (one-action publish-freeze exception)
+
+### Why
+Nicolas explicitly, narrowly lifted the standing publish freeze
+(`NEXT_SESSION_START.md`) for exactly one item,
+`readypack0709-pack007-00-photo-reel`, as a one-action exception --
+scoped to exactly one queue promotion and exactly one Instagram Reel
+publish, with the freeze remaining in full force for everything else
+afterward.
+
+### What changed
+- No code changed. This batch is a real, live production action plus its
+  continuity documentation.
+- `tools/lena_promote_to_queue_v1.py --date 2026-07-09 --slot
+  readypack0709-pack007-00-photo-reel --provider
+  higgsfield_derived_shortform --source-slot
+  readypack0709-pack007-00-photo --promote` re-validated the existing
+  approval artifact (`readypack0709-pack007-00-photo-reel_approval.json`,
+  caption + live-publish statements both already given by Nicolas,
+  `approved_at_utc: 2026-07-12T05:04:45+00:00`) and the clean-export
+  contract, then wrote exactly one file:
+  `pipeline/queue/readypack0709-pack007-00-photo-reel.json`.
+- `tools/process_queue.py --live --date
+  readypack0709-pack007-00-photo-reel --media-type reel --max-posts 1`
+  scanned all 11 real queue items, explicitly skipped the other 10
+  (`reason: date_prefix_filter`, untouched), and published exactly one
+  Reel via the real Graph API path
+  (`instagram_queue_bridge.py` -> `instagram_graph_adapter.py`,
+  `media_type=REELS`, `video_url`).
+
+### Real result
+- Instagram media ID `18114662917723939`.
+- Permalink `https://www.instagram.com/reel/DatBbJdkjzD/`.
+- Published at `2026-07-12T18:49:44+0000`.
+- Reel container creation polling reached `status: FINISHED`.
+- The Graph `video_url` payload pointed at the verified clean derivative
+  (`readypack0709-pack007-00-photo_story_clean.mp4`, sha256
+  `59aa5a6cf864a6d707af80e027755a45b2fec4dc5efff63f4c19b0311f006928`) --
+  never the raw Higgsfield/provider original.
+- Receipt artifact:
+  `pipeline/queue/published/readypack0709-pack007-00-photo-reel.json.receipt.json`.
+  Queue item itself moved from `pipeline/queue/` to
+  `pipeline/queue/published/`.
+
+### Real finding: continuity docs were two commits behind HEAD
+The clean-export enforcement described as "not yet wired into any
+publishing path" in the 2026-07-10/11 banner was, in fact, already
+committed before this session began: `1cc9467d` (`feat: enforce verified
+clean derivative at queue promotion`), `fd765daa` (`feat: enforce clean
+export at Instagram publisher bridge`), `5555d0f8` (`feat: add canonical
+Reel video parity to Architecture A`), `d4d56ef1` (`feat: make
+music-backed short-form video first-class for Reels and Stories`), and
+`0445161d` (`feat: validate derived music-backed Reels through Rule
+Zero`). Together these wired clean-export verification into both queue
+promotion and the Instagram publisher bridge, and gave the
+`higgsfield_derived_shortform` provider its own Rule Zero resolver.
+`NEXT_SESSION_START.md` and the master pivot doc have been updated to
+reflect these commits are already on HEAD.
+
+### Decisions made
+- This is a one-action exception, not a general freeze lift. The
+  standing publish freeze remains in full force for every other
+  promotion, R2 outward-publishing action, and live publish until
+  Nicolas explicitly lifts it again.
+- The approval record remains an immutable pre-publish signoff artifact
+  and was not rewritten after publish. The queue receipt named above is
+  the authoritative post-publish record (real media ID + permalink).
+
+### Explicitly not done
+- No other queue item was promoted or published (the other 10 real
+  queue items were explicitly skipped and remain untouched).
+- No `.env` change.
+- No approval-record edit.
+- No render or regeneration.
+- No unrelated dirty-pile work.
+- No further code change beyond continuity documentation in this batch.
+
 ## 2026-07-05 — Batch 1: Containment (executor drift + preflight metadata-trust)
 
 ### Why
