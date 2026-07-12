@@ -58,6 +58,25 @@ def read_csv(path: Path) -> list[dict]:
     return list(csv.DictReader(path.open("r", encoding="utf-8")))
 
 
+def read_csv_header(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        return next(reader, [])
+
+
+def stable_union_fields(existing_fields: list[str], required_fields: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for field in existing_fields + required_fields:
+        if not field or field in seen:
+            continue
+        seen.add(field)
+        ordered.append(field)
+    return ordered
+
+
 def write_csv(path: Path, fields: list[str], rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -706,6 +725,7 @@ def main() -> int:
     status = config_status(False)
 
     post_rows = read_csv(post_log_path)
+    metric_fields = stable_union_fields(read_csv_header(metrics_path), METRIC_FIELDS)
     metric_rows = read_csv(metrics_path)
     engagement_rows = read_csv(engagement_path)
     candidates = candidate_posts(post_rows, metric_rows, args.days_back, args.max_posts)
@@ -771,7 +791,7 @@ def main() -> int:
                 if idx >= 0:
                     metric_rows[idx] = row
                 else:
-                    metric_rows.append({field: row.get(field, "") for field in METRIC_FIELDS})
+                    metric_rows.append({field: row.get(field, "") for field in metric_fields})
                 metrics_updated += 1
                 changed_dates.add(post_row.get("date", ""))
                 last_metrics_pull[key] = utc_now_iso()
@@ -836,7 +856,7 @@ def main() -> int:
             }
         )
 
-    write_csv(metrics_path, METRIC_FIELDS, metric_rows)
+    write_csv(metrics_path, metric_fields, metric_rows)
     write_csv(engagement_path, ENG_FIELDS, engagement_rows)
 
     refresh_runs = []
