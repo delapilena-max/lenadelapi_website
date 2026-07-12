@@ -37,6 +37,7 @@ from __future__ import annotations
 # surface, by construction, not just by convention.
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -647,6 +648,142 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         "debug_artifacts": debug_artifacts,
         "intended_packet_output_path": str(intended_packet_path),
         "intended_packet_output_already_exists": intended_packet_path.exists(),
+        "files_written_this_run": [],
+    }
+
+
+# --- Derived short-form Reel resolver (read-only, reuses Rule Zero) ---------
+#
+# For a Reel composed LOCALLY from an approved Higgsfield photo + an
+# approved royalty-free music track (tools/lena_prepare_story_video_v1.py),
+# never from a distinct provider video-generation call -- a genuinely
+# different production path from resolve_packet_inputs_video() above, which
+# validates the case where a provider actually generated video motion.
+#
+# Deliberately does NOT compare the derived MP4's own path against the
+# source photo's path -- that is the exact category error this resolver
+# exists to fix (a queue draft whose media is a video legitimately cannot,
+# and must not be made to, match a photo path). Instead:
+#   1. revalidates the source photo through the existing, unmodified
+#      resolve_packet_inputs_higgsfield() -- reuses its QA-pass gate
+#      (which already hard-gates schema-v4 head_framing_safety_margin,
+#      never re-implemented here) and its visual-style evidence resolution,
+#      with zero duplicated logic.
+#   2. locates the prepared short-form MP4 via the existing, unmodified
+#      <slot>_seed.png -> <slot>_story.mp4 naming convention
+#      (tools/lena_prepare_story_video_v1.py::resolve_story_video_path()).
+#   3. re-validates it via the existing, unmodified
+#      validate_music_backed_shortform_asset() -- provenance-sidecar
+#      identity, approved-track eligibility/hash re-verification against
+#      the real manifest, real video+audio streams, exact 9:16, duration,
+#      codecs. Zero duplicated logic.
+#   4. independently re-verifies (re-hashes the real files, never trusts
+#      the sidecar's self-reported claim alone) that the prepared MP4's own
+#      provenance sidecar points back to the exact real source photo path
+#      and SHA-256 -- the one genuinely new cross-check this resolver adds.
+#
+# Identity evidence (Higgsfield) and the clean-export + Reel-bridge-contract
+# chain are deliberately NOT re-validated here -- they are checked in
+# tools/lena_manual_one_off_preflight_v1.py's per-item derived-shortform
+# branch instead, matching the exact existing architectural split every
+# other provider already uses (resolvers resolve Rule Zero/QA truth; the
+# preflight tool's own per-item checks add identity evidence and contract
+# checks on top). No logic is duplicated between the two.
+
+def resolve_packet_inputs_higgsfield_derived_shortform(
+    date_str: str, slot_id: str, out_dir: Optional[Path] = None
+) -> Dict[str, Any]:
+    """Read-only. `slot_id` here is the SOURCE PHOTO's real generation slot
+    (called with --source-slot at the CLI layer, exactly like every other
+    resolver's source_slot_id convention). Raises ResolveError on any
+    hard-fail condition. Writes nothing, ever."""
+    resolved_photo = resolve_packet_inputs_higgsfield(date_str, slot_id, out_dir)
+
+    from lena_prepare_story_video_v1 import (  # noqa: E402  (same bare-import style as lena_higgsfield_qa_bridge_v1 above -- both live in tools/, both rely on TOOLS_DIR on sys.path)
+        StoryVideoError,
+        resolve_story_video_path,
+        validate_music_backed_shortform_asset,
+    )
+
+    source_image_path = Path(resolved_photo["image_path"])
+
+    try:
+        prepared_video_path = resolve_story_video_path(source_image_path)
+    except StoryVideoError as exc:
+        raise ResolveError(f"could not resolve prepared short-form video path: {exc}") from exc
+
+    try:
+        shortform_facts = validate_music_backed_shortform_asset(prepared_video_path)
+    except StoryVideoError as exc:
+        raise ResolveError(f"prepared short-form asset failed validation: {exc}") from exc
+
+    provenance_path = prepared_video_path.with_name(prepared_video_path.stem + "_provenance.json")
+    if not provenance_path.exists():
+        raise ResolveError(f"prepared short-form provenance sidecar does not exist: {provenance_path}")
+    try:
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ResolveError(f"could not parse prepared short-form provenance {provenance_path}: {exc}") from exc
+
+    provenance_source_image_path = Path(str(provenance.get("source_image_path") or ""))
+    try:
+        same_source_image = provenance_source_image_path.resolve() == source_image_path.resolve()
+    except OSError:
+        same_source_image = str(provenance_source_image_path) == str(source_image_path)
+    if not same_source_image:
+        raise ResolveError(
+            f"prepared short-form provenance source_image_path {provenance_source_image_path} does not "
+            f"match the real, independently-resolved source photo {source_image_path}"
+        )
+
+    real_source_image_sha256 = hashlib.sha256(source_image_path.read_bytes()).hexdigest()
+    provenance_source_image_sha256 = provenance.get("source_image_sha256")
+    if provenance_source_image_sha256 != real_source_image_sha256:
+        raise ResolveError(
+            f"prepared short-form provenance source_image_sha256 {provenance_source_image_sha256!r} does "
+            f"not match the real, freshly-recomputed source photo hash {real_source_image_sha256!r}"
+        )
+
+    return {
+        "date": date_str,
+        "slot_id": slot_id,
+        "provider": "higgsfield",
+        "media_kind": "derived_shortform_video",
+        # Source photo identity -- reused verbatim from the unmodified photo resolver.
+        "source_image_path": str(source_image_path),
+        "source_image_sha256": real_source_image_sha256,
+        "qa_path": resolved_photo["qa_path"],
+        "qa_overall": resolved_photo["qa_overall"],
+        "qa_publish_ready": resolved_photo["qa_publish_ready"],
+        "visual_style": resolved_photo["visual_style"],
+        "image_engine": resolved_photo["image_engine"],
+        "image_prompt": resolved_photo["image_prompt"],
+        "custom_reference_id": resolved_photo["custom_reference_id"],
+        "resolution": resolved_photo["resolution"],
+        "avatar_nickname": resolved_photo["avatar_nickname"],
+        "debug_artifacts": resolved_photo["debug_artifacts"],
+        "lane": resolved_photo["lane"],
+        "activity": resolved_photo["activity"],
+        "pose": resolved_photo["pose"],
+        "wardrobe_outfit_id": resolved_photo["wardrobe_outfit_id"],
+        "pose_body_language_id": resolved_photo["pose_body_language_id"],
+        "expression_gaze_id": resolved_photo["expression_gaze_id"],
+        # Derived short-form asset identity -- from the reused, unmodified
+        # validate_music_backed_shortform_asset() call above. Never
+        # re-derived/re-guessed -- every value here is exactly what that
+        # function already independently proved.
+        "prepared_video_path": str(prepared_video_path),
+        "prepared_video_sha256": shortform_facts["video_sha256"],
+        "prepared_video_provenance_path": str(provenance_path),
+        "selected_track_id": shortform_facts["track_id"],
+        "selected_track_sha256": shortform_facts["track_sha256"],
+        "prepared_video_duration_seconds": shortform_facts["duration_seconds"],
+        "prepared_video_codec": shortform_facts["video_codec"],
+        "prepared_audio_codec": shortform_facts["audio_codec"],
+        "prepared_video_width": shortform_facts["width"],
+        "prepared_video_height": shortform_facts["height"],
+        "intended_packet_output_path": resolved_photo["intended_packet_output_path"],
+        "intended_packet_output_already_exists": resolved_photo["intended_packet_output_already_exists"],
         "files_written_this_run": [],
     }
 

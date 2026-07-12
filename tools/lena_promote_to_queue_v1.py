@@ -108,6 +108,7 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     ResolveError,
     resolve_packet_inputs,
     resolve_packet_inputs_higgsfield,
+    resolve_packet_inputs_higgsfield_derived_shortform,
     resolve_packet_inputs_video,
     resolve_queue_draft_output_path,
 )
@@ -132,10 +133,23 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
 # video asset is a separate, optional data field inside that resolver's own
 # output (resolved["provider"]), never conflated with this dispatch key, and
 # never defaulted to Kling or any other specific provider.
+#
+# "higgsfield_derived_shortform" (2026-07-12) is a third, distinct dispatch
+# key -- for a Reel/Story composed LOCALLY from an approved Higgsfield photo
+# + an approved music track (tools/lena_prepare_story_video_v1.py), never
+# from a distinct provider video-generation call. Selects
+# resolve_packet_inputs_higgsfield_derived_shortform(), which revalidates
+# the source photo through the existing, unmodified Higgsfield resolver and
+# separately re-verifies the prepared short-form asset's own provenance --
+# see that function's own module comment for the full chain. Deliberately a
+# separate key from "higgsfield" (a photo item) and "video" (a
+# provider-generated video item): neither of those resolvers' cross-check
+# shapes are correct for a locally-composed derived asset.
 PROVIDER_RESOLVERS = {
     "kling": resolve_packet_inputs,
     "higgsfield": resolve_packet_inputs_higgsfield,
     "video": resolve_packet_inputs_video,
+    "higgsfield_derived_shortform": resolve_packet_inputs_higgsfield_derived_shortform,
 }
 
 # The three original state-transition fields promotion changes. Order
@@ -527,6 +541,23 @@ def _revalidate_with_resolver(
             _check("provider", resolved.get("provider"), metadata.get("provider"))
         if metadata.get("video_engine") or resolved.get("video_engine"):
             _check("video_engine", resolved.get("video_engine"), metadata.get("video_engine"))
+    elif provider == "higgsfield_derived_shortform":
+        # Derived short-form Reel/Story cross-check (2026-07-12) -- compares
+        # against resolve_packet_inputs_higgsfield_derived_shortform()'s own
+        # output shape. Deliberately compares the queue draft's media_path
+        # against the resolved PREPARED VIDEO path, never the source
+        # photo's path -- comparing against the photo (what the plain
+        # "higgsfield" branch below would do) is the exact category error
+        # this dispatch key exists to fix. The generic slot_id check above
+        # (outside this if/elif chain) already cross-checks
+        # resolved["slot_id"] (the source photo slot) against
+        # metadata.source_slot_id, unchanged.
+        _check("media_path", resolved.get("prepared_video_path"), queue_draft.get("media_path"))
+        _check("prepared_video_sha256", resolved.get("prepared_video_sha256"), metadata.get("prepared_video_sha256"))
+        _check("selected_track_id", resolved.get("selected_track_id"), metadata.get("selected_track_id"))
+        _check("selected_track_sha256", resolved.get("selected_track_sha256"), metadata.get("selected_track_sha256"))
+        _check("source_image_path", resolved.get("source_image_path"), metadata.get("source_image_path"))
+        _check("source_image_sha256", resolved.get("source_image_sha256"), metadata.get("source_image_sha256"))
     else:
         _check("image_engine", resolved.get("image_engine"), metadata.get("image_engine"))
         _check("media_path", resolved.get("image_path"), queue_draft.get("media_path"))

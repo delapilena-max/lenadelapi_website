@@ -42,15 +42,26 @@ from __future__ import annotations
 # Never calls Higgsfield, Kling, or Anthropic. Never imports
 # pipeline.posting_manager, tools.process_queue,
 # pipeline.higgsfield_lena_api_executor, pipeline.kling_apilena_api_executor,
-# any publisher/API module, requests, or urllib. Reads (never writes) `.env`
-# only to resolve the same KLING_LENA_ELEMENT_* identity env vars
-# tools/lena_preflight.py itself reads for Kling identity comparison --
-# required for Kling per-item parity, never touched for Higgsfield.
+# requests, or urllib. Reads (never writes) `.env` only to resolve the same
+# KLING_LENA_ELEMENT_* identity env vars tools/lena_preflight.py itself
+# reads for Kling identity comparison -- required for Kling per-item
+# parity, never touched for Higgsfield.
+#
+# One narrow, disclosed exception (2026-07-12): pipeline.publisher.
+# instagram_queue_bridge is imported for its pure, read-only
+# _validate_contract() function only (the "higgsfield_derived_shortform"
+# per-item branch uses it to prove the Reel bridge contract would pass).
+# That module's own network-capable code
+# (instagram_graph_adapter/publish_post) is lazy-loaded via importlib only
+# inside publish_post(), never at import time and never called from here --
+# importing instagram_queue_bridge does not import requests or reach any
+# network-capable code. Still true: nothing in this module ever publishes.
 #
 # Run:
 #   python tools/lena_manual_one_off_preflight_v1.py --date 2026-07-09 --slot readypack0709-pack003-08-photo --provider higgsfield
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -63,6 +74,12 @@ if str(ROOT) not in sys.path:
 from pipeline.env_loader import load_env_once  # noqa: E402
 from pipeline.identity import lena_identity  # noqa: E402
 from pipeline.identity import lena_higgsfield_identity  # noqa: E402
+from pipeline.publisher import instagram_queue_bridge  # noqa: E402
+
+from tools.lena_verify_clean_export_v1 import (  # noqa: E402
+    CleanExportVerificationError,
+    verify_clean_export,
+)
 
 from tools.lena_promote_to_queue_v1 import (  # noqa: E402
     PROVIDER_RESOLVERS,
@@ -190,12 +207,92 @@ def _validate_kling_identity_evidence(
     # stay a faithful per-item mirror rather than a new, different gate.
 
 
+def _validate_derived_shortform_contract_per_item(
+    queue_draft: Dict[str, Any],
+    resolved: Dict[str, Any],
+    date_str: str,
+    evidence_slot_id: str,
+) -> None:
+    """Per-item checks specific to the "higgsfield_derived_shortform"
+    provider (2026-07-12) -- a Reel/Story composed locally from an approved
+    Higgsfield photo + an approved music track
+    (tools/lena_prepare_story_video_v1.py), never a distinct provider
+    video-generation call. Reuses every existing validator unchanged;
+    duplicates none. Raises ManualOneOffPreflightError on any hard-fail
+    condition.
+
+    `resolved` is resolve_packet_inputs_higgsfield_derived_shortform()'s own
+    output (already independently re-verified against the real source
+    photo and the real prepared short-form asset) -- every identity fact
+    used below comes from there, never from the queue draft's own
+    self-reported metadata, matching this whole chain's "never trust
+    self-reported data alone" discipline."""
+    metadata = queue_draft.get("metadata") or {}
+
+    media_type = str(queue_draft.get("media_type") or "").lower().strip()
+    if media_type != "reel":
+        raise ManualOneOffPreflightError(
+            f"higgsfield_derived_shortform provider requires media_type='reel', got {media_type!r}"
+        )
+
+    # Identity evidence (2026-07-12): reuses the existing, unmodified
+    # lena_higgsfield_identity.validate_local_identity_evidence() -- but
+    # against the SOURCE PHOTO's own path and independently-re-resolved
+    # identity fields, never the Reel's own media_path/metadata (which
+    # describe the derived video, not the photo). This is the exact
+    # category-error fix this whole provider key exists for.
+    identity_check_meta = {
+        "provider_job_id": (resolved.get("debug_artifacts") or {}).get("provider_job_id"),
+        "custom_reference_id": resolved.get("custom_reference_id"),
+        "image_prompt": resolved.get("image_prompt"),
+    }
+    reasons = lena_higgsfield_identity.validate_local_identity_evidence(
+        date_str, evidence_slot_id, Path(str(resolved["source_image_path"])), identity_check_meta,
+    )
+    if reasons:
+        raise ManualOneOffPreflightError(
+            "Higgsfield source-photo identity evidence failed: " + "; ".join(reasons)
+        )
+
+    # Clean-export chain (2026-07-12): tools/lena_promote_to_queue_v1.py's
+    # own verify_clean_export() re-verification is already reused unmodified
+    # at actual PROMOTION time for every provider -- but the manual one-off
+    # PREFLIGHT mode has never called it for any provider until now. Reused
+    # here, unmodified, so a derived-shortform Reel's preflight result
+    # genuinely proves the full chain up to (not including) the live Graph
+    # call, not just the pre-promotion subset every other provider's
+    # preflight proves.
+    media_path = Path(str(queue_draft.get("media_path") or ""))
+    try:
+        clean_export_facts = verify_clean_export(media_path)
+    except CleanExportVerificationError as exc:
+        raise ManualOneOffPreflightError(f"clean-export verification failed: {exc}") from exc
+
+    # Reel bridge contract (2026-07-12): proves this item would actually
+    # pass pipeline.publisher.instagram_queue_bridge._validate_contract() --
+    # reused unmodified, called against the exact promoted-item shape real
+    # promotion would produce (media_path -> verified clean derivative,
+    # clean-export provenance populated), built entirely in memory here.
+    # Nothing is written anywhere by this simulation.
+    simulated_promoted = copy.deepcopy(queue_draft)
+    simulated_promoted["media_path"] = clean_export_facts["clean_derivative_path"]
+    simulated_promoted["metadata"]["source_asset_path"] = clean_export_facts["source_path"]
+    simulated_promoted["metadata"]["source_asset_sha256"] = clean_export_facts["source_sha256"]
+    simulated_promoted["metadata"]["clean_export_derivative_sha256"] = clean_export_facts["clean_derivative_sha256"]
+    simulated_promoted["metadata"]["clean_export_verified"] = True
+    try:
+        instagram_queue_bridge._validate_contract(simulated_promoted)
+    except ValueError as exc:
+        raise ManualOneOffPreflightError(f"Reel bridge contract validation failed: {exc}") from exc
+
+
 def _validate_contract_per_item(
     queue_draft: Dict[str, Any],
     provider: str,
     date_str: str,
     slot_id: str,
     source_slot_id: Optional[str] = None,
+    resolved: Optional[Dict[str, Any]] = None,
 ) -> None:
     """The remaining per-item checks tools/lena_preflight.py's automated
     scan performs that lena_promote_to_queue_v1.py's reused validation does
@@ -214,10 +311,20 @@ def _validate_contract_per_item(
     function -- byte-identical behavior for every item validated before
     this parameter existed. Every other check above (avatar/platform/
     caption/image_engine/resolution) reads only queue_draft/metadata
-    fields, never a slot-keyed file path, so none of them are affected."""
+    fields, never a slot-keyed file path, so none of them are affected.
+
+    resolved (2026-07-12, optional, default None): only ever populated (by
+    check_manual_one_off_preflight()) and only ever read when
+    provider == "higgsfield_derived_shortform" -- see the early guard
+    immediately below. Every other provider's behavior is completely
+    unaffected: this function reaches the exact same, byte-identical code
+    it always has for "kling"/"higgsfield"/"video"."""
     effective_evidence_slot_id = source_slot_id or slot_id
     metadata = queue_draft.get("metadata") or {}
 
+    # Generic checks (avatar/platform/caption pattern) apply universally --
+    # run for every provider, including "higgsfield_derived_shortform",
+    # before any provider-specific branching below.
     if metadata.get("avatar_nickname") != REQUIRED_AVATAR:
         raise ManualOneOffPreflightError(
             f"metadata.avatar_nickname must be {REQUIRED_AVATAR!r}, got {metadata.get('avatar_nickname')!r}"
@@ -231,6 +338,17 @@ def _validate_contract_per_item(
     for pattern in GENERIC_CAPTION_PATTERNS:
         if pattern in caption_lower:
             raise ManualOneOffPreflightError(f"generic/repetitive caption pattern found: {pattern!r}")
+
+    if provider == "higgsfield_derived_shortform":
+        if resolved is None:
+            raise ManualOneOffPreflightError(
+                "higgsfield_derived_shortform provider requires the resolved Rule Zero output -- "
+                "internal caller error, not a data problem"
+            )
+        _validate_derived_shortform_contract_per_item(
+            queue_draft, resolved, date_str, effective_evidence_slot_id
+        )
+        return
 
     expected_engine = IMAGE_ENGINES_BY_PROVIDER.get(provider)
     if expected_engine is None:
@@ -331,7 +449,9 @@ def check_manual_one_off_preflight(
     except PromoteError as exc:
         raise ManualOneOffPreflightError(str(exc)) from exc
 
-    _validate_contract_per_item(queue_draft, provider, date_str, slot_id, source_slot_id=source_slot_id)
+    _validate_contract_per_item(
+        queue_draft, provider, date_str, slot_id, source_slot_id=source_slot_id, resolved=resolved,
+    )
 
     return {
         "ok": True,
