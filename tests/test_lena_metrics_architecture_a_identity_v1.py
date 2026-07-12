@@ -27,6 +27,16 @@ from tools.lena_meta_refresh_feedback_v1 import (
     metric_success,
     resolve_structured_post_id,
     parse_post_id,
+    row_has_unknown_scoring_inputs,
+)
+import tools.lena_repair_architecture_a_legacy_zero_placeholders_v1 as repair_mod
+from tools.lena_repair_architecture_a_legacy_zero_placeholders_v1 import (
+    FIELDS_TO_BLANK,
+    TARGET_KEYS,
+    PreconditionError,
+    build_repaired_candidate,
+    verify_postconditions,
+    verify_preconditions,
 )
 
 
@@ -823,3 +833,181 @@ def test_historical_csv_without_creative_columns_loads_and_survives_upsert(tmp_p
 # publisher surface, and every test above operates purely on tmp_path
 # fixtures, never pipeline/analytics/lena_post_metrics_v1_6_1.csv or any
 # other real repo path.
+
+
+# --- Legacy existing-row zero-placeholder repair (2026-07-12) --------------
+#
+# Regression guard for the real blind spot discovered during Gap B scoping:
+# c7134c62 only fixed how BRAND-NEW rows are created. It did nothing for
+# rows that already existed before that fix landed, which still carry
+# literal "0" placeholders for follows/profile_visits/completion_rate/
+# replay_rate -- fields no fetch path has ever actually measured. Directly
+# reproduced: row_has_unknown_scoring_inputs() incorrectly reports such a
+# row as fully known, letting a future refresh silently compute a real
+# score from never-measured data (the same "unknown treated as zero"
+# failure mode as the original incident, via a different vector).
+
+def _real_shaped_metric_row(
+    date: str, slot_id: str, platform: str, media_type: str = "photo",
+    *, follows="0", profile_visits="0", completion_rate="0", replay_rate="0",
+    reach="0", likes="0", saves="0", shares="0", comments="0",
+    score="0", classification="pending",
+) -> dict:
+    """Shaped exactly like a real Architecture A row created before
+    c7134c62 -- same field set real rows carry, fields renamed/parameterized
+    only for isolation. Never touches the real repo CSV."""
+    return {
+        "date": date, "slot_id": slot_id, "platform": platform, "media_type": media_type,
+        "growth_bucket": "", "lane": "rooftop sunset", "hook_category": "",
+        "post_url": f"https://www.instagram.com/p/{slot_id}/", "audio_name": "",
+        "reach": reach, "likes": likes, "saves": saves, "shares": shares, "comments": comments,
+        "follows": follows, "profile_visits": profile_visits,
+        "completion_rate": completion_rate, "replay_rate": replay_rate,
+        "score": score, "classification": classification,
+        "notes": (
+            f"Auto-synced from Architecture A publish receipt "
+            f"(C:\\fake\\queue\\published\\{slot_id}.json.receipt.json); "
+            "update metrics after performance data is available. | "
+            "auto_meta_metrics_refresh:2026-07-11"
+        ),
+        "post_id": slot_id, "instagram_media_id": f"ig-{slot_id}",
+        "permalink": f"https://www.instagram.com/p/{slot_id}/",
+        "source_slot_id": slot_id,
+        "publish_receipt_path": f"C:\\fake\\queue\\published\\{slot_id}.json.receipt.json",
+        "source_asset_path": "", "clean_derivative_path": "",
+        "source_asset_sha256": "", "clean_export_derivative_sha256": "",
+        "clean_export_verified": "false",
+        "wardrobe_outfit_id": "wc_p006", "pose_body_language_id": "", "expression_gaze_id": "",
+    }
+
+
+def _six_row_fixture() -> list:
+    """Mirrors the real repo's exact 6-row shape: 2 non-target historical
+    rows (blank identity, never touched by this repair) + the 4 real
+    proven-affected Architecture A target rows."""
+    non_target_1 = {
+        **_real_shaped_metric_row("2026-06-12", "2026-06-12-03-video", "TikTok", media_type="video"),
+        "post_id": "", "instagram_media_id": "", "permalink": "", "source_slot_id": "",
+        "publish_receipt_path": "", "notes": "Initial manual post log; update metrics after performance data is available.",
+    }
+    non_target_2 = {
+        **_real_shaped_metric_row(
+            "2026-06-24", "2026-06-24-01-photo", "Instagram Feed",
+            completion_rate="0.0", replay_rate="0.0", score="0.0", classification="weak",
+        ),
+        "post_id": "", "instagram_media_id": "", "permalink": "", "source_slot_id": "",
+        "publish_receipt_path": "",
+        "notes": "Auto-synced from posted queue q_a13bb81ef320a7; update metrics after performance data is available. | auto_meta_metrics_refresh:2026-06-29",
+    }
+    targets = [_real_shaped_metric_row(date, slot_id, platform) for date, slot_id, platform in TARGET_KEYS]
+    return [non_target_1, non_target_2] + targets
+
+
+# 1/9. The repaired candidate rows satisfy row_has_unknown_scoring_inputs()
+# is True, and only the four approved fields on the four target rows change.
+def test_repair_blanks_only_legacy_placeholder_fields_on_target_rows() -> None:
+    rows = _six_row_fixture()
+    candidate_rows, cell_changes = build_repaired_candidate(rows)
+
+    assert len(cell_changes) == 16
+    changed_fields = {c["field"] for c in cell_changes}
+    assert changed_fields == set(FIELDS_TO_BLANK)
+    for change in cell_changes:
+        assert change["old"] == "0"
+        assert change["new"] == ""
+        assert tuple(change["key"]) in TARGET_KEYS
+
+    postcondition_report = verify_postconditions(rows, candidate_rows)
+    assert postcondition_report["ok"] is True
+    assert postcondition_report["total_changed_cells"] == 16
+
+    candidate_by_key = {(r["date"], r["slot_id"], r["platform"]): r for r in candidate_rows}
+    for key in TARGET_KEYS:
+        repaired_row = candidate_by_key[key]
+        for field in FIELDS_TO_BLANK:
+            assert repaired_row[field] == ""
+        assert row_has_unknown_scoring_inputs(repaired_row) is True
+
+
+# 6. Confirmed real-zero fields (reach/likes/saves/shares/comments) and
+# score/classification are untouched by the repair.
+def test_repair_leaves_confirmed_real_fields_untouched() -> None:
+    rows = _six_row_fixture()
+    candidate_rows, _ = build_repaired_candidate(rows)
+    candidate_by_key = {(r["date"], r["slot_id"], r["platform"]): r for r in candidate_rows}
+    original_by_key = {(r["date"], r["slot_id"], r["platform"]): r for r in rows}
+    for key in TARGET_KEYS:
+        for field in ("reach", "likes", "saves", "shares", "comments", "score", "classification", "notes"):
+            assert candidate_by_key[key][field] == original_by_key[key][field]
+
+
+# 7. An unrelated non-target row (byte-identical, including one that also
+# happens to carry "0" in the same four fields) remains fully untouched.
+def test_repair_leaves_unrelated_non_target_row_byte_identical() -> None:
+    rows = _six_row_fixture()
+    candidate_rows, _ = build_repaired_candidate(rows)
+    non_target_keys = [
+        ("2026-06-12", "2026-06-12-03-video", "TikTok"),
+        ("2026-06-24", "2026-06-24-01-photo", "Instagram Feed"),
+    ]
+    candidate_by_key = {(r["date"], r["slot_id"], r["platform"]): r for r in candidate_rows}
+    original_by_key = {(r["date"], r["slot_id"], r["platform"]): r for r in rows}
+    for key in non_target_keys:
+        assert candidate_by_key[key] == original_by_key[key]
+
+
+# 8. Unexpected existing values fail closed -- verify_postconditions()
+# rejects a candidate that touched a field/row it shouldn't have.
+def test_verify_postconditions_fails_closed_on_unapproved_change() -> None:
+    rows = _six_row_fixture()
+    candidate_rows, _ = build_repaired_candidate(rows)
+    # Tamper with the candidate: touch an unapproved field on a target row.
+    for row in candidate_rows:
+        if (row["date"], row["slot_id"], row["platform"]) == TARGET_KEYS[0]:
+            row["reach"] = "999"
+    with pytest.raises(PreconditionError):
+        verify_postconditions(rows, candidate_rows)
+
+
+def test_verify_postconditions_fails_closed_on_non_target_row_touched() -> None:
+    rows = _six_row_fixture()
+    candidate_rows, _ = build_repaired_candidate(rows)
+    candidate_rows[0]["follows"] = ""  # non-target row incorrectly touched
+    with pytest.raises(PreconditionError):
+        verify_postconditions(rows, candidate_rows)
+
+
+# 5/8. Wrong hash / wrong row shape fail closed at the precondition
+# boundary -- exercised against isolated tmp_path files, never the real
+# repo CSV.
+def test_verify_preconditions_fails_closed_on_wrong_csv_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
+    sync_mod.write_csv(metrics_path, _six_row_fixture())
+    monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: repair_mod.EXPECTED_HEAD)
+
+    with pytest.raises(PreconditionError, match="sha256"):
+        verify_preconditions()
+
+
+def test_verify_preconditions_fails_closed_on_missing_target_row(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
+    rows = _six_row_fixture()
+    # Wrong row shape: drop one of the four target rows entirely.
+    rows = [r for r in rows if (r["date"], r["slot_id"], r["platform"]) != TARGET_KEYS[0]]
+    sync_mod.write_csv(metrics_path, rows)
+    monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: repair_mod.EXPECTED_HEAD)
+    monkeypatch.setattr(
+        repair_mod, "_sha256_of",
+        lambda path: repair_mod.EXPECTED_CSV_SHA256 if path == metrics_path else repair_mod._sha256_of(path),
+    )
+
+    with pytest.raises(PreconditionError):
+        verify_preconditions()
+
+
+def test_verify_preconditions_fails_closed_on_wrong_head(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "deadbeef")
+    with pytest.raises(PreconditionError, match="git_head"):
+        verify_preconditions()
