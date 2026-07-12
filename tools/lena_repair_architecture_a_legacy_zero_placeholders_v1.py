@@ -48,6 +48,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+SCRIPT_PATH = Path(__file__).resolve()
+
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -62,7 +64,15 @@ from lena_meta_refresh_feedback_v1 import row_has_unknown_scoring_inputs  # noqa
 METRICS_PATH = ROOT / "pipeline" / "analytics" / "lena_post_metrics_v1_6_1.csv"
 TMP_CANDIDATE_PATH = METRICS_PATH.with_suffix(".legacy_zero_repair_tmp.csv")
 
-EXPECTED_HEAD = "966fa376"
+# Deterministic, non-self-referential HEAD expectation (2026-07-12 fix):
+# a hardcoded commit hash here would create an impossible self-blocking
+# requirement the instant this script's own commit becomes HEAD (that
+# commit's hash cannot be known and hardcoded into the very same commit).
+# Instead, the expected HEAD is always the latest commit that actually
+# touched this script -- resolved fresh from git history at run time, via
+# _expected_repair_commit(). See verify_head_precondition().
+REPAIR_SCRIPT_RELATIVE_PATH = "tools/lena_repair_architecture_a_legacy_zero_placeholders_v1.py"
+
 EXPECTED_CSV_SHA256 = "e9e3c2b4274a99fd4ceb44a8c63203b190e35a65d850f0d916e313887f0f5e64"
 EXPECTED_ROW_COUNT = 6
 
@@ -134,14 +144,105 @@ def _sha256_of(path: Path) -> str:
 
 
 def _current_git_head() -> str:
+    """Full (not abbreviated) HEAD commit hash, to avoid any short-hash
+    ambiguity when compared against the expected repair commit."""
     try:
         out = subprocess.run(
-            ["git", "rev-parse", "--short=8", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             cwd=str(ROOT), capture_output=True, text=True, timeout=10, check=True,
         )
         return out.stdout.strip()
     except Exception as exc:
         raise PreconditionError(f"could not read current git HEAD: {exc}") from exc
+
+
+def _expected_repair_commit() -> str:
+    """The latest committed revision that modified this exact repair
+    script -- resolved fresh from git history, never hardcoded. Fails
+    closed (raises PreconditionError) if it cannot be resolved at all,
+    e.g. the script has no commit history yet."""
+    try:
+        out = subprocess.run(
+            ["git", "log", "-1", "--format=%H", "--", REPAIR_SCRIPT_RELATIVE_PATH],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=10, check=True,
+        )
+    except Exception as exc:
+        raise PreconditionError(
+            f"could not resolve latest commit for {REPAIR_SCRIPT_RELATIVE_PATH}: {exc}"
+        ) from exc
+    commit = out.stdout.strip()
+    if not commit:
+        raise PreconditionError(
+            f"no commit history found for {REPAIR_SCRIPT_RELATIVE_PATH} -- refusing to "
+            "proceed without a resolvable expected-HEAD checkpoint"
+        )
+    return commit
+
+
+def verify_head_precondition() -> str:
+    """Isolated HEAD-gate check, directly testable independent of the rest
+    of verify_preconditions(). Returns the current HEAD on success.
+
+    Deliberately narrow: requires current HEAD to equal exactly the latest
+    commit that touched this script -- never a branch name, never
+    ancestry/reachability, never a broad commit range, never tolerant of a
+    dirty tree. At the exact reviewed checkpoint where this script was
+    last committed, the two are identical by construction; any later
+    unrelated commit, or any uncommitted further edit to this script,
+    correctly fails closed."""
+    head = _current_git_head()
+    expected_commit = _expected_repair_commit()
+    if head != expected_commit:
+        raise PreconditionError(
+            "git_head_matches_latest_repair_script_commit: expected "
+            f"{expected_commit} (latest commit touching {REPAIR_SCRIPT_RELATIVE_PATH}), "
+            f"got {head}"
+        )
+    return head
+
+
+def _committed_script_bytes(head: str) -> bytes:
+    """The exact bytes of this repair script as committed at `head`, via
+    `git show <head>:<path>` -- reflects the real committed blob
+    regardless of any staged or unstaged working-tree changes."""
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{head}:{REPAIR_SCRIPT_RELATIVE_PATH}"],
+            cwd=str(ROOT), capture_output=True, timeout=10, check=True,
+        )
+    except Exception as exc:
+        raise PreconditionError(
+            f"could not read committed blob for {REPAIR_SCRIPT_RELATIVE_PATH} at {head}: {exc}"
+        ) from exc
+    return result.stdout
+
+
+def verify_script_integrity(head: str) -> None:
+    """Isolated, directly testable, byte-exact check (2026-07-12): HEAD
+    equaling the latest commit that touched this script is necessary but
+    not sufficient -- an uncommitted (staged or unstaged) local edit to
+    this exact file could still execute while both of those commit hashes
+    stay unchanged. This independently compares the real on-disk working-
+    tree bytes of this script against the exact bytes committed at `head`.
+
+    Deliberately narrow to this one file: never requires the rest of the
+    working tree to be clean (this repo's dirty pile is large, real, and
+    explicitly out of scope -- see AUTHORITATIVE_SURFACES/SESSION_BOOT_
+    PROTOCOL doctrine on preserving it). Comparing working-tree bytes
+    against the committed blob catches a staged-but-uncommitted change and
+    an unstaged change identically -- both manifest as "on-disk differs
+    from committed HEAD," which is exactly the real safety property that
+    matters (what would actually execute), independent of git's index
+    state."""
+    committed_bytes = _committed_script_bytes(head)
+    on_disk_bytes = SCRIPT_PATH.read_bytes()
+    if committed_bytes != on_disk_bytes:
+        raise PreconditionError(
+            "repair_script_matches_committed_head: on-disk "
+            f"{REPAIR_SCRIPT_RELATIVE_PATH} differs from the exact bytes "
+            f"committed at {head} (staged or unstaged local modification) "
+            "-- refusing to proceed with a possibly-unreviewed script"
+        )
 
 
 def _row_key(row: Dict[str, Any]) -> Tuple[str, str, str]:
@@ -158,8 +259,24 @@ def verify_preconditions() -> Dict[str, Any]:
         if not ok:
             raise PreconditionError(f"{name}: {detail}")
 
-    head = _current_git_head()
-    check("git_head_matches_expected", head == EXPECTED_HEAD, f"expected {EXPECTED_HEAD}, got {head}")
+    try:
+        head = verify_head_precondition()
+        head_detail = f"HEAD {head} matches latest commit touching {REPAIR_SCRIPT_RELATIVE_PATH}"
+        head_ok = True
+    except PreconditionError as exc:
+        head = None
+        head_detail = str(exc)
+        head_ok = False
+    check("git_head_matches_latest_repair_script_commit", head_ok, head_detail)
+
+    try:
+        verify_script_integrity(head)
+        integrity_ok = True
+        integrity_detail = "on-disk repair script is byte-identical to the committed blob at HEAD"
+    except PreconditionError as exc:
+        integrity_ok = False
+        integrity_detail = str(exc)
+    check("repair_script_matches_committed_head", integrity_ok, integrity_detail)
 
     if not METRICS_PATH.exists():
         check("metrics_csv_exists", False, str(METRICS_PATH))

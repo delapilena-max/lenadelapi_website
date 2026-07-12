@@ -979,12 +979,17 @@ def test_verify_postconditions_fails_closed_on_non_target_row_touched() -> None:
 
 # 5/8. Wrong hash / wrong row shape fail closed at the precondition
 # boundary -- exercised against isolated tmp_path files, never the real
-# repo CSV.
+# repo CSV. Both tests monkeypatch _current_git_head/_expected_repair_
+# commit to an identical matching value, and verify_script_integrity to a
+# no-op, so the HEAD and script-integrity gates pass and the CSV-level
+# checks under test are actually reached.
 def test_verify_preconditions_fails_closed_on_wrong_csv_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
     sync_mod.write_csv(metrics_path, _six_row_fixture())
     monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
-    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: repair_mod.EXPECTED_HEAD)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "verify_script_integrity", lambda head: None)
 
     with pytest.raises(PreconditionError, match="sha256"):
         verify_preconditions()
@@ -997,7 +1002,9 @@ def test_verify_preconditions_fails_closed_on_missing_target_row(tmp_path: Path,
     rows = [r for r in rows if (r["date"], r["slot_id"], r["platform"]) != TARGET_KEYS[0]]
     sync_mod.write_csv(metrics_path, rows)
     monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
-    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: repair_mod.EXPECTED_HEAD)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "verify_script_integrity", lambda head: None)
     monkeypatch.setattr(
         repair_mod, "_sha256_of",
         lambda path: repair_mod.EXPECTED_CSV_SHA256 if path == metrics_path else repair_mod._sha256_of(path),
@@ -1007,7 +1014,159 @@ def test_verify_preconditions_fails_closed_on_missing_target_row(tmp_path: Path,
         verify_preconditions()
 
 
-def test_verify_preconditions_fails_closed_on_wrong_head(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+# --- HEAD-guard fix (2026-07-12): deterministic, non-self-referential ------
+#
+# Replaces the previous hardcoded EXPECTED_HEAD constant (which became an
+# impossible self-blocking requirement the moment this script's own commit
+# landed and became HEAD) with a check derived fresh from git history:
+# current HEAD must equal exactly the latest commit that touched this
+# script. Never a branch name, never ancestry, never dirty-state tolerant,
+# never a broad commit range.
+
+# 1. Current HEAD equal to the script's latest modifying commit passes.
+def test_verify_head_precondition_passes_when_head_matches_latest_script_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "abc123")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "abc123")
+    assert repair_mod.verify_head_precondition() == "abc123"
+
+
+# 2. Current HEAD different from the script's latest modifying commit
+# fails closed.
+def test_verify_head_precondition_fails_closed_when_head_differs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "deadbeef")
-    with pytest.raises(PreconditionError, match="git_head"):
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "abc123")
+    with pytest.raises(PreconditionError, match="git_head_matches_latest_repair_script_commit"):
+        repair_mod.verify_head_precondition()
+
+
+# 3. Inability to resolve the script's committed revision fails closed --
+# never silently treated as "no constraint"/always-pass.
+def test_verify_head_precondition_fails_closed_when_expected_commit_unresolvable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "abc123")
+
+    def _raise():
+        raise PreconditionError("no commit history found")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", _raise)
+
+    with pytest.raises(PreconditionError, match="no commit history found"):
+        repair_mod.verify_head_precondition()
+
+
+# 3b. _expected_repair_commit() itself fails closed when git returns
+# nothing (e.g. the script has no commit history at all).
+def test_expected_repair_commit_fails_closed_when_git_log_returns_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeCompletedProcess:
+        stdout = ""
+
+    monkeypatch.setattr(
+        repair_mod.subprocess, "run", lambda *a, **k: _FakeCompletedProcess()
+    )
+    with pytest.raises(PreconditionError, match="no commit history found"):
+        repair_mod._expected_repair_commit()
+
+
+# 4. No write occurs on any HEAD-precondition failure -- verify_preconditions()
+# raises before the candidate CSV write path is ever reached, and no
+# temporary candidate file is created.
+def test_no_write_occurs_on_head_precondition_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
+    sync_mod.write_csv(metrics_path, _six_row_fixture())
+    before_bytes = metrics_path.read_bytes()
+    monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "deadbeef")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "abc123")
+
+    with pytest.raises(PreconditionError):
         verify_preconditions()
+
+    assert metrics_path.read_bytes() == before_bytes
+    assert not repair_mod.TMP_CANDIDATE_PATH.exists()
+
+
+# --- Script-integrity fix (2026-07-12): HEAD-commit-match is necessary but
+# not sufficient -- a later uncommitted (staged or unstaged) edit to this
+# exact script could still execute while both HEAD and the latest-commit-
+# touching-the-script hash stay unchanged. verify_script_integrity()
+# independently compares the real on-disk bytes against the exact bytes
+# committed at HEAD via `git show <head>:<path>`, which reflects the
+# committed blob regardless of index/working-tree state -- catching staged
+# and unstaged modifications identically, without requiring the rest of
+# this repo's large, real, intentionally-preserved dirty pile to be clean.
+
+# 1. Committed repair script identical to HEAD passes.
+def test_verify_script_integrity_passes_when_on_disk_matches_committed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    script_copy = tmp_path / "repair_script_copy.py"
+    script_copy.write_bytes(b"# exact committed content\n")
+    monkeypatch.setattr(repair_mod, "SCRIPT_PATH", script_copy)
+    monkeypatch.setattr(repair_mod, "_committed_script_bytes", lambda head: b"# exact committed content\n")
+
+    repair_mod.verify_script_integrity("some-head")  # must not raise
+
+
+# 2. Unstaged modification to the repair script fails closed.
+def test_verify_script_integrity_fails_closed_on_unstaged_modification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    script_copy = tmp_path / "repair_script_copy.py"
+    # Working-tree bytes differ from the committed blob -- an unstaged
+    # edit never touches git's index, so this is exactly what an unstaged
+    # modification looks like from this check's perspective.
+    script_copy.write_bytes(b"# locally edited, never staged\n")
+    monkeypatch.setattr(repair_mod, "SCRIPT_PATH", script_copy)
+    monkeypatch.setattr(repair_mod, "_committed_script_bytes", lambda head: b"# exact committed content\n")
+
+    with pytest.raises(PreconditionError, match="repair_script_matches_committed_head"):
+        repair_mod.verify_script_integrity("some-head")
+
+
+# 3. Staged modification to the repair script fails closed. `git show
+# <head>:<path>` always reflects the committed blob regardless of the
+# index, and this check compares against real on-disk (working-tree)
+# bytes -- so a staged-but-uncommitted edit produces the exact same
+# working-tree-differs-from-committed-blob condition as an unstaged one,
+# and is caught identically, by design (the index state is irrelevant to
+# what would actually execute).
+def test_verify_script_integrity_fails_closed_on_staged_modification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    script_copy = tmp_path / "repair_script_copy.py"
+    script_copy.write_bytes(b"# locally edited AND staged via git add\n")
+    monkeypatch.setattr(repair_mod, "SCRIPT_PATH", script_copy)
+    monkeypatch.setattr(repair_mod, "_committed_script_bytes", lambda head: b"# exact committed content\n")
+
+    with pytest.raises(PreconditionError, match="repair_script_matches_committed_head"):
+        repair_mod.verify_script_integrity("some-head")
+
+
+# 4. Unrelated dirty files elsewhere in the repo must not cause failure --
+# verify_script_integrity() never inspects `git status`, never scans any
+# other path, and only ever compares this one script's own bytes. Proven
+# structurally: it passes purely from the script's own bytes matching,
+# with no dependency on (or mock of) the rest of the working tree's state.
+def test_verify_script_integrity_ignores_unrelated_dirty_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    script_copy = tmp_path / "repair_script_copy.py"
+    script_copy.write_bytes(b"# exact committed content\n")
+    monkeypatch.setattr(repair_mod, "SCRIPT_PATH", script_copy)
+    monkeypatch.setattr(repair_mod, "_committed_script_bytes", lambda head: b"# exact committed content\n")
+    # Deliberately do NOT mock/clean anything else -- this repo's real,
+    # large, intentionally-preserved dirty pile remains exactly as-is in
+    # the background, and the check must still pass.
+
+    repair_mod.verify_script_integrity("some-head")  # must not raise
+
+
+# 5. No candidate file or canonical write occurs when script-integrity
+# validation fails.
+def test_no_write_occurs_on_script_integrity_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
+    sync_mod.write_csv(metrics_path, _six_row_fixture())
+    before_bytes = metrics_path.read_bytes()
+    monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
+    monkeypatch.setattr(
+        repair_mod, "verify_script_integrity",
+        lambda head: (_ for _ in ()).throw(PreconditionError("repair_script_matches_committed_head: mismatch")),
+    )
+
+    with pytest.raises(PreconditionError, match="repair_script_matches_committed_head"):
+        verify_preconditions()
+
+    assert metrics_path.read_bytes() == before_bytes
+    assert not repair_mod.TMP_CANDIDATE_PATH.exists()
