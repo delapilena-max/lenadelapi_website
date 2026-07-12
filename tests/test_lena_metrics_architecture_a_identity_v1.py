@@ -22,7 +22,9 @@ from tools.lena_sync_architecture_a_receipts_to_metrics_v1 import (
     _historical_nested_instagram_media_id,
 )
 from tools.lena_meta_refresh_feedback_v1 import (
+    apply_fetched_metrics,
     candidate_posts,
+    metric_success,
     resolve_structured_post_id,
     parse_post_id,
 )
@@ -314,6 +316,64 @@ def test_sync_all_apply_writes_metrics_csv(tmp_path: Path) -> None:
     assert rows[0]["completion_rate"] == ""
     assert rows[0]["replay_rate"] == ""
     assert rows[0]["score"] == "0"
+
+
+def test_unknown_unfetched_metrics_do_not_turn_architecture_a_pending_row_weak(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-cross-tool-01-photo.json.receipt.json"
+    queue_item_path = published_dir / "test-cross-tool-01-photo.json"
+    receipt = _real_receipt("test-cross-tool-01-photo")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    _write_json(queue_item_path, _promoted_queue_item("test-cross-tool-01-photo"))
+
+    identity = build_identity_fields(receipt, receipt_path)
+    rows, is_new = upsert_metrics_row([], identity)
+
+    assert is_new is True
+    assert len(rows) == 1
+    pre_refresh_row = rows[0]
+
+    assert pre_refresh_row["reach"] == "0"
+    assert pre_refresh_row["likes"] == "0"
+    assert pre_refresh_row["saves"] == "0"
+    assert pre_refresh_row["shares"] == "0"
+    assert pre_refresh_row["comments"] == "0"
+    assert pre_refresh_row["follows"] == ""
+    assert pre_refresh_row["profile_visits"] == ""
+    assert pre_refresh_row["completion_rate"] == ""
+    assert pre_refresh_row["replay_rate"] == ""
+    assert pre_refresh_row["score"] == "0"
+    assert pre_refresh_row["classification"] == "pending"
+
+    fetched = {
+        "metric_results": {
+            "reach": metric_success(0),
+            "likes": metric_success(0),
+            "saves": metric_success(0),
+            "shares": metric_success(0),
+            "comments": metric_success(0),
+            "profile_visits": {"ok": False, "reason": "never fetched"},
+            "completion_rate": {"ok": False, "reason": "never fetched"},
+            "replay_rate": {"ok": False, "reason": "never fetched"},
+        }
+    }
+
+    merged = apply_fetched_metrics(dict(pre_refresh_row), fetched, is_new_row=True)
+
+    assert merged["reach"] == "0"
+    assert merged["likes"] == "0"
+    assert merged["saves"] == "0"
+    assert merged["shares"] == "0"
+    assert merged["comments"] == "0"
+    assert merged["follows"] == ""
+    assert merged["profile_visits"] == ""
+    assert merged["completion_rate"] == ""
+    assert merged["replay_rate"] == ""
+    assert merged["score"] == ""
+    assert merged["classification"] == "pending"
+    assert merged["score"] != "0.0"
+    assert merged["classification"] != "weak"
 
 
 # 1. structured platform media ID is preferred over notes regex
