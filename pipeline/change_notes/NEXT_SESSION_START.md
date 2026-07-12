@@ -76,6 +76,96 @@ Do not interpret a successful test, a passing dry-run, or a code review as
 lifting this freeze on its own -- it lifts only when Nicolas is told all
 five conditions are met and he confirms it explicitly.
 
+> ## ✅ ARCHITECTURE A OUTCOME-LEARNING PUBLISHED-INVENTORY PARITY LANDED AND VERIFIED AGAINST REAL DATA (2026-07-12, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `a96f6925`.
+>
+> **A. What this closes.** `tools/strategy/lena_build_post_outcome_
+> learning_state_v1.py` previously built `published_post_count`/
+> `pending_metrics_posts`/`stale_pending_metrics_posts` from the manual
+> post log only, even though Meta-refresh candidate discovery and
+> recipe/winner scoring already treated metrics rows as first-class. Real,
+> already-published Architecture A posts with no manual-log entry (e.g. a
+> Reel/Story) were invisible to operational published/pending/stale
+> tracking. This is now fixed with a local published-post inventory union,
+> not a new parallel store or a cross-tool refactor.
+>
+> **B. Real commit, HEAD is now `a96f6925`:** `feat: track outcome
+> learning with Architecture A publish parity` -- first-time canonical git
+> tracking of `tools/strategy/lena_build_post_outcome_learning_state_v1.py`
+> (previously present on disk but never committed; `git ls-files`
+> confirmed it absent beforehand), plus the new
+> `actionable_metrics_only_posts()`/`build_published_post_inventory()`
+> functions. Canonical dedupe key remains `(date, slot_id, platform)`;
+> `source_slot_id` is never used for dedupe. Manual-log rows are always
+> included and never modified; a metrics-only row is included only when it
+> carries a real, nonblank `instagram_media_id`, and only under a key no
+> manual row already occupies -- manual values always win on collision, by
+> construction, never by field-level merging. `build_queue_boosts()`,
+> scoring, classification, and winner derivation are completely untouched
+> (verified by inspection and by dedicated tests proving their output is
+> invariant to the union). 12 new focused tests + 87 adjacent + full suite
+> 230 passed, 0 failed.
+>
+> **C. Real production run against current real data, independently
+> verified, not just tested.** `python tools/strategy/
+> lena_build_post_outcome_learning_state_v1.py` (no flags -- the normal
+> real-data path; `--date` defaults to `utc_date()`, confirmed to equal
+> `2026-07-12`) was run exactly once. Analytics CSV SHA256 confirmed
+> byte-identical before and after
+> (`f12d82e27a779883e6e79f5b47c24f0bdd2c0bfd4ac2fe3d8be12640def08307`) --
+> this tool only reads CSVs, it never mutates them. **Real operational
+> transition:** `published_post_count: 2 -> 7`, `pending_metrics_posts: 1
+> -> 6`, `stale_pending_metrics_posts: 1 -> 3`. `winner_post_count`
+> remained `0`; `queue_boosts` remained `{}` -- both byte-identical
+> before/after, confirming the union has zero effect on scoring/winner
+> derivation. Exactly five previously invisible Architecture A
+> metrics-only posts became visible: `2026-07-05-01-photo`,
+> `2026-07-07-03-photo`, `readypack0709-pack003-08-photo`,
+> `readypack0709-pack007-00-photo-story`, and the first real Reel,
+> `readypack0709-pack007-00-photo-reel`. The Reel now resolves as
+> published: yes, pending: yes, stale: no -- its canonical `date` is
+> `2026-07-09`, age 3 days on `2026-07-12`, correctly under the existing
+> 4-day stale threshold. 7 published rows, 7 unique `(date, slot_id,
+> platform)` keys, zero duplicates. The Story/Reel pair remain distinct
+> despite sharing `source_slot_id = readypack0709-pack007-00-photo`.
+> Manual-log-only historical posts remain present. No scoring or
+> classification value was recomputed or mutated anywhere. The existing
+> alert `"Some published posts are still missing resolved metrics
+> updates."` correctly fired -- expected and truthful now that 6 real
+> pending posts exist, not a defect and not suppressed.
+>
+> **D. Runtime artifacts written by this verified run** (not committed by
+> this checkpoint; handled per the repo's existing artifact-tracking
+> doctrine, not auto-staged just because they were regenerated):
+> `pipeline/strategy/lena/next_actions/2026-07-12/
+> lena_post_outcome_learning_state_2026-07-12.json` (new) and `pipeline/
+> state/lena_post_outcome_learning_state_v1.json` (overwritten in place,
+> its own single-canonical-file convention).
+>
+> **E. Two corrections/gaps surfaced this session, preserved here rather
+> than silently fixed:**
+> - The manual post log
+> (`pipeline/analytics/lena_manual_post_log_v2_7.csv`) contains **2**
+>   logical data rows, not 4 -- an earlier session turn miscounted via
+>   physical `wc -l` line count on a CSV with embedded multi-line quoted
+>   caption fields. `csv.DictReader`, what the production tool actually
+>   uses, correctly parses 2 rows; both are present in the published
+>   inventory.
+> - Before this run, `pipeline/state/lena_post_outcome_learning_state_v1.
+>   json` represented state dated `2026-07-01`, but no corresponding dated
+>   `2026-07-01` report artifact existed on disk -- the most recent
+>   pre-existing dated report was `2026-06-24` (generated `2026-06-30`).
+>   This pre-existing gap is recorded as-is, not fabricated or
+>   reconstructed.
+>
+> **F. What must not be done.** No further production-code change, no
+> analytics mutation, no additional state/report regeneration, no live
+> Meta refresh, no scoring change, no winner mutation, no queue/promotion/
+> publish/R2/`.env`/approval action occurred or is authorized beyond what's
+> described above. The standing publish freeze remains fully in force for
+> everything except the already-completed one-Reel exception.
+>
+> Full detail: the changelog's matching 2026-07-12 (later session) entry.
+
 > ## ✅ FIRST REAL LENA REEL PUBLISHED THROUGH THE CLEAN-EXPORT-GATED PATH -- ONE-ACTION PUBLISH-FREEZE EXCEPTION COMPLETE; FREEZE OTHERWISE STILL FULLY IN FORCE (2026-07-12, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is unchanged at `0445161d` (no code committed this session -- documentation only).
 >
 > **A. What this records.** Nicolas explicitly, narrowly lifted the

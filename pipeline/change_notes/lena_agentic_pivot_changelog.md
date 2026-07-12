@@ -4,6 +4,98 @@ Append-only. Add a new dated entry per change batch; never rewrite or delete pri
 
 ---
 
+## 2026-07-12 (later session) - Batch: Architecture A outcome-learning published-inventory parity (landed + verified against real data)
+
+### Why
+`tools/strategy/lena_build_post_outcome_learning_state_v1.py` built
+`published_post_count`/`pending_metrics_posts`/
+`stale_pending_metrics_posts` from the manual post log only. Meta-refresh
+candidate discovery and recipe/winner scoring already treated metrics
+rows as first-class, but a real, already-published Architecture A post
+with no manual-log entry (a Reel or Story) was invisible to operational
+published/pending/stale tracking.
+
+### What changed (commit `a96f6925`, `feat: track outcome learning with Architecture A publish parity`)
+- First-time canonical git tracking of `tools/strategy/
+  lena_build_post_outcome_learning_state_v1.py` -- present on disk before
+  this session but never committed (`git ls-files` confirmed absent).
+  This commit is the whole file entering history, not a narrow diff to an
+  already-tracked file.
+- New `actionable_metrics_only_posts(metrics_rows, manual_keys)`: returns
+  metrics-only posts with a real, nonblank `instagram_media_id`, excluding
+  any `(date, slot_id, platform)` key already owned by a manual row.
+- New `build_published_post_inventory(manual_rows, metrics_rows)`:
+  `list(manual_rows) + actionable_metrics_only_posts(...)`. Manual rows
+  are never modified or merged; on collision the metrics-only entry for
+  that key is simply never created, so manual values win by construction.
+  `source_slot_id` is never part of the key -- a Story and Reel derived
+  from the same source photo remain distinct published posts.
+- `main()`'s published-post loop now iterates
+  `build_published_post_inventory(manual_rows, metrics_rows)` instead of
+  `manual_rows`; both `published_post_count` occurrences (report + final
+  print) updated to match. `build_queue_boosts()`, scoring,
+  classification, and winner derivation untouched.
+- New test file `tests/test_lena_post_outcome_learning_state_
+  architecture_a_parity.py` (12 tests): metrics-only inclusion/exclusion,
+  exact-collision dedupe with manual values winning, distinct
+  platforms/derived-slot-ids, `queue_boosts`/`winner_posts` invariance,
+  and one integration-level representative-mixed-state fixture (not just
+  isolated helper tests).
+- Validation: 12 new + 87 adjacent (metrics identity + Meta-refresh
+  feedback suites) + full suite 230 passed, 0 failed.
+
+### Real production run against real data (2026-07-12, after the commit above)
+- Invocation: `python tools/strategy/
+  lena_build_post_outcome_learning_state_v1.py` (no flags -- the normal
+  real-data path; `--date` defaults to `utc_date()`, confirmed equal to
+  `2026-07-12`).
+- Analytics CSV confirmed byte-identical before and after: sha256
+  `f12d82e27a779883e6e79f5b47c24f0bdd2c0bfd4ac2fe3d8be12640def08307` both
+  times -- this tool only ever reads the CSV, never mutates it.
+- **Real operational transition:** `published_post_count: 2 -> 7`,
+  `pending_metrics_posts: 1 -> 6`, `stale_pending_metrics_posts: 1 -> 3`.
+  `winner_post_count` stayed `0`; `queue_boosts` stayed `{}` -- both
+  byte-identical before/after, proving zero effect on scoring/winner
+  derivation.
+- Exactly five previously invisible Architecture A metrics-only posts
+  became visible: `2026-07-05-01-photo`, `2026-07-07-03-photo`,
+  `readypack0709-pack003-08-photo`,
+  `readypack0709-pack007-00-photo-story`, and the first real Reel,
+  `readypack0709-pack007-00-photo-reel`.
+- The Reel resolves published: yes, pending: yes, stale: no -- canonical
+  `date` `2026-07-09`, age 3 days on `2026-07-12`, under the existing
+  4-day stale threshold. It and its sibling Story remain distinct despite
+  sharing `source_slot_id = readypack0709-pack007-00-photo`.
+- 7 published rows, 7 unique `(date, slot_id, platform)` keys, zero
+  duplicates, verified programmatically. Manual-log-only historical posts
+  remain present. No scoring or classification value was recomputed or
+  mutated. The existing alert `"Some published posts are still missing
+  resolved metrics updates."` correctly fired -- expected and truthful
+  given 6 real pending posts now exist, not suppressed.
+- Runtime artifacts written by this run, **not committed by this
+  checkpoint**: `pipeline/strategy/lena/next_actions/2026-07-12/
+  lena_post_outcome_learning_state_2026-07-12.json` (new) and `pipeline/
+  state/lena_post_outcome_learning_state_v1.json` (overwritten in place).
+
+### Corrections/gaps preserved, not silently fixed
+- The manual post log (`pipeline/analytics/lena_manual_post_log_v2_7.csv`)
+  has **2** logical data rows, not 4 -- an earlier session turn miscounted
+  via physical `wc -l` line count on a CSV with embedded multi-line quoted
+  caption fields. `csv.DictReader`, what the production tool actually
+  uses, correctly parses 2 rows; both are present in the inventory.
+- Before this run, `pipeline/state/lena_post_outcome_learning_state_v1.
+  json` represented state dated `2026-07-01` with no corresponding dated
+  `2026-07-01` report artifact on disk -- the most recent pre-existing
+  dated report was `2026-06-24` (generated `2026-06-30`). Recorded as-is,
+  not fabricated or reconstructed.
+
+### Explicitly not done
+- No further production-code change beyond the parity fix above.
+- No analytics mutation (CSV byte-identical, confirmed by sha256).
+- No live Meta refresh, no scoring change, no winner mutation.
+- No queue/promotion/publish/R2/`.env`/approval action.
+- No unrelated dirty-pile work.
+
 ## 2026-07-12 (later session) - Batch: first real Lena Reel published through the clean-export-gated path (one-action publish-freeze exception)
 
 ### Why

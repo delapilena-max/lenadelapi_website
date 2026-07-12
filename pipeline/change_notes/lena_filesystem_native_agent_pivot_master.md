@@ -49,7 +49,45 @@ matching standing section.
 
 ## 0. Current State (Read This First)
 
-**Newest update (2026-07-12, later session): first real Lena Reel
+**Newest update (2026-07-12, later session): Architecture A
+outcome-learning published-inventory parity landed and verified against
+real data.** HEAD is now `a96f6925`. `tools/strategy/
+lena_build_post_outcome_learning_state_v1.py` (first-time canonical git
+tracking; previously present on disk but never committed) previously
+built `published_post_count`/`pending_metrics_posts`/
+`stale_pending_metrics_posts` from the manual post log only, making real,
+already-published Architecture A posts with no manual-log entry (e.g. a
+Reel/Story) invisible to operational tracking, even though Meta-refresh
+candidate discovery and recipe/winner scoring already treated metrics
+rows as first-class. Fixed with a local published-post inventory union
+(`build_published_post_inventory()`), keyed by the same canonical
+`(date, slot_id, platform)` identity used everywhere else --
+`source_slot_id` never used for dedupe. Manual-log rows always included
+and win on collision by construction; a metrics-only row is included only
+with a real, nonblank `instagram_media_id`. `build_queue_boosts()`,
+scoring, classification, and winner derivation are completely untouched.
+**Run once against real data, independently verified:** analytics CSV
+byte-identical before/after (sha256
+`f12d82e27a779883e6e79f5b47c24f0bdd2c0bfd4ac2fe3d8be12640def08307`);
+real transition `published_post_count: 2 -> 7`,
+`pending_metrics_posts: 1 -> 6`, `stale_pending_metrics_posts: 1 -> 3`;
+`winner_post_count` and `queue_boosts` byte-identical (`0` / `{}`) before
+and after. The first real Reel, `readypack0709-pack007-00-photo-reel`,
+now resolves published/pending/not-stale (date `2026-07-09`, age 3 days
+on `2026-07-12`, under the 4-day threshold); it and its sibling Story
+remain distinct despite sharing `source_slot_id =
+readypack0709-pack007-00-photo`. 7 published rows, 7 unique keys, zero
+duplicates. Two corrections preserved, not silently fixed: the manual
+post log has 2 logical rows, not 4 (an earlier `wc -l`-based miscount on
+a CSV with embedded multi-line quoted fields); and a pre-existing gap
+where the prior canonical state file was dated `2026-07-01` with no
+matching dated report artifact on disk. Runtime artifacts from this run
+(`pipeline/strategy/lena/next_actions/2026-07-12/...` and `pipeline/
+state/lena_post_outcome_learning_state_v1.json`) are not committed by
+this checkpoint. Full detail: `NEXT_SESSION_START.md`'s matching banner
+and the changelog's matching 2026-07-12 (later session) entry.
+
+**Earlier entry, still relevant (2026-07-12, later session): first real Lena Reel
 published through the clean-export-gated path -- a one-action publish-
 freeze exception, now complete.** Nicolas explicitly, narrowly lifted the
 standing publish freeze above for exactly one item:
