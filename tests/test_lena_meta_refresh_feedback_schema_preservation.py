@@ -6,7 +6,7 @@ from pathlib import Path
 import tools.lena_meta_refresh_feedback_v1 as mod
 
 
-CANONICAL_FIELDS_34 = [
+CANONICAL_FIELDS_38 = [
     "date",
     "slot_id",
     "platform",
@@ -41,6 +41,10 @@ CANONICAL_FIELDS_34 = [
     "wardrobe_outfit_id",
     "pose_body_language_id",
     "expression_gaze_id",
+    "publish_architecture",
+    "published_timestamp",
+    "qa_artifact_path",
+    "approval_record_path",
 ]
 
 
@@ -93,16 +97,20 @@ def _canonical_row(slot_id: str, *, lane: str, post_url: str) -> dict:
         "wardrobe_outfit_id": "wc_p020",
         "pose_body_language_id": "pose_01",
         "expression_gaze_id": "expr_01",
+        "publish_architecture": "architecture_a",
+        "published_timestamp": "2026-07-09T12:00:00+0000",
+        "qa_artifact_path": f"C:\\qa\\{slot_id}_qa.json",
+        "approval_record_path": f"C:\\approvals\\{slot_id}_approval.json",
     }
 
 
-def test_schema_preserving_round_trip_keeps_34_columns_and_order(tmp_path: Path) -> None:
+def test_schema_preserving_round_trip_keeps_38_columns_and_order(tmp_path: Path) -> None:
     metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
     rows = [
         _canonical_row("slot-1", lane="rooftop sunset", post_url="https://example.com/p/1"),
         _canonical_row("slot-2", lane="sidewalk dinner", post_url="https://example.com/p/2"),
     ]
-    _write_rows(metrics_path, CANONICAL_FIELDS_34, rows)
+    _write_rows(metrics_path, CANONICAL_FIELDS_38, rows)
 
     existing_header = mod.read_csv_header(metrics_path)
     field_order = mod.stable_union_fields(existing_header, mod.METRIC_FIELDS)
@@ -115,9 +123,9 @@ def test_schema_preserving_round_trip_keeps_34_columns_and_order(tmp_path: Path)
     mod.write_csv(metrics_path, field_order, loaded)
     reloaded = mod.read_csv(metrics_path)
 
-    assert len(_header(metrics_path)) == 34
-    assert _header(metrics_path) == CANONICAL_FIELDS_34
-    assert field_order == CANONICAL_FIELDS_34
+    assert len(_header(metrics_path)) == 38
+    assert _header(metrics_path) == CANONICAL_FIELDS_38
+    assert field_order == CANONICAL_FIELDS_38
     assert reloaded[0]["reach"] == "2600"
     assert reloaded[0]["likes"] == "81"
     assert reloaded[0]["notes"] == "post-refresh"
@@ -134,6 +142,10 @@ def test_schema_preserving_round_trip_keeps_34_columns_and_order(tmp_path: Path)
     assert reloaded[0]["wardrobe_outfit_id"] == "wc_p020"
     assert reloaded[0]["pose_body_language_id"] == "pose_01"
     assert reloaded[0]["expression_gaze_id"] == "expr_01"
+    assert reloaded[0]["publish_architecture"] == "architecture_a"
+    assert reloaded[0]["published_timestamp"] == "2026-07-09T12:00:00+0000"
+    assert reloaded[0]["qa_artifact_path"] == "C:\\qa\\slot-1_qa.json"
+    assert reloaded[0]["approval_record_path"] == "C:\\approvals\\slot-1_approval.json"
     assert reloaded[1] == rows[1]
 
 

@@ -76,7 +76,29 @@ NEW_CREATIVE_PROVENANCE_FIELDS = [
     "pose_body_language_id",
     "expression_gaze_id",
 ]
-METRIC_FIELDS = LEGACY_METRIC_FIELDS + NEW_IDENTITY_FIELDS + NEW_CREATIVE_PROVENANCE_FIELDS
+# Publish-provenance columns (2026-07-12): closes the gap where
+# resolve_canonical_provenance() already computes real qa_artifact_path/
+# approval_record_path values but sync_all() only ever surfaced them in
+# its dry-run/apply JSON summary, never in the CSV itself. Also persists
+# the receipt's own real instagram_timestamp (already written by every
+# Architecture A publish, never fetched from any new source) and a
+# literal publish_architecture marker -- valid because this tool is
+# exclusively the Architecture A receipt-to-metrics path; it never reads
+# or writes Architecture B's separate queue/CSV format. Additive only,
+# appended after the existing columns so stable_union_fields() migrates
+# any historical header safely, exactly like every prior column addition.
+NEW_PUBLISH_METADATA_FIELDS = [
+    "publish_architecture",
+    "published_timestamp",
+    "qa_artifact_path",
+    "approval_record_path",
+]
+METRIC_FIELDS = (
+    LEGACY_METRIC_FIELDS
+    + NEW_IDENTITY_FIELDS
+    + NEW_CREATIVE_PROVENANCE_FIELDS
+    + NEW_PUBLISH_METADATA_FIELDS
+)
 
 DATE_PREFIX_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
 
@@ -268,6 +290,13 @@ def build_identity_fields(receipt: Dict[str, Any], receipt_path: Path) -> Dict[s
         "source_asset_sha256": metadata.get("source_asset_sha256") or "",
         "clean_export_derivative_sha256": metadata.get("clean_export_derivative_sha256") or "",
         "clean_export_verified": "true" if clean_export_verified else "false",
+        # Publish-provenance (2026-07-12). "architecture_a" is a literal,
+        # not inferred: this function only ever runs against Architecture
+        # A's own published_dir/receipt shape. published_timestamp is the
+        # receipt's own real instagram_timestamp -- never fabricated when
+        # absent (older receipts predating this field simply stay blank).
+        "publish_architecture": "architecture_a",
+        "published_timestamp": receipt.get("instagram_timestamp") or "",
     }
 
 
@@ -285,7 +314,11 @@ def upsert_metrics_row(
     for idx, row in enumerate(metric_rows):
         if metric_key(row) == key:
             updated = dict(row)
-            for field in NEW_IDENTITY_FIELDS + NEW_CREATIVE_PROVENANCE_FIELDS:
+            for field in (
+                NEW_IDENTITY_FIELDS
+                + NEW_CREATIVE_PROVENANCE_FIELDS
+                + NEW_PUBLISH_METADATA_FIELDS
+            ):
                 if identity.get(field):
                     updated[field] = identity[field]
             if identity.get("media_type") and not updated.get("media_type"):
@@ -338,6 +371,11 @@ def sync_all(published_dir: Path, metrics_path: Path, apply: bool) -> Dict[str, 
         provenance = resolve_canonical_provenance(
             identity["date"], identity["slot_id"], identity["source_slot_id"]
         )
+        # Thread the already-resolved provenance paths into the same
+        # identity payload upsert_metrics_row() writes -- no new/parallel
+        # resolver, just carrying values this function already computed.
+        identity["qa_artifact_path"] = provenance["qa_artifact_path"] or ""
+        identity["approval_record_path"] = provenance["approval_record_path"] or ""
         metric_rows, is_new = upsert_metrics_row(metric_rows, identity)
         created += 1 if is_new else 0
         updated += 0 if is_new else 1

@@ -11,6 +11,7 @@ import tools.lena_sync_architecture_a_receipts_to_metrics_v1 as sync_mod
 from tools.lena_sync_architecture_a_receipts_to_metrics_v1 import (
     METRIC_FIELDS,
     LEGACY_METRIC_FIELDS,
+    NEW_IDENTITY_FIELDS,
     NEW_CREATIVE_PROVENANCE_FIELDS,
     build_identity_fields,
     derive_date,
@@ -834,6 +835,195 @@ def test_historical_csv_without_creative_columns_loads_and_survives_upsert(tmp_p
 # publisher surface, and every test above operates purely on tmp_path
 # fixtures, never pipeline/analytics/lena_post_metrics_v1_6_1.csv or any
 # other real repo path.
+
+
+# --- publish-provenance persistence (2026-07-12) ----------------------------
+#
+# publish_architecture / published_timestamp / qa_artifact_path /
+# approval_record_path. Closes the gap where resolve_canonical_provenance()
+# already computed real qa_artifact_path/approval_record_path values but
+# sync_all() only ever surfaced them in its dry-run/apply JSON summary,
+# never in the CSV row itself.
+
+def test_build_identity_fields_sets_publish_architecture_literal(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-pm-01-photo.json.receipt.json"
+    receipt = _real_receipt("test-pm-01-photo")
+    _write_json(receipt_path, receipt)
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["publish_architecture"] == "architecture_a"
+
+
+def test_published_timestamp_comes_from_receipt_instagram_timestamp(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-pm-02-photo.json.receipt.json"
+    receipt = _real_receipt("test-pm-02-photo")
+    receipt["instagram_timestamp"] = "2026-07-12T18:49:44+0000"
+    _write_json(receipt_path, receipt)
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["published_timestamp"] == "2026-07-12T18:49:44+0000"
+
+
+def test_published_timestamp_stays_blank_when_receipt_lacks_it(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    receipt_path = published_dir / "test-pm-03-photo.json.receipt.json"
+    receipt = _real_receipt("test-pm-03-photo")
+    del receipt["instagram_timestamp"]
+    _write_json(receipt_path, receipt)
+    identity = build_identity_fields(receipt, receipt_path)
+    assert identity["published_timestamp"] == ""
+
+
+def test_sync_all_persists_qa_and_approval_paths_into_csv_row(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Proves the real fix: sync_all() must thread the already-resolved
+    provenance dict into the CSV row, not only its own JSON summary."""
+    asset_review_root = tmp_path / "asset_review" / "lena"
+    approval_root = tmp_path / "publish_packets" / "lena"
+    monkeypatch.setattr(sync_mod, "ASSET_REVIEW_ROOT", asset_review_root)
+    monkeypatch.setattr(sync_mod, "APPROVAL_ROOT", approval_root)
+
+    published_dir = tmp_path / "published"
+    metrics_path = tmp_path / "metrics.csv"
+    receipt_path = published_dir / "test-pm-04-photo.json.receipt.json"
+    queue_item_path = published_dir / "test-pm-04-photo.json"
+    receipt = _real_receipt("test-pm-04-photo")
+    receipt["published_post_path"] = str(queue_item_path)
+    _write_json(receipt_path, receipt)
+    _write_json(queue_item_path, _promoted_queue_item("test-pm-04-photo"))
+
+    date_str = "2026-07-11"  # matches _promoted_queue_item's metadata.source_date
+    qa_path = asset_review_root / date_str / "test-pm-04-photo_qa.json"
+    approval_path = approval_root / date_str / "test-pm-04-photo_approval.json"
+    _write_json(qa_path, {"overall": "pass"})
+    _write_json(approval_path, {"post_id": "test-pm-04-photo"})
+
+    result = sync_all(published_dir, metrics_path, apply=True)
+    assert result["created"] == 1
+    rows = read_csv(metrics_path)
+    assert len(rows) == 1
+    assert rows[0]["qa_artifact_path"] == str(qa_path)
+    assert rows[0]["approval_record_path"] == str(approval_path)
+    assert rows[0]["publish_architecture"] == "architecture_a"
+    assert rows[0]["published_timestamp"] == "2026-07-10T21:31:17+0000"
+
+
+def test_sync_all_leaves_publish_metadata_blank_when_provenance_absent(tmp_path: Path) -> None:
+    published_dir = tmp_path / "published"
+    metrics_path = tmp_path / "metrics.csv"
+    receipt_path = published_dir / "test-pm-06-photo.json.receipt.json"
+    receipt = _real_receipt("test-pm-06-photo")
+    del receipt["instagram_timestamp"]
+    _write_json(receipt_path, receipt)
+    # No sibling queue item, no QA/approval artifacts on disk at all.
+
+    result = sync_all(published_dir, metrics_path, apply=True)
+    assert result["created"] == 1
+    rows = read_csv(metrics_path)
+    assert rows[0]["qa_artifact_path"] == ""
+    assert rows[0]["approval_record_path"] == ""
+    assert rows[0]["published_timestamp"] == ""
+    assert rows[0]["publish_architecture"] == "architecture_a"  # always real, never absent
+
+
+def test_upsert_never_overwrites_nonblank_publish_metadata_with_blank(tmp_path: Path) -> None:
+    rows = [{
+        "date": "2026-07-12", "slot_id": "test-pm-05-photo", "platform": "Instagram Reels",
+        "publish_architecture": "architecture_a",
+        "published_timestamp": "2026-07-12T18:49:44+0000",
+        "qa_artifact_path": "C:\\real\\qa.json",
+        "approval_record_path": "C:\\real\\approval.json",
+    }]
+    identity = {
+        "date": "2026-07-12", "slot_id": "test-pm-05-photo", "platform": "Instagram Reels",
+        "media_type": "reel", "post_id": "", "instagram_media_id": "", "permalink": "",
+        "source_slot_id": "", "publish_receipt_path": "", "source_asset_path": "",
+        "clean_derivative_path": "", "source_asset_sha256": "", "clean_export_derivative_sha256": "",
+        "clean_export_verified": "false",
+        "publish_architecture": "", "published_timestamp": "",
+        "qa_artifact_path": "", "approval_record_path": "",
+    }
+    rows, is_new = upsert_metrics_row(rows, identity)
+    assert is_new is False
+    assert rows[0]["publish_architecture"] == "architecture_a"
+    assert rows[0]["published_timestamp"] == "2026-07-12T18:49:44+0000"
+    assert rows[0]["qa_artifact_path"] == "C:\\real\\qa.json"
+    assert rows[0]["approval_record_path"] == "C:\\real\\approval.json"
+
+
+def test_historical_csv_without_publish_metadata_columns_loads_and_survives_upsert(
+    tmp_path: Path,
+) -> None:
+    """Mirrors the real, currently-committed 34-column
+    pipeline/analytics/lena_post_metrics_v1_6_1.csv schema (LEGACY +
+    IDENTITY + CREATIVE_PROVENANCE, no publish-metadata columns yet) --
+    exactly what the file looks like on disk today, before this slice's
+    --apply has ever been run against it."""
+    metrics_path = tmp_path / "metrics.csv"
+    header_34 = LEGACY_METRIC_FIELDS + NEW_IDENTITY_FIELDS + NEW_CREATIVE_PROVENANCE_FIELDS
+    with metrics_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=header_34)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-07-09", "slot_id": "readypack0709-pack007-00-photo-story",
+            "platform": "Instagram Story", "media_type": "story", "growth_bucket": "",
+            "lane": "sidewalk dinner", "hook_category": "",
+            "post_url": "https://www.instagram.com/stories/lenadelapineapple.official/3938443513776354906",
+            "audio_name": "", "reach": "0", "likes": "0", "saves": "0", "shares": "0",
+            "comments": "0", "follows": "", "profile_visits": "", "completion_rate": "",
+            "replay_rate": "", "score": "0", "classification": "pending",
+            "notes": "Auto-synced from Architecture A publish receipt; historical row.",
+            "post_id": "readypack0709-pack007-00-photo-story",
+            "instagram_media_id": "17879977575673516",
+            "permalink": "https://www.instagram.com/stories/lenadelapineapple.official/3938443513776354906",
+            "source_slot_id": "readypack0709-pack007-00-photo",
+            "publish_receipt_path": "C:\\real\\receipt.json",
+            "source_asset_path": "", "clean_derivative_path": "", "source_asset_sha256": "",
+            "clean_export_derivative_sha256": "", "clean_export_verified": "false",
+            "wardrobe_outfit_id": "wc_p016", "pose_body_language_id": "", "expression_gaze_id": "",
+        })
+
+    rows = read_csv(metrics_path)
+    assert len(rows) == 1
+    assert rows[0]["instagram_media_id"] == "17879977575673516"  # loads fine, legacy 34-col header
+
+    identity = {
+        "date": "2026-07-12", "slot_id": "readypack0709-pack007-00-photo-reel",
+        "platform": "Instagram Reels", "media_type": "reel",
+        "post_id": "readypack0709-pack007-00-photo-reel",
+        "instagram_media_id": "18114662917723939",
+        "permalink": "https://www.instagram.com/reel/DatBbJdkjzD/",
+        "source_slot_id": "readypack0709-pack007-00-photo",
+        "publish_receipt_path": "C:\\real\\reel_receipt.json",
+        "source_asset_path": "", "clean_derivative_path": "", "source_asset_sha256": "",
+        "clean_export_derivative_sha256": "", "clean_export_verified": "true",
+        "publish_architecture": "architecture_a",
+        "published_timestamp": "2026-07-12T18:49:44+0000",
+        "qa_artifact_path": "C:\\real\\qa.json",
+        "approval_record_path": "C:\\real\\approval.json",
+    }
+    rows, is_new = upsert_metrics_row(rows, identity)
+    assert is_new is True
+    assert len(rows) == 2  # no duplicate -- exactly one new row appended
+
+    write_csv(metrics_path, rows)
+    reloaded = read_csv(metrics_path)
+    assert len(reloaded) == 2
+    historical = next(r for r in reloaded if r["slot_id"] == "readypack0709-pack007-00-photo-story")
+    # Every original value preserved byte-identical; new columns present
+    # but blank for the untouched historical row.
+    assert historical["instagram_media_id"] == "17879977575673516"
+    assert historical.get("publish_architecture", "") == ""
+    assert historical.get("published_timestamp", "") == ""
+    assert historical.get("qa_artifact_path", "") == ""
+    assert historical.get("approval_record_path", "") == ""
+
+    new_row = next(r for r in reloaded if r["slot_id"] == "readypack0709-pack007-00-photo-reel")
+    assert new_row["publish_architecture"] == "architecture_a"
+    assert new_row["published_timestamp"] == "2026-07-12T18:49:44+0000"
+    assert new_row["qa_artifact_path"] == "C:\\real\\qa.json"
+    assert new_row["approval_record_path"] == "C:\\real\\approval.json"
 
 
 # --- Legacy existing-row zero-placeholder repair (2026-07-12) --------------
