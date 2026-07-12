@@ -229,11 +229,13 @@ def verify_script_integrity(head: str) -> None:
     working tree to be clean (this repo's dirty pile is large, real, and
     explicitly out of scope -- see AUTHORITATIVE_SURFACES/SESSION_BOOT_
     PROTOCOL doctrine on preserving it). Comparing working-tree bytes
-    against the committed blob catches a staged-but-uncommitted change and
-    an unstaged change identically -- both manifest as "on-disk differs
-    from committed HEAD," which is exactly the real safety property that
-    matters (what would actually execute), independent of git's index
-    state."""
+    against the committed blob catches an unstaged change and a change
+    that is BOTH staged AND still present on disk. It deliberately does
+    NOT inspect the git index on its own -- see verify_index_integrity()
+    for the complementary check that closes the remaining gap: a
+    modification staged and then reverted on disk (working tree back to
+    matching HEAD, but the index still holding the different staged
+    blob), which this function alone cannot detect."""
     committed_bytes = _committed_script_bytes(head)
     on_disk_bytes = SCRIPT_PATH.read_bytes()
     if committed_bytes != on_disk_bytes:
@@ -242,6 +244,47 @@ def verify_script_integrity(head: str) -> None:
             f"{REPAIR_SCRIPT_RELATIVE_PATH} differs from the exact bytes "
             f"committed at {head} (staged or unstaged local modification) "
             "-- refusing to proceed with a possibly-unreviewed script"
+        )
+
+
+def verify_index_integrity(head: str) -> None:
+    """Isolated, directly testable check (2026-07-12): closes the one gap
+    verify_script_integrity() cannot see on its own -- a version of this
+    script staged into the git index that differs from HEAD, even after
+    the working-tree file has been restored back to match HEAD (e.g.
+    modify -> stage -> revert-on-disk). In that exact sequence, on-disk
+    bytes equal HEAD and HEAD equals the latest commit touching this
+    script, yet the index still holds a different staged blob that would
+    be committed if `git commit` ran right now.
+
+    Scoped to exactly this one file via `git diff --cached --quiet HEAD --
+    <path>` -- never requires the rest of the index/working tree to be
+    clean; unrelated staged or dirty files elsewhere never block this.
+    Fails closed both when a real staged difference is found (exit code 1)
+    and when the index state cannot be determined for any other reason
+    (any exit code other than 0 or 1, or the git invocation itself
+    failing) -- never silently treated as "no difference."."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--quiet", head, "--", REPAIR_SCRIPT_RELATIVE_PATH],
+            cwd=str(ROOT), capture_output=True, timeout=10,
+        )
+    except Exception as exc:
+        raise PreconditionError(
+            f"could not inspect git index state for {REPAIR_SCRIPT_RELATIVE_PATH}: {exc}"
+        ) from exc
+
+    if result.returncode == 1:
+        raise PreconditionError(
+            "repair_script_index_matches_head: the git index contains a staged "
+            f"difference for {REPAIR_SCRIPT_RELATIVE_PATH} relative to {head} -- "
+            "refusing to proceed with a possibly-different staged version"
+        )
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace") if isinstance(result.stderr, (bytes, bytearray)) else str(result.stderr)
+        raise PreconditionError(
+            "repair_script_index_matches_head: could not determine index state "
+            f"for {REPAIR_SCRIPT_RELATIVE_PATH} (git diff exit code {result.returncode}): {stderr}"
         )
 
 
@@ -277,6 +320,15 @@ def verify_preconditions() -> Dict[str, Any]:
         integrity_ok = False
         integrity_detail = str(exc)
     check("repair_script_matches_committed_head", integrity_ok, integrity_detail)
+
+    try:
+        verify_index_integrity(head)
+        index_ok = True
+        index_detail = "git index has no staged difference for the repair script relative to HEAD"
+    except PreconditionError as exc:
+        index_ok = False
+        index_detail = str(exc)
+    check("repair_script_index_matches_head", index_ok, index_detail)
 
     if not METRICS_PATH.exists():
         check("metrics_csv_exists", False, str(METRICS_PATH))

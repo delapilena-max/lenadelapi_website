@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -990,6 +991,7 @@ def test_verify_preconditions_fails_closed_on_wrong_csv_hash(tmp_path: Path, mon
     monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
     monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
     monkeypatch.setattr(repair_mod, "verify_script_integrity", lambda head: None)
+    monkeypatch.setattr(repair_mod, "verify_index_integrity", lambda head: None)
 
     with pytest.raises(PreconditionError, match="sha256"):
         verify_preconditions()
@@ -1005,6 +1007,7 @@ def test_verify_preconditions_fails_closed_on_missing_target_row(tmp_path: Path,
     monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
     monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
     monkeypatch.setattr(repair_mod, "verify_script_integrity", lambda head: None)
+    monkeypatch.setattr(repair_mod, "verify_index_integrity", lambda head: None)
     monkeypatch.setattr(
         repair_mod, "_sha256_of",
         lambda path: repair_mod.EXPECTED_CSV_SHA256 if path == metrics_path else repair_mod._sha256_of(path),
@@ -1166,6 +1169,139 @@ def test_no_write_occurs_on_script_integrity_failure(tmp_path: Path, monkeypatch
     )
 
     with pytest.raises(PreconditionError, match="repair_script_matches_committed_head"):
+        verify_preconditions()
+
+    assert metrics_path.read_bytes() == before_bytes
+    assert not repair_mod.TMP_CANDIDATE_PATH.exists()
+
+
+# --- Index-integrity fix (2026-07-12): closes the remaining gap ------------
+#
+# verify_script_integrity() alone cannot see a version staged into the git
+# index that differs from HEAD if the working-tree file is later restored
+# to match HEAD (modify -> stage -> revert-on-disk). At that point on-disk
+# bytes equal HEAD and HEAD equals the latest commit touching the script,
+# yet the index still holds a different staged blob that would be
+# committed if `git commit` ran right now. verify_index_integrity() closes
+# this via a real, isolated git repo -- not mocked -- reproducing the
+# exact sequence.
+
+def _isolated_git_repo(tmp_path: Path) -> Path:
+    repo_dir = tmp_path / "isolated_repo"
+    repo_dir.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=str(repo_dir), check=True)
+    return repo_dir
+
+
+def _git_head(repo_dir: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=str(repo_dir), capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+
+# 1. Real, non-mocked reproduction of the exact index-only staged-
+# divergence scenario: committed HEAD version exists; a modified version
+# is staged; the working tree is restored to match HEAD; the index still
+# differs -- fails closed.
+def test_verify_index_integrity_fails_closed_on_staged_divergence_with_restored_working_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_dir = _isolated_git_repo(tmp_path)
+    script_rel = "fake_repair_script.py"
+    script_path = repo_dir / script_rel
+    committed_content = b"# committed content\n"
+    script_path.write_bytes(committed_content)
+    subprocess.run(["git", "add", script_rel], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(repo_dir), check=True)
+    head = _git_head(repo_dir)
+
+    # 2. Stage a modified version.
+    script_path.write_bytes(b"# modified content, staged then reverted\n")
+    subprocess.run(["git", "add", script_rel], cwd=str(repo_dir), check=True)
+
+    # 3. Restore the working-tree file back to match HEAD.
+    script_path.write_bytes(committed_content)
+
+    # Sanity: working-tree bytes now equal HEAD's committed bytes -- proves
+    # verify_script_integrity() alone would NOT have caught this case.
+    assert script_path.read_bytes() == committed_content
+
+    monkeypatch.setattr(repair_mod, "ROOT", repo_dir)
+    monkeypatch.setattr(repair_mod, "REPAIR_SCRIPT_RELATIVE_PATH", script_rel)
+
+    with pytest.raises(PreconditionError, match="repair_script_index_matches_head"):
+        repair_mod.verify_index_integrity(head)
+
+
+# 2. Identical index/HEAD state passes.
+def test_verify_index_integrity_passes_when_index_matches_head(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_dir = _isolated_git_repo(tmp_path)
+    script_rel = "fake_repair_script.py"
+    (repo_dir / script_rel).write_bytes(b"# committed content\n")
+    subprocess.run(["git", "add", script_rel], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(repo_dir), check=True)
+    head = _git_head(repo_dir)
+
+    monkeypatch.setattr(repair_mod, "ROOT", repo_dir)
+    monkeypatch.setattr(repair_mod, "REPAIR_SCRIPT_RELATIVE_PATH", script_rel)
+
+    repair_mod.verify_index_integrity(head)  # must not raise
+
+
+# 3. Inability to inspect the index fails closed -- never silently
+# treated as "no difference."
+def test_verify_index_integrity_fails_closed_when_index_state_undeterminable(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeCompletedProcess:
+        returncode = 129
+        stderr = b"fatal: some unexpected git error"
+
+    monkeypatch.setattr(repair_mod.subprocess, "run", lambda *a, **k: _FakeCompletedProcess())
+
+    with pytest.raises(PreconditionError, match="repair_script_index_matches_head"):
+        repair_mod.verify_index_integrity("some-head")
+
+
+# 4. Unrelated staged files elsewhere must not block the repair -- the
+# check is scoped to exactly the repair script's own path.
+def test_verify_index_integrity_ignores_unrelated_staged_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_dir = _isolated_git_repo(tmp_path)
+    script_rel = "fake_repair_script.py"
+    other_rel = "unrelated_file.txt"
+    (repo_dir / script_rel).write_bytes(b"# committed content\n")
+    (repo_dir / other_rel).write_bytes(b"unrelated committed content\n")
+    subprocess.run(["git", "add", script_rel, other_rel], cwd=str(repo_dir), check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(repo_dir), check=True)
+    head = _git_head(repo_dir)
+
+    # Stage a real, unrelated modification -- must not affect the repair
+    # script's own index-integrity check.
+    (repo_dir / other_rel).write_bytes(b"unrelated staged modification\n")
+    subprocess.run(["git", "add", other_rel], cwd=str(repo_dir), check=True)
+
+    monkeypatch.setattr(repair_mod, "ROOT", repo_dir)
+    monkeypatch.setattr(repair_mod, "REPAIR_SCRIPT_RELATIVE_PATH", script_rel)
+
+    repair_mod.verify_index_integrity(head)  # must not raise
+
+
+# 5. No candidate file or canonical write occurs when index-integrity
+# validation fails.
+def test_no_write_occurs_on_index_integrity_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics_path = tmp_path / "lena_post_metrics_v1_6_1.csv"
+    sync_mod.write_csv(metrics_path, _six_row_fixture())
+    before_bytes = metrics_path.read_bytes()
+    monkeypatch.setattr(repair_mod, "METRICS_PATH", metrics_path)
+    monkeypatch.setattr(repair_mod, "_current_git_head", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "_expected_repair_commit", lambda: "matching-commit")
+    monkeypatch.setattr(repair_mod, "verify_script_integrity", lambda head: None)
+    monkeypatch.setattr(
+        repair_mod, "verify_index_integrity",
+        lambda head: (_ for _ in ()).throw(PreconditionError("repair_script_index_matches_head: staged mismatch")),
+    )
+
+    with pytest.raises(PreconditionError, match="repair_script_index_matches_head"):
         verify_preconditions()
 
     assert metrics_path.read_bytes() == before_bytes
