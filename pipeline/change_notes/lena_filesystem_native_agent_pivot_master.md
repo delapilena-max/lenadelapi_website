@@ -49,6 +49,52 @@ matching standing section.
 
 ## 0. Current State (Read This First)
 
+**Newest update (2026-07-12): legacy-zero placeholder repair completed and
+canonical metrics state restored.** HEAD is now `db50fcbd`. The 2026-07-11
+Meta-refresh incident left four real, pre-existing Architecture A metrics
+rows carrying literal `"0"` placeholders in `follows`/`profile_visits`/
+`completion_rate`/`replay_rate`, which `row_has_unknown_scoring_inputs()`
+incorrectly read as known values -- the same "unknown treated as zero"
+failure mode as the original incident, via a different vector. Three real
+commits closed this: `3e51a9e2` (`fix: repair legacy Lena metric zero
+placeholders`, the one-time fail-closed repair script), `a3d84d87` (`fix:
+verify committed Lena repair script integrity`, HEAD + on-disk-bytes
+guards), and `db50fcbd` (`fix: guard Lena repair against staged script
+drift`, the final `verify_index_integrity()` guard closing the
+staged-then-reverted gap). Exactly one authorized real `--apply` ran and
+succeeded: exactly 4 target rows (`(2026-07-05, 2026-07-05-01-photo,
+Instagram Feed)`, `(2026-07-07, 2026-07-07-03-photo, Instagram Feed)`,
+`(2026-07-09, readypack0709-pack003-08-photo, Instagram Feed)`,
+`(2026-07-09, readypack0709-pack007-00-photo-story, Instagram Story)`),
+exactly 16 cells, each `follows`/`profile_visits`/`completion_rate`/
+`replay_rate` going `"0"` -> `""`, nothing else changed. Canonical CSV
+SHA-256 is now `bc2ea7df6c7966bb39466cfa18b23504c591ab1630054d08d929c846d2
+20b408` (previously `e9e3c2b4274a99fd4ceb44a8c63203b190e35a65d850f0d916e31
+3887f0f5e64`). Independently, multi-pass verified: 6 rows preserved; exact
+34-column schema/order preserved; all 4 repaired rows now
+`row_has_unknown_scoring_inputs(...) == True`; all 4 still carry `score ==
+"0"` / `classification == "pending"` (scoring itself untouched); both
+non-target rows and all identity/provenance/creative-provenance/`notes`/
+`lane` fields unchanged; all 4 real incident-evidence artifacts remain
+byte-identical; no temp candidate remains; no second repair invocation
+occurred or is needed. Full suite: **189 passed, 0 failed** (focused
+HEAD/index/integrity/repair: 18 passed; Architecture A identity suite: 56
+passed; partial-failure + candidate-discovery + schema-preservation: 24
+passed). **Standing freezes explicitly remain in force and are not touched
+by this checkpoint:** LIVE META REFRESH, SCORING CHANGES, GAP B
+IMPLEMENTATION, OUTCOME LEARNING, and WINNER MUTATION all remain FROZEN;
+LIVE PUBLISH remains fully subject to the standing publish/clean-export
+freeze above, none of whose five conditions this checkpoint satisfies or
+counts toward. **Gap B remains read-only scoped, not implemented** --
+media-type-aware scoring applicability; lower urgency than the
+now-completed repair; implementing it alone would currently change zero
+real classifications since `follows`/`profile_visits` remain
+independently unfetched regardless of media type. No Meta API call, no
+publish/render/queue-promotion/R2/provider action, no `.env` access, no
+incident-evidence cleanup, no unrelated dirty-pile work occurred
+producing this checkpoint. Full detail: `NEXT_SESSION_START.md`'s top
+banner and the changelog's matching 2026-07-12 entry.
+
 **Last updated:** 2026-07-10/11, later session (strategic correction from
 Nicolas: the actual goal is one autonomous Lena content loop, not
 publisher-choosing -- see "Primary Product Objective" above. This session's

@@ -7271,3 +7271,133 @@ No render, generation, publish, queue mutation, R2 action, Meta/Instagram/
 Kling/provider call, `.env` access, or code change occurred producing this
 entry beyond the one already-described `75215779` commit -- the
 architecture audit and freeze recording were entirely read-only/docs-only.
+
+---
+
+## 2026-07-12 - Legacy-zero placeholder repair completed and canonical metrics state restored
+
+### Why
+The 2026-07-11 Meta-refresh incident (two defects, fixed at `4a8d2be0` and
+`c7134c62`) left four real, pre-existing Architecture A metrics rows
+carrying literal `"0"` placeholders in `follows`/`profile_visits`/
+`completion_rate`/`replay_rate` from the old `upsert_metrics_row()`
+convention, even though none of those four fields has ever actually been
+fetched by either Meta platform path. Because `row_has_unknown_scoring_
+inputs()` treats a literal `"0"` as a known value, this incorrectly made
+those four rows look scored on data that was never really measured -- the
+same "unknown treated as zero" failure mode as the original incident, via
+a different vector.
+
+### What changed
+Three real commits, in order, HEAD is now `db50fcbd`:
+- `3e51a9e2` `fix: repair legacy Lena metric zero placeholders` -- added
+  `tools/lena_repair_architecture_a_legacy_zero_placeholders_v1.py`, a
+  one-time, dry-run-by-default, fail-closed repair script targeting
+  exactly the four proven-affected rows by their real `(date, slot_id,
+  platform)` identity, never row position. Defaults to dry-run; `--apply`
+  performs one atomic write (temp file + `os.replace()`), only after
+  every precondition and postcondition passes.
+- `a3d84d87` `fix: verify committed Lena repair script integrity` --
+  added the current-HEAD-full-hash guard (compared against the latest
+  commit that actually touched the repair script, resolved fresh from git
+  history, never hardcoded) and the on-disk-bytes-vs-committed-HEAD-blob
+  guard, so a locally-edited, unreviewed version of the script cannot
+  execute even if HEAD itself looks correct.
+- `db50fcbd` `fix: guard Lena repair against staged script drift` --
+  added `verify_index_integrity()`, closing the one remaining gap: a
+  version of the script staged into the git index that differs from HEAD,
+  even after the working-tree file is restored to match HEAD (modify ->
+  stage -> revert-on-disk), which the byte-guard alone cannot see. Scoped
+  to exactly the repair script's own path via `git diff --cached --quiet
+  HEAD -- <path>`; unrelated staged or dirty files elsewhere never block
+  it; fails closed if the index state can't be determined for any reason.
+- Preceding safety commits this repair builds on: `966fa376` (`feat: add
+  per-field Lena Meta refresh reporting`), `fb45aab6` (cross-tool
+  unknown-value regression guard), `c7134c62` (`fix: preserve unknown
+  Lena metrics as blank placeholders`).
+
+### Real canonical repair result
+Exactly one authorized real repair `--apply` was run and completed
+successfully. Exactly 4 Architecture A rows were repaired:
+`(2026-07-05, 2026-07-05-01-photo, Instagram Feed)`, `(2026-07-07,
+2026-07-07-03-photo, Instagram Feed)`, `(2026-07-09,
+readypack0709-pack003-08-photo, Instagram Feed)`, `(2026-07-09,
+readypack0709-pack007-00-photo-story, Instagram Story)`. Exactly 16 cells
+changed: on each of the 4 rows, `follows`/`profile_visits`/
+`completion_rate`/`replay_rate` went `"0"` -> `""`. Nothing else changed.
+
+### Post-repair canonical state
+Canonical CSV SHA-256 is now
+`bc2ea7df6c7966bb39466cfa18b23504c591ab1630054d08d929c846d220b408`
+(previously
+`e9e3c2b4274a99fd4ceb44a8c63203b190e35a65d850f0d916e313887f0f5e64`).
+Independently, multi-pass verified:
+- Exactly 6 rows preserved.
+- Exact 34-column canonical schema and order preserved.
+- All 4 repaired rows now return `row_has_unknown_scoring_inputs(...) ==
+  True`.
+- All 4 repaired rows still carry `score == "0"` and `classification ==
+  "pending"` -- scoring itself is untouched by this repair.
+- Both non-target rows unchanged.
+- All identity fields, provenance fields, and creative-provenance fields
+  unchanged.
+- `notes` and `lane` unchanged on every row.
+- All 4 real incident-evidence artifacts remain byte-identical to their
+  recorded SHA-256/size values.
+- No temp candidate file remains.
+- No second repair invocation occurred, and none is needed -- the
+  script's own preconditions would now correctly refuse a second run,
+  since the 4 rows no longer match the required pre-repair `"0"` values.
+
+### Safety guards protecting this one-time repair path
+All run before any candidate construction, temp-file creation, or write:
+current-HEAD-full-hash guard; latest-commit-touching-the-script guard;
+on-disk-bytes-vs-committed-HEAD-blob guard; git-index-vs-HEAD guard for
+the repair script; exact canonical CSV SHA-256 precondition; exact
+34-column header/order precondition; exact 6-row-count precondition;
+exact 4-row structured allowlist (never row position); exact
+expected-current-value checks (refuses to touch any row whose real
+current values diverge from the documented pre-repair state);
+incident-evidence existence/hash/size checks; full postcondition
+validation against both the original and candidate in-memory row sets;
+atomic replacement, never edit-in-place; fail-closed second-run behavior.
+
+### Validation
+Latest full suite: **189 passed, 0 failed**. Relevant validated suites:
+focused HEAD/index/integrity/repair -- 18 passed; Architecture A identity
+suite -- 56 passed; partial-failure + candidate-discovery +
+schema-preservation -- 24 passed.
+
+### Standing freezes remain in force
+This checkpoint does not lift, weaken, or imply progress toward lifting
+any of the following:
+- LIVE META REFRESH: FROZEN.
+- SCORING CHANGES: FROZEN.
+- GAP B IMPLEMENTATION: FROZEN.
+- OUTCOME LEARNING: FROZEN.
+- WINNER MUTATION: FROZEN.
+- LIVE PUBLISH: remains fully subject to the standing publish/clean-export
+  freeze recorded elsewhere in this changelog and in
+  `NEXT_SESSION_START.md` -- this checkpoint does not touch, satisfy, or
+  count toward any of its five conditions.
+
+### Gap B status
+Read-only scoped, **not implemented**. Gap B concerns media-type-aware
+scoring applicability (whether/how scoring should treat metrics
+differently by media type). It remains lower urgency than the
+now-completed legacy-zero repair. Implementing Gap B alone would
+currently change zero real classifications, because `follows` and
+`profile_visits` remain independently unfetched by either Meta platform
+path regardless of media type. Do not treat Gap B as completed, approved,
+or scheduled by this entry.
+
+### What must not be done
+No automatic second repair. No further repair `--apply`. No Meta API
+call. No publish, render, queue promotion, or R2/provider action. No
+`.env` access. No incident-evidence cleanup. No unrelated dirty-pile
+work.
+
+No Meta API call, no publish, no render, no queue promotion, no R2/
+provider action, no `.env` access occurred producing these three commits
+-- this batch was strictly a repair-script/test/git-history change plus
+one authorized, fully-verified real canonical CSV write via `--apply`.

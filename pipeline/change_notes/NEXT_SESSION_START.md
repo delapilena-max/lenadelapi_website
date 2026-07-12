@@ -76,6 +76,114 @@ Do not interpret a successful test, a passing dry-run, or a code review as
 lifting this freeze on its own -- it lifts only when Nicolas is told all
 five conditions are met and he confirms it explicitly.
 
+> ## ✅ LEGACY-ZERO PLACEHOLDER REPAIR COMPLETED AND CANONICAL METRICS STATE RESTORED (2026-07-12) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `db50fcbd`.
+>
+> **A. What this closes.** The 2026-07-11 Meta-refresh incident (two
+> defects, fixed at `4a8d2be0` and `c7134c62`) left four real,
+> pre-existing Architecture A metrics rows carrying literal `"0"`
+> placeholders in `follows`/`profile_visits`/`completion_rate`/
+> `replay_rate` from the old `upsert_metrics_row()` convention, even though
+> none of those four fields has ever actually been fetched by either Meta
+> platform path. Because `row_has_unknown_scoring_inputs()` treats a
+> literal `"0"` as a known value, this incorrectly made those rows look
+> scored on data that was never really measured -- the same "unknown
+> treated as zero" failure mode as the original incident, via a different
+> vector. This is now fully repaired and independently, multi-pass
+> verified.
+>
+> **B. Real commits, in order, HEAD is now `db50fcbd`:**
+> - `3e51a9e2` `fix: repair legacy Lena metric zero placeholders` -- added
+>   `tools/lena_repair_architecture_a_legacy_zero_placeholders_v1.py`, a
+>   one-time, fail-closed, dry-run-by-default repair script targeting
+>   exactly the four proven-affected rows by their real `(date, slot_id,
+>   platform)` identity, never row position.
+> - `a3d84d87` `fix: verify committed Lena repair script integrity` --
+>   added the HEAD-matches-latest-commit guard and the on-disk-bytes-vs-
+>   committed-blob guard, closing the gap where a locally-edited,
+>   unreviewed version of the repair script could otherwise execute.
+> - `db50fcbd` `fix: guard Lena repair against staged script drift` --
+>   added `verify_index_integrity()`, closing the final gap: a version of
+>   the script staged into the git index that differs from HEAD even after
+>   the working-tree file is restored to match HEAD (modify -> stage ->
+>   revert-on-disk), which the byte-guard alone cannot see. Scoped to
+>   exactly the repair script's own path via `git diff --cached --quiet
+>   HEAD -- <path>`; unrelated staged/dirty files elsewhere never block it;
+>   fails closed if index state can't be determined.
+> - Relevant preceding safety commits this repair builds on: `966fa376`
+>   (`feat: add per-field Lena Meta refresh reporting`), `fb45aab6`
+>   (cross-tool unknown-value regression guard), `c7134c62` (`fix: preserve
+>   unknown Lena metrics as blank placeholders`).
+>
+> **C. Real canonical repair result.** Exactly one authorized real repair
+> `--apply` was run and completed successfully. Exactly 4 Architecture A
+> rows were repaired -- `(2026-07-05, 2026-07-05-01-photo, Instagram
+> Feed)`, `(2026-07-07, 2026-07-07-03-photo, Instagram Feed)`, `(2026-07-09,
+> readypack0709-pack003-08-photo, Instagram Feed)`, `(2026-07-09,
+> readypack0709-pack007-00-photo-story, Instagram Story)`. Exactly 16
+> cells changed: on each of the 4 rows, `follows`/`profile_visits`/
+> `completion_rate`/`replay_rate` went `"0"` -> `""`. Nothing else changed.
+>
+> **D. Post-repair canonical state, independently verified across multiple
+> passes.** Canonical CSV SHA-256 is now `bc2ea7df6c7966bb39466cfa18b23504
+> c591ab1630054d08d929c846d220b408` (previously `e9e3c2b4274a99fd4ceb44a8c6
+> 3203b190e35a65d850f0d916e313887f0f5e64`). Confirmed: exactly 6 rows;
+> exact 34-column canonical schema and order preserved; all 4 repaired
+> rows now return `row_has_unknown_scoring_inputs(...) == True`; all 4
+> repaired rows still carry `score == "0"` and `classification ==
+> "pending"` (unchanged -- this repair never touches scoring); both
+> non-target rows unchanged; all identity, provenance, and creative-
+> provenance fields unchanged; `notes` and `lane` unchanged on every row;
+> all 4 real incident-evidence artifacts remain byte-identical to their
+> recorded hashes; no temp candidate file remains; no second repair
+> invocation occurred or is needed -- the script's own preconditions would
+> now correctly refuse a second run since the 4 rows no longer match the
+> required pre-repair `"0"` values.
+>
+> **E. Safety guards protecting this one-time repair path** (all run
+> before any candidate construction, temp-file creation, or write):
+> current-HEAD-full-hash guard; latest-commit-touching-the-script guard;
+> on-disk-bytes-vs-committed-HEAD-blob guard; git-index-vs-HEAD guard for
+> the repair script; exact canonical CSV SHA-256 precondition; exact
+> 34-column header/order precondition; exact 6-row-count precondition;
+> exact 4-row structured allowlist (never row position); exact
+> expected-current-value checks (refuses to touch any row whose real
+> current values diverge from the documented pre-repair state); incident-
+> evidence existence/hash/size checks; full postcondition validation
+> against both the original and candidate in-memory row sets; atomic
+> replacement (temp file + `os.replace()`, never edit-in-place);
+> fail-closed second-run behavior.
+>
+> **F. Validation state.** Latest full suite: **189 passed, 0 failed**.
+> Relevant validated suites: focused HEAD/index/integrity/repair -- 18
+> passed; Architecture A identity suite -- 56 passed; partial-failure +
+> candidate-discovery + schema-preservation -- 24 passed.
+>
+> **G. Standing freezes explicitly remain in force -- this checkpoint does
+> not lift, weaken, or imply progress toward lifting any of them:**
+> - LIVE META REFRESH: FROZEN.
+> - SCORING CHANGES: FROZEN.
+> - GAP B IMPLEMENTATION: FROZEN.
+> - OUTCOME LEARNING: FROZEN.
+> - WINNER MUTATION: FROZEN.
+> - LIVE PUBLISH: remains fully subject to the standing publish/
+>   clean-export freeze above -- this checkpoint does not touch, satisfy,
+>   or count toward any of its five conditions.
+> Also still true: no automatic second repair; no further repair
+> `--apply`; no Meta API call occurred; no publish/render/queue-promotion/
+> R2/provider action occurred; no `.env` access occurred; no incident-
+> evidence cleanup occurred; no unrelated dirty-pile work occurred.
+>
+> **H. Gap B status -- read-only scoped, NOT implemented.** Gap B concerns
+> media-type-aware scoring applicability (whether/how scoring should treat
+> metrics differently by media type). It remains lower urgency than the
+> now-completed legacy-zero repair. Implementing Gap B alone would
+> currently change zero real classifications, because `follows` and
+> `profile_visits` remain independently unfetched by either Meta platform
+> path regardless of media type. Do not treat Gap B as completed,
+> approved, or scheduled by this checkpoint.
+>
+> Full detail: the changelog's matching 2026-07-12 entry.
+
 > ## ⚠️ STRATEGIC CORRECTION: THE GOAL IS ONE AUTONOMOUS LENA CONTENT LOOP, NOT PUBLISHER-CHOOSING; TWO COMPETING REEL-CAPABLE PUBLISHING ARCHITECTURES DISCOVERED; VIDEO-BACKED STORY GRAPH ROUTING SHIPPED; PRIVMETA-STYLE CLEAN-EXPORT METADATA SCRUBBING NOW DECIDED/REQUIRED (NOT YET VALIDATED OR INTEGRATED) (2026-07-10/11, later session) -- read this before assuming any banner below is the latest checkpoint. HEAD is now `2f76e73f`. Read the standing objective section above this banner first -- it is not dated and does not get superseded.
 >
 > **A. Real commit landed:** `2f76e73f` `feat: support video-backed Instagram
@@ -2916,3 +3024,265 @@ wait for the user to specify.
   diagnosis, blocker discovery, next-step decision, live-path correction,
   source-of-truth change) must update both continuity files (master + changelog)
   before being reported as closed. If they weren't updated, the step isn't done.
+
+## 2026-07-11 â€” Canonical-data mutation safety doctrine and Meta-refresh incident
+
+**Status: HISTORICAL.** This section is the forensic record of the
+original 2026-07-11 Meta-refresh incident, its two defects, and the
+safety doctrine adopted in response. Both Bug 1 and Bug 2 are now
+RESOLVED -- see the 2026-07-12 checkpoint banner near the top of this
+file for current status, exact repair commits, and the exact repaired
+rows/cells. The general canonical-data mutation safety doctrine below
+remains standing and still applies to all future canonical-data
+mutations; only the incident-specific status/freeze/next-steps language
+below has been superseded, and is marked as such in place rather than
+deleted.
+
+### Checkpoint at incident time (historical)
+
+Committed HEAD at incident time:
+
+`4a8d2be0` â€” `fix: preserve canonical Lena metrics schema on Meta refresh`
+
+Recent relevant commits as of that checkpoint:
+
+- `4a8d2be0` â€” preserve canonical Lena metrics schema on Meta refresh
+- `0f737c6b` â€” discover Architecture A posts for Lena Meta refresh
+- `ebde1229` â€” preserve Lena metrics on partial Meta fetch failure
+- `1e3f7b8d` â€” propagate creative provenance from queue metadata into Lena metrics
+- `a8f25268` â€” forward pose/expression provenance IDs into queue metadata
+
+(Current HEAD is now `db50fcbd` -- see the 2026-07-12 checkpoint banner
+near the top of this file.)
+
+### Incident summary
+
+Exactly one controlled live Meta metrics refresh was run on 2026-07-11:
+
+`python tools/lena_meta_refresh_feedback_v1.py --days-back 6 --max-posts 4 --skip-comments --skip-feedback-refresh`
+
+It processed exactly four Architecture A Instagram-family posts.
+
+Two separate defects were exposed:
+
+1. `tools/lena_meta_refresh_feedback_v1.py` rewrote the canonical metrics CSV using its own narrow 21-column `METRIC_FIELDS` header, dropping 13 newer identity/provenance columns.
+
+2. Architecture A rows originally created by `tools/lena_sync_architecture_a_receipts_to_metrics_v1.py` used literal `"0"` placeholders for never-fetched metrics including:
+   - `follows`
+   - `profile_visits`
+   - `completion_rate`
+   - `replay_rate`
+
+   The later unknown-input gate checked only for blank strings, so those placeholder zeros were interpreted as known measurements and the four Architecture A rows were changed from `pending` to `weak`.
+
+### Incident evidence â€” preserve, do not delete or rewrite
+
+Primary incident report:
+
+`pipeline/analytics/lena_meta_feedback_reports/2026-07-11/lena_meta_feedback_refresh_191355.json`
+
+Incident-state record:
+
+`pipeline/state/lena_meta_feedback_ingestion_state_v1.json`
+
+Byte-for-byte snapshot of the damaged 21-column metrics CSV:
+
+`pipeline/analytics/lena_meta_feedback_reports/2026-07-11/incident_lena_post_metrics_after_refresh_191355.csv`
+
+Snapshot SHA-256:
+
+`1599405B5F68BE8E191BFCBB2EBC6E16E49CEA05B1CD14BFDB135C98A12778F2`
+
+Do not delete, overwrite, move, clean up, or silently regenerate these incident artifacts.
+
+### Bug 1 status â€” FIXED
+
+Commit:
+
+`4a8d2be0` â€” `fix: preserve canonical Lena metrics schema on Meta refresh`
+
+The Meta-refresh writer now:
+
+- reads the actual on-disk metrics CSV header
+- builds a stable superset of existing header + refresh-owned fields
+- preserves all existing columns in their original order
+- appends only genuinely missing required fields
+- preserves unrelated identity/provenance values
+- prevents a 34-column canonical CSV from collapsing to the old 21-column refresh schema
+
+Validation at this checkpoint:
+
+- schema-preservation focused tests: `2 passed`
+- partial-failure tests: `9 passed`
+- candidate-discovery tests: `9 passed`
+- Architecture A identity tests: `33 passed`
+- full suite: `162 passed`
+
+### Bug 2 status
+
+Historical status at incident time: **NOT YET FIXED.** Current status:
+**RESOLVED -- see the 2026-07-12 checkpoint above.**
+
+At incident time, the source placeholder convention was unresolved:
+`tools/lena_sync_architecture_a_receipts_to_metrics_v1.py::upsert_metrics_row()` was creating new rows with literal `"0"` placeholders for metrics that may never have been measured.
+
+The proven dangerous fields were:
+
+- `follows`
+- `profile_visits`
+- `completion_rate`
+- `replay_rate`
+
+These were not correctly represented as unknown/unavailable/not-applicable when they actually were.
+
+**Resolution.** The source convention itself was fixed by `c7134c62`
+(`fix: preserve unknown Lena metrics as blank placeholders`). The exact
+cross-tool incident boundary was permanently regression-guarded by
+`fb45aab6` (`test: guard Lena metrics cross-tool unknown-value
+semantics`). Richer per-field Meta refresh reporting was added by
+`966fa376` (`feat: add per-field Lena Meta refresh reporting`).
+
+A separate, later-discovered **residual** defect (distinct from the
+source-convention fix above): four real, pre-existing Architecture A rows
+still carried the old legacy `"0"` placeholders because they predated
+`c7134c62` and were never touched by that fix. That residual defect was
+repaired via `3e51a9e2` (`fix: repair legacy Lena metric zero
+placeholders`), `a3d84d87` (`fix: verify committed Lena repair script
+integrity`), and `db50fcbd` (`fix: guard Lena repair against staged
+script drift`). Exactly one authorized real repair `--apply` completed
+successfully: exactly 4 rows, exactly 16 cells (`follows`/
+`profile_visits`/`completion_rate`/`replay_rate` on each, `"0"` -> `""`,
+nothing else changed). Current canonical CSV SHA-256:
+`bc2ea7df6c7966bb39466cfa18b23504c591ab1630054d08d929c846d220b408`. Latest
+validated test state: **189 passed, 0 failed**. Full detail: the
+2026-07-12 checkpoint banner near the top of this file and the
+changelog's matching 2026-07-12 entry.
+
+The historical instruction immediately above this note -- "do not run
+another live Meta refresh until this convention is repaired, tested,
+reviewed, and the damaged canonical data is restored" -- has had its
+stated precondition satisfied (repaired, tested, reviewed twice,
+restored). **This does NOT itself lift the standing LIVE META REFRESH
+freeze.** That freeze is a separate, standing decision recorded in the
+freeze state below and in the 2026-07-12 checkpoint, and remains FROZEN
+until Nicolas gives a new, explicit instruction to lift it.
+
+### Canonical-data mutation safety doctrine
+
+For all future live or stateful operations:
+
+**No live action that writes canonical data is considered safe until the exact writer, schema preservation, write surfaces, and recovery path have been explicitly verified.**
+
+Required preflight before recommending any live `--apply`, Meta refresh, queue mutation, publish, or other canonical-data write:
+
+1. Inspect the actual final writer, not only upstream helpers.
+2. Compare input schema versus output schema.
+3. Prove no existing columns can disappear.
+4. Prove unrelated fields survive unchanged.
+5. Identify every file the command can write, including incidental/downstream files.
+6. Exercise the full read â†’ mutate â†’ write round trip on a realistic fixture matching the production file shape.
+7. Distinguish:
+   - confirmed zero
+   - blank
+   - unknown
+   - unavailable
+   - failed
+   - not applicable
+8. Never treat unknown/unavailable/not-applicable as zero.
+9. Preserve a forensic snapshot before risky irreversible mutations when rollback is not trivial.
+10. Prefer dry-run or read-only candidate simulation before live execution.
+11. If a critical invariant is assumed rather than tested, do not recommend the live run.
+12. After exactly one live run, stop and inspect before any rerun.
+
+Hard semantic doctrine:
+
+- `unknown != zero`
+- `unavailable != zero`
+- `not applicable != zero`
+- `failed fetch != zero`
+- confirmed real zero is a valid zero
+- `pending` must not silently become scored from placeholder values
+- canonical superset schemas must never be narrowed by downstream writers
+- identity/provenance fields must survive every analytics refresh
+- approval records remain immutable pre-publish signoff artifacts
+- published receipts remain authoritative post-publish evidence
+
+### Freeze state at incident time (historical)
+
+As recorded at incident time, until explicitly approved otherwise:
+
+- LIVE META REFRESH: FROZEN
+- SCORING CHANGES: FROZEN
+- OUTCOME LEARNING: FROZEN
+- WINNER MUTATION: FROZEN
+- CSV RESTORATION: FROZEN until Bug 2 repair path is implemented and independently reviewed
+- no rerun of Operation A yet
+- no cleanup of incident evidence
+- no manual fabrication or backfill of historical provenance
+
+**Current status (2026-07-12): CSV RESTORATION is COMPLETE.** The Bug 2
+repair path was implemented (`3e51a9e2`), independently reviewed twice
+(the byte-integrity guard commit `a3d84d87` plus a full independent
+read-only safety review immediately before `--apply` authorization), and
+the canonical CSV was restored via one authorized real `--apply`. See the
+2026-07-12 checkpoint banner near the top of this file for the exact
+repaired rows/cells and post-repair hash.
+
+**All other freezes listed above are unaffected by this and remain
+standing, current, and in force:** LIVE META REFRESH, SCORING CHANGES,
+OUTCOME LEARNING, and WINNER MUTATION are all still FROZEN, and GAP B
+IMPLEMENTATION (added 2026-07-12) is also FROZEN. LIVE PUBLISH remains
+governed by the separate, pre-existing standing publish/clean-export
+freeze documented above in this file and is **not** implicitly unfrozen
+by the legacy-zero repair. Still true: no automatic rerun of Operation A;
+no cleanup of incident evidence; no manual fabrication or backfill of
+historical provenance.
+
+### Next safe sequence â€” HISTORICAL, COMPLETED AND SUPERSEDED by the 2026-07-12 checkpoint above.
+
+Original sequence, preserved for forensic record:
+
+1. Implement Bug 2 only:
+   repair the placeholder convention at its source.
+2. Run focused regression tests.
+3. Run the full suite.
+4. Commit exactly that narrow slice.
+5. Independent read-only review.
+6. Restore the canonical metrics CSV from authoritative receipts/queue metadata.
+7. Separately restore the four invalid `weak` classifications to honest `pending`.
+8. Verify exact identity, provenance, metrics, scoring state, and incident evidence preservation.
+9. Only then reconsider another live Meta refresh.
+
+**Completion summary:**
+- **Steps 1-5:** completed via `3e51a9e2` (the repair script), `a3d84d87`
+  (HEAD + on-disk-byte integrity guard), and `db50fcbd` (git-index
+  guard), plus two independent read-only reviews (one before the
+  `--apply` authorization, one full post-repair audit after). Focused and
+  full-suite regression run and passing at every step; final state 189
+  passed, 0 failed.
+- **Step 6:** completed with a narrower real effect than originally
+  envisioned. Rather than a full restore-from-receipts, the legacy-zero
+  repair script directly blanked exactly the four proven-affected
+  placeholder cells on exactly the four proven-affected rows, via one
+  authorized `--apply`, verified against the real canonical data before
+  and after.
+- **Step 7:** the `weak` -> `pending` classification restoration this
+  step describes was already completed separately, by an earlier
+  restoration step (evidenced by the preserved
+  `incident_lena_post_metrics_pre_step_b_restoration.csv` incident
+  artifact), before the legacy-zero repair described in this checkpoint
+  began. Confirmed by the repair script's own fail-closed precondition,
+  which required `score == "0"` and `classification == "pending"` on all
+  4 target rows before it would proceed at all -- and which did in fact
+  pass. The legacy-zero repair itself never touches `score` or
+  `classification`.
+- **Step 8:** completed. Exact identity, provenance, creative-provenance,
+  metrics, scoring state, and all 4 incident-evidence artifacts were
+  independently verified byte/value-identical before and after the
+  repair, across multiple independent review passes.
+- **Step 9:** the stated precondition ("repaired, tested, reviewed, and
+  the damaged canonical data is restored") is now satisfied. **This does
+  NOT itself authorize a live Meta refresh.** LIVE META REFRESH remains a
+  separate, standing FROZEN state per the freeze sections above and the
+  2026-07-12 checkpoint, to be lifted only by a new, explicit instruction
+  from Nicolas.
