@@ -278,9 +278,9 @@ def upsert_metrics_row(
     never rewrites performance metric values (reach/likes/.../score/
     classification) at all -- only the structured identity/provenance
     fields this sync exists to attach. A genuinely new row (no existing
-    (date, slot_id, platform) match) is created with metric fields defaulted
-    to the same "0 / pending" placeholder convention every other real
-    ingestion path in this codebase already uses."""
+    (date, slot_id, platform) match) is created with only the metrics
+    that are intentionally known-at-creation seeded to placeholders;
+    unsupported or unmeasured outcome fields remain blank/unknown."""
     key = metric_key(identity)
     for idx, row in enumerate(metric_rows):
         if metric_key(row) == key:
@@ -304,8 +304,7 @@ def upsert_metrics_row(
 
     new_row = {field: identity.get(field, "") for field in METRIC_FIELDS}
     for placeholder_field in (
-        "reach", "likes", "saves", "shares", "comments", "follows",
-        "profile_visits", "completion_rate", "replay_rate", "score",
+        "reach", "likes", "saves", "shares", "comments", "score",
     ):
         new_row[placeholder_field] = "0"
     new_row["classification"] = "pending"

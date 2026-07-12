@@ -309,6 +309,11 @@ def test_sync_all_apply_writes_metrics_csv(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0]["instagram_media_id"] == "17879977575673516"
     assert rows[0]["classification"] == "pending"
+    assert rows[0]["follows"] == ""
+    assert rows[0]["profile_visits"] == ""
+    assert rows[0]["completion_rate"] == ""
+    assert rows[0]["replay_rate"] == ""
+    assert rows[0]["score"] == "0"
 
 
 # 1. structured platform media ID is preferred over notes regex
@@ -746,6 +751,11 @@ def test_historical_csv_without_creative_columns_loads_and_survives_upsert(tmp_p
     assert new_row["wardrobe_outfit_id"] == "wc_p006"
     assert new_row["pose_body_language_id"] == "pose_p018"
     assert new_row["expression_gaze_id"] == "exp_g013"
+    assert new_row["follows"] == ""
+    assert new_row["profile_visits"] == ""
+    assert new_row["completion_rate"] == ""
+    assert new_row["replay_rate"] == ""
+    assert new_row["classification"] == "pending"
 
 
 # 18/19/20. No network call, no Meta call, no real CSV mutation during
