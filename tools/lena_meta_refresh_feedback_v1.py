@@ -168,6 +168,13 @@ def metric_failure(reason: str) -> dict:
     return {"ok": False, "reason": reason}
 
 
+# Stable, truthful reason (2026-07-12): `follows` is not referenced by any
+# real Graph API call this tool makes for either platform -- its absence
+# from metric_results would otherwise be a silent, ambiguous gap rather
+# than an honest, explicit "this tool doesn't ask for this metric" fact.
+NOT_REQUESTED_BY_TOOL = "not_requested_by_tool"
+
+
 def metric_result_value(result: dict) -> float | None:
     if isinstance(result, dict) and result.get("ok"):
         return numeric(result.get("value"))
@@ -216,6 +223,30 @@ def apply_fetched_metrics(row: dict, fetched: dict, is_new_row: bool) -> dict:
     else:
         row["score"], row["classification"] = score_row(row)
     return row
+
+
+def build_metrics_report_entry(row: dict, fetched: dict) -> dict:
+    """Pure function, no I/O -- shapes the per-post `metrics` block written
+    into the refresh report JSON. Extracted (2026-07-12) so the report's
+    per-field fetch truth is independently testable without invoking
+    main(). Preserves every field the report already carried (`ok`,
+    `reach`/`likes`/`comments`/`shares`/`saves`, `classification`, `score`)
+    byte-for-byte, and additively carries forward the real, already-computed
+    `metric_results` (from fetch_instagram_metrics()/fetch_facebook_metrics(),
+    tagged ok/value or ok/reason via metric_success()/metric_failure()) that
+    was previously discarded before the report was written. Never
+    recomputes or reinterprets any fetch outcome -- pure passthrough."""
+    return {
+        "ok": True,
+        "reach": row["reach"],
+        "likes": row["likes"],
+        "comments": row["comments"],
+        "shares": row["shares"],
+        "saves": row["saves"],
+        "classification": row["classification"],
+        "score": row["score"],
+        "metric_results": fetched.get("metric_results", {}),
+    }
 
 
 def score_row(row: dict) -> tuple[float, str]:
@@ -397,6 +428,7 @@ def fetch_instagram_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
             "reach": metric_failure("insight_unavailable"),
             "saves": metric_failure("insight_unavailable"),
             "shares": metric_failure("insight_unavailable"),
+            "follows": metric_failure(NOT_REQUESTED_BY_TOOL),
             "profile_visits": metric_failure("metric_unavailable"),
             "completion_rate": metric_failure("metric_unavailable"),
             "replay_rate": metric_failure("metric_unavailable"),
@@ -438,6 +470,7 @@ def fetch_facebook_metrics(post_id: str, cfg: dict, policy: dict) -> dict:
             "shares": metric_success(shares),
             "reach": metric_failure("insight_unavailable"),
             "saves": metric_failure("metric_unavailable"),
+            "follows": metric_failure(NOT_REQUESTED_BY_TOOL),
             "profile_visits": metric_failure("metric_unavailable"),
             "completion_rate": metric_failure("metric_unavailable"),
             "replay_rate": metric_failure("metric_unavailable"),
@@ -795,16 +828,7 @@ def main() -> int:
                 metrics_updated += 1
                 changed_dates.add(post_row.get("date", ""))
                 last_metrics_pull[key] = utc_now_iso()
-                metrics_report = {
-                    "ok": True,
-                    "reach": row["reach"],
-                    "likes": row["likes"],
-                    "comments": row["comments"],
-                    "shares": row["shares"],
-                    "saves": row["saves"],
-                    "classification": row["classification"],
-                    "score": row["score"],
-                }
+                metrics_report = build_metrics_report_entry(row, fetched)
             except Exception as exc:
                 metrics_report = {"ok": False, "error": str(exc)}
 

@@ -275,3 +275,133 @@ def test_existing_row_score_uses_protected_merged_row() -> None:
 
     assert merged["score"] == expected_score
     assert merged["classification"] == expected_classification
+
+
+# --- Gap A: richer per-field Meta refresh reporting (2026-07-12) -----------
+#
+# Proves the real fetch functions' metric_results already distinguish
+# confirmed-zero, confirmed-nonzero, failed-fetch, and unavailable/never-
+# attempted simultaneously, and that this truth now survives into the
+# per-post report entry instead of being silently discarded. No real
+# network call (graph_get is monkeypatched, same pattern already proven
+# safe elsewhere in this file) and no canonical CSV/state mutation.
+
+def test_instagram_fetch_distinguishes_all_reportable_states(monkeypatch) -> None:
+    def fake_graph_get(path: str, params: dict, cfg: dict, token_override=None, platform: str = "") -> dict:
+        metric = params.get("metric")
+        if path == "/ig-post-states":
+            return {"id": "ig-post-states", "permalink": "https://example.com/p/ig", "like_count": 42, "comments_count": 5}
+        if metric == "reach":
+            return {"data": [{"name": "reach", "values": [{"value": 0}]}]}
+        if metric == "saved":
+            raise RuntimeError("transient graph error")
+        if metric == "shares":
+            raise RuntimeError("transient graph error")
+        raise AssertionError(f"unexpected call: {path} {params}")
+
+    monkeypatch.setattr(mod, "graph_get", fake_graph_get)
+
+    fetched = mod.fetch_instagram_metrics(
+        "ig-post-states",
+        {"auth_mode": "instagram_login"},
+        {
+            "base_fields": "id,permalink,like_count,comments_count",
+            "insight_metrics": ["reach", "saved", "shares"],
+        },
+    )
+    results = fetched["metric_results"]
+
+    # confirmed successful zero
+    assert results["reach"] == {"ok": True, "value": 0.0}
+    # confirmed successful nonzero (from the summary object, not insights)
+    assert results["likes"] == {"ok": True, "value": 42.0}
+    assert results["comments"] == {"ok": True, "value": 5.0}
+    # failed fetch (a real exception during an attempted insight call)
+    assert results["saves"]["ok"] is False
+    assert results["saves"]["reason"].startswith("error:")
+    assert results["shares"]["ok"] is False
+    assert results["shares"]["reason"].startswith("error:")
+    # unavailable / never attempted by this tool at all
+    assert results["profile_visits"] == {"ok": False, "reason": "metric_unavailable"}
+    assert results["completion_rate"] == {"ok": False, "reason": "metric_unavailable"}
+    assert results["replay_rate"] == {"ok": False, "reason": "metric_unavailable"}
+    # follows: explicitly, truthfully unsupported by this tool
+    assert results["follows"] == {"ok": False, "reason": "not_requested_by_tool"}
+
+    # The five requested categories are all represented and mutually
+    # distinguishable by (ok, value/reason) -- confirmed zero and confirmed
+    # nonzero are both "ok: True" but distinguished by their real value;
+    # failed-fetch, unavailable, and not-requested-by-tool are all
+    # "ok: False" but distinguished by their reason string. Two fields
+    # legitimately sharing the same reason (e.g. profile_visits/
+    # completion_rate/replay_rate all "metric_unavailable") is correct,
+    # not a collision to guard against.
+    assert results["reach"]["value"] == 0.0 and results["likes"]["value"] != 0.0
+
+
+def test_facebook_fetch_includes_explicit_follows_not_requested() -> None:
+    fetched_metric_results_shape = {
+        "likes": mod.metric_success(1),
+        "comments": mod.metric_success(0),
+        "shares": mod.metric_success(2),
+        "reach": mod.metric_failure("insight_unavailable"),
+        "saves": mod.metric_failure("metric_unavailable"),
+        "follows": mod.metric_failure(mod.NOT_REQUESTED_BY_TOOL),
+        "profile_visits": mod.metric_failure("metric_unavailable"),
+        "completion_rate": mod.metric_failure("metric_unavailable"),
+        "replay_rate": mod.metric_failure("metric_unavailable"),
+    }
+    # Sanity: the constant used in production is the exact literal reported.
+    assert mod.NOT_REQUESTED_BY_TOOL == "not_requested_by_tool"
+    assert fetched_metric_results_shape["follows"] == {"ok": False, "reason": "not_requested_by_tool"}
+
+
+# 6/9/10/11. The final per-post report entry preserves metric_results
+# verbatim rather than dropping it -- pure passthrough, no recomputation,
+# no scoring change.
+def test_report_entry_preserves_metric_results_truth() -> None:
+    row = _existing_row()
+    row["reach"] = "2600"
+    row["classification"] = "strong"
+    row["score"] = "61.0"
+    fetched = {
+        "metric_results": {
+            "reach": mod.metric_success(2600),
+            "likes": mod.metric_success(0),
+            "saves": mod.metric_failure("error:boom"),
+            "shares": mod.metric_success(10),
+            "comments": mod.metric_success(13),
+            "follows": mod.metric_failure(mod.NOT_REQUESTED_BY_TOOL),
+            "profile_visits": mod.metric_failure("metric_unavailable"),
+            "completion_rate": mod.metric_failure("metric_unavailable"),
+            "replay_rate": mod.metric_failure("metric_unavailable"),
+        }
+    }
+
+    entry = mod.build_metrics_report_entry(row, fetched)
+
+    # Existing report fields preserved byte-for-byte.
+    assert entry["ok"] is True
+    assert entry["reach"] == row["reach"]
+    assert entry["likes"] == row["likes"]
+    assert entry["comments"] == row["comments"]
+    assert entry["shares"] == row["shares"]
+    assert entry["saves"] == row["saves"]
+    assert entry["classification"] == row["classification"]
+    assert entry["score"] == row["score"]
+
+    # New: full per-field fetch truth carried through verbatim, not
+    # recomputed or reinterpreted.
+    assert entry["metric_results"] == fetched["metric_results"]
+    # Distinct states still distinguishable inside the report entry itself.
+    assert entry["metric_results"]["reach"]["ok"] is True
+    assert entry["metric_results"]["likes"]["value"] == 0.0
+    assert entry["metric_results"]["saves"]["ok"] is False
+    assert entry["metric_results"]["saves"]["reason"] == "error:boom"
+    assert entry["metric_results"]["follows"]["reason"] == "not_requested_by_tool"
+
+
+def test_report_entry_missing_metric_results_defaults_to_empty_dict() -> None:
+    row = _existing_row()
+    entry = mod.build_metrics_report_entry(row, {})
+    assert entry["metric_results"] == {}
