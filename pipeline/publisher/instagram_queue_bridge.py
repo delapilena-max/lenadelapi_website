@@ -26,6 +26,20 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
     CleanExportVerificationError,
     verify_clean_export,
 )
+from tools.lena_prepare_story_video_v1 import (  # noqa: E402
+    StoryVideoError,
+    validate_music_backed_shortform_asset,
+)
+
+# Video file extensions this bridge treats as "actually video" for the
+# purpose of routing a Story payload's contract branch (2026-07-12) -- the
+# same set instagram_graph_adapter.py already uses for its own, separate
+# image_url-vs-video_url discriminator. Kept as an independent constant
+# here rather than importing that module at load time, to avoid a new
+# module-level dependency between the two publisher files (this file
+# already lazy-loads the graph adapter via _load_adapter() at call time,
+# never at import time).
+_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 
 # Instagram's own documented feed-photo aspect-ratio range (width/height),
 # per Meta's Content Publishing API reference
@@ -74,6 +88,48 @@ def _duration(path: Path) -> float | None:
         return float(out)
     except Exception:
         return None
+
+
+def _probe_streams(path: Path) -> Dict[str, Any]:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise ValueError("Lena contract violation: ffprobe is not available on PATH")
+    try:
+        out = subprocess.check_output(
+            [
+                ffprobe,
+                "-v", "error",
+                "-print_format", "json",
+                "-show_format",
+                "-show_streams",
+                str(path),
+            ],
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=30,
+        )
+        return json.loads(out)
+    except Exception as exc:
+        raise ValueError(f"Lena contract violation: could not probe media streams from {path}: {exc}") from exc
+
+
+def _require_video_and_audio_streams(path: Path, media_type_label: str) -> Dict[str, Any]:
+    probe = _probe_streams(path)
+    streams = probe.get("streams", [])
+    video_streams = [s for s in streams if s.get("codec_type") == "video"]
+    audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+    if not video_streams:
+        raise ValueError(f"Lena contract violation: {media_type_label} has no video stream -- refusing to publish")
+    if not audio_streams:
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} has no audio stream -- refusing to publish "
+            "(fail closed, no silent Reel/Story)"
+        )
+    return {
+        "probe": probe,
+        "video_stream": video_streams[0],
+        "audio_stream": audio_streams[0],
+    }
 
 
 def _validate_static_image_engine_and_prompt(meta: Dict[str, Any], specs: Dict[str, Any], media_type_label: str) -> None:
@@ -192,6 +248,65 @@ def _validate_downstream_clean_export(payload: Dict[str, Any]) -> None:
         )
 
 
+def _validate_music_backed_short_form_video(meta: Dict[str, Any], media_path: Path, media_type_label: str) -> None:
+    """Fail-closed contract for the shared music-backed short-form video
+    path (2026-07-12) -- a 9:16 MP4 composed locally from an approved still
+    image + an approved royalty-free track (tools/lena_prepare_story_video_v1.py),
+    as opposed to a provider-generated video (which carries video_prompt
+    and is validated by the existing branch in _validate_contract()). This
+    is the shared bridge used by BOTH the video/reel branch and the
+    video-backed story branch below -- deliberately one function, not two,
+    so Reel and Story never diverge on what "a valid music-backed clip"
+    means.
+
+    For Storys this path is selected only when the actual queued media is a
+    video file; for Reels it is selected by the explicit `media_type ==
+    "reel"` route. In both cases the prepared source asset is independently
+    re-verified from its own provenance sidecar -- never trusted from queue
+    metadata alone.
+
+    Every check independently re-verifies against the real file on disk
+    right now -- never trusts a metadata claim alone. Raises ValueError
+    (this module's existing contract-violation exception shape) on any
+    failure; no fallback, no silent reroute to a different destination or
+    to a silent/no-audio asset."""
+    source_asset_path_raw = meta.get("source_asset_path")
+    if not source_asset_path_raw:
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} is missing metadata.source_asset_path -- "
+            "cannot verify the original prepared short-form asset"
+        )
+    source_asset_path = Path(str(source_asset_path_raw)).resolve()
+    try:
+        validate_music_backed_shortform_asset(source_asset_path)
+    except StoryVideoError as exc:
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} failed prepared-shortform validation: {exc}"
+        ) from exc
+
+    stream_facts = _require_video_and_audio_streams(media_path, media_type_label)
+    v0 = stream_facts["video_stream"]
+    a0 = stream_facts["audio_stream"]
+    width = int(v0.get("width") or 0)
+    height = int(v0.get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise ValueError(f"Lena contract violation: {media_type_label} has invalid dimensions {width}x{height}")
+    if abs((width / height) - (9 / 16)) > 0.01:
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} dimensions {width}x{height} are not 9:16"
+        )
+    if str(v0.get("codec_name") or "").lower() != "h264":
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} queued derivative video codec is not h264: "
+            f"{v0.get('codec_name')!r}"
+        )
+    if str(a0.get("codec_name") or "").lower() != "aac":
+        raise ValueError(
+            f"Lena contract violation: {media_type_label} queued derivative audio codec is not aac: "
+            f"{a0.get('codec_name')!r}"
+        )
+
+
 def _validate_contract(payload: Dict[str, Any]) -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8-sig"))
     specs = contract["required_media_specs"]
@@ -269,10 +384,34 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
         # that range exists specifically for feed IMAGE posts, not Stories.
         # No resize/crop/convert/mutation of any kind; media_path existence
         # is already checked above, shared across every media type.
+        #
+        # Video-backed Story branch (2026-07-12): a Story is not always a
+        # static image -- tools/lena_prepare_story_video_v1.py's real,
+        # music-backed 9:16 MP4 output is an equally valid Story asset.
+        # Discriminated by the real file extension (never by media_type
+        # alone, since "story" covers both shapes) -- if it's a video file,
+        # it MUST carry explicit music-backed-composition provenance and
+        # pass the shared short-form video contract below; it is never
+        # silently treated as a static image (which would wrongly skip the
+        # audio/video-stream/track checks) and never silently falls back to
+        # a silent Story.
+        if media_path.suffix.lower() in _VIDEO_EXTENSIONS:
+            _validate_music_backed_short_form_video(meta, media_path, "story")
+            return
+
         _validate_static_image_engine_and_prompt(meta, specs, "story")
         return
 
-    if media_type in {"video", "reel"}:
+    if media_type in {"reel"}:
+        # First-class explicit Reel contract (2026-07-12): a payload that
+        # says Reel is routed through the shared music-backed short-form
+        # validator directly. Destination is explicit here -- never guessed
+        # from file extension, and never collapsed back to generic "video"
+        # at this bridge layer.
+        _validate_music_backed_short_form_video(meta, media_path, "reel")
+        return
+
+    if media_type in {"video"}:
         # Provider-neutral video/Reel contract (2026-07-11) -- replaces the
         # legacy Kling-coupled branch. Requires only fields the current,
         # provider-neutral Rule Zero video resolver
@@ -288,9 +427,11 @@ def _validate_contract(payload: Dict[str, Any]) -> None:
         # actually validated real code against (confirmed by direct
         # read-only audit: build_queue_draft() never set any of those
         # fields for any provider).
+        #
         if not meta.get("video_prompt"):
             raise ValueError("Lena contract violation: video missing video_prompt")
 
+        _require_video_and_audio_streams(media_path, "video")
         dur = _duration(media_path)
         if dur is None:
             raise ValueError("Lena contract violation: could not verify video duration")
@@ -354,6 +495,12 @@ def publish_post(payload: Dict[str, Any]) -> Dict[str, Any]:
             "post_id": payload.get("post_id"),
             "instagram_result": result,
         }
+
+    if media_type in {"story", "stories"}:
+        raise ValueError(
+            "Lena contract violation: story publishing requires the Instagram Graph route -- "
+            "refusing to silently reroute a Story payload through the fallback Reel publisher"
+        )
 
     result = instagram_adapter.publish_reel(media_path, caption)
     return {

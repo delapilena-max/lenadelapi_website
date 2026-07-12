@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -11,8 +13,13 @@ from tools.lena_scrub_media_metadata_v1 import resolve_clean_output_path, scrub_
 from pipeline.publisher.instagram_graph_adapter import (
     InstagramPublishError,
     _validate_clean_export_before_publish,
+    build_container_creation_request,
     publish_post,
+    wait_for_container_if_needed,
 )
+
+FFMPEG = shutil.which("ffmpeg")
+requires_ffmpeg = pytest.mark.skipif(FFMPEG is None, reason="ffmpeg not available on PATH")
 
 
 def _make_source_png(path: Path) -> Path:
@@ -29,6 +36,22 @@ def _make_clean_pair(tmp_path: Path, name: str = "asset_seed.png") -> Path:
 
 def _sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def _make_test_video(path: Path, duration: float = 3.0, width: int = 640, height: int = 1136) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            FFMPEG, "-y",
+            "-f", "lavfi", "-i", f"testsrc=duration={duration}:size={width}x{height}:rate=24",
+            "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+            "-t", str(duration),
+            "-c:v", "libx264", "-c:a", "aac", "-shortest",
+            str(path),
+        ],
+        check=True, capture_output=True, timeout=60,
+    )
+    return path
 
 
 def _valid_payload(source: Path) -> dict:
@@ -224,6 +247,76 @@ def test_valid_payload_passes_gate_and_reaches_next_real_check(tmp_path: Path, m
 
     with pytest.raises(InstagramPublishError, match="missing required environment variable"):
         publish_post(payload)
+
+
+@requires_ffmpeg
+def test_build_container_request_reel_uses_video_url_without_share_to_feed(tmp_path: Path) -> None:
+    video_path = _make_test_video(tmp_path / "reel.mp4", duration=2.0)
+    request = build_container_creation_request(
+        media_url="https://example.com/reel.mp4",
+        media_type="reel",
+        caption="caption",
+        media_path=video_path,
+    )
+    assert request["video_url"] == "https://example.com/reel.mp4"
+    assert request["media_type"] == "REELS"
+    assert "image_url" not in request
+    assert "share_to_feed" not in request
+
+
+@requires_ffmpeg
+def test_build_container_request_story_video_uses_video_url_and_stories(tmp_path: Path) -> None:
+    video_path = _make_test_video(tmp_path / "story.mp4", duration=2.0)
+    request = build_container_creation_request(
+        media_url="https://example.com/story.mp4",
+        media_type="story",
+        caption="caption",
+        media_path=video_path,
+    )
+    assert request["video_url"] == "https://example.com/story.mp4"
+    assert request["media_type"] == "STORIES"
+    assert "image_url" not in request
+
+
+@requires_ffmpeg
+def test_build_container_request_story_video_without_audio_rejects(tmp_path: Path) -> None:
+    video_path = tmp_path / "silent_story.mp4"
+    subprocess.run(
+        [
+            FFMPEG, "-y",
+            "-f", "lavfi", "-i", "testsrc=duration=2:size=640x1136:rate=24",
+            "-t", "2",
+            "-c:v", "libx264",
+            str(video_path),
+        ],
+        check=True, capture_output=True, timeout=60,
+    )
+    with pytest.raises(InstagramPublishError, match="no audio stream"):
+        build_container_creation_request(
+            media_url="https://example.com/silent_story.mp4",
+            media_type="story",
+            caption="caption",
+            media_path=video_path,
+        )
+
+
+def test_wait_for_container_polls_video_story(monkeypatch: pytest.MonkeyPatch) -> None:
+    states = iter([
+        {"status_code": "IN_PROGRESS"},
+        {"status_code": "FINISHED"},
+    ])
+    monkeypatch.setattr(
+        "pipeline.publisher.instagram_graph_adapter.get_container_status",
+        lambda **kwargs: next(states),
+    )
+    monkeypatch.setattr("pipeline.publisher.instagram_graph_adapter.time.sleep", lambda *_args, **_kwargs: None)
+    result = wait_for_container_if_needed(
+        creation_id="123",
+        access_token="token",
+        media_type="story",
+        creation_request={"video_url": "https://example.com/story.mp4", "media_type": "STORIES"},
+    )
+    assert result["status_code"] == "FINISHED"
 
 
 # 15. no network call occurs during tests -- structural guarantee, not just

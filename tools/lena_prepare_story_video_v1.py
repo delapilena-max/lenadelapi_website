@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-# Lena Story-video preparation -- composes an approved 9:16 image master
-# with a deterministically-selected approved audio track into a 20-second
-# MP4 Story video with a real audio stream.
+# Lena short-form music-backed video preparation -- composes an approved
+# 9:16 image master with a deterministically-selected approved audio track
+# into one 20-second MP4 asset with a real audio stream. The publishing
+# layer may later route that SAME validated asset explicitly as either an
+# Instagram Reel or an Instagram Story.
 #
 # Reuses tools/lena_music_pool_v1.py for eligibility/selection (never
 # duplicates that logic). Never downloads music, never calls any
@@ -38,6 +40,8 @@ if str(ROOT) not in sys.path:
 
 from tools.lena_music_pool_v1 import (  # noqa: E402
     MusicPoolError,
+    check_track_eligibility,
+    load_manifest,
     select_track_deterministic,
 )
 
@@ -70,6 +74,143 @@ def _ffprobe(path: Path) -> Dict[str, Any]:
     if probe.returncode != 0:
         raise StoryVideoError(f"ffprobe failed on {path}: {probe.stderr.strip()[-2000:]}")
     return json.loads(probe.stdout)
+
+
+def _find_manifest_track(manifest: Dict[str, Any], track_id: str) -> Optional[Dict[str, Any]]:
+    for track in manifest.get("tracks", []):
+        if str(track.get("track_id") or "") == track_id:
+            return track
+    return None
+
+
+def validate_music_backed_shortform_asset(
+    video_path: Path,
+    *,
+    expected_track_id: Optional[str] = None,
+    expected_track_sha256: Optional[str] = None,
+    manifest_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Read-only validator for the shared 9:16 short-form asset contract.
+
+    This is intentionally destination-agnostic: the SAME validated MP4 can
+    later be routed as a Reel or a Story by the publishing layer. It proves
+    the asset itself is a real, approved music-backed short-form video:
+    real file on disk, matching provenance sidecar, approved eligible track,
+    H.264 video, AAC audio, readable video+audio streams, 9:16 geometry,
+    and ~20 second duration.
+    """
+    resolved_video_path = video_path.resolve()
+    if not resolved_video_path.exists():
+        raise StoryVideoError(f"short-form video does not exist: {resolved_video_path}")
+
+    provenance_path = resolved_video_path.with_name(resolved_video_path.stem + "_provenance.json")
+    if not provenance_path.exists():
+        raise StoryVideoError(f"short-form provenance sidecar does not exist: {provenance_path}")
+
+    try:
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise StoryVideoError(f"short-form provenance sidecar failed to parse: {provenance_path}: {exc}") from exc
+
+    if provenance.get("generated_by") != "tools/lena_prepare_story_video_v1.py":
+        raise StoryVideoError(
+            f"unexpected provenance generator {provenance.get('generated_by')!r} for {resolved_video_path}"
+        )
+    if Path(str(provenance.get("output_path") or "")).resolve() != resolved_video_path:
+        raise StoryVideoError(
+            "short-form provenance output_path does not match the actual asset path: "
+            f"{provenance.get('output_path')!r} vs {resolved_video_path}"
+        )
+
+    actual_video_sha256 = _sha256_file(resolved_video_path)
+    if provenance.get("output_sha256") != actual_video_sha256:
+        raise StoryVideoError(
+            f"short-form video SHA-256 {actual_video_sha256!r} does not match provenance output_sha256 "
+            f"{provenance.get('output_sha256')!r}"
+        )
+
+    selected_track_id = str(provenance.get("selected_track_id") or "").strip()
+    selected_track_sha256 = str(provenance.get("selected_track_sha256") or "").strip()
+    if not selected_track_id:
+        raise StoryVideoError("short-form provenance is missing selected_track_id")
+    if not selected_track_sha256:
+        raise StoryVideoError("short-form provenance is missing selected_track_sha256")
+    if expected_track_id and selected_track_id != expected_track_id:
+        raise StoryVideoError(
+            f"short-form asset uses track_id {selected_track_id!r}, expected {expected_track_id!r}"
+        )
+    if expected_track_sha256 and selected_track_sha256 != expected_track_sha256:
+        raise StoryVideoError(
+            f"short-form asset uses track SHA-256 {selected_track_sha256!r}, expected {expected_track_sha256!r}"
+        )
+
+    manifest = load_manifest(manifest_path)
+    manifest_track = _find_manifest_track(manifest, selected_track_id)
+    if manifest_track is None:
+        raise StoryVideoError(f"selected track_id {selected_track_id!r} is not present in the approved music manifest")
+    if str(manifest_track.get("sha256") or "") != selected_track_sha256:
+        raise StoryVideoError(
+            f"selected track sha256 {selected_track_sha256!r} does not match manifest sha256 "
+            f"{manifest_track.get('sha256')!r}"
+        )
+
+    reasons = check_track_eligibility(manifest_track)
+    if reasons:
+        raise StoryVideoError(
+            f"selected track {selected_track_id!r} is no longer eligible: " + "; ".join(reasons)
+        )
+
+    probe = _ffprobe(resolved_video_path)
+    fmt = probe.get("format", {})
+    streams = probe.get("streams", [])
+    video_streams = [s for s in streams if s.get("codec_type") == "video"]
+    audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+    if not video_streams:
+        raise StoryVideoError("short-form asset has no video stream")
+    if not audio_streams:
+        raise StoryVideoError("short-form asset has no audio stream")
+
+    v0 = video_streams[0]
+    a0 = audio_streams[0]
+    width = int(v0.get("width") or 0)
+    height = int(v0.get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise StoryVideoError(f"short-form asset has invalid video dimensions {width}x{height}")
+    if width * 16 != height * 9:
+        raise StoryVideoError(
+            f"short-form asset is not exact 9:16: {width}x{height}"
+        )
+
+    duration_value = fmt.get("duration")
+    if duration_value is None:
+        raise StoryVideoError("short-form asset has no measurable duration")
+    duration_seconds = float(duration_value)
+    if abs(duration_seconds - TARGET_DURATION_SECONDS) > 0.05:
+        raise StoryVideoError(
+            f"short-form asset duration {duration_seconds:.6f}s is not the required {TARGET_DURATION_SECONDS}s"
+        )
+
+    if str(v0.get("codec_name") or "").lower() != "h264":
+        raise StoryVideoError(f"short-form asset video codec is not h264: {v0.get('codec_name')!r}")
+    if str(a0.get("codec_name") or "").lower() != "aac":
+        raise StoryVideoError(f"short-form asset audio codec is not aac: {a0.get('codec_name')!r}")
+
+    return {
+        "ok": True,
+        "video_path": str(resolved_video_path),
+        "provenance_path": str(provenance_path),
+        "slot_id": provenance.get("slot_id"),
+        "track_id": selected_track_id,
+        "track_sha256": selected_track_sha256,
+        "video_sha256": actual_video_sha256,
+        "duration_seconds": duration_seconds,
+        "video_codec": str(v0.get("codec_name") or ""),
+        "audio_codec": str(a0.get("codec_name") or ""),
+        "width": width,
+        "height": height,
+        "audio_channels": a0.get("channels"),
+        "audio_sample_rate_hz": int(a0["sample_rate"]) if a0.get("sample_rate") else None,
+    }
 
 
 def resolve_story_video_path(source_path: Path) -> Path:

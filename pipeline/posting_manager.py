@@ -272,7 +272,9 @@ class PostingManager:
                 return "story"
             if normalized in {"photo", "image", "jpg", "jpeg", "png", "webp"}:
                 return "photo"
-            if normalized in {"video", "reel", "short", "mp4", "mov", "m4v", "webm"}:
+            if normalized in {"reel", "reels"}:
+                return "reel"
+            if normalized in {"video", "short", "mp4", "mov", "m4v", "webm"}:
                 return "video"
         ext = media_path.suffix.lower()
         if ext in set(self.config.get("allowed_photo_extensions", sorted(PHOTO_EXTENSIONS))):
@@ -285,7 +287,10 @@ class PostingManager:
         size = media_path.stat().st_size
         if size <= 0:
             raise PostValidationError("media file is empty")
-        limit_mb = float(self.config.get("max_video_mb" if media_type == "video" else "max_photo_mb", 512 if media_type == "video" else 25))
+        is_video_like = media_type in {"video", "reel", "story"}
+        limit_mb = float(
+            self.config.get("max_video_mb" if is_video_like else "max_photo_mb", 512 if is_video_like else 25)
+        )
         if size > limit_mb * 1024 * 1024:
             raise PostValidationError(f"media file exceeds {limit_mb:g} MB limit")
 

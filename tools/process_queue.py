@@ -19,7 +19,12 @@ def main() -> int:
     parser.add_argument("--max-posts", type=int, default=None, help="Maximum posts to process this run; default comes from config.")
     parser.add_argument("--dry-run", action="store_true", help="Validate and generate receipts without posting or moving queue files.")
     parser.add_argument("--live", action="store_true", help="Allow queue mutation and configured publisher backend.")
-    parser.add_argument("--media-type", choices=["photo", "video"], action="append", help="Restrict to one or more media types.")
+    parser.add_argument(
+        "--media-type",
+        choices=["photo", "video", "reel", "story"],
+        action="append",
+        help="Restrict to one or more media types.",
+    )
     parser.add_argument("--date", default="", help="Only process queue items whose filenames start with this YYYY-MM-DD date.")
     parser.add_argument("--config", default=None, help="Optional posting_config.json path.")
     args = parser.parse_args()

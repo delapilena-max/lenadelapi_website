@@ -5,7 +5,7 @@ This adapter is designed for content_bot's PostingManager module backend.
 It expects a payload dict with:
   - post_id
   - media_path
-  - media_type: photo|image|video|reel
+  - media_type: photo|image|video|reel|story
   - caption
   - raw: optional source queue JSON
 
@@ -17,8 +17,6 @@ Optional environment variables:
   INSTAGRAM_GRAPH_API_VERSION=v25.0
   CONTENT_BOT_PUBLIC_MEDIA_BASE_URL=https://media.example.com/content-bot
   CONTENT_BOT_PUBLIC_MEDIA_ROOT=pipeline/public_media
-  CONTENT_BOT_IG_VIDEO_MEDIA_TYPE=REELS
-  CONTENT_BOT_IG_SHARE_TO_FEED=true
   CONTENT_BOT_IG_POLL_TIMEOUT_SECONDS=900
   CONTENT_BOT_IG_POLL_INTERVAL_SECONDS=10
 
@@ -45,9 +43,9 @@ from typing import Any, Dict, Iterable, Optional
 from urllib.parse import quote, urlsplit
 from datetime import datetime, timezone
 import json
-import mimetypes
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -250,43 +248,114 @@ def _media_url_extension(media_url: str) -> str:
     return Path(urlsplit(media_url).path).suffix.lower()
 
 
-def create_media_container(*, ig_user_id: str, access_token: str, media_url: str, media_type: str, caption: str) -> Dict[str, Any]:
+def _probe_local_media_contract(media_path: Path) -> Dict[str, Any]:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise InstagramPublishError("ffprobe is not available on PATH -- cannot validate local media streams")
+    try:
+        out = subprocess.check_output(
+            [
+                ffprobe,
+                "-v", "error",
+                "-print_format", "json",
+                "-show_format",
+                "-show_streams",
+                str(media_path),
+            ],
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=30,
+        )
+        data = json.loads(out)
+    except Exception as exc:
+        raise InstagramPublishError(f"could not probe local media {media_path}: {exc}") from exc
+
+    streams = data.get("streams", [])
+    video_streams = [s for s in streams if s.get("codec_type") == "video"]
+    audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+    return {
+        "has_video_stream": bool(video_streams),
+        "has_audio_stream": bool(audio_streams),
+        "video_stream": video_streams[0] if video_streams else None,
+        "audio_stream": audio_streams[0] if audio_streams else None,
+    }
+
+
+def build_container_creation_request(
+    *,
+    media_url: str,
+    media_type: str,
+    caption: str,
+    media_path: Optional[Path] = None,
+    share_to_feed: Optional[bool] = None,
+) -> Dict[str, Any]:
     normalized = str(media_type or "photo").strip().lower()
-    endpoint = f"{_api_base()}/{ig_user_id}/media"
     data: Dict[str, Any] = {
         "caption": caption or "",
-        "access_token": access_token,
     }
+
+    local_media_path = media_path.resolve() if media_path is not None else None
+    is_local_video = False
+    if local_media_path is not None:
+        media_facts = _probe_local_media_contract(local_media_path)
+        is_local_video = bool(media_facts["has_video_stream"])
+    else:
+        media_facts = None
 
     if normalized in {"photo", "image", "jpg", "jpeg", "png", "webp"}:
         data["image_url"] = media_url
     elif normalized in {"story", "stories"}:
-        # Instagram Story branch (2026-07-10, extended same day to support
-        # video Stories -- tools/lena_prepare_story_video_v1.py composes a
-        # real music-backed MP4 Story asset). A Story can be a static image
-        # (the original, still-default behavior) or a real video; the only
-        # reliable discriminator available at this function's boundary is
-        # the media URL's own file extension -- this function receives no
-        # local Path, only the already-resolved media_url string. Reuses
-        # this module's own pre-existing VIDEO_EXTENSIONS set (defined
-        # above, previously unused) rather than inventing a new list or
-        # widening create_media_container()'s signature. Video Stories send
-        # video_url; image Stories are completely unchanged and still send
-        # image_url. Neither branch ever sets REELS media_type or
-        # share_to_feed -- those stay exclusive to the video/reel branch
-        # below, which this change does not touch.
-        if _media_url_extension(media_url) in VIDEO_EXTENSIONS:
+        is_story_video = is_local_video or _media_url_extension(media_url) in VIDEO_EXTENSIONS
+        if is_story_video:
+            if media_facts is not None and not media_facts["has_audio_stream"]:
+                raise InstagramPublishError(
+                    "story payload local media has no audio stream -- refusing to build a silent video Story"
+                )
             data["video_url"] = media_url
         else:
             data["image_url"] = media_url
         data["media_type"] = "STORIES"
-    elif normalized in {"video", "reel", "reels", "mp4", "mov", "m4v"}:
+    elif normalized in {"reel", "reels"}:
+        if media_facts is not None:
+            if not media_facts["has_video_stream"]:
+                raise InstagramPublishError("reel payload local media has no video stream")
+            if not media_facts["has_audio_stream"]:
+                raise InstagramPublishError("reel payload local media has no audio stream")
         data["video_url"] = media_url
-        data["media_type"] = os.environ.get("CONTENT_BOT_IG_VIDEO_MEDIA_TYPE", "REELS")
-        if _truthy(os.environ.get("CONTENT_BOT_IG_SHARE_TO_FEED", "true")):
+        data["media_type"] = "REELS"
+        if share_to_feed is True:
+            data["share_to_feed"] = "true"
+    elif normalized in {"video", "mp4", "mov", "m4v"}:
+        if media_facts is not None and not media_facts["has_video_stream"]:
+            raise InstagramPublishError("video payload local media has no video stream")
+        data["video_url"] = media_url
+        data["media_type"] = "REELS"
+        if share_to_feed is True:
             data["share_to_feed"] = "true"
     else:
         raise InstagramPublishError(f"unsupported media_type for Instagram: {media_type}")
+    return data
+
+
+def create_media_container(
+    *,
+    ig_user_id: str,
+    access_token: str,
+    media_url: str,
+    media_type: str,
+    caption: str,
+    media_path: Optional[Path] = None,
+    share_to_feed: Optional[bool] = None,
+) -> Dict[str, Any]:
+    endpoint = f"{_api_base()}/{ig_user_id}/media"
+    data = build_container_creation_request(
+        media_url=media_url,
+        media_type=media_type,
+        caption=caption,
+        media_path=media_path,
+        share_to_feed=share_to_feed,
+    )
+    data["access_token"] = access_token
 
     created = _request_json("POST", endpoint, data=data)
     if not created.get("id"):
@@ -304,9 +373,24 @@ def get_container_status(*, creation_id: str, access_token: str) -> Dict[str, An
     )
 
 
-def wait_for_container_if_needed(*, creation_id: str, access_token: str, media_type: str) -> Dict[str, Any]:
+def wait_for_container_if_needed(
+    *,
+    creation_id: str,
+    access_token: str,
+    media_type: str,
+    creation_request: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Polls Instagram's async container-processing status for any real
+    video upload -- Reel or video Story alike.
+
+    `creation_request` (2026-07-12) closes a real gap: a video-backed Story
+    sends `media_type=STORIES` to Instagram (never REELS), so checking
+    `media_type` alone would incorrectly skip polling for it. The real
+    payload shape is authoritative here: if the container request used
+    `video_url`, poll; if it used `image_url`, skip."""
     normalized = str(media_type or "").lower()
-    if normalized not in {"video", "reel", "reels", "mp4", "mov", "m4v"}:
+    is_video = bool((creation_request or {}).get("video_url"))
+    if normalized not in {"video", "reel", "reels", "mp4", "mov", "m4v"} and not is_video:
         return {"status_code": "SKIPPED", "reason": "photo containers do not require polling"}
 
     timeout_seconds = int(os.environ.get("CONTENT_BOT_IG_POLL_TIMEOUT_SECONDS", "900"))
@@ -422,7 +506,21 @@ def publish_post(payload: Dict[str, Any]) -> Dict[str, Any]:
     media_type = str(payload.get("media_type") or payload.get("type") or "photo")
     caption = str(payload.get("caption") or "")[:2200]
     post_id = str(payload.get("post_id") or payload.get("id") or "instagram_post")
+    media_path_value = payload.get("media_path") or payload.get("path") or payload.get("file")
+    media_path = Path(str(media_path_value)).resolve() if media_path_value else None
     media_url = resolve_public_media_url(payload)
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    share_to_feed_value = metadata.get("share_to_feed")
+    if share_to_feed_value is None:
+        share_to_feed_value = payload.get("share_to_feed")
+    explicit_share_to_feed = share_to_feed_value if isinstance(share_to_feed_value, bool) else None
+    creation_request = build_container_creation_request(
+        media_url=media_url,
+        media_type=media_type,
+        caption=caption,
+        media_path=media_path,
+        share_to_feed=explicit_share_to_feed,
+    )
 
     created = create_media_container(
         ig_user_id=ig_user_id,
@@ -430,9 +528,16 @@ def publish_post(payload: Dict[str, Any]) -> Dict[str, Any]:
         media_url=media_url,
         media_type=media_type,
         caption=caption,
+        media_path=media_path,
+        share_to_feed=explicit_share_to_feed,
     )
     creation_id = str(created["id"])
-    status = wait_for_container_if_needed(creation_id=creation_id, access_token=access_token, media_type=media_type)
+    status = wait_for_container_if_needed(
+        creation_id=creation_id,
+        access_token=access_token,
+        media_type=media_type,
+        creation_request=creation_request,
+    )
     published = publish_media_container(ig_user_id=ig_user_id, access_token=access_token, creation_id=creation_id)
 
     # Provenance enrichment: look up the PUBLISHED media object (not the creation/
@@ -470,6 +575,7 @@ def publish_post(payload: Dict[str, Any]) -> Dict[str, Any]:
         "ig_user_id": ig_user_id,
         "media_type": media_type,
         "media_url": media_url,
+        "creation_request": creation_request,
         "creation_id": creation_id,
         "container_status": status,
         "instagram_media_id": instagram_media_id,
