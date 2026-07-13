@@ -4,6 +4,223 @@ Append-only. Add a new dated entry per change batch; never rewrite or delete pri
 
 ---
 
+## 2026-07-13 - Batch: Kling I2V commissioning runner committed; four isolated evidence experiments completed; production video path remains open
+
+### What changed
+
+Current HEAD is `4978f17e` (`feat: add guarded Lena Kling I2V
+commissioning runner`). That commit contains exactly:
+- `tools/lena_kling_i2v_commission_v1.py`
+- `tests/test_lena_kling_i2v_commission_v1.py`
+
+After the guarded runner's reviewed dry-run state, four isolated live
+commissioning experiments completed, each with one attempt:
+- `readypack0709-pack003-08-motion-test-01` -- provider task
+  `905632584749682713`
+- `readypack0709-pack003-08-motion-test-02` -- provider task
+  `905648881676591124`
+- `readypack0709-pack003-08-motion-test-03` -- provider task
+  `905660343245602875`
+- `readypack0709-pack003-08-motion-test-04` -- provider task
+  `905662756903976987`
+
+All four used source `readypack0709-pack003-08-photo`, source SHA256
+`b7162ad92e5118118ecb39135ee5f105682ce3ea22d714e0b93ba3a54074cd4f`,
+model `kling-v2-1-master`, endpoint
+`https://api-singapore.klingai.com/v1/videos/image2video`, and requested
+duration 5 seconds. Existing manifests record successful single-attempt
+provider results. The outputs and manifests remain isolated commissioning
+evidence and must be preserved as-is.
+
+### Production classification and current blockers
+
+These four experiments are evidence only. They are not canonical Reel
+assets and do not establish Kling as Lena's production video path. Motion
+quality and prompt adherence are not sufficient for premium production,
+so the production video-path decision remains open. Higgsfield remains
+Lena's identity and still-image generation foundation. The
+static-photo-plus-music Reel path remains the currently integrated Reel
+path unless explicitly changed. No future Kling generation, production
+integration, promotion, or publish action is approved by this checkpoint.
+
+### Freeze and containment
+
+The standing publish freeze remains in force except for the already
+completed, documented one-item Reel exception. That exception did not
+lift the project-wide freeze. Clean-export validation and enforcement
+remain a project-wide requirement. No queue, approval, promotion,
+publish, outward R2 upload, analytics mutation, or `.env` action was part
+of the four commissioning runs or this documentation reconciliation.
+
+### Historical-state correction
+
+The 2026-07-12/13 entry below remains preserved as the truthful state at
+that checkpoint, but its claims that HEAD was `5c6d2c87`, the runner was
+uncommitted, and no live Kling I2V call had occurred are superseded by
+this entry. This correction does not rewrite that historical record and
+does not approve a next provider or implementation action.
+
+---
+
+## 2026-07-12/13 (later session) - Batch: wardrobe A/B/C isolation experiment complete, Soul-ID drift repaired, video-motion path chosen, commissioning runner built (not yet committed)
+
+### Why
+Two threads: (1) validate whether text-driven wardrobe swapping is
+reliable enough for production without building a heavier controlled-test
+architecture, and (2) return Lena to the primary strategic goal of real
+character-motion video rather than another static-photo-plus-music Reel.
+
+### What changed, in order
+
+**1. Read-only video/Reel-stack audit.** Confirmed the derived
+photo-to-video Reel lane (static photo + licensed music, `tools/
+lena_prepare_story_video_v1.py`) is the only fully intact, integrated
+motion-adjacent lane. Direct Kling image-to-video has real historical
+success (see item 5 below) but its actual submission code is gone.
+`tools/lena_submit_kling_lipsync_v1.py` has a confirmed **broken import**
+-- `tools/strategy/lena_submit_kling_video_payload_v1.py` does not exist
+on disk and has zero git history (never committed, unrecoverable). The
+separate, undocumented legacy v2.8/v2.9 publisher architecture was
+reconfirmed disconnected from all current provenance/metrics work.
+
+**2. Second Reel candidate composed (parked, not published).** Used
+the existing, unmodified `lena_prepare_story_video_v1.py` +
+`lena_scrub_media_metadata_v1.py` chain to compose a Reel from
+`readypack0709-pack004-08-photo` (existing, unused, real QA-pass, lane
+"sidewalk dinner"). Directly frame-inspected the resulting MP4: no
+crop/scale/color drift versus the source PNG, headroom preserved
+(~4.2-4.5%, tighter than but not touching the danger zone), static frame
+confirmed unchanged across the full 20s hold. Explicitly flagged: I have
+no audio-listening capability, so music-fit could not be verified by me.
+**Not queued, not approved, not published** -- parked pending review.
+
+**3. Wardrobe A/B/C isolation experiment.**
+- Designed and got explicit approval for 3 wardrobe-only prompt variants
+  (cobalt blue satin `wc_p008`, hot pink ribbed knit `wc_p010`, cherry red
+  square-neck `wc_p020`), each byte-identical to the
+  `readypack0709-pack004-08-photo` baseline prompt except the single
+  `Wardrobe:` sentence -- proven programmatically before any generation.
+- Built and committed `tools/lena_higgsfield_prompt_isolation_test_v1.py`
+  + `tests/test_lena_higgsfield_prompt_isolation_test_v1.py`
+  (`c8054e7b`) -- a narrow, separate one-off Higgsfield prompt-test
+  runner. Never imports or calls `resolve_prompt_source()` in the
+  canonical pack executor; dry-run default, `--live` required, max 3
+  variants, fails closed on production-pack-shaped slot IDs, duplicate
+  test IDs, missing source lineage, and any existing manifest/image/`.tmp`
+  collision (no overwrite path in v1). Codex Sol's independent review
+  required two fixes before commit (overwrite-flag removal, exception-safe
+  temp-file cleanup) -- both implemented, re-reviewed, approved.
+- **First live attempt: 3 submissions, 3 failures.** `higgsfield generate
+  create` exited `3`, stderr `Error: Character not found`, identical all
+  three times (confirmed non-transient by a second identical attempt).
+  Root cause diagnosed read-only via `higgsfield soul-id list --json`:
+  the account's live Lena Soul ID had rotated to
+  `90a293d7-f3af-4377-8751-3304a27b6f31`, while the repo's
+  `DEFAULT_LENA_CUSTOM_REFERENCE_ID` still pointed at the stale
+  `1f1200e4-1cc9-4504-ac1c-3304b687e3c1` (confirmed absent from the live
+  account).
+- **Repair committed (`5c6d2c87`, `fix: update canonical Lena Higgsfield
+  Soul identity`):** `pipeline/higgsfield_lena_api_executor.py`'s
+  singular live-submission default updated to the current ID (with a
+  dated doctrine comment explaining the rotation). `pipeline/identity/
+  lena_higgsfield_identity.py` gained a narrow
+  `APPROVED_CUSTOM_REFERENCE_IDS = {historical_id, current_id}` set, used
+  **only** by `validate_local_identity_evidence()`'s read-only, local
+  evidence check -- the pre-existing queue-item-metadata cross-check was
+  preserved unchanged (an approved ID alone still isn't sufficient if it
+  disagrees with what the queue item itself claims). No historical
+  manifest/evidence file was rewritten;
+  `tests/test_lena_derived_shortform_reel_preflight_v1.py`'s pinned
+  historical constant was left untouched (18 tests still pass). New
+  focused test file `tests/test_lena_higgsfield_reference_id_policy_v1.py`
+  (11 tests). Full suite at commit time: 265 passed, 0 failed.
+- **Second live attempt: 3/3 succeeded**, all under the repaired current
+  ID. Variant A: job `a99564eb-78ce-4075-a9f6-12fad6497ece`, output SHA256
+  `016169946de5e9a7d9d575775a57757cbf2cb9ba2b38fbe962f2c3c923a8d655`.
+  Variant B: job `6fd3b84d-1671-4592-ab62-db45981ec5b7`, output SHA256
+  `0085d68214e738604a0a25348de12335bc79287dfd67b6a184f2a88d07d7b0f8`.
+  Variant C: job `ada3a4da-84ba-4f59-adce-0b31f51706a3`, output SHA256
+  `7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb`. All
+  independently re-verified: 1152x2048 PNGs, prompt hashes matching
+  approval exactly, correct source lineage, `custom_reference_id=
+  90a293d7-...` in every manifest.
+
+**4. Nicolas's final verdict, recorded verbatim as doctrine:** wardrobe
+text-swapping is proven reliable for production; strict pixel-level
+scene/pose isolation is **not** proven -- systematic non-wardrobe drift
+observed across all 3 variants in environment, cars, restaurant layout,
+handbag/accessories, background population, lighting, exact raised-arm
+geometry, and camera distance/geometry. Not treated as a failure. No
+further wardrobe testing is needed right now. Scores: A identity 8.5,
+pose 7, environment 4, framing 8, wardrobe 9, overall isolation 7; B
+identity 8.5, pose 8, environment 5, framing 8.5, wardrobe 9.5 (best
+material-specific fidelity), overall isolation 7.5; C identity 9, pose 8,
+environment 5, framing 8.5, wardrobe 9.5, overall isolation 7.7 (best
+overall). **A/B/C evidence is immutable** -- `pipeline/higgsfield_library/
+lena/2026-07-09/prompt_isolation_tests/` and `pipeline/higgsfield_debug/
+2026-07-09/prompt_isolation_tests/` must never be moved, renamed,
+rewritten, approved, queued, or cleaned up.
+
+**5. Read-only video-motion architecture assessment.** Direct Kling
+image-to-video chosen as the smallest-new-architecture path to real
+character motion (not another static-photo-plus-music Reel). Real
+evidence: `pipeline/config/kling_video_model_policy_v1.json` confirms
+`kling-v2-1-master` completed a real live image-to-video submit on
+2026-07-01 (`kling-v3-0-turbo` was rejected by the live API); the real
+succeeded historical job (`pipeline/strategy/lena/kling_video_results/
+2026-06-30/kling_video_result_2026-06-30_podclip_20260630_01_
+901327158671446020.json`) confirms endpoint `https://api-singapore.
+klingai.com/v1/videos/image2video` and a real public-URL (never
+upload/base64) seed-image contract. Chose `readypack0709-pack003-08-photo`
+(explicitly not Variant C, not Variant B) as the first motion source:
+already QA-passed, already live-published, cleaner hand/limb visibility
+and simpler rooftop geometry than any wardrobe-test image, despite an
+already-documented leaner-than-ideal body reading.
+
+**6. Built `tools/lena_kling_i2v_commission_v1.py` + tests -- NOT YET
+COMMITTED.** Narrow Kling image-to-video commissioning runner: dry-run
+default, `--live` required, model (`kling-v2-1-master`) and endpoint
+(`https://api-singapore.klingai.com/v1/videos/image2video`) pinned as
+constants with no CLI override, at most one provider submission ever
+(structurally verified: exactly one `_http_json("POST", ...)` call in the
+live path), no retry/fallback, fails closed on any output collision
+(manifest/video/`.tmp`, no overwrite path), never uploads the source image
+anywhere -- `--live` requires an already-existing public URL supplied
+explicitly (a real one exists for this exact source from its own prior
+real Instagram feed publish, `https://pub-ee462a06dda9471ca44720da4c8597b5.
+r2.dev/lena/queue-media/2026-07-10/readypack0709-pack003-08-photo.png`,
+but its current live reachability was never network-checked). Reuses
+`pipeline/kling_apilena_api_executor.py`'s real, already-live-proven
+transport (`_auth_header`/`_http_json`/`_download_file`/
+`_sanitize_reference_url`) verbatim -- never modifies that file, never
+uses the disconnected legacy `pipeline/renderer/kling.py` (inspected
+read-only only). 30 new tests. Full suite: **295 passed, 0 failed**.
+Dry-run verified against the real source (SHA256
+`b7162ad92e5118118ecb39135ee5f105682ce3ea22d714e0b93ba3a54074cd4f`) and
+the real locked motion prompt (SHA256
+`231c44f1e9d827b5cadfb7fd6bc58ff79d896486d4941d83d58803d228ad9a2f`) under
+test video identity `readypack0709-pack003-08-motion-test-01` -- zero
+subprocess/network/download/file-write.
+
+### Real, honest gap preserved, not glossed over
+The exact literal Kling image2video request-body field names are **not**
+recoverable from current repo evidence -- the historical payload-dryrun
+artifact that would have proven them is also gone (same fate as the
+missing submission module). The new runner's payload shape is
+reconstructed from Kling's documented image2video contract, not copied
+from a recovered historical payload. This should get real scrutiny before
+any actual `--live` Kling I2V attempt.
+
+### Explicitly not done
+- No `--live` Kling I2V call has occurred -- fully separate, not-yet-
+  authorized next action.
+- No queue/approval/promotion/publish/R2/analytics/outcome-learning/
+  Meta-refresh/`.env` action occurred anywhere in this entire stretch.
+- A/B/C experiment evidence was not moved, rewritten, or cleaned up.
+- `tools/lena_kling_i2v_commission_v1.py` and its test file were not
+  staged or committed.
+- No unrelated dirty-pile work.
+
 ## 2026-07-12 (later session) - Batch: Architecture A outcome-learning published-inventory parity (landed + verified against real data)
 
 ### Why
@@ -172,6 +389,51 @@ reflect these commits are already on HEAD.
 - No render or regeneration.
 - No unrelated dirty-pile work.
 - No further code change beyond continuity documentation in this batch.
+
+## 2026-07-10/11 - Batch: session warm-up protocol for new chats
+
+### Why
+The repo now has enough moving parts, continuity doctrine, architecture
+forks, and historical/legacy surfaces that a new chat can easily become
+"locally smart but globally wrong" if it starts from a narrow file read or
+from chat memory. The project needs a repeatable way to force each new
+session to acquire the current objective, freeze state, live-path truth,
+authoritative modules, infrastructure map, and hard prohibitions before
+proposing work.
+
+### What changed
+- New: `pipeline/knowledge/content_bot/SESSION_BOOT_PROTOCOL.md`
+  - Pointer-based new-session procedure; intentionally not a copied
+    checkpoint file.
+  - Surfaces standing repo truths immediately: autonomous-loop north star,
+    Reels/Feed/Stories priority, publish freeze, no live publish/queue/R2
+    until clean-export proof + explicit lift, metadata scrubber status,
+    no duplicate systems without checking existing infra first, no `.env`
+    access/edits without approval, preserve dirty pile, read-only first,
+    no render/provider/publish action without approval, repo files over chat
+    memory.
+  - Requires a fixed boot report with: CURRENT HEAD, CURRENT BRANCH, REPO
+    STATUS, PRIMARY OBJECTIVE, CURRENT LIVE PATH, CURRENT BLOCKERS, CURRENT
+    PUBLISH FREEZE STATUS, LATEST COMPLETED STEP, NEXT APPROVED STEP, OPEN
+    ARCHITECTURE DECISIONS, UNTRACKED / DIRTY FILES OF INTEREST, HARD
+    PROHIBITIONS, CONTRADICTIONS FOUND, FILES READ.
+- New: `pipeline/change_notes/CHAT_SESSION_BOOT_PROMPT.md`
+  - Copy-paste prompt for launching a new chat into the protocol.
+- Updated: `pipeline/knowledge/content_bot/AUTHORITATIVE_SURFACES.md`
+  - Added the warm-up protocol as the authoritative onboarding surface for
+    new chats.
+- Updated: `pipeline/knowledge/content_bot/REPO_MAP.md`
+  - Added the boot surfaces to repo orientation.
+- Updated: `pipeline/change_notes/NEXT_SESSION_START.md`
+  - Added the boot surfaces to the "inspect first" list.
+- Updated: `pipeline/change_notes/lena_filesystem_native_agent_pivot_master.md`
+  - Recorded the process improvement in current state.
+
+### Explicitly not done
+- No production code path changed.
+- No provider call, render, publish, queue mutation, or `.env` edit.
+- No attempt to resolve the architecture fork or publish freeze; this batch
+  only improves session orientation discipline.
 
 ## 2026-07-05 — Batch 1: Containment (executor drift + preflight metadata-trust)
 
@@ -7440,6 +7702,119 @@ No render, generation, publish, queue mutation, R2 action, Meta/Instagram/
 Kling/provider call, `.env` access, or code change occurred producing this
 entry beyond the one already-described `75215779` commit -- the
 architecture audit and freeze recording were entirely read-only/docs-only.
+
+---
+
+## 2026-07-11 - Batch: Architecture A publish-identity -> Lena metrics join (honest provenance-split commit pair; sync tool not yet run against real data)
+
+### Why
+A metrics-identity slice needed to join real Architecture A publish
+receipts into the Lena metrics CSV via structured `instagram_media_id`
+(instead of relying solely on the legacy free-text `post_id:<id>` notes
+convention). Mid-slice, `tools/lena_meta_refresh_feedback_v1.py` (the file
+this slice needed to touch) was discovered untracked with **zero prior git
+history**, even though ~717 of its ~740 total lines are pre-existing
+functionality with no relation to this slice. Committing the whole file as
+one commit would have falsely attributed that pre-existing code to this
+change.
+
+### What changed
+Two commits, in order, HEAD is now `ce28ea6a`:
+- `e84c4b2f` `chore: checkpoint pre-existing Lena Meta feedback refresh
+  tool` -- the exact pre-slice version of `tools/
+  lena_meta_refresh_feedback_v1.py`, reconstructed by manually removing
+  only this slice's own additions (`_post_log_key()`,
+  `resolve_structured_post_id()`, the `candidate_posts()` signature/body
+  change, and the one call-site argument), diffed against the full slice
+  version to confirm nothing else was altered. Committed and explicitly
+  labeled a checkpoint of pre-existing code, not new functionality.
+- `ce28ea6a` `feat: join Architecture A publish identity to Lena metrics`
+  -- the real slice, reapplied on top of the checkpoint (diff-confirmed to
+  be the exact mirror image of the removal above):
+  - `_post_log_key(row)` -- `(date, slot_id, platform)` tuple key.
+  - `resolve_structured_post_id(post_row, metric_index)` -- prefers a
+    non-empty `instagram_media_id` already present on the matching
+    metrics row (sourced from a real Architecture A publish receipt via
+    the new sync tool below, never fabricated); falls back to the legacy
+    `parse_post_id(notes)` regex only when no structured value exists for
+    that key. `parse_post_id()` itself is unmodified.
+  - `candidate_posts()` gained a `metric_rows` parameter and now builds a
+    `metric_index` to resolve identity through the function above, instead
+    of always going straight to the notes regex.
+  - New: `tools/lena_sync_architecture_a_receipts_to_metrics_v1.py` --
+    joins real Architecture A publish receipts into `pipeline/analytics/
+    lena_post_metrics_v1_6_1.csv`. Preserves `post_id`, real
+    `instagram_media_id`, `permalink`, `slot_id`, `source_slot_id` when
+    available; attaches clean-export provenance (`publish_receipt_path`,
+    `source_asset_path`, `clean_derivative_path`,
+    `source_asset_sha256`, `clean_export_derivative_sha256`,
+    `clean_export_verified`) only when real evidence exists -- never
+    fabricates or recomputes clean-export verification, never invents a
+    universal identifier. Historical CSV rows without the new fields load
+    and survive unchanged; existing non-empty values are not silently
+    overwritten. Defaults to a non-mutating mode; `--apply` performs the
+    one write (dry-run semantics to be explicitly confirmed via `--help`
+    before the next real run, per the next-approved-step below).
+  - New: `tests/test_lena_metrics_architecture_a_identity_v1.py` -- 16
+    tests covering identity-field construction from real receipt shapes,
+    `source_slot_id` fallback, clean-export provenance attach/absence
+    (including the "no fabricated provenance for a missing queue item" and
+    "pre-contract item stays without fabricated evidence" cases), date/
+    platform derivation, canonical-provenance resolution, historical CSV
+    load/survive-upsert, never-overwrite-with-blank, dry-run-does-not-
+    write, apply-writes, and the structured-vs-legacy-notes precedence
+    behavior end-to-end through `candidate_posts()`.
+
+### Validation
+- `python -m py_compile` clean on all three touched/new files, both before
+  Commit 1 (pre-slice reconstruction) and before Commit 2 (full slice).
+- Focused: `pytest tests/test_lena_metrics_architecture_a_identity_v1.py
+  -v` -- **16 passed**.
+- Full suite: `pytest tests/ -v` -- **101 passed** (zero regressions).
+- `git diff --cached` inspected before each commit to confirm the staged
+  file set was exactly the intended set, nothing extra swept in from the
+  large pre-existing unrelated dirty working tree.
+
+### Decisions made
+- Split into two commits specifically to keep git history honest about
+  provenance -- large pre-existing untracked files get an explicit,
+  labeled checkpoint commit rather than being silently folded into a
+  feature commit.
+- Scope was deliberately held to identity/provenance joining only: no
+  scoring weight, classification threshold, recommendation ranking,
+  `parse_post_id()` internals, winner-mutation logic, job-state file,
+  `PostingManager`, Reel/video file, or Architecture B file was touched.
+
+### Blockers / parked work
+- The sync tool has not been run against the real repo data in any mode
+  yet (neither dry-run nor `--apply`). `pipeline/analytics/
+  lena_post_metrics_v1_6_1.csv` has zero real rows with structured
+  identity/provenance from this tool so far.
+- The recipe_id/slot_id architecture-join work (a separate, broader
+  effort) has not been started.
+
+### Next approved step
+A **dry-run-only** real invocation of `tools/
+lena_sync_architecture_a_receipts_to_metrics_v1.py` against the real repo
+data (no `--apply`), starting with `--help` to explicitly confirm the
+tool's default-mode/dry-run semantics before running it, to inspect
+exactly what it would propose (receipts discovered, rows it would insert
+vs. update vs. leave unchanged, identity/provenance integrity) before any
+real mutation is authorized.
+
+### What must not be done
+No `--apply` run against the real CSV without a separate, explicit
+authorization from Nicolas after dry-run results are reviewed. No
+mutation of `pipeline/analytics/lena_post_metrics_v1_6_1.csv`. No touching
+`pipeline/posting_manager.py`, `pipeline/lena_job_state.py`, committed
+Reel/video files, `tools/lena_scrub_media_metadata_v1.py`,
+`tools/instagram_publish_smoke.py`, Architecture B, or
+`instagram_direct_publisher_patch/`. The standing publish freeze remains
+fully in force.
+
+No publish, render, generation, R2 action, Meta/Instagram/provider call,
+or `.env` access occurred producing either commit -- this batch was
+strictly a code/test/git-history change.
 
 ---
 
