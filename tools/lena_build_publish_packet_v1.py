@@ -691,13 +691,17 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
 # checks on top). No logic is duplicated between the two.
 
 def resolve_packet_inputs_higgsfield_derived_shortform(
-    date_str: str, slot_id: str, out_dir: Optional[Path] = None
+    date_str: str,
+    slot_id: str,
+    out_dir: Optional[Path] = None,
+    output_slot_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Read-only. `slot_id` here is the SOURCE PHOTO's real generation slot
     (called with --source-slot at the CLI layer, exactly like every other
     resolver's source_slot_id convention). Raises ResolveError on any
     hard-fail condition. Writes nothing, ever."""
     resolved_photo = resolve_packet_inputs_higgsfield(date_str, slot_id, out_dir)
+    package_slot_id = output_slot_id or slot_id
 
     from lena_prepare_story_video_v1 import (  # noqa: E402  (same bare-import style as lena_higgsfield_qa_bridge_v1 above -- both live in tools/, both rely on TOOLS_DIR on sys.path)
         StoryVideoError,
@@ -746,8 +750,10 @@ def resolve_packet_inputs_higgsfield_derived_shortform(
 
     return {
         "date": date_str,
-        "slot_id": slot_id,
-        "provider": "higgsfield",
+        "slot_id": package_slot_id,
+        "source_slot_id": slot_id,
+        "provider": "higgsfield_derived_shortform",
+        "source_provider": "higgsfield",
         "media_kind": "derived_shortform_video",
         # Source photo identity -- reused verbatim from the unmodified photo resolver.
         "source_image_path": str(source_image_path),
@@ -782,8 +788,10 @@ def resolve_packet_inputs_higgsfield_derived_shortform(
         "prepared_audio_codec": shortform_facts["audio_codec"],
         "prepared_video_width": shortform_facts["width"],
         "prepared_video_height": shortform_facts["height"],
-        "intended_packet_output_path": resolved_photo["intended_packet_output_path"],
-        "intended_packet_output_already_exists": resolved_photo["intended_packet_output_already_exists"],
+        "intended_packet_output_path": str(resolve_packet_output_path(date_str, package_slot_id, out_dir)),
+        "intended_packet_output_already_exists": resolve_packet_output_path(
+            date_str, package_slot_id, out_dir
+        ).exists(),
         "files_written_this_run": [],
     }
 
@@ -888,7 +896,24 @@ def build_packet_markdown(resolved: Dict[str, Any]) -> str:
     # 2. Image (or Video, 2026-07-11: media-kind-aware, additive only --
     # the rest of this section's fields already use .get()-with-fallback and
     # need no change for either media kind).
-    if resolved.get("media_kind") == "video":
+    if resolved.get("media_kind") == "derived_shortform_video":
+        lines.append("## 1. Derived short-form video")
+        lines.append("")
+        lines.append("- **Media kind:** `derived_shortform_video`")
+        lines.append(f"- **Path:** `{resolved['prepared_video_path']}`")
+        lines.append(f"- **Prepared video SHA-256:** `{resolved['prepared_video_sha256']}`")
+        lines.append(f"- **Source image:** `{resolved['source_image_path']}`")
+        lines.append(f"- **Source image SHA-256:** `{resolved['source_image_sha256']}`")
+        lines.append(f"- **Source slot:** `{resolved['source_slot_id']}`")
+        lines.append(f"- **Composition provenance:** `{resolved['prepared_video_provenance_path']}`")
+        lines.append(f"- **Music track:** `{resolved['selected_track_id']}`")
+        lines.append(f"- **Music track SHA-256:** `{resolved['selected_track_sha256']}`")
+        lines.append(
+            f"- **Composition:** {resolved['prepared_video_duration_seconds']}s, "
+            f"{resolved['prepared_video_width']}x{resolved['prepared_video_height']}, "
+            f"video `{resolved['prepared_video_codec']}`, audio `{resolved['prepared_audio_codec']}`"
+        )
+    elif resolved.get("media_kind") == "video":
         lines.append("## 1. Video")
         lines.append("")
         lines.append(f"- **Path:** `{resolved['video_path']}`")
@@ -1063,7 +1088,69 @@ def build_queue_draft(resolved: Dict[str, Any], packet_output_path: Path) -> Dic
     resolve_packet_inputs_video()) produces a genuinely new, additive
     video-shaped draft -- never a hand-authored stopgap."""
     debug_artifacts = resolved.get("debug_artifacts") or {}
-    is_video = resolved.get("media_kind") == "video"
+    media_kind = resolved.get("media_kind")
+    is_derived_shortform = media_kind == "derived_shortform_video"
+    is_video = media_kind == "video"
+
+    if is_derived_shortform:
+        source_slot_id = resolved.get("source_slot_id") or resolved["slot_id"]
+        metadata: Dict[str, Any] = {
+            "avatar_nickname": resolved["avatar_nickname"],
+            "provider": "higgsfield_derived_shortform",
+            "source_provider": resolved.get("source_provider") or "higgsfield",
+            "video_prompt": (
+                "Locally composed, music-backed 9:16 short-form video derived from "
+                f"approved Higgsfield source slot {source_slot_id}; no provider video generation."
+            ),
+            "publish_packet_path": str(packet_output_path),
+            "qa_path": resolved.get("qa_path"),
+            "qa_overall": resolved.get("qa_overall"),
+            "source_date": resolved.get("date"),
+            "source_slot_id": source_slot_id,
+            "generated_by": "tools/lena_build_publish_packet_v1.py",
+            "queue_draft_only": True,
+            "source_image_path": resolved["source_image_path"],
+            "source_image_sha256": resolved["source_image_sha256"],
+            "prepared_video_sha256": resolved["prepared_video_sha256"],
+            "prepared_shortform_provenance_path": resolved["prepared_video_provenance_path"],
+            "selected_track_id": resolved["selected_track_id"],
+            "selected_track_sha256": resolved["selected_track_sha256"],
+            "duration_seconds": resolved["prepared_video_duration_seconds"],
+            "video_codec": resolved["prepared_video_codec"],
+            "audio_codec": resolved["prepared_audio_codec"],
+            "width": resolved["prepared_video_width"],
+            "height": resolved["prepared_video_height"],
+            "aspect_ratio": "9:16",
+        }
+        debug_artifacts = resolved.get("debug_artifacts") or {}
+        optional_metadata = {
+            "source_provider_job_id": debug_artifacts.get("provider_job_id"),
+            "source_custom_reference_id": resolved.get("custom_reference_id"),
+            "source_resolution": resolved.get("resolution"),
+            "image_prompt": resolved.get("image_prompt"),
+            "lane": resolved.get("lane"),
+            "activity": resolved.get("activity"),
+            "pose": resolved.get("pose"),
+            "visual_style": resolved.get("visual_style"),
+            "wardrobe_outfit_id": resolved.get("wardrobe_outfit_id"),
+            "pose_body_language_id": resolved.get("pose_body_language_id"),
+            "expression_gaze_id": resolved.get("expression_gaze_id"),
+        }
+        for key, value in optional_metadata.items():
+            if value is not None:
+                metadata[key] = value
+
+        return {
+            "post_id": resolved["slot_id"],
+            "slot_id": resolved["slot_id"],
+            "media_path": resolved["prepared_video_path"],
+            "media_type": "reel",
+            "platforms": ["instagram"],
+            "caption": QUEUE_DRAFT_CAPTION_PLACEHOLDER,
+            "approved_for_live_publish": False,
+            "operator_review_required": True,
+            "metadata": metadata,
+        }
 
     if is_video:
         # Contract fields required by instagram_queue_bridge._validate_contract()'s
@@ -1246,13 +1333,22 @@ def main() -> int:
     parser.add_argument("--slot", required=True, dest="slot_id", help="exact slot_id, e.g. 2026-07-07-03-photo")
     parser.add_argument(
         "--provider",
-        choices=["kling", "higgsfield", "video"],
+        choices=["kling", "higgsfield", "higgsfield_derived_shortform", "video"],
         default="kling",
         help=(
             "Explicit provider selector (default: kling, preserved for backward "
             "compatibility). Never auto-detected from whichever manifest happens "
             "to exist, and never falls back across providers -- an invalid value "
             "is rejected by argparse itself."
+        ),
+    )
+    parser.add_argument(
+        "--source-slot",
+        default=None,
+        dest="source_slot_id",
+        help=(
+            "Explicit source-photo slot for higgsfield_derived_shortform when the package/Reel "
+            "identity in --slot is distinct. Ignored for no other provider."
         ),
     )
     parser.add_argument(
@@ -1293,14 +1389,27 @@ def main() -> int:
             print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
             return 1
 
+    if args.source_slot_id and args.provider != "higgsfield_derived_shortform":
+        parser.error("--source-slot is only valid with --provider higgsfield_derived_shortform")
+
     if args.provider == "higgsfield":
         resolver = resolve_packet_inputs_higgsfield
+    elif args.provider == "higgsfield_derived_shortform":
+        resolver = None
     elif args.provider == "video":
         resolver = resolve_packet_inputs_video
     else:
         resolver = resolve_packet_inputs
     try:
-        resolved = resolver(args.date, args.slot_id, out_dir)
+        if args.provider == "higgsfield_derived_shortform":
+            resolved = resolve_packet_inputs_higgsfield_derived_shortform(
+                args.date,
+                args.source_slot_id or args.slot_id,
+                out_dir,
+                output_slot_id=args.slot_id,
+            )
+        else:
+            resolved = resolver(args.date, args.slot_id, out_dir)
     except ResolveError as exc:
         print(json.dumps({"ok": False, "error": str(exc), "date": args.date, "slot_id": args.slot_id}, indent=2))
         return 1
