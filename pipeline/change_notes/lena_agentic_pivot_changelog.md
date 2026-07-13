@@ -7945,3 +7945,32 @@ No Meta API call, no publish, no render, no queue promotion, no R2/
 provider action, no `.env` access occurred producing these three commits
 -- this batch was strictly a repair-script/test/git-history change plus
 one authorized, fully-verified real canonical CSV write via `--apply`.
+
+---
+
+## 2026-07-13 -- Canonical Lena niche strategy established prospectively
+
+Established **Glamour, Choices, And Beautiful Trouble** as Lena's canonical
+niche. The core promise is: Lena is a glamorous, curvy, adventurous woman with
+a beautiful life and a taste for choices that may become stories. Followers do
+not control her, but they sometimes influence what she does next. **Come for
+the image. Stay to see what the choice becomes.**
+
+The seven canonical pillars are `everyday_lena`,
+`style_and_getting_ready`, `beautiful_trouble`, `city_and_social_life`,
+`adventure_and_escape`, `audience_choice_and_payoff`, and
+`high_heat_glamour`. Balanced sexuality is explicit: high-heat glamour is one
+pillar, not the whole account, no consecutive high-heat posts, and normally at
+least two lower-temperature or story-forward posts between strongly
+provocative posts. Audience choice is occasional and consequential, with at
+most two unresolved choices, a normal 1-3-post payoff window, a five-post
+ceiling unless explicitly designated as a longer arc, and Lena retaining final
+agency.
+
+Older fitness/wellness-only and luxury-baddie-only niche definitions are
+superseded prospectively. Historical assets remain valid and immutable. This
+checkpoint changed no body specification, prompt brain, QA schema, provider
+behavior, coordinator, world state, series state, generation, queue, approval,
+promotion, publish, upload, analytics, or freeze state. Dormant untracked CTA,
+poll, series, continuity, and engagement policy files remain reference-only and
+gain no authority from this checkpoint.

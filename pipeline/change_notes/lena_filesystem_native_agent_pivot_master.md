@@ -3862,3 +3862,34 @@ required before any retry.
 None pending on the publisher/commit thread -- it's closed. Lena render/publish
 threads remain in their last recorded state (render freeze narrowed but in
 force; no further publish without explicit approval).
+
+---
+
+## 2026-07-13 -- Canonical niche strategy superseding checkpoint
+
+The prospective production strategy for Lena is now **Glamour, Choices, And
+Beautiful Trouble**. Core promise: Lena is a glamorous, curvy, adventurous
+woman with a beautiful life and a taste for choices that may become stories.
+Followers do not control her, but they sometimes influence what she does next.
+**Come for the image. Stay to see what the choice becomes.**
+
+Canonical pillars: `everyday_lena`, `style_and_getting_ready`,
+`beautiful_trouble`, `city_and_social_life`, `adventure_and_escape`,
+`audience_choice_and_payoff`, and `high_heat_glamour`.
+
+The strategy uses quiet, warm, glamorous, and high-heat sequencing rather than
+publishing quotas. `high_heat_glamour` is one pillar, not the whole account.
+No consecutive high-heat posts are allowed by doctrine; normally at least two
+lower-temperature or story-forward posts separate strongly provocative posts.
+Choices must be meaningful and payable: at most two may remain unresolved,
+with normal payoff in 1-3 published Lena posts and a five-post ceiling unless
+an arc is explicitly designated longer. Audience influence never becomes
+audience control.
+
+This entry prospectively supersedes older fitness/wellness-only and
+luxury-baddie-only niche definitions without invalidating or rewriting any
+historical asset or evidence. Historical assets remain valid and immutable.
+No body specification changed. No prompt brain, provider behavior, coordinator,
+generation, queue, approval, promotion, publishing, upload, analytics, or
+freeze state changed. Dormant untracked CTA, poll, series, continuity, and
+engagement policies remain non-authoritative reference material.

@@ -15,7 +15,16 @@
     "gym_confidence",
     "coffee_daylife",
     "should_i_post_this",
-    "playful_confession"
+    "playful_confession",
+    "curiosity_open_loop",
+    "consequence",
+    "meaningful_choice",
+    "payoff",
+    "adventure_escape",
+    "situational_humor",
+    "quiet_personal",
+    "world_expansion",
+    "callback"
   ],
   "recipes": [
     {
@@ -40,7 +49,9 @@
       "linked_hook_categories": [
         "mirror_fitcheck",
         "outfit_problem",
-        "should_i_post_this"
+        "should_i_post_this",
+        "curiosity_open_loop",
+        "meaningful_choice"
       ],
       "caption_angle": "Playful self-aware -- she checked, the mirror agreed, she posted. Short, present-tense, quiet punchline.",
       "caption_draft": "the mirror said yes first",
@@ -79,7 +90,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Catalog-locked from apartment_mirror_variety expansion lane to prevent STYLE_BANK fallback and keep the mirror lane sexy, apartment-coded, and non-hotel.",
       "environment_id": "env_m005",
-      "proof_priority": 4
+      "proof_priority": 4,
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "anticipation"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_002",
@@ -104,7 +127,9 @@
       "linked_hook_categories": [
         "errand_attention",
         "casual_but_not",
-        "coffee_daylife"
+        "coffee_daylife",
+        "situational_humor",
+        "payoff"
       ],
       "caption_angle": "Dry self-aware -- the errand was optional, the outfit was not. Short and matter-of-fact.",
       "caption_draft": "quick run. ended up dressed like this.",
@@ -142,7 +167,18 @@
       "wardrobe_allow_high_risk": false,
       "environment_id": "env_s001",
       "proof_priority": 6,
-      "wardrobe_notes": "Leggy sexpot daytime register 2026-06-30: leg-out mini + crop, legs on display. Replaces the too-covered earlier swap."
+      "wardrobe_notes": "Leggy sexpot daytime register 2026-06-30: leg-out mini + crop, legs on display. Replaces the too-covered earlier swap.",
+      "strategy_pillars": [
+        "everyday_lena",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_003",
@@ -165,7 +201,8 @@
       "linked_hook_categories": [
         "errand_attention",
         "outfit_problem",
-        "playful_confession"
+        "playful_confession",
+        "situational_humor"
       ],
       "caption_angle": "Playful confession -- overdressed for the errand and fully aware of it. Short, dry, present-tense.",
       "caption_draft": "the store was not ready for this.",
@@ -177,7 +214,16 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "QA-confirmed white French terry hoodie set. task 899503921557798966.",
       "production_status": "test_only",
-      "production_exclude_reason": "Grocery/produce-aisle scene rejected 2026-06-26; not aligned with Lena fashion/beauty/selfie/model production direction."
+      "production_exclude_reason": "Grocery/produce-aisle scene rejected 2026-06-26; not aligned with Lena fashion/beauty/selfie/model production direction.",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "id": "hcr_004",
@@ -202,7 +248,9 @@
       "linked_hook_categories": [
         "gym_confidence",
         "casual_but_not",
-        "playful_confession"
+        "playful_confession",
+        "situational_humor",
+        "payoff"
       ],
       "caption_angle": "Post-workout quiet confidence -- no hype, no hustle-culture language. Just presence and completion.",
       "caption_draft": "the session happened. rest is optional.",
@@ -240,7 +288,18 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Catalog-locked gym set to keep the lane athletic, fitted, and body-consistent without drifting into old fallback clothing.",
       "environment_id": "env_gym001",
-      "proof_priority": 8
+      "proof_priority": 8,
+      "strategy_pillars": [
+        "everyday_lena",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_005",
@@ -264,7 +323,9 @@
       "linked_hook_categories": [
         "outfit_problem",
         "should_i_post_this",
-        "mirror_fitcheck"
+        "mirror_fitcheck",
+        "curiosity_open_loop",
+        "meaningful_choice"
       ],
       "caption_angle": "Ready-to-leave self-awareness -- the outfit is better than the destination warrants. Short, dry.",
       "caption_draft": "the door was the only thing between this and the street.",
@@ -306,7 +367,19 @@
       "wardrobe_outfit_id": "wc_p004",
       "wardrobe_allow_high_risk": false,
       "environment_id": "env_a004",
-      "proof_priority": 5
+      "proof_priority": 5,
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "anticipation"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_006",
@@ -329,7 +402,9 @@
       "linked_hook_categories": [
         "outfit_problem",
         "should_i_post_this",
-        "casual_but_not"
+        "casual_but_not",
+        "curiosity_open_loop",
+        "consequence"
       ],
       "caption_angle": "Dry self-aware -- what was she doing here and why did she look like this? No explanation offered.",
       "caption_draft": "the parking garage was not the plan. the photo was.",
@@ -369,7 +444,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Catalog-locked for the parking-garage flash lane so the outfit stays elevated and sexy rather than collapsing into generic fallback streetwear.",
       "environment_id": "env_p001",
-      "proof_priority": 9
+      "proof_priority": 9,
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "anticipation",
+        "consequence"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_007",
@@ -392,7 +479,8 @@
       "linked_hook_categories": [
         "playful_confession",
         "coffee_daylife",
-        "casual_but_not"
+        "casual_but_not",
+        "quiet_personal"
       ],
       "wardrobe_blocked_terms": [
         "turtleneck",
@@ -578,7 +666,16 @@
           "skin becomes airbrushed, waxy, or plastic",
           "hands or body posture stop feeling natural mid-action"
         ]
-      }
+      },
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "id": "hcr_008",
@@ -603,7 +700,9 @@
       "linked_hook_categories": [
         "outfit_problem",
         "should_i_post_this",
-        "casual_but_not"
+        "casual_but_not",
+        "payoff",
+        "callback"
       ],
       "caption_angle": "Present in the moment -- the city was the backdrop, the outfit was just there. Short and confident.",
       "caption_draft": "the city does not care. I dressed up anyway.",
@@ -642,7 +741,18 @@
       "wardrobe_outfit_id": "wc_p062",
       "wardrobe_allow_high_risk": false,
       "environment_id": "env_r001",
-      "proof_priority": 10
+      "proof_priority": 10,
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_009",
@@ -665,7 +775,9 @@
       "linked_hook_categories": [
         "outfit_problem",
         "should_i_post_this",
-        "casual_but_not"
+        "casual_but_not",
+        "curiosity_open_loop",
+        "consequence"
       ],
       "caption_angle": "Going-out energy -- composed and in the moment. Not explaining where or why. Short.",
       "caption_draft": "running late. still showing up like this.",
@@ -705,7 +817,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Catalog-locked staircase going-out dress to preserve the warm, cinematic event lane and prevent fallback into safer generic looks.",
       "environment_id": "env_g003",
-      "proof_priority": 11
+      "proof_priority": 11,
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "experience",
+        "consequence"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_010",
@@ -730,7 +854,9 @@
       "linked_hook_categories": [
         "casual_but_not",
         "errand_attention",
-        "playful_confession"
+        "playful_confession",
+        "situational_humor",
+        "payoff"
       ],
       "caption_angle": "Self-aware about the outfit versus the complete absence of occasion. Just outside. No reason. Short.",
       "caption_draft": "just outside. no reason.",
@@ -768,7 +894,18 @@
           "skin becomes waxy, poreless, or overly polished"
         ]
       },
-      "wardrobe_notes": "Safe leggy reassignment 2026-06-30: wc_p034 (white faux-leather) drifted to tight-white underwear-ambiguous shorts + butt-focus; use wc_p021 black mini skirt + blazer."
+      "wardrobe_notes": "Safe leggy reassignment 2026-06-30: wc_p034 (white faux-leather) drifted to tight-white underwear-ambiguous shorts + butt-focus; use wc_p021 black mini skirt + blazer.",
+      "strategy_pillars": [
+        "everyday_lena",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_011",
@@ -792,7 +929,9 @@
       "linked_hook_categories": [
         "mirror_fitcheck",
         "should_i_post_this",
-        "playful_confession"
+        "playful_confession",
+        "meaningful_choice",
+        "quiet_personal"
       ],
       "caption_angle": "Quiet self-check energy -- she only meant to check the top half and still saved it.",
       "caption_draft": "only meant to check the earrings.",
@@ -832,7 +971,18 @@
       "wardrobe_notes": "Face-priority proof lane anchored to the red dress family without relying on full-body mirror framing.",
       "environment_id": "env_v008",
       "proof_priority": 1,
-      "environment_context": "Environment: home getting-ready corner, clothes chair, shoes near mirror, small products, warm apartment light, not hotel. "
+      "environment_context": "Environment: home getting-ready corner, clothes chair, shoes near mirror, small products, warm apartment light, not hotel. ",
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "setup",
+        "choice"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_012",
@@ -856,7 +1006,9 @@
       "linked_hook_categories": [
         "mirror_fitcheck",
         "should_i_post_this",
-        "playful_confession"
+        "playful_confession",
+        "meaningful_choice",
+        "curiosity_open_loop"
       ],
       "caption_angle": "A quick getting-ready save she almost skipped because it was only supposed to be a last-second mirror check.",
       "caption_draft": "was only checking the neckline.",
@@ -903,7 +1055,18 @@
       "wardrobe_notes": "Face-priority proof lane for non-red apartment variety while keeping the same lived-in getting-ready realism standard.",
       "environment_id": "env_v008",
       "proof_priority": 2,
-      "environment_context": "Environment: home getting-ready corner, clothes chair, shoes near mirror, small products, warm apartment light, not hotel. "
+      "environment_context": "Environment: home getting-ready corner, clothes chair, shoes near mirror, small products, warm apartment light, not hotel. ",
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "choice"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_013",
@@ -927,7 +1090,9 @@
       "linked_hook_categories": [
         "should_i_post_this",
         "mirror_fitcheck",
-        "playful_confession"
+        "playful_confession",
+        "meaningful_choice",
+        "payoff"
       ],
       "caption_angle": "A little accidental beauty save from the getting-ready process.",
       "caption_draft": "only meant to check one thing.",
@@ -964,7 +1129,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Beauty-prep lane stays current and attractive without collapsing into another mirror-proof dress save.",
       "environment_id": "env_v005",
-      "proof_priority": 12
+      "proof_priority": 12,
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_014",
@@ -988,7 +1165,9 @@
       "linked_hook_categories": [
         "casual_but_not",
         "should_i_post_this",
-        "outfit_problem"
+        "outfit_problem",
+        "curiosity_open_loop",
+        "payoff"
       ],
       "caption_angle": "She looked too put together for an elevator save to stay private.",
       "caption_draft": "the elevator lighting kept the receipt.",
@@ -1025,7 +1204,18 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Tailored elevator lane for building-departure variety without defaulting to dresses every time.",
       "environment_id": "env_e003",
-      "proof_priority": 13
+      "proof_priority": 13,
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_015",
@@ -1049,7 +1239,9 @@
       "linked_hook_categories": [
         "playful_confession",
         "should_i_post_this",
-        "casual_but_not"
+        "casual_but_not",
+        "curiosity_open_loop",
+        "consequence"
       ],
       "caption_angle": "A transit save that feels better than whatever was waiting at the destination.",
       "caption_draft": "saved this before we even got there.",
@@ -1086,7 +1278,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Night-transit glamour lane that gives Lena a believable world beyond apartments and sidewalks.",
       "environment_id": "env_c003",
-      "proof_priority": 14
+      "proof_priority": 14,
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "experience",
+        "consequence"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_016",
@@ -1111,7 +1315,9 @@
       "linked_hook_categories": [
         "casual_but_not",
         "errand_attention",
-        "outfit_problem"
+        "outfit_problem",
+        "world_expansion",
+        "payoff"
       ],
       "caption_angle": "Outside for nothing that justified the outfit, which is exactly why it works.",
       "caption_draft": "the building looked expensive so i kept the photo.",
@@ -1148,7 +1354,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Street-editorial lane with stronger architectural context and a different silhouette than the skirt-based street recipes.",
       "environment_id": "env_s006",
-      "proof_priority": 15
+      "proof_priority": 15,
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "world_expansion",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_017",
@@ -1173,7 +1391,9 @@
       "linked_hook_categories": [
         "should_i_post_this",
         "playful_confession",
-        "casual_but_not"
+        "casual_but_not",
+        "payoff",
+        "callback"
       ],
       "caption_angle": "A social rooftop moment that reads like it actually happened.",
       "caption_draft": "the lights made me save it.",
@@ -1210,7 +1430,18 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Rooftop social lane that keeps her attractive and summery without collapsing into another red-dress or mirror cycle.",
       "environment_id": "env_r004",
-      "proof_priority": 16
+      "proof_priority": 16,
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_018",
@@ -1233,7 +1464,10 @@
       "linked_hook_categories": [
         "outfit_problem",
         "should_i_post_this",
-        "casual_but_not"
+        "casual_but_not",
+        "consequence",
+        "payoff",
+        "callback"
       ],
       "caption_angle": "A quick public save from the part of the night that usually gets skipped.",
       "caption_draft": "this part of the night always looks better in photos.",
@@ -1270,7 +1504,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Public night lane for believable in-between city movement, distinct from garage flash and rooftop scenes.",
       "environment_id": "env_g005",
-      "proof_priority": 17
+      "proof_priority": 17,
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "consequence",
+        "aftermath",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "id": "hcr_019",
@@ -1293,7 +1539,9 @@
       "linked_hook_categories": [
         "casual_but_not",
         "outfit_problem",
-        "should_i_post_this"
+        "should_i_post_this",
+        "curiosity_open_loop",
+        "payoff"
       ],
       "caption_angle": "Leaving-the-building energy, but the lobby ended up getting the save.",
       "caption_draft": "was just trying to get downstairs.",
@@ -1330,7 +1578,19 @@
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Classy-sexy building-departure lane that expands her life beyond rooftops and apartments while keeping strong garment stability.",
       "environment_id": "env_g002",
-      "proof_priority": 18
+      "proof_priority": 18,
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     }
   ]
 }

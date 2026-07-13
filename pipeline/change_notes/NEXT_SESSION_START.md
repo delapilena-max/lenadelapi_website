@@ -3678,3 +3678,40 @@ Original sequence, preserved for forensic record:
   separate, standing FROZEN state per the freeze sections above and the
   2026-07-12 checkpoint, to be lifted only by a new, explicit instruction
   from Nicolas.
+
+---
+
+## 2026-07-13 -- Lena niche strategy checkpoint (prospective authority)
+
+The canonical Lena niche is now **Glamour, Choices, And Beautiful Trouble**.
+Lena is a glamorous, curvy, adventurous woman with a beautiful life and a
+taste for choices that may become stories. Followers do not control her, but
+they sometimes influence what she does next. **Come for the image. Stay to see
+what the choice becomes.**
+
+The seven canonical content pillars are:
+
+1. `everyday_lena`
+2. `style_and_getting_ready`
+3. `beautiful_trouble`
+4. `city_and_social_life`
+5. `adventure_and_escape`
+6. `audience_choice_and_payoff`
+7. `high_heat_glamour`
+
+Sexuality is governed by balance and sequencing, not a rigid quota.
+`high_heat_glamour` is one pillar, not the whole account; strongly provocative
+posts must not run consecutively and normally require at least two
+lower-temperature or story-forward posts between them. Audience choices are
+occasional, meaningful, limited to two unresolved choices, and normally paid
+off within the next 1-3 published Lena posts. Followers may influence Lena,
+but never control her identity, safety, body shape, intimate behavior, or
+major-life claims.
+
+This checkpoint prospectively supersedes older fitness/wellness-only and
+luxury-baddie-only niche definitions. Historical assets remain valid and
+immutable. No body specification, prompt-brain code, provider behavior,
+coordinator, generation, publishing, queue, approval, freeze state, or
+historical evidence changed through this strategy checkpoint. Existing
+dormant CTA, poll, series, continuity, and engagement policies remain reference
+material only unless separately adopted.

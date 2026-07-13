@@ -9,7 +9,16 @@
       "details": "steam from the coffee, one loose strand of hair near her cheek, a phone face-down on the counter, soft shadows on the wall",
       "camera": "candid editorial lifestyle photo, 50mm lens, shallow depth of field, waist-up composition",
       "lighting": "early morning natural window light, warm highlights, gentle contrast",
-      "caption": "coffee first, personality later"
+      "caption": "coffee first, personality later",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "apartment doorway",
@@ -18,7 +27,19 @@
       "details": "tote bag over her shoulder, keys in one hand, a jacket draped over her arm, soft shadow from the doorframe",
       "camera": "full-body candid lifestyle portrait, 35mm lens, natural candid framing from just outside the door",
       "lighting": "warm apartment interior light mixing with cool hallway light, soft natural split on her face",
-      "caption": "leaving on the first try today"
+      "caption": "leaving on the first try today",
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "anticipation"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "coffee shop",
@@ -27,7 +48,18 @@
       "details": "iced coffee condensation ring on the counter in the foreground, receipt and straw wrapper beside the cup, tote bag hooked on the stool, silver spoon on the saucer, soft window reflection in the glass",
       "camera": "candid street-style cafe photo, 50mm lens, soft background blur",
       "lighting": "cloudy daylight through glass, neutral tones, realistic skin highlights",
-      "caption": "quick coffee turned into a whole little reset"
+      "caption": "quick coffee turned into a whole little reset",
+      "strategy_pillars": [
+        "everyday_lena",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "rainy street",
@@ -36,7 +68,19 @@
       "details": "tiny raindrops on her coat, reflective puddles, wind lifting a few strands of hair, soft bokeh lights",
       "camera": "handheld street photo, 85mm lens, full-body candid, natural motion blur, not cinematic grading",
       "lighting": "overcast blue-gray daylight with warm reflections from shop windows",
-      "caption": "rain always makes errands feel more dramatic"
+      "caption": "rain always makes errands feel more dramatic",
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "consequence",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "rooftop sunset",
@@ -45,7 +89,18 @@
       "details": "gold light along her hair, subtle wind movement, glass of sparkling water on a side table, skyline softly blurred",
       "camera": "candid outdoor portrait, 70mm lens, medium shot, shallow depth of field, natural light",
       "lighting": "golden-hour backlight, warm rim light, soft face fill",
-      "caption": "stayed for the light"
+      "caption": "stayed for the light",
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "bookstore",
@@ -54,7 +109,17 @@
       "details": "paper texture, a receipt tucked into the book, soft dust in the light, one hand resting on the shelf",
       "camera": "quiet cinematic portrait, 50mm lens, natural framing through shelves",
       "lighting": "warm indoor lamp light with soft shadows",
-      "caption": "went in for one book and immediately lied to myself"
+      "caption": "went in for one book and immediately lied to myself",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "grocery run",
@@ -63,7 +128,16 @@
       "details": "green stems in her hand, canvas tote bag, oranges and lemons nearby, realistic aisle clutter",
       "camera": "documentary lifestyle photo, 35mm lens, candid mid-shot",
       "lighting": "clean natural store light mixed with daylight from front windows",
-      "caption": "flowers were not on the list but here we are"
+      "caption": "flowers were not on the list but here we are",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "car moment",
@@ -72,7 +146,19 @@
       "details": "seatbelt strap, faint reflection on the window, lip gloss catching light, phone cable near the console",
       "camera": "intimate candid portrait, 50mm lens from driver-side angle",
       "lighting": "soft overcast window light, muted tones",
-      "caption": "parked for five minutes and somehow reset my whole mood"
+      "caption": "parked for five minutes and somehow reset my whole mood",
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "anticipation",
+        "choice",
+        "aftermath"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "studio desk",
@@ -81,7 +167,16 @@
       "details": "tangled cable at the desk edge, sticky notes with scrawled reminders, open notebook with crossed-out lines, iced coffee condensation ring on the desk surface, laptop screen glow on her face",
       "camera": "modern creator workspace portrait, 35mm lens, medium composition",
       "lighting": "late afternoon window light mixed with a warm desk lamp",
-      "caption": "pretending this is organized because the lamp is cute"
+      "caption": "pretending this is organized because the lamp is cute",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "night out",
@@ -90,7 +185,19 @@
       "details": "small clutch or mini bag, subtle jewelry highlights, scuffed sidewalk, a posted menu or sign near the door, and nightlife imperfections that feel real not staged",
       "camera": "flash-adjacent nightlife social photo, 35mm lens, candid friend-shot composition, no mirror",
       "lighting": "warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain",
-      "caption": "caught me on the way in"
+      "caption": "caught me on the way in",
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "dinner booth",
@@ -99,7 +206,18 @@
       "details": "water glass, dessert plate with a few bites left, folded napkin, menu corner, chair pattern, and subtle table clutter that feels used not staged",
       "camera": "candid phone-camera dinner photo, 35mm lens feel, seated mid-shot from across the table",
       "lighting": "warm restaurant practical lighting mixed with window reflections and slight low-light grain",
-      "caption": "the restaurant lighting was working harder than i was"
+      "caption": "the restaurant lighting was working harder than i was",
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "wine bar patio",
@@ -108,7 +226,19 @@
       "details": "half-finished drink, small appetizer plate, receipt folder, candle wax marks on the table, nearby people blurred in the background",
       "camera": "nighttime candid social photo, realistic phone flash or ambient-phone capture, natural seated-standing angle from a friend nearby",
       "lighting": "warm patio practicals, low ambient city light, believable highlight rolloff on skin and glass",
-      "caption": "just one drink and then suddenly it was a whole night"
+      "caption": "just one drink and then suddenly it was a whole night",
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "consequence"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "brunch patio",
@@ -117,7 +247,16 @@
       "details": "silverware on a folded napkin, glass water bottle, brunch plate in frame, phone face-down on the table, slight table clutter and sun patches",
       "camera": "real social-feed brunch photo, natural friend-shot from the opposite side of the table, mid-shot with face and upper body clear",
       "lighting": "soft daylight with mild shadow contrast, flattering but unretouched outdoor light",
-      "caption": "brunch is basically just daytime gossip with silverware"
+      "caption": "brunch is basically just daytime gossip with silverware",
+      "strategy_pillars": [
+        "city_and_social_life"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "sidewalk dinner",
@@ -126,7 +265,19 @@
       "details": "table numbers, glassware, scuffed pavement, diners nearby, a chair pulled out awkwardly, and small imperfect venue details",
       "camera": "candid street-night photo from a friend a few steps behind her, 35mm lens feel, natural movement",
       "lighting": "mixed storefront glow and city-night ambient light, realistic shadow falloff, slight motion softness",
-      "caption": "stepped outside for two seconds and somehow stayed out"
+      "caption": "stepped outside for two seconds and somehow stayed out",
+      "strategy_pillars": [
+        "beautiful_trouble",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "consequence",
+        "aftermath",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "lobby cocktail bar",
@@ -135,7 +286,18 @@
       "details": "coaster, cocktail napkin, menu tucked under one glass, ambient reflections, imperfect chair placement, subtle background patrons",
       "camera": "low-light candid social portrait, friend-shot from across the small table, natural phone-camera framing",
       "lighting": "warm bar light, controlled shadows, slight sensor grain, no polished ad finish",
-      "caption": "this looked more put together than the rest of my day"
+      "caption": "this looked more put together than the rest of my day",
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "skincare evening",
@@ -144,7 +306,16 @@
       "details": "dewy skin texture, tiny water droplets near the sink, open moisturizer jar, soft robe fabric",
       "camera": "close-up beauty lifestyle portrait, 85mm lens, natural skin detail",
       "lighting": "soft warm bathroom light, realistic highlights on skin",
-      "caption": "night routine doing the heavy lifting"
+      "caption": "night routine doing the heavy lifting",
+      "strategy_pillars": [
+        "style_and_getting_ready"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "airport day",
@@ -153,7 +324,19 @@
       "details": "passport wallet in hand, coffee cup in suitcase side pocket, moving walkway reflections, realistic travel fatigue",
       "camera": "travel street-style photo, 35mm lens, full-body candid shot",
       "lighting": "cool airport daylight mixed with overhead lighting",
-      "caption": "airport coffee counts as a personality trait"
+      "caption": "airport coffee counts as a personality trait",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "gym cooldown",
@@ -162,7 +345,17 @@
       "details": "slight flyaways, natural post-workout skin glow, water bottle on the floor, realistic fabric folds",
       "camera": "candid wellness lifestyle photo, 50mm lens, low angle",
       "lighting": "clean morning studio light, soft reflections in the mirror",
-      "caption": "the part where you just sit for a minute"
+      "caption": "the part where you just sit for a minute",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "aftermath",
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "laundry day",
@@ -171,7 +364,16 @@
       "details": "laundry basket, dryer glow, quarters on top of the machine, a paperback book nearby",
       "camera": "cinematic slice-of-life photo, 35mm lens, natural candid framing",
       "lighting": "mixed fluorescent and daylight, realistic color balance",
-      "caption": "romanticizing laundry because someone has to"
+      "caption": "romanticizing laundry because someone has to",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "museum afternoon",
@@ -180,7 +382,17 @@
       "details": "gallery card beside painting, soft footsteps implied, simple jewelry, calm posture",
       "camera": "quiet handheld portrait, 50mm lens, natural museum composition, candid visitor feel",
       "lighting": "soft museum track lighting, clean neutral tones",
-      "caption": "came for the quiet"
+      "caption": "came for the quiet",
+      "strategy_pillars": [
+        "city_and_social_life"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "late kitchen snack",
@@ -189,7 +401,17 @@
       "details": "bowl of strawberries, loose hair, reflection in the window, one cabinet door slightly ajar",
       "camera": "intimate night lifestyle photo, 50mm lens, close candid framing",
       "lighting": "warm kitchen practical light with soft fridge glow",
-      "caption": "standing over the sink counts as dinner sometimes"
+      "caption": "standing over the sink counts as dinner sometimes",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "aftermath",
+        "quiet_reset"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "flower shop",
@@ -198,7 +420,19 @@
       "details": "brown paper bouquet wrap, ribbon ends, petals near the sidewalk, soft wind in her hair",
       "camera": "candid street photo, 85mm lens, shallow background blur, natural morning light",
       "lighting": "bright but soft morning light, gentle skin highlights",
-      "caption": "bought flowers for the apartment and maybe also for my mood"
+      "caption": "bought flowers for the apartment and maybe also for my mood",
+      "strategy_pillars": [
+        "everyday_lena",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "record store",
@@ -207,7 +441,19 @@
       "details": "fingertips on album sleeve, soft dust, vintage speakers in the background, tote bag on her shoulder",
       "camera": "grainy candid phone photo, 35mm lens, natural side angle, warm store light",
       "lighting": "warm low store lighting, subtle film-like grain",
-      "caption": "found three records and zero self-control"
+      "caption": "found three records and zero self-control",
+      "strategy_pillars": [
+        "city_and_social_life",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "warm",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "mirror outfit check",
@@ -216,7 +462,19 @@
       "details": "jewelry tray, boots near the wall, soft mirror dust at the edge only, and ordinary apartment clutter that keeps it human",
       "camera": "natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance",
       "lighting": "late afternoon window light, soft warm tones",
-      "caption": "almost ready and somehow still late"
+      "caption": "almost ready and somehow still late",
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "anticipation"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "city bench",
@@ -225,7 +483,17 @@
       "details": "wind moving her hair, coffee lid detail, tote bag beside her, small sun patches through leaves",
       "camera": "street-style lifestyle portrait, 85mm lens, natural candid framing",
       "lighting": "dappled late morning sunlight, soft shadows",
-      "caption": "five quiet minutes before the day started asking for things"
+      "caption": "five quiet minutes before the day started asking for things",
+      "strategy_pillars": [
+        "everyday_lena"
+      ],
+      "creative_temperature": "quiet",
+      "narrative_roles": [
+        "quiet_reset",
+        "aftermath"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "elevator moment",
@@ -234,7 +502,18 @@
       "details": "small bag in one hand, elevator call button panel, imperfect corridor reflections, slight motion softness from the doors",
       "camera": "candid hallway photo from a friend a few feet away, 35mm lens, no reflection gimmick",
       "lighting": "warm overhead corridor light with realistic shadow falloff",
-      "caption": "the hallway was doing more than the elevator"
+      "caption": "the hallway was doing more than the elevator",
+      "strategy_pillars": [
+        "style_and_getting_ready",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "anticipation",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "motorcycle street glam",
@@ -243,7 +522,20 @@
       "details": "a real stationary sport motorcycle fully in frame, engine off, no motion blur, kickstand down, brand-neutral tank and side panels, worn leather seat texture",
       "camera": "low-angle candid street-fashion editorial photo, 35mm point-and-shoot feel, slight film grain, three-quarter to full-body framing",
       "lighting": "cool overhead garage light mixed with a warm streak of sodium light from the entrance, hard-edged realistic shadows",
-      "caption": "borrowed the bike for the photo, kept the confidence for myself"
+      "caption": "borrowed the bike for the photo, kept the confidence for myself",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "heritage moto pinup",
@@ -252,7 +544,20 @@
       "details": "a real stationary heritage cruiser fully in frame, chrome fenders and a classic tank, tan leather seat, engine off, kickstand down, no motion blur",
       "camera": "low-angle candid pinup-editorial street photo, 35mm lens, warm golden-hour glow, three-quarter to full-body framing",
       "lighting": "warm golden-hour backlight with soft rim light, gentle film-like warmth",
-      "caption": "borrowed the bike, kept the sunset"
+      "caption": "borrowed the bike, kept the sunset",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "high_heat_glamour",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "high_heat",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "antique cruiser editorial",
@@ -261,7 +566,19 @@
       "details": "a real stationary antique heritage cruiser fully in frame, worn leather seat, spoked wheels, chrome details with patina, engine off, kickstand down, no motion blur",
       "camera": "candid vintage-editorial street photo, 35mm lens, visible film grain, three-quarter to full-body framing",
       "lighting": "warm overhead shop light mixed with a cool daylight streak from the open bay door, realistic film-grain texture",
-      "caption": "some things age better than the rest of us"
+      "caption": "some things age better than the rest of us",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "custom chopper eye candy",
@@ -270,7 +587,19 @@
       "details": "a real stationary custom chopper fully in frame, long front fork, polished chrome throughout, low slung seat, engine off, kickstand down, no motion blur",
       "camera": "dramatic low-angle editorial street photo, 35mm lens, high-contrast night lighting, three-quarter to full-body framing",
       "lighting": "cool streetlight mixed with warm neon reflections, high-contrast dramatic shadows",
-      "caption": "the bike was the excuse, the shot was the point"
+      "caption": "the bike was the excuse, the shot was the point",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "garage grease glam",
@@ -279,7 +608,19 @@
       "details": "realistic garage clutter -- wrenches, a shop rag, a parts tray -- and a real stationary motorcycle partly visible in frame, engine off, no motion blur",
       "camera": "candid garage-editorial photo, 35mm lens, natural work-light grain, three-quarter to full-body framing",
       "lighting": "mixed fluorescent shop light and a warm shaft of daylight from the open garage door",
-      "caption": "grease under the nails, glam everywhere else"
+      "caption": "grease under the nails, glam everywhere else",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "experience",
+        "consequence",
+        "world_expansion"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     },
     {
       "lane": "bike wash bikini",
@@ -288,7 +629,17 @@
       "details": "a real stationary motorcycle fully in frame, suds and water beads on the chrome, engine off, kickstand down, no motion blur",
       "camera": "candid summer street-fashion photo, 35mm lens, bright natural daylight, three-quarter to full-body framing",
       "lighting": "bright midday sun with clean natural highlights, realistic water-drop sparkle",
-      "caption": "the bike did not need this many suds, but here we are"
+      "caption": "the bike did not need this many suds, but here we are",
+      "strategy_pillars": [
+        "high_heat_glamour",
+        "adventure_and_escape"
+      ],
+      "creative_temperature": "high_heat",
+      "narrative_roles": [
+        "experience"
+      ],
+      "choice_eligible": false,
+      "payoff_eligible": false
     },
     {
       "lane": "desert roadside cruiser",
@@ -297,7 +648,20 @@
       "details": "a real stationary heritage cruiser fully in frame, dust on the chrome, worn leather saddlebags, engine off, kickstand down, no motion blur",
       "camera": "cinematic Americana road photo, 35mm lens, warm sunset color, three-quarter to full-body framing",
       "lighting": "warm desert sunset light, long shadows, dusty golden haze",
-      "caption": "stopped for gas, stayed for the light"
+      "caption": "stopped for gas, stayed for the light",
+      "strategy_pillars": [
+        "adventure_and_escape",
+        "audience_choice_and_payoff"
+      ],
+      "creative_temperature": "glamorous",
+      "narrative_roles": [
+        "choice",
+        "experience",
+        "world_expansion",
+        "payoff"
+      ],
+      "choice_eligible": true,
+      "payoff_eligible": true
     }
   ],
   "production_blocked_lanes": [
