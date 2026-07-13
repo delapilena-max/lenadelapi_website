@@ -3715,3 +3715,274 @@ coordinator, generation, publishing, queue, approval, freeze state, or
 historical evidence changed through this strategy checkpoint. Existing
 dormant CTA, poll, series, continuity, and engagement policies remain reference
 material only unless separately adopted.
+
+---
+
+## 2026-07-13 -- New architectural direction: horizontal scaling across influencer nodes
+
+`content_bot` must now be planned as a horizontally scalable autonomous media
+platform capable of supporting multiple influencer nodes, not as a Lena-only
+one-off system. Lena remains the primary production influencer and the proving
+ground for the architecture, but future influencers must be able to join
+without cloning large amounts of fragile code or rebuilding the pipeline.
+
+The architectural goal is shared infrastructure where behavior is genuinely
+common; influencer-specific configuration and state where identity or creative
+behavior is unique; explicit boundaries between platform-wide and
+influencer-owned responsibilities; minimal duplication; strong provenance and
+isolation; independent influencer state; safe concurrent operation; and
+maintainable upgrades across all influencer nodes.
+
+### Shared platform infrastructure
+
+Where their underlying contracts are truly common across influencers, shared
+platform responsibilities may include:
+
+- provider adapters and generation execution interfaces;
+- media download and artifact handling;
+- QA engines and clean-export enforcement;
+- provenance schemas and package-construction primitives;
+- queue, publishing, receipt, and metrics-ingestion infrastructure;
+- common learning primitives;
+- scheduling and orchestration/state-machine primitives;
+- failure memory and retry-policy frameworks;
+- observability and common test utilities.
+
+Do not generalize a responsibility merely because two files look similar.
+Infrastructure is shared only when its behavioral contract is genuinely common.
+
+### Influencer-owned configuration and state
+
+Each influencer must own its own durable identity and creative state, including
+as applicable:
+
+- canonical identity and provider identity references;
+- niche, personality, content pillars, and content strategy;
+- visual, body/appearance, wardrobe, and voice rules;
+- hook strategy, creative-temperature doctrine, and narrative roles;
+- audience-choice rules, world state, and series state;
+- historical assets, generation history, and QA history;
+- publication history, metrics state, and learning state;
+- next-content decision state.
+
+One influencer must never silently inherit another influencer's identity,
+strategy, state, provenance, or history.
+
+### Optional specialized sub-nodes
+
+Do not assume that Lena or every future influencer needs additional attached
+sub-nodes. A specialized sub-node should exist only when it has a clearly
+bounded responsibility that cannot be handled cleanly by shared infrastructure
+or the influencer's primary configuration and state. Possible future examples
+include generation-decision, QA-decision, repair, narrative/world-state,
+publishing, or learning nodes, but none should be created merely for
+organizational appearance.
+
+Before adding a sub-node, determine:
+
+- the exact responsibility it owns;
+- its inputs and outputs;
+- the state it may mutate;
+- what it explicitly does not own;
+- whether the responsibility is shared across influencers;
+- whether it belongs in common infrastructure instead;
+- whether creating the node reduces or increases complexity.
+
+Favor the smallest number of clearly bounded components necessary for reliable
+autonomy.
+
+### Clones and new influencer nodes
+
+Future influencer nodes are independent influencer instances running on shared
+platform infrastructure. Do not blindly clone Lena's entire directory, code
+paths, historical state, prompts, or provider assumptions. A new influencer
+should ideally be created from a defined influencer-node contract or template
+containing only required influencer-specific surfaces.
+
+The long-term model is conceptually:
+
+```text
+shared content_bot platform
+    |
+    +-- Lena influencer node
+    +-- Influencer B node
+    +-- Influencer C node
+    +-- Influencer D node
+```
+
+Each node must remain independently identifiable and auditable while using
+common platform services where appropriate. The architecture must eventually
+define:
+
+- what makes an influencer node complete;
+- which files and configurations are required;
+- which state is private to each influencer and which services are shared;
+- how jobs, schedules, provider spend, provenance, and queues are isolated;
+- how publishing accounts, metrics, and learning remain influencer-specific;
+- how one influencer's failure is prevented from corrupting another's state;
+- how common infrastructure upgrades can be rolled out safely;
+- whether multiple influencer nodes can run concurrently without artifact
+  collisions or state corruption;
+- the minimum safe template for adding a second influencer.
+
+### Do not prematurely redesign Lena
+
+Do not assume Lena currently needs another attached node. Do not restructure
+Lena merely to make the directory tree look more agentic. Lena remains the
+production proving ground. First determine the correct multi-influencer
+platform architecture; then evaluate whether Lena's existing surfaces fit it
+or require a narrow migration.
+
+Do not perform a large speculative refactor, move files for cosmetic
+consistency, or duplicate infrastructure into new influencer directories
+unless duplication is proven necessary.
+
+### Small-task execution doctrine
+
+All future architecture work must be divided into small, explicit goals:
+
+```text
+one goal
+-> one narrow task
+-> implementation
+-> focused tests
+-> independent review
+-> fix concrete findings
+-> final review
+-> selective commit
+-> next goal
+```
+
+Do not combine multiple major architectural changes or jump ahead because later
+phases appear related. Do not mix provider migration, node cloning, scheduler
+design, strategy changes, QA redesign, publishing changes, world-state wiring,
+learning changes, or infrastructure refactors unless the current approved task
+explicitly requires that scope.
+
+Every task must define its exact objective, allowed files, in-scope and
+out-of-scope responsibilities, stop boundary, required tests, prohibited side
+effects, approval requirements, and commit boundary. When ambiguity appears,
+stop and report before widening scope.
+
+### Current priority: architecture plan only
+
+Do not immediately create clone influencer nodes, refactor Lena, or build a
+global orchestration framework. The next architectural step is a read-only plan
+that answers:
+
+1. What is the current de facto influencer-node architecture in the repository?
+2. Which Lena components are genuinely influencer-specific?
+3. Which Lena components are shared platform infrastructure currently living
+   under Lena-specific paths?
+4. Which infrastructure is duplicated or at risk of duplication?
+5. What should the canonical influencer-node contract contain?
+6. What should remain shared globally?
+7. What state must be isolated per influencer?
+8. What identifiers and namespaces are required for safe horizontal scaling?
+9. How should credentials, provider spend, queues, publishing identities,
+   schedules, metrics, learning, and provenance be separated?
+10. Can multiple influencer nodes run concurrently without artifact collisions
+    or state corruption?
+11. What minimum template would allow a second influencer to be added safely?
+12. What should not yet be generalized because only Lena has proven the need?
+
+The first output must be an architecture plan only. No implementation may begin
+until that plan is reviewed and explicitly approved.
+
+### Current project continuity
+
+Lena remains the current primary production influencer. Her canonical niche
+remains **Glamour, Choices, And Beautiful Trouble**. The standing publish freeze
+remains fully in force, and all current historical assets and evidence remain
+valid and immutable.
+
+This checkpoint authorizes no provider call, generation, queue action,
+publishing action, analytics mutation, world-state mutation, or clone creation.
+Its purpose is to establish the next direction: build `content_bot` as a
+maintainable, horizontally scalable, multi-influencer autonomous media platform
+through small, reviewable, testable tasks while avoiding speculative
+complexity.
+
+---
+
+## 2026-07-13 -- Priority clarification: finish Lena before horizontal scaling
+
+The horizontal-scaling requirement remains recorded and must not be forgotten,
+but it is not the current implementation priority. The current priority is to
+finish the Lena node first.
+
+Do not create Influencer B. Do not clone Lena. Do not begin multi-influencer
+refactoring. Do not build a generalized influencer factory, template, registry,
+scheduler, or orchestration layer yet unless finishing Lena directly proves
+that one is required.
+
+Lena remains the primary production node and proving ground for `content_bot`.
+The correct sequence is:
+
+1. Finish Lena's coherent, minimally supervised loop.
+2. Prove the architecture through Lena in real operation.
+3. Stabilize the contracts that are genuinely reusable.
+4. Then design the smallest safe mechanism for adding more influencer nodes.
+
+Horizontal scaling remains important because `content_bot` must eventually
+support multiple independent influencer nodes efficiently and maintainably.
+That future direction must preserve:
+
+- shared infrastructure where behavior is genuinely common;
+- isolated influencer-specific identity, strategy, state, history, queues,
+  metrics, learning, and publishing identity;
+- minimal duplication and safe concurrency;
+- clear provenance and maintainable upgrades;
+- no silent cross-influencer state contamination.
+
+None of that should distract from finishing Lena now. Do not prematurely
+generalize Lena-specific behavior merely because it may someday be shared. Do
+not prematurely duplicate Lena into another influencer. Do not redesign
+`content_bot` as though the platform does not already exist: `content_bot` is
+already the platform.
+
+The immediate execution rule is:
+
+```text
+finish Lena
+-> validate Lena end to end
+-> document what was actually reusable
+-> then scale horizontally
+```
+
+The scaling requirement is a continuity requirement, not the next build task.
+
+### Small-task execution remains mandatory
+
+Continue working through small, explicit goals:
+
+```text
+one goal
+-> one narrow task
+-> implementation
+-> focused tests
+-> independent review
+-> fix concrete findings
+-> final review
+-> selective commit
+-> next goal
+```
+
+Do not bundle horizontal-scaling work into current Lena tasks or widen scope
+merely because future multi-influencer support may eventually benefit. When a
+Lena task is complete, reassess the next highest-leverage Lena bottleneck. Only
+after Lena is sufficiently complete should horizontal scaling become an active
+implementation workstream.
+
+### Current continuity
+
+Lena remains the current primary production influencer and proving ground. Her
+canonical niche remains **Glamour, Choices, And Beautiful Trouble**. The
+existing `content_bot` architecture remains authoritative. The standing publish
+freeze remains fully in force. Historical assets and evidence remain valid and
+immutable.
+
+This checkpoint authorizes no provider call, generation, clone creation, new
+influencer creation, queue action, publishing action, analytics mutation, or
+multi-influencer refactor. Its purpose is to make one priority explicit: do not
+forget horizontal scaling, but finish Lena first.
