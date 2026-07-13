@@ -27,7 +27,12 @@ from __future__ import annotations
 #   No Prompt Enhancer parameter exists in this schema -- see doctrine note
 #   below. No negative-prompt parameter exists either.
 #   Lena's confirmed Soul: name="Lena", type="soul_2",
-#   id=1f1200e4-1cc9-4504-ac1c-3304b687e3c1 (`soul-id list --json`).
+#   id=90a293d7-f3af-4377-8751-3304a27b6f31 (`soul-id list --json`,
+#   re-confirmed 2026-07-12 -- the provider account's live Soul ID rotated
+#   at some point after the original 2026-07-09/10 confirmation; the prior
+#   id, 1f1200e4-1cc9-4504-ac1c-3304b687e3c1, is no longer present on the
+#   account and is preserved only as historical fact in already-recorded
+#   manifests/evidence -- never used as a default for new live submissions).
 #
 # PROMPT ENHANCER DOCTRINE: the authenticated schema for text2image_soul_v2
 # exposes no enhancer-shaped parameter at all (searched for enhance/
@@ -113,9 +118,17 @@ HIGGSFIELD_ASPECT_RATIO = "9:16"
 HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.10"
 
 # Lena's confirmed Soul (`higgsfield soul-id list --json`, authenticated,
-# 2026-07-09/10 later session). Non-secret identity/config metadata, not
-# read from or written to .env (see SOUL ID DOCTRINE above).
-DEFAULT_LENA_CUSTOM_REFERENCE_ID = "1f1200e4-1cc9-4504-ac1c-3304b687e3c1"
+# re-confirmed 2026-07-12 -- the account's live Soul ID rotated since the
+# original 2026-07-09/10 confirmation; the prior id
+# 1f1200e4-1cc9-4504-ac1c-3304b687e3c1 is no longer present on the
+# provider account). Non-secret identity/config metadata, not read from or
+# written to .env (see SOUL ID DOCTRINE above). This is the single, current
+# default used for every NEW live submission -- it is never chosen from a
+# set, and historical evidence recorded under the prior id remains valid
+# historical fact (see pipeline/identity/lena_higgsfield_identity.py's
+# APPROVED_CUSTOM_REFERENCE_IDS for the separate, read-only evidence-side
+# policy that accepts either id).
+DEFAULT_LENA_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 CONFIRMED_LENA_SOUL_NAME = "Lena"
 CONFIRMED_LENA_SOUL_TYPE = "soul_2"
 

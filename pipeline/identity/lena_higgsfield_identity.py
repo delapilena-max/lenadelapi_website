@@ -40,7 +40,22 @@ EXPECTED_SOUL_STATUS = "completed"
 EXPECTED_SOUL_NAME = "Lena"
 EXPECTED_SOUL_TYPE = "soul_2"
 EXPECTED_JOB_TYPE = "text2image_soul_v2"
-EXPECTED_CUSTOM_REFERENCE_ID = "1f1200e4-1cc9-4504-ac1c-3304b687e3c1"
+# Both are real, provider-confirmed Lena Soul ids -- not interchangeable
+# by convenience, but both genuinely valid depending on WHEN a given piece
+# of evidence was recorded. The account's live Soul id rotated at some
+# point after the original 2026-07-09/10 confirmation (re-confirmed via
+# `higgsfield soul-id list --json` on 2026-07-12: only the second id below
+# is present on the account today). Historical evidence recorded under the
+# first id remains genuinely correct for what was actually verified at
+# that time and must never be rewritten to match current provider truth.
+# pipeline/higgsfield_lena_api_executor.py::DEFAULT_LENA_CUSTOM_REFERENCE_ID
+# is the separate, singular default used for NEW live submissions -- it is
+# always exactly the current id, never chosen from this set. This set
+# exists only for read-only, local evidence validation below.
+APPROVED_CUSTOM_REFERENCE_IDS = {
+    "1f1200e4-1cc9-4504-ac1c-3304b687e3c1",  # historical Lena Soul id (2026-07-09/10 confirmation)
+    "90a293d7-f3af-4377-8751-3304a27b6f31",  # current live Lena Soul id (re-confirmed 2026-07-12)
+}
 # The one real, approved Higgsfield photo resolution proven so far -- see
 # tools/lena_build_publish_packet_v1.py's resolve_packet_inputs_higgsfield(),
 # which measures this from the real saved image rather than trusting a
@@ -459,10 +474,10 @@ def validate_local_identity_evidence(
             f"identity_verification.json job_type {evidence.get('job_type')!r} is not {EXPECTED_JOB_TYPE!r}"
         )
 
-    if evidence.get("custom_reference_id") != EXPECTED_CUSTOM_REFERENCE_ID:
+    if evidence.get("custom_reference_id") not in APPROVED_CUSTOM_REFERENCE_IDS:
         reasons.append(
             f"identity_verification.json custom_reference_id {evidence.get('custom_reference_id')!r} "
-            f"is not the approved Lena reference id {EXPECTED_CUSTOM_REFERENCE_ID!r}"
+            f"is not one of the approved Lena reference ids {sorted(APPROVED_CUSTOM_REFERENCE_IDS)!r}"
         )
 
     if evidence.get("soul_name") != EXPECTED_SOUL_NAME:
