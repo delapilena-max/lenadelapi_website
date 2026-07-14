@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from collections import Counter, defaultdict
 from datetime import date as date_cls
 from datetime import datetime, timezone
@@ -13,10 +14,19 @@ ROOT = Path(__file__).resolve().parents[2]
 NODE = ROOT / "pipeline" / "influencer_nodes" / "lena"
 PROMPTS = ROOT / "pipeline" / "prompt_banks" / "lena"
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
+METRICS_INGESTION_STATE = ROOT / "pipeline" / "state" / "lena_meta_feedback_ingestion_state_v1.json"
 
 POLICY_PATH = NODE / "post_outcome_learning_policy_v1.json"
 RECIPE_BANK_PATH = PROMPTS / "lena_high_caliber_prompt_recipe_bank_v1.json"
 FOLLOWUP_POLICY_PATH = NODE / "followup_post_decision_policy_v1_7.json"
+SCORING_MODEL_PATH = NODE / "post_metric_scoring_model_v1_6_1.json"
+RESOLVED_CLASSIFICATIONS = {"winner", "strong", "neutral", "weak"}
+UNSUPPORTED_FIELD_REASONS = {
+    "follows": "not_requested_by_tool",
+    "profile_visits": "metric_unavailable",
+    "completion_rate": "metric_unavailable",
+    "replay_rate": "metric_unavailable",
+}
 
 
 def read_json(path: Path) -> dict:
@@ -35,6 +45,15 @@ def read_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def read_json_or_empty(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    try:
+        return read_json(path)
+    except Exception:
+        return {}
+
+
 def utc_date() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -51,6 +70,181 @@ def days_since(value: str, current_date: date_cls) -> int | None:
     if not parsed:
         return None
     return (current_date - parsed).days
+
+
+def platform_family(platform: str) -> str:
+    value = (platform or "").strip().lower()
+    if value.startswith("instagram"):
+        return "instagram"
+    if value.startswith("facebook"):
+        return "facebook"
+    if value.startswith("tiktok"):
+        return "tiktok"
+    return ""
+
+
+def parse_refresh_note_date(notes: str) -> str:
+    match = re.search(r"auto_meta_metrics_refresh:(\d{4}-\d{2}-\d{2})", notes or "")
+    return match.group(1) if match else ""
+
+
+def refresh_failure_evidence(metric_row: dict, metrics_state: dict, key: str) -> str:
+    for field in (
+        "refresh_failures_by_post_key",
+        "failed_metrics_pull_by_post_key",
+        "last_metrics_pull_failure_by_post_key",
+        "last_metrics_pull_error_by_post_key",
+    ):
+        bucket = metrics_state.get(field, {})
+        if isinstance(bucket, dict):
+            value = bucket.get(key, "")
+            if value:
+                return str(value)
+    notes = (metric_row.get("notes") or "").lower()
+    if "refresh_failed" in notes or "metrics_refresh_failed" in notes:
+        return metric_row.get("notes", "")
+    return ""
+
+
+def missing_scoring_fields(row: dict) -> list[str]:
+    required = scoring_required_fields(score_model())
+    return [field for field in sorted(required) if str(row.get(field, "")).strip() == ""]
+
+
+def unsupported_missing_fields(row: dict) -> list[str]:
+    if platform_family(row.get("platform", "")) not in {"instagram", "facebook"}:
+        return []
+    unsupported = set(UNSUPPORTED_FIELD_REASONS)
+    return [field for field in missing_scoring_fields(row) if field in unsupported]
+
+
+def fetchable_missing_fields(row: dict) -> list[str]:
+    unsupported = set(unsupported_missing_fields(row))
+    return [field for field in missing_scoring_fields(row) if field not in unsupported]
+
+
+def has_scoring_success(row: dict) -> bool:
+    classification = (row.get("classification") or "").strip().lower()
+    score = str(row.get("score", "")).strip()
+    return classification in RESOLVED_CLASSIFICATIONS and score != ""
+
+
+def recommended_metrics_action(state: str) -> str:
+    return {
+        "resolved": "no_metrics_resolution_action",
+        "manual_only_unverified": "manual_identity_or_metric_update_required",
+        "pending_never_refreshed": "request_supported_meta_refresh",
+        "pending_refreshable": "request_supported_meta_refresh",
+        "pending_unsupported": "manual_or_future_capability_resolution_required",
+        "refresh_failed": "retry_or_escalate_refresh",
+    }.get(state, "manual_review_required")
+
+
+def learning_status_from_items(items: list[dict]) -> str:
+    unresolved = [item for item in items if item.get("metrics_resolution_state") != "resolved"]
+    if not unresolved:
+        return "current"
+    if any(item.get("is_stale") for item in unresolved):
+        return "stale_unresolved"
+    if any(item.get("metrics_resolution_state") in {"manual_only_unverified", "pending_unsupported", "refresh_failed"} for item in unresolved):
+        return "manual_or_future_capability_required"
+    return "usable_but_incomplete"
+
+
+def classify_metrics_resolution(
+    post: dict,
+    metric_row: dict,
+    metrics_state: dict,
+    current_date: date_cls,
+    is_manual_row: bool,
+    stale_threshold: int,
+) -> dict:
+    key = metric_key(post)
+    key_str = "|".join(key)
+    last_pull = ""
+    pull_bucket = metrics_state.get("last_metrics_pull_by_post_key", {})
+    if isinstance(pull_bucket, dict):
+        last_pull = str(pull_bucket.get(key_str, "") or "")
+    refresh_note = parse_refresh_note_date(metric_row.get("notes", ""))
+    refresh_failure = refresh_failure_evidence(metric_row, metrics_state, key_str)
+    has_refresh_evidence = bool(last_pull or refresh_note)
+    real_identity = bool(
+        (metric_row.get("instagram_media_id") or "").strip()
+        or (metric_row.get("publish_receipt_path") or "").strip()
+    )
+    candidate_row = metric_row if metric_row else post
+    missing_fields = missing_scoring_fields(candidate_row)
+    unsupported_fields = unsupported_missing_fields(candidate_row)
+    fetchable_fields = fetchable_missing_fields(candidate_row)
+    classification = (candidate_row.get("classification") or "").strip().lower()
+    score = str(candidate_row.get("score", "")).strip()
+    age = days_since(post.get("date", ""), current_date)
+
+    if refresh_failure:
+        state = "refresh_failed"
+    elif has_scoring_success(candidate_row):
+        state = "resolved"
+    elif is_manual_row and not real_identity:
+        state = "manual_only_unverified"
+    elif real_identity and not has_refresh_evidence:
+        state = "pending_never_refreshed"
+    elif real_identity and unsupported_fields and not fetchable_fields:
+        state = "pending_unsupported"
+    elif real_identity and fetchable_fields:
+        state = "pending_refreshable"
+    elif real_identity:
+        state = "pending_unsupported"
+    else:
+        state = "manual_only_unverified"
+    is_stale = bool(state != "resolved" and age is not None and age >= stale_threshold)
+
+    reason_map = {
+        "resolved": "scoring-required fields are present and classification has resolved",
+        "manual_only_unverified": "manual log row without real published identity evidence",
+        "pending_never_refreshed": "real published identity exists but no refresh-attempt evidence is present",
+        "pending_refreshable": "real published identity exists and missing fields remain requestable",
+        "pending_unsupported": "remaining missing fields are explicitly unsupported or unrequested by the current refresh contract",
+        "refresh_failed": "affirmative refresh failure evidence is present",
+    }
+
+    evidence = {
+        "publication_evidence": {
+            "publish_receipt_path": metric_row.get("publish_receipt_path", ""),
+            "approval_record_path": metric_row.get("approval_record_path", ""),
+            "manual_post_log_path": str(ROOT / "pipeline" / "analytics" / "lena_manual_post_log_v2_7.csv") if is_manual_row else "",
+        },
+        "identity_evidence": {
+            "instagram_media_id": metric_row.get("instagram_media_id", ""),
+            "source_slot_id": metric_row.get("source_slot_id", ""),
+            "source_asset_sha256": metric_row.get("source_asset_sha256", ""),
+            "clean_export_derivative_sha256": metric_row.get("clean_export_derivative_sha256", ""),
+            "clean_export_verified": metric_row.get("clean_export_verified", ""),
+        },
+        "refresh_evidence": {
+            "last_metrics_pull_at": last_pull,
+            "refresh_note_date": refresh_note,
+            "refresh_failure": refresh_failure,
+        },
+        "resolution_inputs": {
+            "missing_scoring_fields": missing_fields,
+            "unsupported_missing_fields": unsupported_fields,
+            "fetchable_missing_fields": fetchable_fields,
+            "classification": classification,
+            "score": score,
+            "age_days": age if age is not None else "",
+        },
+    }
+
+    return {
+        "metrics_resolution_state": state,
+        "is_stale": is_stale,
+        "metrics_resolution_reason": reason_map[state],
+        "metrics_resolution_evidence": evidence,
+        "recommended_action": recommended_metrics_action(state),
+        "missing_scoring_fields": missing_fields,
+        "unsupported_missing_fields": unsupported_fields,
+        "fetchable_missing_fields": fetchable_fields,
+    }
 
 
 def active_recipes() -> list[dict]:
@@ -82,6 +276,20 @@ def numeric(value: str) -> float:
         return float(value or 0)
     except Exception:
         return 0.0
+
+
+def score_model() -> dict:
+    if SCORING_MODEL_PATH.is_file():
+        return read_json(SCORING_MODEL_PATH)
+    return {"weights": {}, "classification": {"winner": 75, "strong": 50, "neutral": 25, "weak": 0}}
+
+
+def scoring_required_fields(model: dict | None = None) -> set[str]:
+    active_model = model or score_model()
+    weights = active_model.get("weights", {})
+    required = {field for field, weight in weights.items() if numeric(weight) > 0}
+    required.add("reach")
+    return required
 
 
 def hook_match_score(metric_row: dict, recipe: dict) -> int:
@@ -245,6 +453,7 @@ def main() -> int:
     policy = read_json(POLICY_PATH)
     followup_policy = read_json(FOLLOWUP_POLICY_PATH)
     current_date = parse_date(args.date) or date_cls.fromisoformat(utc_date())
+    metrics_state = read_json_or_empty(METRICS_INGESTION_STATE)
 
     manual_path = Path(args.manual_post_log_path) if args.manual_post_log_path else ROOT / Path(policy["manual_post_log_path"])
     metrics_path = Path(args.post_metrics_path) if args.post_metrics_path else ROOT / Path(policy["post_metrics_path"])
@@ -257,12 +466,13 @@ def main() -> int:
     recipes = active_recipes()
 
     metrics_by_key = {metric_key(row): row for row in metrics_rows}
-    pending_classes = set(policy.get("pending_classifications", ["pending"]))
     stale_threshold = int(policy.get("freshness_windows", {}).get("metrics_stale_days", 4))
+    manual_keys = {metric_key(row) for row in manual_rows}
 
     pending_metrics_posts: list[dict] = []
     stale_pending_metrics_posts: list[dict] = []
     published_posts: list[dict] = []
+    metrics_resolution_posts: list[dict] = []
 
     # Published-post inventory (2026-07-12): union of manual-log posts and
     # metrics-only Architecture A posts with a real, actionable
@@ -276,7 +486,14 @@ def main() -> int:
     for post in published_post_rows:
         key = metric_key(post)
         metric = metrics_by_key.get(key, {})
-        classification = (metric.get("classification") or "missing").strip().lower()
+        resolution = classify_metrics_resolution(
+            post,
+            metric,
+            metrics_state,
+            current_date,
+            key in manual_keys,
+            stale_threshold,
+        )
         post_summary = {
             "date": post.get("date", ""),
             "platform": post.get("platform", ""),
@@ -284,15 +501,16 @@ def main() -> int:
             "lane": post.get("lane", ""),
             "hook_category": post.get("hook_category", ""),
             "post_url": post.get("post_url", ""),
-            "classification": classification,
+            "classification": (metric.get("classification") or "missing").strip().lower(),
             "score": metric.get("score", ""),
+            **resolution,
         }
         published_posts.append(post_summary)
+        metrics_resolution_posts.append(post_summary)
 
-        if classification in pending_classes or classification == "missing":
+        if post_summary["metrics_resolution_state"] != "resolved":
             pending_metrics_posts.append(post_summary)
-            age = days_since(post.get("date", ""), current_date)
-            if age is not None and age >= stale_threshold:
+            if post_summary["is_stale"]:
                 stale_pending_metrics_posts.append(post_summary)
 
     boost_by_recipe_id, reasons_by_recipe, winner_posts = build_queue_boosts(
@@ -309,6 +527,7 @@ def main() -> int:
 
     signal_followup_map = followup_policy.get("signals_to_followups", {})
     class_counts = Counter((row.get("classification") or "").strip().lower() for row in metrics_rows)
+    resolution_counts = Counter((row.get("metrics_resolution_state") or "unclassified") for row in metrics_resolution_posts)
     operational_alerts: list[str] = []
     if len(stale_pending_metrics_posts) >= int(policy.get("operational_alerts", {}).get("stale_pending_metrics_threshold", 1)):
         operational_alerts.append("Some published posts are still missing resolved metrics updates.")
@@ -327,9 +546,26 @@ def main() -> int:
         "published_post_count": len(published_post_rows),
         "metrics_row_count": len(metrics_rows),
         "metrics_classification_counts": dict(class_counts),
+        "metrics_resolution_counts": dict(resolution_counts),
         "winner_posts": winner_posts,
         "pending_metrics_posts": pending_metrics_posts,
         "stale_pending_metrics_posts": stale_pending_metrics_posts,
+        "metrics_resolution_posts": metrics_resolution_posts,
+        "metrics_resolution_summary": {
+            "learning_status": learning_status_from_items(metrics_resolution_posts),
+            "current_count": sum(1 for row in metrics_resolution_posts if row.get("metrics_resolution_state") == "resolved"),
+            "usable_but_incomplete_count": sum(
+                1
+                for row in metrics_resolution_posts
+                if row.get("metrics_resolution_state") in {"pending_never_refreshed", "pending_refreshable"} and not row.get("is_stale")
+            ),
+            "stale_unresolved_count": sum(1 for row in metrics_resolution_posts if row.get("metrics_resolution_state") != "resolved" and row.get("is_stale")),
+            "manual_or_future_capability_required_count": sum(
+                1
+                for row in metrics_resolution_posts
+                if row.get("metrics_resolution_state") in {"manual_only_unverified", "pending_unsupported", "refresh_failed"}
+            ),
+        },
         "queue_boosts": {
             "boost_by_recipe_id": boost_by_recipe_id,
             "reasons_by_recipe": reasons_by_recipe,

@@ -6,6 +6,8 @@ from tools.strategy.lena_build_post_outcome_learning_state_v1 import (
     actionable_metrics_only_posts,
     build_published_post_inventory,
     build_queue_boosts,
+    classify_metrics_resolution,
+    learning_status_from_items,
     metric_key,
     days_since,
 )
@@ -406,3 +408,192 @@ def test_real_reel_is_published_pending_and_not_stale() -> None:
     age = days_since(reel["date"], current_date)
     assert age == 3
     assert age < stale_threshold  # pending, not stale
+
+
+def test_resolution_state_resolved_with_legitimate_zero_values() -> None:
+    current_date = date(2026, 7, 12)
+    post = _metrics_row(
+        "2026-07-11",
+        "resolved-zero-photo",
+        "Instagram Feed",
+        instagram_media_id="ig-resolved",
+        permalink="https://example.com/p/resolved",
+        lane="coffee",
+        hook_category="hook",
+        classification="weak",
+        score="0",
+    )
+    for field in ("follows", "profile_visits", "completion_rate", "replay_rate"):
+        post[field] = "0"
+    post["reach"] = "0"
+    post["likes"] = "0"
+    post["saves"] = "0"
+    post["shares"] = "0"
+    post["comments"] = "0"
+    post["publish_receipt_path"] = "C:\\receipts\\resolved-zero-photo.json.receipt.json"
+    post["approval_record_path"] = "C:\\approvals\\resolved-zero-photo_approval.json"
+    post["source_asset_sha256"] = "a" * 64
+    post["clean_export_derivative_sha256"] = "b" * 64
+    post["clean_export_verified"] = "true"
+
+    resolution = classify_metrics_resolution(
+        {"date": post["date"], "slot_id": post["slot_id"], "platform": post["platform"]},
+        post,
+        {"last_metrics_pull_by_post_key": {"2026-07-11|resolved-zero-photo|Instagram Feed": "2026-07-12T00:00:00+00:00"}},
+        current_date,
+        False,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "resolved"
+    assert resolution["is_stale"] is False
+    assert resolution["recommended_action"] == "no_metrics_resolution_action"
+
+
+def test_resolution_state_manual_row_with_real_metrics_row_resolves_even_without_identity() -> None:
+    current_date = date(2026, 7, 12)
+    manual_post = _manual_row("2026-06-24", "2026-06-24-01-photo", "Instagram Feed")
+    metric_row = _metrics_row(
+        "2026-06-24",
+        "2026-06-24-01-photo",
+        "Instagram Feed",
+        lane="coffee",
+        hook_category="coffee_walk",
+        classification="weak",
+        score="0.0",
+    )
+
+    resolution = classify_metrics_resolution(
+        manual_post,
+        metric_row,
+        {"last_metrics_pull_by_post_key": {"2026-06-24|2026-06-24-01-photo|Instagram Feed": "2026-06-29T00:00:00+00:00"}},
+        current_date,
+        True,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "resolved"
+    assert resolution["is_stale"] is False
+    assert resolution["recommended_action"] == "no_metrics_resolution_action"
+
+
+def test_resolution_state_manual_only_placeholder_is_unverified() -> None:
+    current_date = date(2026, 7, 12)
+    manual_post = _manual_row("2026-06-12", "2026-06-12-03-video", "TikTok")
+
+    resolution = classify_metrics_resolution(
+        manual_post,
+        {},
+        {},
+        current_date,
+        True,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "manual_only_unverified"
+    assert resolution["recommended_action"] == "manual_identity_or_metric_update_required"
+    assert resolution["is_stale"] is True
+
+
+def test_resolution_state_never_refreshed_real_publish_is_distinct() -> None:
+    current_date = date(2026, 7, 12)
+    post = _metrics_row(
+        "2026-07-09",
+        "never-refreshed-photo",
+        "Instagram Reels",
+        instagram_media_id="ig-never",
+        permalink="https://www.instagram.com/reel/never/",
+        lane="sidewalk dinner",
+        classification="pending",
+        score="0",
+    )
+    post["publish_receipt_path"] = "C:\\receipts\\never-refreshed-photo.json.receipt.json"
+    post["approval_record_path"] = "C:\\approvals\\never-refreshed-photo_approval.json"
+
+    resolution = classify_metrics_resolution(
+        {"date": post["date"], "slot_id": post["slot_id"], "platform": post["platform"]},
+        post,
+        {},
+        current_date,
+        False,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "pending_never_refreshed"
+    assert resolution["recommended_action"] == "request_supported_meta_refresh"
+    assert resolution["is_stale"] is False
+
+
+def test_resolution_state_refreshed_but_unsupported_fields_remain_pending() -> None:
+    current_date = date(2026, 7, 12)
+    post = _metrics_row(
+        "2026-07-09",
+        "unsupported-photo",
+        "Instagram Feed",
+        instagram_media_id="ig-supported",
+        permalink="https://www.instagram.com/p/unsupported/",
+        lane="rooftop sunset",
+        classification="pending",
+        score="0",
+    )
+    post["publish_receipt_path"] = "C:\\receipts\\unsupported-photo.json.receipt.json"
+    post["approval_record_path"] = "C:\\approvals\\unsupported-photo_approval.json"
+    post["notes"] = "Auto-synced from Architecture A publish receipt (C:\\receipts\\unsupported-photo.json.receipt.json); update metrics after performance data is available. | auto_meta_metrics_refresh:2026-07-11"
+    post["follows"] = ""
+    post["profile_visits"] = ""
+    post["completion_rate"] = ""
+    post["replay_rate"] = ""
+
+    resolution = classify_metrics_resolution(
+        {"date": post["date"], "slot_id": post["slot_id"], "platform": post["platform"]},
+        post,
+        {"last_metrics_pull_by_post_key": {"2026-07-09|unsupported-photo|Instagram Feed": "2026-07-11T00:00:00+00:00"}},
+        current_date,
+        False,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "pending_unsupported"
+    assert resolution["recommended_action"] == "manual_or_future_capability_resolution_required"
+    assert resolution["unsupported_missing_fields"] == ["completion_rate", "follows", "profile_visits", "replay_rate"]
+
+
+def test_resolution_state_staleness_is_independent_overlay() -> None:
+    current_date = date(2026, 7, 14)
+    post = _metrics_row(
+        "2026-07-09",
+        "stale-photo",
+        "Instagram Feed",
+        instagram_media_id="ig-stale",
+        permalink="https://www.instagram.com/p/stale/",
+        lane="rooftop sunset",
+        classification="pending",
+        score="0",
+    )
+    post["publish_receipt_path"] = "C:\\receipts\\stale-photo.json.receipt.json"
+    post["approval_record_path"] = "C:\\approvals\\stale-photo_approval.json"
+    post["notes"] = "Auto-synced from Architecture A publish receipt (C:\\receipts\\stale-photo.json.receipt.json); update metrics after performance data is available. | auto_meta_metrics_refresh:2026-07-11"
+
+    resolution = classify_metrics_resolution(
+        {"date": post["date"], "slot_id": post["slot_id"], "platform": post["platform"]},
+        post,
+        {"last_metrics_pull_by_post_key": {"2026-07-09|stale-photo|Instagram Feed": "2026-07-11T00:00:00+00:00"}},
+        current_date,
+        False,
+        4,
+    )
+
+    assert resolution["metrics_resolution_state"] == "pending_unsupported"
+    assert resolution["is_stale"] is True
+
+
+def test_learning_status_helper_distinguishes_current_incomplete_and_stale() -> None:
+    assert learning_status_from_items([
+        {"metrics_resolution_state": "resolved", "is_stale": False},
+    ]) == "current"
+    assert learning_status_from_items([
+        {"metrics_resolution_state": "pending_never_refreshed", "is_stale": False},
+    ]) == "usable_but_incomplete"
+    assert learning_status_from_items([
+        {"metrics_resolution_state": "pending_unsupported", "is_stale": True},
+    ]) == "stale_unresolved"
