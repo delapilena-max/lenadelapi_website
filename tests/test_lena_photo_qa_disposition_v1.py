@@ -237,6 +237,13 @@ def _evaluate(harness: dict, observations: dict | None = None, **updates):
     return disposition.evaluate_photo_qa_disposition(**kwargs)
 
 
+def _run_main(monkeypatch: pytest.MonkeyPatch, argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict]:
+    monkeypatch.setattr(sys, "argv", ["lena_photo_qa_disposition_v1.py", *argv])
+    exit_code = disposition.main()
+    report = json.loads(capsys.readouterr().out)
+    return exit_code, report
+
+
 def test_accept_disposition_is_bound_and_not_publish_ready(harness) -> None:
     result = _evaluate(harness, _all_pass())
     assert result["disposition"] == "accept"
@@ -378,6 +385,52 @@ def test_image_sha_mismatch_blocks(harness) -> None:
     _write_json(harness["evidence_path"], evidence)
     result = _evaluate(harness, _all_pass())
     assert result["reason_codes"] == ["image_hash_mismatch"]
+
+
+def test_main_normalizes_uppercase_expected_image_sha_before_validation(harness, capsys) -> None:
+    uppercase_sha = _sha(harness["image_path"]).upper()
+    exit_code, report = _run_main(
+        harness["monkeypatch"],
+        [
+            "--decision-artifact", str(harness["decision_path"]),
+            "--manifest", str(harness["manifest_path"]),
+            "--image", str(harness["image_path"]),
+            "--expected-image-sha256", uppercase_sha,
+            "--identity-evidence", str(harness["evidence_path"]),
+            "--identity-reference-authority-artifact", str(harness["kwargs"]["reference_authority_artifact"]),
+            "--identity-reference-authority-sha256", harness["kwargs"]["reference_authority_sha256"],
+            "--identity-reference", f"{harness['reference_path']}::{_sha(harness['reference_path'])}",
+        ],
+        capsys,
+    )
+    assert exit_code == 1
+    assert report["artifact"]["reason_codes"] == ["visual_review_unavailable"]
+    assert report["artifact"]["image_sha256"] == _sha(harness["image_path"])
+    assert report["artifact_write"] == {"requested": False, "written": False, "path": None}
+
+
+def test_main_write_artifact_preserves_original_blocked_reason(harness, capsys) -> None:
+    exit_code, report = _run_main(
+        harness["monkeypatch"],
+        [
+            "--decision-artifact", str(harness["decision_path"]),
+            "--manifest", str(harness["manifest_path"]),
+            "--image", str(harness["image_path"]),
+            "--expected-image-sha256", "0" * 64,
+            "--identity-evidence", str(harness["evidence_path"]),
+            "--identity-reference-authority-artifact", str(harness["kwargs"]["reference_authority_artifact"]),
+            "--identity-reference-authority-sha256", harness["kwargs"]["reference_authority_sha256"],
+            "--identity-reference", f"{harness['reference_path']}::{_sha(harness['reference_path'])}",
+            "--write-artifact",
+        ],
+        capsys,
+    )
+    assert exit_code == 1
+    assert report["artifact"]["reason_codes"] == ["image_hash_mismatch"]
+    assert report["artifact"]["qa_inputs"]["binding_error"].startswith(
+        "generated image SHA does not match explicit expected SHA"
+    )
+    assert report["artifact_write"] == {"requested": True, "written": False, "path": None}
 
 
 def test_invalid_identity_evidence_blocks(harness) -> None:

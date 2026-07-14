@@ -1168,11 +1168,12 @@ def main() -> int:
     args = _parser().parse_args()
     try:
         specs = [parse_reference_spec(value) for value in args.identity_reference]
+        expected_image_sha256 = str(args.expected_image_sha256).lower()
         artifact = evaluate_photo_qa_disposition(
             decision_path=args.decision_artifact,
             manifest_path=args.manifest,
             image_path=args.image,
-            expected_image_sha256=args.expected_image_sha256,
+            expected_image_sha256=expected_image_sha256,
             identity_evidence_path=args.identity_evidence,
             reference_specs=specs,
             reference_authority_artifact=args.identity_reference_authority_artifact,
@@ -1187,9 +1188,17 @@ def main() -> int:
         )
         report: dict[str, Any] = {"artifact": artifact, "artifact_write": {"requested": args.write_artifact, "written": False, "path": None}}
         if args.write_artifact:
-            path, artifact, created = write_disposition_artifact(artifact)
-            report["artifact"] = artifact
-            report["artifact_write"] = {"requested": True, "written": created, "path": str(path)}
+            try:
+                path, artifact, created = write_disposition_artifact(artifact)
+            except BoundaryError:
+                if artifact.get("qa_inputs", {}).get("binding_error"):
+                    path = None
+                    created = False
+                else:
+                    raise
+            else:
+                report["artifact"] = artifact
+            report["artifact_write"] = {"requested": True, "written": created, "path": str(path) if path else None}
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if artifact["disposition"] != "hard_stop" else 1
     except BoundaryError as exc:
