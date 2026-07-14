@@ -61,6 +61,7 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from pipeline.qa import lena_photo_qa  # noqa: E402
+from tools import lena_photo_qa_disposition_v1 as lena_photo_qa_disposition  # noqa: E402
 
 # Reused, not reimplemented: the Higgsfield-aware resolver below builds on
 # the same manifest-loading/image-resolution helpers the existing Higgsfield
@@ -207,10 +208,313 @@ def _probe_video_metadata(video_path: Path) -> Dict[str, Any]:
 def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
     qa_path = lena_photo_qa.qa_artifact_path(date_str, slot_id)
     if not qa_path.exists():
-        raise ResolveError(
-            f"no QA verdict exists for this slot: {qa_path} -- "
-            "cannot build a packet ahead of QA (90_content_packet/RULES.md Rule zero)"
+        disposition_glob = sorted(qa_path.parent.glob(f"{slot_id}__*_qa_disposition.json"))
+        if not disposition_glob:
+            raise ResolveError(
+                f"no QA verdict exists for this slot: {qa_path} -- "
+                "cannot build a packet ahead of QA (90_content_packet/RULES.md Rule zero)"
+            )
+        if len(disposition_glob) != 1:
+            raise ResolveError(
+                f"multiple QA disposition artifacts exist for slot {slot_id!r}: "
+                + ", ".join(str(path) for path in disposition_glob)
+                + " -- refusing ambiguous semantic-QA bridge"
+            )
+        disposition_path = disposition_glob[0]
+        try:
+            qa_result = json.loads(disposition_path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ResolveError(
+                f"QA disposition exists but failed to load/parse: {disposition_path}: {exc}"
+            ) from exc
+        if not isinstance(qa_result, dict):
+            raise ResolveError(f"QA disposition must contain a JSON object: {disposition_path}")
+        try:
+            expected_disposition_path = lena_photo_qa_disposition.disposition_artifact_path(
+                qa_result, qa_path.parent.parent
+            ).resolve()
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"QA disposition path binding is invalid at {disposition_path}: {exc.detail}") from exc
+        if disposition_path.resolve() != expected_disposition_path:
+            raise ResolveError(
+                f"QA disposition filename/path does not match its slot/date/image binding: {disposition_path}"
+            )
+
+        def _require_repo_contained(raw: Any, label: str) -> Path:
+            path = Path(str(raw or ""))
+            try:
+                resolved = path.resolve(strict=True)
+            except (OSError, RuntimeError) as exc:
+                raise ResolveError(f"{label} does not exist: {path}") from exc
+            try:
+                resolved.relative_to(ROOT.resolve())
+            except ValueError as exc:
+                raise ResolveError(f"{label} must be repository-contained: {resolved}") from exc
+            return resolved
+
+        if qa_result.get("schema_version") != lena_photo_qa_disposition.SCHEMA_VERSION:
+            raise ResolveError(
+                f"QA disposition at {disposition_path} has unsupported schema_version "
+                f"{qa_result.get('schema_version')!r} -- refusing semantic-QA bridge"
+            )
+        if qa_result.get("slot_id") != slot_id or qa_result.get("generation_provenance", {}).get("date") != date_str:
+            raise ResolveError(
+                f"QA disposition slot/date binding does not match requested {date_str}/{slot_id}: {disposition_path}"
+            )
+        if qa_result.get("reviewer_type") != "bounded_visual_provider" or qa_result.get("provider_called") is not True:
+            raise ResolveError(
+                f"QA disposition reviewer/provider state is invalid at {disposition_path}"
+            )
+        if qa_result.get("disposition") != "accept":
+            raise ResolveError(
+                f"QA disposition disposition={qa_result.get('disposition')!r} "
+                f"(not 'accept') at {disposition_path} -- cannot build a packet for a non-accepted render"
+            )
+        if qa_result.get("reason_codes") != [] or qa_result.get("side_effects_performed") != []:
+            raise ResolveError(
+                f"QA disposition at {disposition_path} is not cleanly accepted -- reason_codes/side_effects must be empty"
+            )
+        if qa_result.get("exact_next_allowed_action") != "existing_downstream_qa_and_human_review_gates_only":
+            raise ResolveError(
+                f"QA disposition next action {qa_result.get('exact_next_allowed_action')!r} "
+                f"is not the downstream human-review gate contract at {disposition_path}"
+            )
+
+        image_sha = str(qa_result.get("image_sha256") or "")
+        if not lena_photo_qa_disposition.SHA256_RE.fullmatch(image_sha):
+            raise ResolveError(f"QA disposition image_sha256 is invalid at {disposition_path}")
+        image_path = _require_repo_contained(qa_result.get("image_path"), "generated image path")
+        try:
+            image = lena_photo_qa_disposition._inspect_image(image_path, generated=True)
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"generated image binding failed: {exc.detail}") from exc
+        if image["sha256"] != image_sha or Path(image["path"]) != image_path:
+            raise ResolveError(f"generated image bytes do not match QA disposition binding at {disposition_path}")
+
+        decision_path = _require_repo_contained(qa_result.get("decision_artifact_path"), "decision artifact path")
+        try:
+            decision, candidate = lena_photo_qa_disposition._validate_decision(decision_path)
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"decision binding failed: {exc.detail}") from exc
+        except Exception as exc:
+            raise ResolveError(f"decision binding failed: {exc}") from exc
+
+        try:
+            manifest_path = _require_repo_contained(
+                (qa_result.get("generation_provenance") or {}).get("manifest_path"),
+                "generation manifest path",
+            )
+            manifest = lena_photo_qa_disposition._validate_manifest(manifest_path, decision, candidate, image)
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"manifest binding failed: {exc.detail}") from exc
+
+        qa_inputs = qa_result.get("qa_inputs") if isinstance(qa_result.get("qa_inputs"), dict) else {}
+        try:
+            identity_evidence_path = _require_repo_contained(
+                qa_inputs.get("identity_evidence_path"),
+                "identity evidence path",
+            )
+            identity_evidence = lena_photo_qa_disposition._validate_identity_evidence(
+                identity_evidence_path, decision, candidate, manifest, image
+            )
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"identity evidence binding failed: {exc.detail}") from exc
+
+        identity_provenance = qa_result.get("identity_reference_provenance")
+        if not isinstance(identity_provenance, dict):
+            raise ResolveError(f"QA disposition is missing identity_reference_provenance at {disposition_path}")
+        authority_path = _require_repo_contained(
+            identity_provenance.get("authority_artifact_path"),
+            "reference authority artifact path",
         )
+        authority_sha = str(identity_provenance.get("authority_artifact_sha256") or "")
+        authority_artifact_commit = str(identity_provenance.get("authority_artifact_commit") or "")
+        references = identity_provenance.get("references")
+        if not isinstance(references, list) or not references:
+            raise ResolveError(f"QA disposition references are missing or invalid at {disposition_path}")
+        reference_specs = []
+        for entry in references:
+            if not isinstance(entry, dict):
+                raise ResolveError(f"QA disposition references are malformed at {disposition_path}")
+            reference_path = _require_repo_contained(entry.get("path"), "identity reference path")
+            reference_sha = str(entry.get("sha256") or "")
+            if not lena_photo_qa_disposition.SHA256_RE.fullmatch(reference_sha):
+                raise ResolveError(f"QA disposition reference SHA is invalid at {disposition_path}")
+            reference_specs.append((reference_path, reference_sha))
+        try:
+            validated_references, reference_set_sha, reference_authority = lena_photo_qa_disposition._validate_references(
+                reference_specs,
+                authority_path,
+                authority_sha,
+                authority_artifact_commit,
+            )
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"reference authority binding failed: {exc.detail}") from exc
+
+        top_level_mismatches = {
+            "authority_commit": decision.get("authority_commit"),
+            "decision_artifact_path": str(decision_path),
+            "decision_fingerprint_sha256": decision.get("decision_fingerprint_sha256"),
+            "candidate_id": candidate.get("candidate_id"),
+            "slot_id": candidate.get("slot_id"),
+            "lane": candidate.get("lane"),
+            "recipe_id": candidate.get("recipe_id"),
+            "hook_id": candidate.get("hook_id"),
+            "prompt_sha256": candidate.get("prompt_sha256"),
+            "image_path": image["path"],
+            "image_sha256": image["sha256"],
+        }
+        mismatches = [
+            f"{key}: expected {expected!r}, got {qa_result.get(key)!r}"
+            for key, expected in top_level_mismatches.items()
+            if qa_result.get(key) != expected
+        ]
+
+        manifest_sha = lena_photo_qa_disposition._sha256_file(manifest_path)
+        generation_provenance = qa_result.get("generation_provenance") if isinstance(qa_result.get("generation_provenance"), dict) else {}
+        provenance_expected = {
+            "manifest_path": str(manifest_path),
+            "manifest_sha256": manifest_sha,
+            "date": decision.get("as_of_date"),
+            "provider": manifest.get("provider"),
+            "job_type": manifest.get("job_type"),
+            "provider_job_id": manifest.get("provider_job_id"),
+            "provider_status": manifest.get("provider_status"),
+            "custom_reference_id": manifest.get("custom_reference_id"),
+            "soul_name": manifest.get("cli_soul_name"),
+            "soul_type": manifest.get("cli_soul_type"),
+        }
+        mismatches.extend(
+            f"generation_provenance.{key}: expected {expected!r}, got {generation_provenance.get(key)!r}"
+            for key, expected in provenance_expected.items()
+            if generation_provenance.get(key) != expected
+        )
+        expected_sources = {
+            "candidate_and_authority": str(decision_path),
+            "provider_generation": str(manifest_path),
+            "local_image_hash_and_identity": str(identity_evidence_path),
+        }
+        field_sources = generation_provenance.get("field_sources")
+        if field_sources != expected_sources:
+            mismatches.append(
+                f"generation_provenance.field_sources: expected {expected_sources!r}, got {field_sources!r}"
+            )
+
+        identity_sha = lena_photo_qa_disposition._sha256_file(identity_evidence_path)
+        qa_inputs_expected = {
+            "identity_evidence_path": str(identity_evidence_path),
+            "identity_evidence_sha256": identity_sha,
+            "identity_verification_result": identity_evidence.get("verification_result"),
+        }
+        mismatches.extend(
+            f"qa_inputs.{key}: expected {expected!r}, got {qa_inputs.get(key)!r}"
+            for key, expected in qa_inputs_expected.items()
+            if qa_inputs.get(key) != expected
+        )
+        identity_expected = {
+            "authority_artifact_path": str(authority_path),
+            "authority_artifact_sha256": authority_sha,
+            "authority_commit": reference_authority.get("authority_commit"),
+            "authority_artifact_commit": authority_artifact_commit,
+            "reference_set_sha256": reference_set_sha,
+            "authority_id": reference_authority.get("authority_id"),
+        }
+        mismatches.extend(
+            f"identity_reference_provenance.{key}: expected {expected!r}, got {identity_provenance.get(key)!r}"
+            for key, expected in identity_expected.items()
+            if identity_provenance.get(key) != expected
+        )
+        if identity_provenance.get("references") != validated_references:
+            mismatches.append("identity_reference_provenance.references do not match validated reference bindings")
+
+        qa_checks = qa_result.get("qa_checks")
+        if not isinstance(qa_checks, dict) or set(qa_checks) != set(lena_photo_qa_disposition.OBSERVATION_KEYS):
+            raise ResolveError(f"QA disposition must contain exactly every required QA check key at {disposition_path}")
+        visual_observations = {
+            "schema_version": lena_photo_qa_disposition.VISUAL_SCHEMA_VERSION,
+            "observations": {
+                key: qa_checks[key]
+                for key in lena_photo_qa_disposition.VISUAL_OBSERVATION_KEYS
+            },
+        }
+        try:
+            normalized_visual = lena_photo_qa_disposition.validate_visual_observations(visual_observations)
+        except lena_photo_qa_disposition.BoundaryError as exc:
+            raise ResolveError(f"visual observation binding failed: {exc.detail}") from exc
+        for key, entry in normalized_visual.items():
+            if entry.get("status") != "pass" or entry.get("reason_codes") != []:
+                raise ResolveError(f"visual observation {key!r} is not a complete successful pass at {disposition_path}")
+        for key in lena_photo_qa_disposition.LOCAL_TECHNICAL_KEYS:
+            entry = qa_checks.get(key)
+            if (
+                not isinstance(entry, dict)
+                or set(entry) != {"status", "reason_codes", "notes"}
+                or entry.get("status") != "pass"
+                or entry.get("reason_codes") != []
+                or not isinstance(entry.get("notes"), str)
+                or not entry.get("notes").strip()
+            ):
+                raise ResolveError(f"local QA check {key!r} is not a complete successful pass at {disposition_path}")
+
+        visual_source = qa_result.get("visual_judgment_source")
+        if not isinstance(visual_source, dict):
+            raise ResolveError(f"QA disposition is missing visual_judgment_source at {disposition_path}")
+        if (
+            visual_source.get("reviewer_type") != "bounded_visual_provider"
+            or visual_source.get("provider") != lena_photo_qa_disposition.APPROVED_VISUAL_PROVIDER
+            or visual_source.get("model") != lena_photo_qa_disposition.APPROVED_VISUAL_MODEL
+            or visual_source.get("observation_schema_version") != lena_photo_qa_disposition.VISUAL_SCHEMA_VERSION
+        ):
+            raise ResolveError(f"QA disposition visual reviewer binding is invalid at {disposition_path}")
+        observations_sha = str(visual_source.get("observations_sha256") or "")
+        request_binding_sha = str(visual_source.get("request_binding_sha256") or "")
+        if (
+            not lena_photo_qa_disposition.SHA256_RE.fullmatch(observations_sha)
+            or not lena_photo_qa_disposition.SHA256_RE.fullmatch(request_binding_sha)
+        ):
+            raise ResolveError(f"QA disposition visual hash bindings are invalid at {disposition_path}")
+        expected_observations_sha = lena_photo_qa_disposition._sha256_bytes(
+            lena_photo_qa_disposition._canonical_bytes(visual_observations)
+        )
+        expected_request_binding_sha = lena_photo_qa_disposition._sha256_bytes(
+            lena_photo_qa_disposition._canonical_bytes(
+                {
+                    "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
+                    "image_sha256": image["sha256"],
+                    "reference_set_sha256": reference_set_sha,
+                }
+            )
+        )
+        if visual_source.get("observations_sha256") != expected_observations_sha:
+            mismatches.append(
+                f"visual_judgment_source.observations_sha256: expected {expected_observations_sha!r}, got {visual_source.get('observations_sha256')!r}"
+            )
+        if visual_source.get("request_binding_sha256") != expected_request_binding_sha:
+            mismatches.append(
+                f"visual_judgment_source.request_binding_sha256: expected {expected_request_binding_sha!r}, got {visual_source.get('request_binding_sha256')!r}"
+            )
+
+        if mismatches:
+            raise ResolveError(
+                "QA disposition binding mismatch: " + "; ".join(mismatches)
+            )
+        return {
+            "schema_version": qa_result["schema_version"],
+            "slot_id": slot_id,
+            "date": date_str,
+            "media_type": "photo",
+            "reviewed_by": qa_result.get("reviewer_type"),
+            "reviewed_at_utc": qa_result.get("generated_at_utc"),
+            "checklist": {},
+            "production_scoring": {},
+            "overall": "pass",
+            "failure_reasons": [],
+            "created_at_utc": qa_result.get("generated_at_utc"),
+            "publish_ready": True,
+            "publish_ready_reason": "accepted lena_photo_qa_disposition_v1 artifact",
+            "_qa_path": str(disposition_path),
+            "_qa_source": "lena_photo_qa_disposition_v1",
+        }
     qa_result = lena_photo_qa.load_qa_result(date_str, slot_id)
     if not isinstance(qa_result, dict):
         raise ResolveError(f"QA file exists but failed to load/parse: {qa_path}")
@@ -229,7 +533,14 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
             "cannot build a packet for a non-passing render (90_content_packet/RULES.md Rule zero)"
         )
 
+    qa_result = dict(qa_result)
+    qa_result.setdefault("_qa_path", str(qa_path))
+    qa_result.setdefault("_qa_source", "lena_photo_qa")
     return qa_result
+
+
+def _resolved_qa_path(qa_result: Dict[str, Any], date_str: str, slot_id: str) -> str:
+    return str(qa_result.get("_qa_path") or lena_photo_qa.qa_artifact_path(date_str, slot_id))
 
 
 def _resolve_optional_debug_artifacts(date_str: str, slot_id: str) -> Dict[str, Any]:
@@ -302,7 +613,7 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "date": date_str,
         "slot_id": slot_id,
         "image_path": str(image_path),
-        "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
+        "qa_path": _resolved_qa_path(qa_result, date_str, slot_id),
         "qa_overall": qa_result.get("overall"),
         "qa_publish_ready": qa_result.get("publish_ready"),
         "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),
@@ -398,7 +709,7 @@ def resolve_packet_inputs_video(date_str: str, slot_id: str, out_dir: Optional[P
         "width": width,
         "height": height,
         "aspect_ratio": aspect_ratio,
-        "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
+        "qa_path": _resolved_qa_path(qa_result, date_str, slot_id),
         "qa_overall": qa_result.get("overall"),
         "qa_publish_ready": qa_result.get("publish_ready"),
         "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),
@@ -601,7 +912,7 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         "slot_id": slot_id,
         "provider": "higgsfield",
         "image_path": str(image_path),
-        "qa_path": str(lena_photo_qa.qa_artifact_path(date_str, slot_id)),
+        "qa_path": _resolved_qa_path(qa_result, date_str, slot_id),
         "qa_overall": qa_result.get("overall"),
         "qa_publish_ready": qa_result.get("publish_ready"),
         "qa_publish_ready_reason": qa_result.get("publish_ready_reason"),

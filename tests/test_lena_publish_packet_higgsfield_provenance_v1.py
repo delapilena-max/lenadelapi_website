@@ -7,9 +7,12 @@ from pathlib import Path
 import pytest
 
 import pipeline.qa.lena_photo_qa as lena_photo_qa
+import tools.lena_build_publish_packet_v1 as packet_mod
+from tools import lena_photo_qa_disposition_v1 as disposition
 from tools.lena_build_publish_packet_v1 import (
     build_queue_draft,
     resolve_packet_inputs_higgsfield,
+    ResolveError,
 )
 
 # tools/lena_build_publish_packet_v1.py imports lena_higgsfield_qa_bridge_v1
@@ -62,6 +65,245 @@ def _write_qa_pass(asset_review_root: Path, date_str: str, slot_id: str) -> None
     out_path = asset_review_root / date_str / f"{slot_id}_qa.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(qa, indent=2), encoding="utf-8")
+
+
+def _write_accepted_disposition(asset_review_root: Path, date_str: str, slot_id: str, image_sha: str) -> Path:
+    artifact = {
+        "schema_version": disposition.SCHEMA_VERSION,
+        "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "slot_id": slot_id,
+        "image_sha256": image_sha,
+        "generation_provenance": {"date": date_str},
+        "reason_codes": [],
+        "disposition": "accept",
+        "reviewer_type": "bounded_visual_provider",
+        "side_effects_performed": [],
+        "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
+    }
+    out_path = asset_review_root / date_str / f"{slot_id}__{image_sha}_qa_disposition.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
+    return out_path
+
+
+def _write_generated_image(path: Path, color: str = "white") -> Path:
+    from PIL import Image
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1152, 2048), color=color).save(path, format="PNG")
+    return path
+
+
+def _bridge_artifact(
+    repo_root: Path,
+    date_str: str,
+    slot_id: str,
+    image_path: Path,
+    *,
+    decision_path: Path,
+    manifest_path: Path,
+    identity_evidence_path: Path,
+    authority_path: Path,
+    reference_path: Path,
+) -> dict:
+    image_sha = disposition._sha256_file(image_path)
+    manifest_sha = disposition._sha256_file(manifest_path)
+    identity_sha = disposition._sha256_file(identity_evidence_path)
+    authority_sha = "1" * 64
+    reference_sha = "2" * 64
+    reference_set_sha = "3" * 64
+    decision_fingerprint = "4" * 64
+    visual_observations = {
+        "schema_version": disposition.VISUAL_SCHEMA_VERSION,
+        "observations": {
+            key: {"status": "pass", "reason_codes": [], "notes": f"{key} passed"}
+            for key in disposition.VISUAL_OBSERVATION_KEYS
+        },
+    }
+    observations_sha = disposition._sha256_bytes(disposition._canonical_bytes(visual_observations))
+    request_binding_sha = disposition._sha256_bytes(
+        disposition._canonical_bytes(
+            {
+                "decision_fingerprint_sha256": decision_fingerprint,
+                "image_sha256": image_sha,
+                "reference_set_sha256": reference_set_sha,
+            }
+        )
+    )
+    qa_checks = {
+        **visual_observations["observations"],
+        "dimensions": {"status": "pass", "reason_codes": [], "notes": "locally measured 1152x2048"},
+        "file_integrity": {"status": "pass", "reason_codes": [], "notes": "Pillow verify and reopen succeeded"},
+        "format": {"status": "pass", "reason_codes": [], "notes": "locally detected supported format PNG"},
+        "downstream_compatibility": {"status": "pass", "reason_codes": [], "notes": "approved Higgsfield dimensions and supported still-image format"},
+    }
+    return {
+        "schema_version": disposition.SCHEMA_VERSION,
+        "influencer_id": "lena",
+        "generated_at_utc": "2026-07-14T04:16:35Z",
+        "authority_commit": "a" * 40,
+        "decision_artifact_path": str(decision_path),
+        "decision_fingerprint_sha256": decision_fingerprint,
+        "candidate_id": f"{slot_id}::hcr_006::cbn_004",
+        "slot_id": slot_id,
+        "lane": "night out",
+        "recipe_id": "hcr_006",
+        "hook_id": "cbn_004",
+        "prompt_sha256": "5" * 64,
+        "image_path": str(image_path),
+        "image_sha256": image_sha,
+        "generation_provenance": {
+            "manifest_path": str(manifest_path),
+            "manifest_sha256": manifest_sha,
+            "date": date_str,
+            "field_sources": {
+                "candidate_and_authority": str(decision_path),
+                "provider_generation": str(manifest_path),
+                "local_image_hash_and_identity": str(identity_evidence_path),
+            },
+            "provider": "higgsfield",
+            "job_type": "text2image_soul_v2",
+            "provider_job_id": "job-123",
+            "provider_status": "completed",
+            "custom_reference_id": "ref-123",
+            "soul_name": "Lena",
+            "soul_type": "soul_2",
+        },
+        "identity_reference_provenance": {
+            "authority_id": "lena_identity_reference_authority_v1",
+            "authority_artifact_path": str(authority_path),
+            "authority_artifact_sha256": authority_sha,
+            "authority_commit": "b" * 40,
+            "authority_artifact_commit": "a" * 40,
+            "reference_set_sha256": reference_set_sha,
+            "references": [
+                {
+                    "path": str(reference_path),
+                    "sha256": reference_sha,
+                    "format": "PNG",
+                    "width": 1152,
+                    "height": 2048,
+                    "authority_relative_path": "pipeline/higgsfield_library/lena/reference.png",
+                }
+            ],
+            "authority_semantics": "exact committed authority artifact and reference-set binding",
+        },
+        "qa_inputs": {
+            "identity_evidence_path": str(identity_evidence_path),
+            "identity_evidence_sha256": identity_sha,
+            "identity_verification_result": "pass",
+        },
+        "qa_checks": qa_checks,
+        "reason_codes": [],
+        "disposition": "accept",
+        "retry_eligible": False,
+        "hard_stop_reason": None,
+        "confidence": "high",
+        "reviewer_type": "bounded_visual_provider",
+        "visual_judgment_source": {
+            "reviewer_type": "bounded_visual_provider",
+            "provider": disposition.APPROVED_VISUAL_PROVIDER,
+            "model": disposition.APPROVED_VISUAL_MODEL,
+            "observation_schema_version": disposition.VISUAL_SCHEMA_VERSION,
+            "observations_sha256": observations_sha,
+            "request_binding_sha256": request_binding_sha,
+        },
+        "provider_called": True,
+        "side_effects_performed": [],
+        "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
+    }
+
+
+def _bridge_context(tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch):
+    repo_root = (tmp_path / "repo").resolve()
+    repo_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(packet_mod, "ROOT", repo_root)
+    date_str = "2026-07-13"
+    slot_id = "lenagate-bridge-photo"
+    image_path = _write_generated_image(repo_root / "tmp" / "bridge-tests" / f"{slot_id}.png")
+    manifest_path = repo_root / "tmp" / "bridge-tests" / f"{slot_id}_manifest.json"
+    decision_path = repo_root / "tmp" / "bridge-tests" / f"{slot_id}_decision.json"
+    identity_evidence_path = repo_root / "tmp" / "bridge-tests" / f"{slot_id}_identity.json"
+    authority_path = repo_root / "tmp" / "bridge-tests" / f"{slot_id}_authority.json"
+    reference_path = repo_root / "tmp" / "bridge-tests" / f"{slot_id}_reference.png"
+    _write_generated_image(reference_path, color="gray")
+    for path, value in (
+        (manifest_path, {"manifest": True}),
+        (decision_path, {"decision": True}),
+        (identity_evidence_path, {"identity": True}),
+        (authority_path, {"authority": True}),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value, indent=2), encoding="utf-8")
+    _write_higgsfield_manifest(isolated_roots["debug_root"], date_str, slot_id, image_path)
+    artifact = _bridge_artifact(
+        repo_root,
+        date_str,
+        slot_id,
+        image_path,
+        decision_path=decision_path,
+        manifest_path=manifest_path,
+        identity_evidence_path=identity_evidence_path,
+        authority_path=authority_path,
+        reference_path=reference_path,
+    )
+    disposition_path = isolated_roots["asset_review_root"] / date_str / f"{slot_id}__{artifact['image_sha256']}_qa_disposition.json"
+    disposition_path.parent.mkdir(parents=True, exist_ok=True)
+    disposition_path.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
+
+    decision = {
+        "authority_commit": artifact["authority_commit"],
+        "decision_fingerprint_sha256": artifact["decision_fingerprint_sha256"],
+        "as_of_date": date_str,
+    }
+    candidate = {
+        "candidate_id": artifact["candidate_id"],
+        "slot_id": slot_id,
+        "lane": artifact["lane"],
+        "recipe_id": artifact["recipe_id"],
+        "hook_id": artifact["hook_id"],
+        "prompt_sha256": artifact["prompt_sha256"],
+    }
+    manifest = {
+        "provider": artifact["generation_provenance"]["provider"],
+        "job_type": artifact["generation_provenance"]["job_type"],
+        "provider_job_id": artifact["generation_provenance"]["provider_job_id"],
+        "provider_status": artifact["generation_provenance"]["provider_status"],
+        "custom_reference_id": artifact["generation_provenance"]["custom_reference_id"],
+        "cli_soul_name": artifact["generation_provenance"]["soul_name"],
+        "cli_soul_type": artifact["generation_provenance"]["soul_type"],
+    }
+    identity = {"verification_result": "pass"}
+    validated_refs = artifact["identity_reference_provenance"]["references"]
+    reference_authority = {
+        "authority_id": artifact["identity_reference_provenance"]["authority_id"],
+        "authority_commit": artifact["identity_reference_provenance"]["authority_commit"],
+    }
+
+    monkeypatch.setattr(packet_mod.lena_photo_qa_disposition, "_validate_decision", lambda path: (decision, candidate))
+    monkeypatch.setattr(packet_mod.lena_photo_qa_disposition, "_validate_manifest", lambda path, d, c, i: manifest)
+    monkeypatch.setattr(packet_mod.lena_photo_qa_disposition, "_validate_identity_evidence", lambda path, d, c, m, i: identity)
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_references",
+        lambda specs, authority_path, authority_sha, authority_commit: (
+            validated_refs,
+            artifact["identity_reference_provenance"]["reference_set_sha256"],
+            reference_authority,
+        ),
+    )
+    return {
+        "date": date_str,
+        "slot": slot_id,
+        "image_path": image_path,
+        "manifest_path": manifest_path,
+        "decision_path": decision_path,
+        "identity_evidence_path": identity_evidence_path,
+        "authority_path": authority_path,
+        "reference_path": reference_path,
+        "artifact": artifact,
+        "disposition_path": disposition_path,
+    }
 
 
 def _write_higgsfield_manifest(
@@ -209,6 +451,131 @@ def test_higgsfield_existing_identity_and_creative_fields_unchanged(tmp_path: Pa
     assert draft["metadata"]["activity"] == "test lane"
     assert draft["metadata"]["provider_job_id"] == "test-provider-job-id"
     assert draft["media_type"] == "photo"
+
+
+def test_higgsfield_resolution_bridges_exactly_one_accepted_disposition_when_legacy_qa_missing(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+
+    resolved = resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+    assert resolved["qa_path"] == str(ctx["disposition_path"])
+    assert resolved["qa_overall"] == "pass"
+    assert resolved["qa_publish_ready"] is True
+    assert resolved["qa_publish_ready_reason"] == "accepted lena_photo_qa_disposition_v1 artifact"
+
+
+def test_higgsfield_resolution_rejects_image_tampering_sha_mismatch(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    _write_generated_image(ctx["image_path"], color="black")
+
+    with pytest.raises(ResolveError, match="generated image bytes do not match QA disposition binding"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_manifest_mismatch(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["generation_provenance"]["provider_job_id"] = "wrong-job"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="generation_provenance.provider_job_id"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_decision_mismatch(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["decision_fingerprint_sha256"] = "9" * 64
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="decision_fingerprint_sha256"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_wrong_reviewer_or_provider_state(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["provider_called"] = False
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="reviewer/provider state is invalid"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_incomplete_observations(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    del value["qa_checks"]["face_continuity"]
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="exactly every required QA check key"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_path_escape(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    escaped = tmp_path / "outside-decision.json"
+    escaped.write_text("{}", encoding="utf-8")
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["decision_artifact_path"] = str(escaped)
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="decision artifact path must be repository-contained"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_ambiguous_disposition_bridge(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    second = dict(ctx["artifact"])
+    second["image_sha256"] = "c" * 64
+    second_path = isolated_roots["asset_review_root"] / ctx["date"] / f"{ctx['slot']}__{'c' * 64}_qa_disposition.json"
+    second_path.write_text(json.dumps(second, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match="multiple QA disposition artifacts exist"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_nonaccepted_disposition_bridge(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["disposition"] = "hard_stop"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    with pytest.raises(ResolveError, match=r"disposition='hard_stop'"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_prefers_unchanged_legacy_qa_over_disposition(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    _write_qa_pass(isolated_roots["asset_review_root"], ctx["date"], ctx["slot"])
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["disposition"] = "hard_stop"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+    resolved = resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+    assert resolved["qa_path"].endswith(f"{ctx['slot']}_qa.json")
+    assert resolved["qa_overall"] == "pass"
 
 
 # 16/17/18. No network call, no publish, no real queue item mutated --
