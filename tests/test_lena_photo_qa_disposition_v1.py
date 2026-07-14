@@ -660,6 +660,87 @@ def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch
     assert client_options == [{"max_retries": 0}]
     assert len(provider_calls) == 1
     assert provider_calls[0]["model"] == disposition.APPROVED_VISUAL_MODEL
+    tool = provider_calls[0]["tools"][0]
+    assert tool["name"] == "submit_visual_observations"
+    assert tool["input_schema"]["required"] == ["observations"]
+    assert "schema_version" in tool["input_schema"]["properties"]
+
+
+def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "bound.png"
+    image_bytes = b"bound image bytes"
+    image_path.write_bytes(image_bytes)
+    observations = {"observations": _all_pass()["observations"]}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            return SimpleNamespace(content=[SimpleNamespace(
+                type="tool_use", name="submit_visual_observations", input=observations,
+            )])
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
+    request = {
+        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "identity_references": [],
+        "visual_model": disposition.APPROVED_VISUAL_MODEL,
+    }
+    result = disposition.call_anthropic_visual_review(request)
+    assert result["schema_version"] == disposition.VISUAL_SCHEMA_VERSION
+    assert result["observations"] == observations["observations"]
+
+
+def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redacted_diagnostics(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "bound.png"
+    image_bytes = b"bound image bytes"
+    image_path.write_bytes(image_bytes)
+    payload = {"schema_version": "wrong_schema", "observations": _all_pass()["observations"]}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            return SimpleNamespace(content=[SimpleNamespace(
+                type="tool_use", name="submit_visual_observations", input=payload,
+            )])
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
+    request = {
+        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "identity_references": [],
+        "visual_model": disposition.APPROVED_VISUAL_MODEL,
+    }
+    with pytest.raises(disposition.BoundaryError, match="conflicting schema_version") as excinfo:
+        disposition.call_anthropic_visual_review(request)
+    text = str(excinfo.value)
+    assert '"schema_version_matches_expected": false' in text
+    assert "bound image bytes" not in text
+
+
+def test_anthropic_adapter_non_dict_payload_reports_only_redacted_diagnostics(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "bound.png"
+    image_bytes = b"bound image bytes"
+    image_path.write_bytes(image_bytes)
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            return SimpleNamespace(content=[SimpleNamespace(
+                type="tool_use", name="submit_visual_observations", input=["not", "a", "dict"],
+            )])
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
+    request = {
+        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "identity_references": [],
+        "visual_model": disposition.APPROVED_VISUAL_MODEL,
+    }
+    with pytest.raises(disposition.BoundaryError, match="malformed structured observation payload") as excinfo:
+        disposition.call_anthropic_visual_review(request)
+    text = str(excinfo.value)
+    assert '"input_type": "list"' in text
+    assert "bound image bytes" not in text
+
+
+def test_validator_still_rejects_missing_schema_version_outside_adapter() -> None:
+    with pytest.raises(disposition.BoundaryError, match="missing or invalid schema_version"):
+        disposition.validate_visual_observations({"observations": _all_pass()["observations"]})
 
 
 def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monkeypatch) -> None:

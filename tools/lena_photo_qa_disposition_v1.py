@@ -835,6 +835,25 @@ def _review_request(
     }
 
 
+def _redacted_tool_input_diagnostics(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {"input_type": type(value).__name__}
+    diagnostics: dict[str, Any] = {"keys": sorted(value.keys())}
+    observations = value.get("observations")
+    if isinstance(observations, dict):
+        diagnostics["observation_keys"] = sorted(observations.keys())
+        diagnostics["observation_entry_types"] = {
+            key: type(item).__name__
+            for key, item in observations.items()
+        }
+    else:
+        diagnostics["observations_type"] = type(observations).__name__
+    if "schema_version" in value:
+        diagnostics["schema_version_type"] = type(value.get("schema_version")).__name__
+        diagnostics["schema_version_matches_expected"] = value.get("schema_version") == VISUAL_SCHEMA_VERSION
+    return diagnostics
+
+
 def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
     """One bounded call. Lazy import; no retries, fallback, or second candidate."""
     import anthropic  # type: ignore[import-not-found]
@@ -878,7 +897,7 @@ def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
             "input_schema": {
                 "type": "object",
                 "properties": {"schema_version": {"type": "string", "enum": [VISUAL_SCHEMA_VERSION]}, "observations": {"type": "object", "properties": properties, "required": list(VISUAL_OBSERVATION_KEYS), "additionalProperties": False}},
-                "required": ["schema_version", "observations"],
+                "required": ["observations"],
                 "additionalProperties": False,
             },
         }],
@@ -888,7 +907,23 @@ def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
     blocks = [block for block in response.content if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_visual_observations"]
     if len(blocks) != 1:
         raise BoundaryError("visual_review_unavailable", "visual provider did not return exactly one structured observation block")
-    return blocks[0].input
+    payload = blocks[0].input
+    if not isinstance(payload, dict):
+        diagnostics = _redacted_tool_input_diagnostics(payload)
+        raise BoundaryError(
+            "visual_review_unavailable",
+            "visual provider returned a malformed structured observation payload: "
+            + json.dumps(diagnostics, sort_keys=True),
+        )
+    echoed_schema = payload.get("schema_version")
+    if echoed_schema is not None and echoed_schema != VISUAL_SCHEMA_VERSION:
+        diagnostics = _redacted_tool_input_diagnostics(payload)
+        raise BoundaryError(
+            "visual_review_unavailable",
+            "visual provider returned a conflicting schema_version: "
+            + json.dumps(diagnostics, sort_keys=True),
+        )
+    return {"schema_version": VISUAL_SCHEMA_VERSION, **payload}
 
 
 def _read_bound_image_bytes(item: dict[str, Any]) -> bytes:
