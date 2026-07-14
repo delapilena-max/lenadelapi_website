@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 from pipeline.identity import lena_higgsfield_identity as identity
 from tools import lena_photo_qa_disposition_v1 as disposition
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff
+from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
 
 
@@ -43,6 +44,19 @@ def _failed(key: str, reason: str) -> dict:
     value = _all_pass()
     value["observations"][key] = {"status": "fail", "reason_codes": [reason], "notes": f"observed {reason}"}
     return value
+
+
+RETRY_DATE = "2026-07-13"
+RETRY_SLOT = "lenagate2026071325ca9e1d-pack000-01-retry01-photo"
+RETRY_IMAGE_SHA = "aa25ba41d0a50f0261933f8f53bbe58d8183f0df37769c1a09655ad6c08de45c"
+RETRY_DECISION = ROOT / "pipeline" / "strategy" / "lena" / "retry_decisions" / RETRY_DATE / (
+    f"{RETRY_SLOT}__128799286987_retry_decision.json"
+)
+RETRY_MANIFEST = ROOT / "pipeline" / "higgsfield_debug" / RETRY_DATE / RETRY_SLOT / "result_manifest.json"
+RETRY_IMAGE = ROOT / "pipeline" / "higgsfield_library" / "lena" / RETRY_DATE / f"{RETRY_SLOT}_seed.png"
+RETRY_IDENTITY = ROOT / "pipeline" / "higgsfield_debug" / RETRY_DATE / RETRY_SLOT / "identity_verification.json"
+REFERENCE_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
+MODEL_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_model_authority_v1.json"
 
 
 @pytest.fixture()
@@ -256,6 +270,46 @@ def test_accept_disposition_is_bound_and_not_publish_ready(harness) -> None:
     assert result["image_sha256"] == _sha(harness["image_path"])
 
 
+def test_retry_lineage_reaches_no_provider_qa_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        disposition,
+        "_validate_manifest_bank_context",
+        lambda manifest, candidate, commit: None,
+    )
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=RETRY_DECISION,
+        manifest_path=RETRY_MANIFEST,
+        image_path=RETRY_IMAGE,
+        expected_image_sha256=RETRY_IMAGE_SHA,
+        identity_evidence_path=RETRY_IDENTITY,
+        reference_specs=[(
+            ROOT / "pipeline" / "higgsfield_library" / "lena" / "2026-07-09" / "prompt_isolation_tests" / "readypack0709-pack004-08-wardrobe-test-c_seed.png",
+            "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb",
+        )],
+        reference_authority_artifact=REFERENCE_AUTHORITY,
+        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        failure_memory_loader=lambda: {
+            "pattern_counts": {},
+            "soft_flagged_patterns": [],
+            "hard_excluded_patterns": [],
+            "contributing_records": [],
+            "skipped": [],
+        },
+    )
+    assert result["reason_codes"] == ["visual_review_unavailable"]
+    assert result["provider_called"] is False
+    assert result["qa_inputs"]["decision_kind"] == "retry_decision"
+    assert result["decision_fingerprint_sha256"] == "ad559b7b3eaa29ad4a70d991990c0bea6c8d0bf8eaff696d18cf4af85d9ce130"
+    assert result["generation_provenance"]["manifest_path"] == str(RETRY_MANIFEST.resolve())
+
+
+def test_original_selected_candidate_no_provider_behavior_is_unchanged(harness) -> None:
+    result = _evaluate(harness)
+    assert result["reason_codes"] == ["visual_review_unavailable"]
+    assert result["provider_called"] is False
+    assert result["qa_inputs"]["decision_kind"] == "selected_candidate"
+
+
 @pytest.mark.parametrize(
     ("key", "reason"),
     [
@@ -297,6 +351,25 @@ def test_semantic_hard_stop_reasons(harness, key, reason) -> None:
     assert result["disposition"] == "hard_stop"
     assert result["hard_stop_reason"] == reason
     assert result["retry_eligible"] is False
+
+
+def test_background_identity_duplication_is_deterministic_hard_failure(harness) -> None:
+    result = _evaluate(harness, _failed("no_background_identity_duplication", "wrong_person_or_identity_collapse"))
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["wrong_person_or_identity_collapse"]
+    assert result["hard_stop_reason"] == "wrong_person_or_identity_collapse"
+
+
+def test_clean_background_identity_observation_can_proceed_normally(harness) -> None:
+    observations = _all_pass()
+    observations["observations"]["no_background_identity_duplication"] = {
+        "status": "pass",
+        "reason_codes": [],
+        "notes": "background people are non-recognizable and clearly distinct from Lena",
+    }
+    result = _evaluate(harness, observations)
+    assert result["disposition"] == "accept"
+    assert result["reason_codes"] == []
 
 
 @pytest.mark.parametrize(
@@ -743,6 +816,24 @@ def test_validator_still_rejects_missing_schema_version_outside_adapter() -> Non
         disposition.validate_visual_observations({"observations": _all_pass()["observations"]})
 
 
+def test_missing_duplicate_identity_observation_fails_closed() -> None:
+    payload = _all_pass()
+    payload["observations"].pop("no_background_identity_duplication")
+    with pytest.raises(disposition.BoundaryError, match="exactly every required observation key"):
+        disposition.validate_visual_observations(payload)
+
+
+def test_malformed_duplicate_identity_observation_fails_closed() -> None:
+    payload = _all_pass()
+    payload["observations"]["no_background_identity_duplication"] = {
+        "status": "fail",
+        "reason_codes": ["recoverable_identity_drift"],
+        "notes": "invalid reason for this observation",
+    }
+    with pytest.raises(disposition.BoundaryError, match="incompatible reason code"):
+        disposition.validate_visual_observations(payload)
+
+
 def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
     image_bytes = b"bound image bytes"
@@ -967,6 +1058,73 @@ def test_canonical_rubric_and_exact_bindings_reach_single_mocked_call(harness) -
     assert request["identity_reference_set_sha256"] == harness["reference_set_sha"]
     assert request["visual_model_authority"]["approved_model"] == "exact-test-model"
     assert "disposition" not in request["required_observation_keys"]
+    assert "no_background_identity_duplication" in request["required_observation_keys"]
+    assert "background person" in request["instruction"].lower()
+    assert "second lena-like identity" in json.dumps(request["scene_context"]).lower()
+
+
+def test_tampered_retry_decision_fingerprint_fails_before_provider_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    tampered = tmp_path / RETRY_DECISION.name
+    artifact = json.loads(RETRY_DECISION.read_text(encoding="utf-8-sig"))
+    artifact["retry_decision_fingerprint_sha256"] = "0" * 64
+    _write_json(tampered, artifact)
+    calls: list[dict] = []
+    monkeypatch.setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request) or _all_pass())
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=tampered,
+        manifest_path=RETRY_MANIFEST,
+        image_path=RETRY_IMAGE,
+        expected_image_sha256=RETRY_IMAGE_SHA,
+        identity_evidence_path=RETRY_IDENTITY,
+        reference_specs=[],
+        reference_authority_artifact=REFERENCE_AUTHORITY,
+        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        live_visual_review=True,
+        visual_provider="anthropic",
+        visual_model=disposition.APPROVED_VISUAL_MODEL,
+        visual_model_authority_artifact=MODEL_AUTHORITY,
+        visual_model_authority_sha256=_sha(MODEL_AUTHORITY),
+        expected_decision_fingerprint="0" * 64,
+        expected_reference_set_sha256="0" * 64,
+    )
+    assert calls == []
+    assert result["reason_codes"] == ["decision_binding_mismatch"]
+
+
+def test_tampered_retry_manifest_fails_before_provider_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        disposition,
+        "_validate_manifest_bank_context",
+        lambda manifest, candidate, commit: None,
+    )
+    tampered = tmp_path / "result_manifest.json"
+    manifest = json.loads(RETRY_MANIFEST.read_text(encoding="utf-8-sig"))
+    manifest["retry_execution_contract"]["retry_decision_fingerprint_sha256"] = "0" * 64
+    _write_json(tampered, manifest)
+    calls: list[dict] = []
+    monkeypatch.setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request) or _all_pass())
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=RETRY_DECISION,
+        manifest_path=tampered,
+        image_path=RETRY_IMAGE,
+        expected_image_sha256=RETRY_IMAGE_SHA,
+        identity_evidence_path=RETRY_IDENTITY,
+        reference_specs=[(
+            ROOT / "pipeline" / "higgsfield_library" / "lena" / "2026-07-09" / "prompt_isolation_tests" / "readypack0709-pack004-08-wardrobe-test-c_seed.png",
+            "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb",
+        )],
+        reference_authority_artifact=REFERENCE_AUTHORITY,
+        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        live_visual_review=True,
+        visual_provider="anthropic",
+        visual_model=disposition.APPROVED_VISUAL_MODEL,
+        visual_model_authority_artifact=MODEL_AUTHORITY,
+        visual_model_authority_sha256=_sha(MODEL_AUTHORITY),
+        expected_decision_fingerprint="ad559b7b3eaa29ad4a70d991990c0bea6c8d0bf8eaff696d18cf4af85d9ce130",
+        expected_reference_set_sha256="f75b124c7738ee858375bfd45bd46ad5427e29b0e10ac819f289af648627b3d8",
+    )
+    assert calls == []
+    assert result["reason_codes"] == ["provenance_mismatch"]
 
 
 def test_missing_canonical_rubric_fails_before_provider(harness) -> None:

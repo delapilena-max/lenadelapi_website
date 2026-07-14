@@ -92,6 +92,8 @@ def test_written_retry_decision_reaches_real_executor_dry_run_path(
     )
     artifact_path = Path(written["retry_decision_artifact_path"])
 
+    manifest_path = executor.manifest_path(DATE, written["retry_slot_id"])
+    before = manifest_path.read_bytes() if manifest_path.exists() else None
     monkeypatch.setattr(
         sys,
         "argv",
@@ -101,9 +103,10 @@ def test_written_retry_decision_reaches_real_executor_dry_run_path(
     stdout = capsys.readouterr().out
     assert "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===" in stdout
     assert f"slot_id                 : {written['retry_slot_id']}" in stdout
-    assert str(executor.manifest_path(DATE, written["retry_slot_id"])) in stdout
+    assert str(manifest_path) in stdout
     assert "=== RESULT: no subprocess call, no network call, no file written. Dry-run only. ===" in stdout
-    assert not executor.manifest_path(DATE, written["retry_slot_id"]).exists()
+    after = manifest_path.read_bytes() if manifest_path.exists() else None
+    assert after == before
 
 
 def test_tampered_retry_decision_fails_closed(tmp_path: Path) -> None:

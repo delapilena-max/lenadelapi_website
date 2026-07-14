@@ -24,6 +24,7 @@ from pipeline.qa import lena_higgsfield_failure_memory as failure_memory  # noqa
 from pipeline.qa import lena_photo_qa  # noqa: E402
 from tools import lena_higgsfield_qa_bridge_v1 as qa_bridge  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff  # noqa: E402
+from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff  # noqa: E402
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector  # noqa: E402
 
 
@@ -90,6 +91,7 @@ OBSERVATION_KEYS = (
     "body_silhouette_continuity",
     "distinctive_marks",
     "lena_reference_soul_consistency",
+    "no_background_identity_duplication",
     "required_action",
     "gaze",
     "posture",
@@ -135,6 +137,7 @@ ALLOWED_REASON_CODES_BY_OBSERVATION = {
     "body_silhouette_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
     "distinctive_marks": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
     "lena_reference_soul_consistency": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
+    "no_background_identity_duplication": {"wrong_person_or_identity_collapse"},
     "required_action": {"required_action_missed"},
     "gaze": {"gaze_missed"},
     "posture": {"posture_missed"},
@@ -460,7 +463,7 @@ def _validate_model_authority(path: Path, expected_sha: str, commit: str, provid
     return {"path": str(path.resolve()), "sha256": expected_sha, "provider": provider, "approved_model": approved_model}
 
 
-def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _validate_selected_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
         artifact = handoff._read_artifact(path)
         candidate = handoff._validate_shape(artifact)
@@ -471,11 +474,60 @@ def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     return artifact, candidate
 
 
+def _retry_candidate_from_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "candidate_id": f"{artifact['retry_slot_id']}::{artifact['recipe_id']}::{artifact['hook_id']}::retry01",
+        "slot_id": artifact["retry_slot_id"],
+        "lane": artifact["lane"],
+        "activity": artifact.get("pose") or "",
+        "recipe_id": artifact["recipe_id"],
+        "hook_id": artifact["hook_id"],
+        "hook_text": artifact.get("hook_text"),
+        "caption_seed": artifact.get("caption_seed"),
+        "pose": artifact.get("pose"),
+        "pose_body_language_id": artifact.get("pose_body_language_id"),
+        "wardrobe_outfit_id": artifact.get("wardrobe_outfit_id"),
+        "visual_style": artifact.get("visual_style"),
+        "camera_text": artifact.get("camera_text"),
+        "lighting_text": artifact.get("lighting_text"),
+        "prompt_sha256": artifact["retry_prompt_sha256"],
+    }
+
+
+def _validate_retry_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        artifact = retry_handoff._validate_retry_decision_artifact(path)
+        correction_path = Path(str(artifact.get("source_retry_plan_correction_artifact_path") or "")).resolve()
+        _, _, _, original_decision, _, _, _ = retry_handoff._validate_correction_artifact(correction_path)
+    except retry_handoff.RetryDecisionError as exc:
+        raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
+    artifact = dict(artifact)
+    artifact["authority_commit"] = original_decision["authority_commit"]
+    candidate = _retry_candidate_from_artifact(artifact)
+    return artifact, candidate
+
+
+def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
+    try:
+        artifact = handoff._read_artifact(path)
+    except handoff.ConsumerError as exc:
+        raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
+    schema_version = artifact.get("schema_version")
+    if schema_version == selector.SCHEMA_VERSION:
+        decision, candidate = _validate_selected_decision(path)
+        return decision, candidate, "selected_candidate"
+    if schema_version == retry_handoff.SCHEMA_VERSION:
+        decision, candidate = _validate_retry_decision(path)
+        return decision, candidate, "retry_decision"
+    raise BoundaryError("decision_binding_mismatch", "wrong_schema_version: artifact is not a Lena pre-generation candidate decision or retry decision")
+
+
 def _validate_manifest(
     path: Path,
     decision: dict[str, Any],
     candidate: dict[str, Any],
     image: dict[str, Any],
+    decision_kind: str,
 ) -> dict[str, Any]:
     manifest = _read_json_object(path, "provenance_mismatch", "Higgsfield result manifest")
     expected = {
@@ -515,6 +567,9 @@ def _validate_manifest(
     conflict_terms = manifest.get("expression_scene_conflict_terms")
     if not isinstance(conflict_terms, list) or any(not isinstance(item, str) or not item for item in conflict_terms):
         raise BoundaryError("provenance_mismatch", "manifest expression_scene_conflict_terms must be a list of nonempty strings")
+    retry_count = manifest.get("retry_count")
+    if type(retry_count) is not int:
+        raise BoundaryError("provenance_mismatch", "manifest retry_count must be an integer")
     exact_context = {
         "job_type": identity.EXPECTED_JOB_TYPE,
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
@@ -524,12 +579,42 @@ def _validate_manifest(
         "wardrobe_outfit_id": candidate.get("wardrobe_outfit_id"),
         "effective_wardrobe_silhouette_class": candidate.get("visual_style"),
         "live_attempt_count": 1,
-        "retry_count": 0,
         "image_format_detected": {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}[image["format"]],
     }
     for key in ("live_attempt_count", "retry_count"):
         if type(manifest.get(key)) is not int:
             raise BoundaryError("provenance_mismatch", f"manifest {key} must be an integer")
+    if decision_kind == "selected_candidate":
+        exact_context["retry_count"] = 0
+    else:
+        retry_contract = manifest.get("retry_execution_contract")
+        if not isinstance(retry_contract, dict):
+            raise BoundaryError("provenance_mismatch", "retry manifest must carry retry_execution_contract")
+        expected_retry_contract = {
+            "schema_version": retry_handoff.RETRY_EXECUTION_CONTRACT_SCHEMA_VERSION,
+            "retry_decision_fingerprint_sha256": decision["retry_decision_fingerprint_sha256"],
+            "retry_attempt": decision["retry_attempt"],
+            "retry_cap": decision["retry_cap"],
+            "original_slot_id": decision["original_slot_id"],
+            "retry_slot_id": decision["retry_slot_id"],
+            "original_prompt_sha256": decision["original_prompt_sha256"],
+            "retry_prompt_sha256": decision["retry_prompt_sha256"],
+            "background_identity_constraint": decision["prompt_mutation"]["added_constraint"],
+            "source_original_decision_fingerprint_sha256": decision["source_original_decision_fingerprint_sha256"],
+            "source_original_manifest_path": decision["source_original_manifest_path"],
+            "source_original_manifest_sha256": decision["source_original_manifest_sha256"],
+            "source_original_provider_job_evidence": decision["source_original_provider_job_evidence"],
+            "source_valid_human_rejection_artifact_path": decision["source_valid_human_rejection_artifact_path"],
+            "source_valid_human_rejection_artifact_sha256": decision["source_valid_human_rejection_artifact_sha256"],
+            "source_invalid_retry_plan_artifact_path": decision["source_invalid_retry_plan_artifact_path"],
+            "source_invalid_retry_plan_artifact_sha256": decision["source_invalid_retry_plan_artifact_sha256"],
+            "source_retry_plan_correction_artifact_path": decision["source_retry_plan_correction_artifact_path"],
+            "source_retry_plan_correction_artifact_sha256": decision["source_retry_plan_correction_artifact_sha256"],
+        }
+        if retry_contract != expected_retry_contract:
+            raise BoundaryError("provenance_mismatch", "retry manifest retry_execution_contract does not match the retry decision lineage exactly")
+        # Existing executor manifests write retry_count=0 even for bounded retries; bind to the real on-disk contract rather than inventing a new meaning.
+        exact_context["retry_count"] = 0
     mismatches = [f"{key}: expected {value!r}, got {manifest.get(key)!r}" for key, value in exact_context.items() if manifest.get(key) != value]
     if mismatches:
         raise BoundaryError("provenance_mismatch", "manifest generation context mismatch: " + "; ".join(mismatches))
@@ -775,6 +860,7 @@ def _load_canonical_rubric(authority_commit: str) -> dict[str, Any]:
         "visual_qa_rules": rules,
         "required_semantic_dimensions": {
             "identity": ["face", "hair", "apparent age", "skin", "body silhouette", "Lena reference consistency"],
+            "background_identity_duplication": ["recognizable background person must not read as Lena or a second Lena-like identity"],
             "scene_coherence": ["action", "gaze", "posture", "prop interaction", "required visual evidence", "environment", "wardrobe"],
             "physical_realism": ["anatomy", "hands and fingers", "limbs", "reflections", "object contact", "impossible geometry", "body distortion"],
             "aesthetic_quality": ["composition", "lighting", "premium visual discipline", "natural asymmetry", "overprocessing", "clutter"],
@@ -799,10 +885,15 @@ def _review_request(
     rubric: dict[str, Any],
     model_authority: dict[str, Any],
 ) -> dict[str, Any]:
+    active_fingerprint = (
+        decision["decision_fingerprint_sha256"]
+        if "decision_fingerprint_sha256" in decision
+        else decision["retry_decision_fingerprint_sha256"]
+    )
     return {
         "schema_version": "lena_visual_review_request_v1",
         "influencer_id": "lena",
-        "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
+        "decision_fingerprint_sha256": active_fingerprint,
         "candidate_id": candidate["candidate_id"],
         "slot_id": candidate["slot_id"],
         "lane": candidate["lane"],
@@ -823,6 +914,10 @@ def _review_request(
             "wardrobe_outfit_name": manifest.get("wardrobe_outfit_name"),
             "wardrobe_silhouette_class": manifest.get("wardrobe_silhouette_class"),
             "effective_wardrobe_silhouette_class": manifest.get("effective_wardrobe_silhouette_class"),
+            "background_identity_constraint": (
+                "Recognizable Lena identity must not appear on any secondary or background person. "
+                "Any background person must be non-recognizable, clearly distinct from Lena, or both, and must never read as a second Lena-like identity."
+            ),
         },
         "canonical_semantic_rubric": rubric,
         "canonical_semantic_rubric_sha256": _sha256_bytes(_canonical_bytes(rubric)),
@@ -831,7 +926,11 @@ def _review_request(
         "allowed_reason_codes": sorted(HARD_STOP_CODES | RETRYABLE_CODES),
         "visual_provider": provider,
         "visual_model": model,
-        "instruction": "Report observations only. Do not choose a disposition.",
+        "instruction": (
+            "Report structured observations only. Do not choose a disposition. "
+            "You must explicitly judge whether any secondary or background person carries a recognizable Lena-like identity; "
+            "if yes, fail no_background_identity_duplication with wrong_person_or_identity_collapse."
+        ),
     }
 
 
@@ -993,16 +1092,21 @@ def evaluate_photo_qa_disposition(
     try:
         if not isinstance(reference_authority_artifact, Path) or not SHA256_RE.fullmatch(str(reference_authority_sha256)):
             raise BoundaryError("identity_evidence_invalid", "committed identity-reference authority path and SHA-256 are required")
-        decision, candidate = _validate_decision(decision_path.resolve())
+        decision, candidate, decision_kind = _validate_decision(decision_path.resolve())
         image = _inspect_image(image_path.resolve(), generated=True)
         if not SHA256_RE.fullmatch(str(expected_image_sha256)) or image["sha256"] != expected_image_sha256:
             raise BoundaryError(
                 "image_hash_mismatch",
                 f"generated image SHA does not match explicit expected SHA: expected {expected_image_sha256}, got {image['sha256']}",
             )
-        manifest = _validate_manifest(manifest_path.resolve(), decision, candidate, image)
+        manifest = _validate_manifest(manifest_path.resolve(), decision, candidate, image, decision_kind)
         identity_evidence = _validate_identity_evidence(
             identity_evidence_path.resolve(), decision, candidate, manifest, image
+        )
+        active_fingerprint = (
+            decision["decision_fingerprint_sha256"]
+            if decision_kind == "selected_candidate"
+            else decision["retry_decision_fingerprint_sha256"]
         )
         references, reference_set_sha, reference_authority = _validate_references(
             reference_specs, reference_authority_artifact.resolve(), reference_authority_sha256, decision["authority_commit"]
@@ -1023,7 +1127,7 @@ def evaluate_photo_qa_disposition(
                 decision["authority_commit"], str(visual_provider or ""), str(visual_model or ""),
             )
             bindings = {
-                "decision fingerprint": (expected_decision_fingerprint, decision["decision_fingerprint_sha256"]),
+                "decision fingerprint": (expected_decision_fingerprint, active_fingerprint),
                 "image SHA": (expected_image_sha256, image["sha256"]),
                 "reference-set SHA": (expected_reference_set_sha256, reference_set_sha),
             }
@@ -1069,7 +1173,7 @@ def evaluate_photo_qa_disposition(
             "request_binding_sha256": _sha256_bytes(
                 _canonical_bytes(
                     {
-                        "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
+                        "decision_fingerprint_sha256": active_fingerprint,
                         "image_sha256": image["sha256"],
                         "reference_set_sha256": reference_set_sha,
                     }
@@ -1101,7 +1205,7 @@ def evaluate_photo_qa_disposition(
             "generated_at_utc": _utc_now(),
             "authority_commit": decision["authority_commit"],
             "decision_artifact_path": str(decision_path.resolve()),
-            "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
+            "decision_fingerprint_sha256": active_fingerprint,
             "candidate_id": candidate["candidate_id"],
             "slot_id": candidate["slot_id"],
             "lane": candidate["lane"],
@@ -1137,6 +1241,7 @@ def evaluate_photo_qa_disposition(
                 "identity_evidence_path": str(identity_evidence_path.resolve()),
                 "identity_evidence_sha256": _sha256_file(identity_evidence_path),
                 "identity_verification_result": identity_evidence.get("verification_result"),
+                "decision_kind": decision_kind,
                 "failure_memory": memory_evidence,
                 "canonical_qa_contract": canonical_qa_contract,
             },
