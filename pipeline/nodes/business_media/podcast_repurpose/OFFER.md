@@ -1,9 +1,12 @@
 # Offer — podcast_repurpose
 
+**Primary framing:** Autonomous Content Operations Engine
+
 ## The pitch (one line)
 
-> "I turn your existing videos, podcasts, calls, and business knowledge into a month of
-> short-form social content."
+> "I run a managed content operations engine for your existing media and business
+> knowledge - strategy, repurposing, QA, repair, client approval, publishing support,
+> provenance, metrics, and learning."
 
 ## Who it's for
 
@@ -12,6 +15,9 @@ system: podcast hosts, coaches/consultants/course creators, local/regional servi
 businesses with raw iPhone clips and testimonials, any small business posting long-form
 with no short-form presence. Full detail:
 `pipeline/change_notes/business_media_node_pivot_plan.md` §4.
+
+This is a done-for-you managed content operation, not generic AI posts. The buyer is
+getting a reliable human-approved content workflow, not a self-serve platform.
 
 ## Proposed monthly package (hypothesis, not priced/committed yet)
 
@@ -56,6 +62,21 @@ variants, light post-batch notes). Reasoning, not evidence:
 has run. Treat it as the opening assumption for the first 1–3 pricing conversations
 only, per the pivot memo's Day 4 pilot-outreach step (§10) and Day 7 review-and-adjust
 step.
+
+## Current pilot-ready offer
+
+The pilot-ready working offer is one managed pilot package at **$1,250/month**.
+That price is intentionally a single, internally consistent pilot target for the
+current commercialization route, and it is still unvalidated.
+
+The earlier **$997/month** anchor remains historical context from the exploratory
+phase only. It can be referenced as prior hypothesis, but it is not the current
+pilot-ready offer price.
+
+Scope remains the managed content-operation package above: strategy, repurposing,
+QA, repair, client approval, publishing support, provenance, metrics, and learning.
+The client is buying a reliable human-approved content workflow, not generic AI
+posts or a self-serve system.
 
 ## What's explicitly out of scope for now
 

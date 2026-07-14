@@ -9,25 +9,30 @@ actually exists in this repo as of 2026-07-07, not aspirational architecture.
 
 ## 1. New positioning
 
-`content_bot` is no longer framed as "an AI influencer node system" (Lena only). It is
-reframed as **horizontal media production infrastructure**: a repo capable of running
-multiple independent "media node" types, each turning some raw input into finished,
-platform-ready content, each with its own folder, its own docs, its own generation/QA/
-publish rules.
+`content_bot` is horizontal media production infrastructure, not a one-off Lena-only
+influencer system. It is a repo capable of running multiple independent media-node
+types, each turning raw input into finished, platform-ready content, each with its own
+folder, its own docs, its own generation/QA/publish rules.
 
-Lena (the AI-influencer photo/video pipeline) was always the **first node built** —
-she just happened to be built before this framing existed. Nothing about her changes
-technically; what changes is how the repo is described and how the next node gets built
-next to her, not instead of her.
+The binding commercialization route selected on 2026-07-14 is:
+
+1. Sell managed autonomous content production first.
+2. Use Lena as the flagship owned-media property and proof-producing case study.
+3. Productize or license the infrastructure only after proof from Lena and paying
+   managed clients.
+
+If this conflicts with older exploratory commercialization language in this memo or in
+the node docs, this route controls. Lena remains the hardest proof node, not the whole
+business, and `content_bot` remains horizontal infrastructure throughout.
 
 ## 2. Revenue Lane vs. Lena R&D Lane
 
 | | **Lena R&D / Demo Lane** | **Revenue Lane (new)** |
 |---|---|---|
-| Role | Stress-test node. Proves the infrastructure (identity continuity, QA schema, folder-native agent docs, repair doctrine, continuity discipline) works under a hard, adversarial case — a single photoreal AI persona across constant novel prompts. | Where money actually gets made. Business-facing media nodes serving paying clients. |
-| Status | **Generation frozen** pending the Kling visual-reference API answer (see `NEXT_SESSION_START.md`'s RENDER FREEZE banner). Frozen ≠ abandoned — nothing is deleted, downgraded, or deprioritized as infrastructure. | **Active build target**, starting now. |
-| First product | None yet (never published) | **Podcast / Long-Form Repurposing Node** |
-| What it's for | Learning: does the QA-schema pattern, the folder-native agent pattern, the repair-doctrine pattern, the continuity-file discipline all hold up? Yes — proven across this session's wardrobe-fix, schema-v2, and root-cause work. | Applying those same proven patterns to a business offer that can be sold this week, without waiting on Lena's Kling blocker. |
+| Role | Stress-test node. Proves the infrastructure (identity continuity, QA schema, folder-native agent docs, repair doctrine, continuity discipline) works under a hard, adversarial case - a single photoreal AI persona across constant novel prompts. | Managed service lane. This is the Autonomous Content Operations Engine: strategy -> generation/repurposing -> QA -> repair -> client approval -> publishing -> provenance -> metrics -> learning. |
+| Status | **Generation frozen** pending the Kling visual-reference API answer (see `NEXT_SESSION_START.md`'s RENDER FREEZE banner). Frozen != abandoned - nothing is deleted, downgraded, or deprioritized as infrastructure. | **Active build target**, starting now. First sellable wedge: `podcast_repurpose`. |
+| First product | None yet (never published) | **Managed content operations pilot** |
+| What it's for | Learning: does the QA-schema pattern, the folder-native agent pattern, the repair-doctrine pattern, the continuity-file discipline all hold up? Yes - proven across this session's wardrobe-fix, schema-v2, and root-cause work. | Applying those same proven patterns to a reliable done-for-you content operation that a client can buy without needing to run the machinery themselves. |
 
 **This is not a demotion.** Lena is the hardest node to get right (identity continuity
 across arbitrary generative image content) and everything learned building her
@@ -38,9 +43,12 @@ fast instead of from scratch.
 
 **Internal name:** `business_media_node` / `podcast_repurpose`
 
+**Primary framing:** **Autonomous Content Operations Engine**
+
 **External framing (the actual pitch):**
-> "I turn your existing videos, podcasts, calls, and business knowledge into a month of
-> short-form social content."
+> "I run a managed content operations engine for your existing media and business
+> knowledge - strategy, repurposing, QA, repair, client approval, publishing support,
+> provenance, metrics, and learning."
 
 ## 4. First target customers / ideal customer profiles
 
@@ -105,6 +113,13 @@ conversation.
 
 Every step above is manual/human-run for the MVP. No code is being built this turn —
 this is the workflow the future code should encode, once approved.
+
+The manual workflow is the managed-service proof path. It is intentionally not a
+self-serve product, SaaS, or multi-tenant platform.
+
+Pilot pricing hypothesis: **$1,250/month** for the first managed pilot package above.
+The earlier $997/month anchor remains an earlier exploratory hypothesis, but it is not
+the current pilot-ready offer price.
 
 ## 7. Folder / node structure
 

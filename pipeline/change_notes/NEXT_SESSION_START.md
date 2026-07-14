@@ -3986,3 +3986,110 @@ This checkpoint authorizes no provider call, generation, clone creation, new
 influencer creation, queue action, publishing action, analytics mutation, or
 multi-influencer refactor. Its purpose is to make one priority explicit: do not
 forget horizontal scaling, but finish Lena first.
+
+---
+
+## 2026-07-14 -- Commercialization route selected
+
+The binding commercialization route is now selected and controls wherever
+older exploratory commercialization language conflicts with it:
+
+1. Sell managed autonomous content production first.
+2. Use Lena as the flagship owned-media property and proof-producing case
+   study.
+3. Productize or license the infrastructure only after proof from Lena and
+   paying managed clients.
+
+Primary business framing: **Autonomous Content Operations Engine**.
+
+This is a done-for-you managed content operation covering:
+strategy -> generation/repurposing -> QA -> repair -> client approval ->
+publishing -> provenance -> metrics -> learning.
+
+The client buys a reliable managed content operation, not generic AI posts.
+Human approval remains explicit. Lena is the flagship owned-media case study
+and hardest proof node, but she is not the entire business. `content_bot`
+remains horizontal infrastructure. `podcast_repurpose` is the first sellable
+service wedge, not the permanent boundary of the company.
+
+Pilot-ready offer target: one managed pilot in the approximately $1,000-
+$1,500 range. The earlier $997/month anchor remains historical context as an
+earlier hypothesis; the current pilot-ready offer uses a single consistent
+working price of $1,250/month for the first managed pilot package. This is
+still unvalidated and does not imply a completed pilot, sent outreach, or a
+validated pricing model.
+
+This new decision does not lift the standing publish freeze, does not change
+any queue/upload/provider/operator-approval restriction, and does not authorize
+SaaS, a multi-tenant platform, or a generalized self-serve product yet.
+
+---
+
+## 2026-07-13 -- Automated Lena photo-QA disposition checkpoint
+
+Current committed HEAD remains
+`77594565a06002b28eb1378ef6bf3e98348362bc`.
+
+A new automated Lena photo-QA disposition boundary is implemented locally but
+remains untracked, unstaged, and uncommitted in exactly:
+
+- `tools/lena_photo_qa_disposition_v1.py`
+- `tests/test_lena_photo_qa_disposition_v1.py`
+
+The boundary binds one selected Higgsfield still through decision, manifest,
+image, identity-sidecar, trusted-reference, semantic-review, local technical
+QA, and failure-memory evidence to exactly one deterministic local disposition:
+
+- `accept`
+- `retryable_failure`
+- `hard_stop`
+
+Production semantic acceptance remains fail-closed. A future live semantic
+review requires both a committed trusted-reference authority artifact and a
+separately committed approved-model authority artifact, plus exact decision,
+image, and reference-set bindings. No such production authority is fabricated
+or implicitly approved by this checkpoint.
+
+The current implementation includes:
+
+- no public fixture-observation or reviewer-injection bypass;
+- committed, exact-path and exact-hash reference authority with repository
+  containment;
+- committed Anthropic model authority and exact approved-model binding;
+- exact provider-payload byte revalidation using the same in-memory bytes that
+  are encoded for a future call;
+- strict integer validation for generation-attempt and retry counters;
+- committed pose and expression/gaze bank validation;
+- committed expression safe-fallback text, reason, boolean, and conflict-term
+  validation;
+- committed wardrobe ID, canonical name, and wardrobe-prompt validation while
+  preserving the distinction between catalog and effective silhouettes;
+- a complete committed canonical semantic rubric;
+- observations-only model output with deterministic local disposition mapping;
+- immutable, full-image-SHA disposition identity and fail-closed collisions;
+- no automatic retry, generation, approval, queue, promotion, upload,
+  publication, analytics, learning, world-state, `.env`, or freeze mutation.
+
+Latest local verification:
+
+- focused photo-QA disposition suite: `117 passed, 1 skipped`;
+- the one skip is the Windows symlink-creation regression; containment resolves
+  paths before repository checks and the outside-repository traversal test
+  passes;
+- adjacent Higgsfield, selector, handoff, packaging, and Reel regressions:
+  `194 passed`;
+- `git diff --check`: passed;
+- supplemental two-file whitespace checks: passed;
+- syntax compilation: passed;
+- CLI help: passed.
+
+No provider call or real visual review occurred. No media was generated. No
+downstream pipeline state changed. The standing publish freeze remains fully in
+force, and historical assets and evidence remain valid and immutable.
+
+### Exact next action
+
+Perform one final independent read-only review of the exact two-file automated
+photo-QA disposition slice. If approved as-is, selectively commit only those
+two files. Do not stage this continuity document with that implementation
+unless a separate documentation commit is explicitly requested.
