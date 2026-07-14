@@ -293,7 +293,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
 
         decision_path = _require_repo_contained(qa_result.get("decision_artifact_path"), "decision artifact path")
         try:
-            decision, candidate = lena_photo_qa_disposition._validate_decision(decision_path)
+            decision, candidate, decision_kind = lena_photo_qa_disposition._validate_decision(decision_path)
         except lena_photo_qa_disposition.BoundaryError as exc:
             raise ResolveError(f"decision binding failed: {exc.detail}") from exc
         except Exception as exc:
@@ -304,7 +304,13 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
                 (qa_result.get("generation_provenance") or {}).get("manifest_path"),
                 "generation manifest path",
             )
-            manifest = lena_photo_qa_disposition._validate_manifest(manifest_path, decision, candidate, image)
+            manifest = lena_photo_qa_disposition._validate_manifest(
+                manifest_path,
+                decision,
+                candidate,
+                image,
+                decision_kind,
+            )
         except lena_photo_qa_disposition.BoundaryError as exc:
             raise ResolveError(f"manifest binding failed: {exc.detail}") from exc
 
@@ -405,6 +411,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
             "identity_evidence_path": str(identity_evidence_path),
             "identity_evidence_sha256": identity_sha,
             "identity_verification_result": identity_evidence.get("verification_result"),
+            "decision_kind": decision_kind,
         }
         mismatches.extend(
             f"qa_inputs.{key}: expected {expected!r}, got {qa_inputs.get(key)!r}"
