@@ -31,6 +31,12 @@ SCHEMA_VERSION = "lena_photo_qa_disposition_v1"
 VISUAL_SCHEMA_VERSION = "lena_visual_observations_v1"
 REFERENCE_AUTHORITY_SCHEMA_VERSION = "lena_identity_reference_authority_v1"
 MODEL_AUTHORITY_SCHEMA_VERSION = "lena_visual_model_authority_v1"
+MODEL_AUTHORITY_ID = "lena_visual_model_authority_v1"
+APPROVED_VISUAL_PROVIDER = "anthropic"
+APPROVED_VISUAL_MODEL = "claude-sonnet-5"
+MODEL_AUTHORITY_KEYS = {
+    "schema_version", "influencer_id", "authority_id", "provider", "approved_model",
+}
 OUTPUT_ROOT = ROOT / "pipeline" / "asset_review" / "lena"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ALLOWED_IMAGE_FORMATS = {"PNG", "JPEG", "WEBP"}
@@ -293,7 +299,8 @@ def _exact_lexical_repo_path(raw: str, label: str) -> Path:
 
 
 def _committed_json_authority(
-    path: Path, expected_sha: str, commit: str, schema: str, *, require_self_commit: bool = True
+    path: Path, expected_sha: str, commit: str, schema: str, *, require_self_commit: bool = True,
+    exact_keys: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     if not SHA256_RE.fullmatch(str(expected_sha)):
         raise BoundaryError("identity_evidence_invalid", "authority artifact requires an explicit SHA-256")
@@ -301,9 +308,17 @@ def _committed_json_authority(
     if _sha256_bytes(committed) != expected_sha:
         raise BoundaryError("identity_evidence_invalid", "authority artifact SHA-256 does not match committed bytes")
     _require_crlf_lf_equivalent(path, committed)
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError(f"duplicate JSON key: {key}")
+            value[key] = item
+        return value
+
     try:
-        value = json.loads(committed.decode("utf-8-sig"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        value = json.loads(committed.decode("utf-8-sig"), object_pairs_hook=reject_duplicate_keys)
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise BoundaryError("identity_evidence_invalid", "authority artifact is not valid JSON") from exc
     if not isinstance(value, dict) or value.get("schema_version") != schema:
         raise BoundaryError("identity_evidence_invalid", f"authority artifact must use schema {schema}")
@@ -311,6 +326,8 @@ def _committed_json_authority(
         raise BoundaryError("identity_evidence_invalid", "authority artifact influencer/commit binding is invalid")
     if require_self_commit and value.get("authority_commit") != commit:
         raise BoundaryError("identity_evidence_invalid", "authority artifact influencer/commit binding is invalid")
+    if exact_keys is not None and set(value) != exact_keys:
+        raise BoundaryError("identity_evidence_invalid", "authority artifact fields do not match the exact schema")
     return value
 
 
@@ -429,11 +446,16 @@ def _validate_references(
 
 
 def _validate_model_authority(path: Path, expected_sha: str, commit: str, provider: str, model: str) -> dict[str, Any]:
-    authority = _committed_json_authority(path, expected_sha, commit, MODEL_AUTHORITY_SCHEMA_VERSION)
-    if provider != "anthropic" or authority.get("provider") != "anthropic":
+    authority = _committed_json_authority(
+        path, expected_sha, commit, MODEL_AUTHORITY_SCHEMA_VERSION,
+        require_self_commit=False, exact_keys=MODEL_AUTHORITY_KEYS,
+    )
+    if authority.get("authority_id") != MODEL_AUTHORITY_ID:
+        raise BoundaryError("visual_review_unavailable", "visual model authority ID is invalid")
+    if provider != APPROVED_VISUAL_PROVIDER or authority.get("provider") != APPROVED_VISUAL_PROVIDER:
         raise BoundaryError("visual_review_unavailable", "visual review provider must be independently approved as anthropic")
     approved_model = authority.get("approved_model")
-    if not isinstance(model, str) or not model or approved_model != model:
+    if approved_model != APPROVED_VISUAL_MODEL or model != APPROVED_VISUAL_MODEL or approved_model != model:
         raise BoundaryError("visual_review_unavailable", "requested visual model does not exactly match committed model authority")
     return {"path": str(path.resolve()), "sha256": expected_sha, "provider": provider, "approved_model": approved_model}
 
@@ -841,7 +863,7 @@ def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
         }
         for key in VISUAL_OBSERVATION_KEYS
     }
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(max_retries=0)
     response = client.messages.create(
         model=request["visual_model"],
         max_tokens=4096,

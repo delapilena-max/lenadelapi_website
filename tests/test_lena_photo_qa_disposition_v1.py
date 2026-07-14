@@ -5,6 +5,7 @@ import inspect
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -577,6 +578,66 @@ def test_single_provider_exception_becomes_hard_stop_without_retry(harness) -> N
     assert result["provider_called"] is True
 
 
+def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "bound.png"
+    image_bytes = b"bound image bytes"
+    image_path.write_bytes(image_bytes)
+    client_options = []
+    provider_calls = []
+    observations = _all_pass()
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            provider_calls.append(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(
+                type="tool_use", name="submit_visual_observations", input=observations,
+            )])
+
+    def fake_anthropic(**kwargs):
+        client_options.append(kwargs)
+        return SimpleNamespace(messages=FakeMessages())
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
+    request = {
+        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "identity_references": [],
+        "visual_model": disposition.APPROVED_VISUAL_MODEL,
+    }
+    assert disposition.call_anthropic_visual_review(request) == observations
+    assert client_options == [{"max_retries": 0}]
+    assert len(provider_calls) == 1
+    assert provider_calls[0]["model"] == disposition.APPROVED_VISUAL_MODEL
+
+
+def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monkeypatch) -> None:
+    image_path = tmp_path / "bound.png"
+    image_bytes = b"bound image bytes"
+    image_path.write_bytes(image_bytes)
+    client_options = []
+    provider_calls = []
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            provider_calls.append(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text="not structured")])
+
+    def fake_anthropic(**kwargs):
+        client_options.append(kwargs)
+        return SimpleNamespace(messages=FakeMessages())
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
+    request = {
+        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "identity_references": [],
+        "visual_model": disposition.APPROVED_VISUAL_MODEL,
+    }
+    with pytest.raises(disposition.BoundaryError, match="exactly one structured observation block"):
+        disposition.call_anthropic_visual_review(request)
+    assert client_options == [{"max_retries": 0}]
+    assert len(provider_calls) == 1
+    assert provider_calls[0]["model"] == disposition.APPROVED_VISUAL_MODEL
+
+
 def test_output_filename_contains_full_image_sha_and_old_qa_is_untouched(harness) -> None:
     old_qa = harness["tmp_path"] / "output" / harness["date"] / f"{harness['slot']}_qa.json"
     _write_json(old_qa, {"historical": True})
@@ -699,15 +760,18 @@ def test_failure_memory_never_constructs_none_pose_key() -> None:
 
 
 def test_model_binding_requires_exact_independently_approved_identity(monkeypatch) -> None:
-    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args: {
+    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args, **kwargs: {
         "schema_version": disposition.MODEL_AUTHORITY_SCHEMA_VERSION,
-        "influencer_id": "lena", "authority_commit": "a" * 40,
-        "provider": "anthropic", "approved_model": "approved-model",
+        "influencer_id": "lena",
+        "authority_id": disposition.MODEL_AUTHORITY_ID,
+        "provider": "anthropic", "approved_model": disposition.APPROVED_VISUAL_MODEL,
     })
     with pytest.raises(disposition.BoundaryError):
         disposition._validate_model_authority(Path("authority.json"), "1" * 64, "a" * 40, "anthropic", "arbitrary-model")
-    approved = disposition._validate_model_authority(Path("authority.json"), "1" * 64, "a" * 40, "anthropic", "approved-model")
-    assert approved["approved_model"] == "approved-model"
+    approved = disposition._validate_model_authority(
+        Path("authority.json"), "1" * 64, "a" * 40, "anthropic", disposition.APPROVED_VISUAL_MODEL,
+    )
+    assert approved["approved_model"] == disposition.APPROVED_VISUAL_MODEL
 
 
 @pytest.mark.parametrize("updates", [

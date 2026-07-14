@@ -1,0 +1,7 @@
+{
+  "schema_version": "lena_visual_model_authority_v1",
+  "influencer_id": "lena",
+  "authority_id": "lena_visual_model_authority_v1",
+  "provider": "anthropic",
+  "approved_model": "claude-sonnet-5"
+}
