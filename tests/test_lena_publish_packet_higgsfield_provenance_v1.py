@@ -13,6 +13,8 @@ from tools.lena_build_publish_packet_v1 import (
     build_queue_draft,
     resolve_packet_inputs_higgsfield,
     ResolveError,
+    write_packet,
+    write_queue_draft,
 )
 
 # tools/lena_build_publish_packet_v1.py imports lena_higgsfield_qa_bridge_v1
@@ -312,6 +314,56 @@ def _bridge_context(tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPa
     }
 
 
+def _retry_decision(ctx: dict, *, fingerprint: str | None = None, retry_slot_id: str | None = None) -> dict:
+    return {
+        "authority_commit": ctx["artifact"]["authority_commit"],
+        "as_of_date": ctx["date"],
+        "retry_decision_fingerprint_sha256": fingerprint or ctx["artifact"]["decision_fingerprint_sha256"],
+        "retry_attempt": 1,
+        "retry_cap": 1,
+        "original_slot_id": "lenagate-original-photo",
+        "retry_slot_id": retry_slot_id or ctx["slot"],
+        "original_prompt_sha256": "6" * 64,
+        "retry_prompt_sha256": ctx["artifact"]["prompt_sha256"],
+        "prompt_mutation": {"added_constraint": "Background identity safety"},
+        "source_original_decision_fingerprint_sha256": "7" * 64,
+        "source_original_manifest_path": str(ctx["manifest_path"]),
+        "source_original_manifest_sha256": disposition._sha256_file(ctx["manifest_path"]),
+        "source_original_provider_job_evidence": {
+            "provider": "higgsfield",
+            "provider_job_id": "job-123",
+            "provider_status": "completed",
+        },
+        "source_valid_human_rejection_artifact_path": str(ctx["decision_path"]),
+        "source_valid_human_rejection_artifact_sha256": disposition._sha256_file(ctx["decision_path"]),
+        "source_retry_plan_correction_artifact_path": str(ctx["authority_path"]),
+        "source_retry_plan_correction_artifact_sha256": disposition._sha256_file(ctx["authority_path"]),
+    }
+
+
+def _retry_candidate(ctx: dict) -> dict:
+    return {
+        "candidate_id": ctx["artifact"]["candidate_id"],
+        "slot_id": ctx["slot"],
+        "lane": ctx["artifact"]["lane"],
+        "recipe_id": ctx["artifact"]["recipe_id"],
+        "hook_id": ctx["artifact"]["hook_id"],
+        "prompt_sha256": ctx["artifact"]["prompt_sha256"],
+    }
+
+
+def _bridge_manifest(ctx: dict) -> dict:
+    return {
+        "provider": ctx["artifact"]["generation_provenance"]["provider"],
+        "job_type": ctx["artifact"]["generation_provenance"]["job_type"],
+        "provider_job_id": ctx["artifact"]["generation_provenance"]["provider_job_id"],
+        "provider_status": ctx["artifact"]["generation_provenance"]["provider_status"],
+        "custom_reference_id": ctx["artifact"]["generation_provenance"]["custom_reference_id"],
+        "cli_soul_name": ctx["artifact"]["generation_provenance"]["soul_name"],
+        "cli_soul_type": ctx["artifact"]["generation_provenance"]["soul_type"],
+    }
+
+
 def _write_higgsfield_manifest(
     debug_root: Path,
     date_str: str,
@@ -483,57 +535,12 @@ def test_higgsfield_resolution_bridges_accepted_retry_disposition(
     monkeypatch.setattr(
         packet_mod.lena_photo_qa_disposition,
         "_validate_decision",
-        lambda path: (
-            {
-                **{
-                    key: ctx["artifact"][key]
-                    for key in ("authority_commit",)
-                },
-                "decision_fingerprint_sha256": ctx["artifact"]["decision_fingerprint_sha256"],
-                "as_of_date": ctx["date"],
-                "retry_decision_fingerprint_sha256": ctx["artifact"]["decision_fingerprint_sha256"],
-                "retry_attempt": 1,
-                "retry_cap": 1,
-                "original_slot_id": "lenagate-original-photo",
-                "retry_slot_id": ctx["slot"],
-                "original_prompt_sha256": "6" * 64,
-                "retry_prompt_sha256": ctx["artifact"]["prompt_sha256"],
-                "prompt_mutation": {"added_constraint": "Background identity safety"},
-                "source_original_decision_fingerprint_sha256": "7" * 64,
-                "source_original_manifest_path": str(ctx["manifest_path"]),
-                "source_original_manifest_sha256": disposition._sha256_file(ctx["manifest_path"]),
-                "source_original_provider_job_evidence": {
-                    "provider": "higgsfield",
-                    "provider_job_id": "job-123",
-                    "provider_status": "completed",
-                },
-                "source_valid_human_rejection_artifact_path": str(ctx["decision_path"]),
-                "source_valid_human_rejection_artifact_sha256": disposition._sha256_file(ctx["decision_path"]),
-            },
-            {
-                "candidate_id": ctx["artifact"]["candidate_id"],
-                "slot_id": ctx["slot"],
-                "lane": ctx["artifact"]["lane"],
-                "recipe_id": ctx["artifact"]["recipe_id"],
-                "hook_id": ctx["artifact"]["hook_id"],
-                "prompt_sha256": ctx["artifact"]["prompt_sha256"],
-            },
-            "retry_decision",
-        ),
+        lambda path: (_retry_decision(ctx), _retry_candidate(ctx), "retry_decision"),
     )
-    manifest = {
-        "provider": ctx["artifact"]["generation_provenance"]["provider"],
-        "job_type": ctx["artifact"]["generation_provenance"]["job_type"],
-        "provider_job_id": ctx["artifact"]["generation_provenance"]["provider_job_id"],
-        "provider_status": ctx["artifact"]["generation_provenance"]["provider_status"],
-        "custom_reference_id": ctx["artifact"]["generation_provenance"]["custom_reference_id"],
-        "cli_soul_name": ctx["artifact"]["generation_provenance"]["soul_name"],
-        "cli_soul_type": ctx["artifact"]["generation_provenance"]["soul_type"],
-    }
     monkeypatch.setattr(
         packet_mod.lena_photo_qa_disposition,
         "_validate_manifest",
-        lambda path, d, c, i, k: manifest if k == "retry_decision" else pytest.fail("wrong decision_kind"),
+        lambda path, d, c, i, k: _bridge_manifest(ctx) if k == "retry_decision" else pytest.fail("wrong decision_kind"),
     )
 
     resolved = resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
@@ -588,43 +595,100 @@ def test_higgsfield_resolution_rejects_retry_decision_kind_mismatch(
     monkeypatch.setattr(
         packet_mod.lena_photo_qa_disposition,
         "_validate_decision",
-        lambda path: (
-            {
-                "authority_commit": ctx["artifact"]["authority_commit"],
-                "decision_fingerprint_sha256": ctx["artifact"]["decision_fingerprint_sha256"],
-                "as_of_date": ctx["date"],
-                "retry_decision_fingerprint_sha256": ctx["artifact"]["decision_fingerprint_sha256"],
-                "retry_attempt": 1,
-                "retry_cap": 1,
-                "original_slot_id": "lenagate-original-photo",
-                "retry_slot_id": ctx["slot"],
-                "original_prompt_sha256": "6" * 64,
-                "retry_prompt_sha256": ctx["artifact"]["prompt_sha256"],
-                "prompt_mutation": {"added_constraint": "Background identity safety"},
-                "source_original_decision_fingerprint_sha256": "7" * 64,
-                "source_original_manifest_path": str(ctx["manifest_path"]),
-                "source_original_manifest_sha256": disposition._sha256_file(ctx["manifest_path"]),
-                "source_original_provider_job_evidence": {
-                    "provider": "higgsfield",
-                    "provider_job_id": "job-123",
-                    "provider_status": "completed",
-                },
-                "source_valid_human_rejection_artifact_path": str(ctx["decision_path"]),
-                "source_valid_human_rejection_artifact_sha256": disposition._sha256_file(ctx["decision_path"]),
-            },
-            {
-                "candidate_id": ctx["artifact"]["candidate_id"],
-                "slot_id": ctx["slot"],
-                "lane": ctx["artifact"]["lane"],
-                "recipe_id": ctx["artifact"]["recipe_id"],
-                "hook_id": ctx["artifact"]["hook_id"],
-                "prompt_sha256": ctx["artifact"]["prompt_sha256"],
-            },
-            "retry_decision",
-        ),
+        lambda path: (_retry_decision(ctx), _retry_candidate(ctx), "retry_decision"),
     )
 
     with pytest.raises(ResolveError, match="qa_inputs.decision_kind"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_selected_disposition_builds_packet_and_queue_draft_end_to_end(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    out_dir = tmp_path / "packet_out"
+
+    resolved = resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"], out_dir)
+    packet_path = write_packet(resolved, out_dir, force=False)
+    draft_path = write_queue_draft(resolved, packet_path, out_dir, force=False)
+
+    assert packet_path.exists()
+    assert draft_path.exists()
+    packet_text = packet_path.read_text(encoding="utf-8")
+    draft = json.loads(draft_path.read_text(encoding="utf-8"))
+    assert f"# Lena Publish Packet -- {ctx['slot']}" in packet_text
+    assert "accepted lena_photo_qa_disposition_v1 artifact" in packet_text
+    assert draft["caption"] == packet_mod.QUEUE_DRAFT_CAPTION_PLACEHOLDER
+    assert draft["slot_id"] == ctx["slot"]
+    assert draft["metadata"]["qa_path"] == str(ctx["disposition_path"])
+    assert draft["metadata"]["source_slot_id"] == ctx["slot"]
+
+
+def test_higgsfield_retry_disposition_builds_packet_and_queue_draft_end_to_end(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    out_dir = tmp_path / "packet_out"
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["qa_inputs"]["decision_kind"] = "retry_decision"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_decision",
+        lambda path: (_retry_decision(ctx), _retry_candidate(ctx), "retry_decision"),
+    )
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_manifest",
+        lambda path, d, c, i, k: _bridge_manifest(ctx) if k == "retry_decision" else pytest.fail("wrong decision_kind"),
+    )
+
+    resolved = resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"], out_dir)
+    packet_path = write_packet(resolved, out_dir, force=False)
+    draft_path = write_queue_draft(resolved, packet_path, out_dir, force=False)
+
+    assert packet_path.exists()
+    assert draft_path.exists()
+    draft = json.loads(draft_path.read_text(encoding="utf-8"))
+    assert draft["caption"] == packet_mod.QUEUE_DRAFT_CAPTION_PLACEHOLDER
+    assert draft["slot_id"] == ctx["slot"]
+    assert draft["metadata"]["qa_path"] == str(ctx["disposition_path"])
+    assert draft["metadata"]["source_slot_id"] == ctx["slot"]
+
+
+def test_higgsfield_resolution_rejects_retry_decision_missing_active_fingerprint(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["qa_inputs"]["decision_kind"] = "retry_decision"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+    decision = _retry_decision(ctx)
+    del decision["retry_decision_fingerprint_sha256"]
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_decision",
+        lambda path: (decision, _retry_candidate(ctx), "retry_decision"),
+    )
+
+    with pytest.raises(ResolveError, match="retry decision retry_decision_fingerprint_sha256"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_retry_lineage_slot_mismatch(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    value = json.loads(ctx["disposition_path"].read_text(encoding="utf-8"))
+    value["qa_inputs"]["decision_kind"] = "retry_decision"
+    ctx["disposition_path"].write_text(json.dumps(value, indent=2), encoding="utf-8")
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_decision",
+        lambda path: (_retry_decision(ctx, retry_slot_id="wrong-retry-slot"), _retry_candidate(ctx), "retry_decision"),
+    )
+
+    with pytest.raises(ResolveError, match="retry decision retry_slot_id .* does not match candidate slot_id"):
         resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
 
 

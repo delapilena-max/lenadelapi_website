@@ -114,6 +114,134 @@ class QueueDraftWriteError(Exception):
     this is raised."""
 
 
+def _require_nonempty_string(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ResolveError(f"{label} must be a non-empty string")
+    return value
+
+
+def _require_sha256_string(value: Any, label: str) -> str:
+    sha = _require_nonempty_string(value, label)
+    if not lena_photo_qa_disposition.SHA256_RE.fullmatch(sha):
+        raise ResolveError(f"{label} must be a lowercase SHA-256 hex string")
+    return sha
+
+
+def _normalize_decision_binding(
+    decision_path: Path,
+    decision: Dict[str, Any],
+    candidate: Dict[str, Any],
+    decision_kind: str,
+) -> Dict[str, Any]:
+    if decision_kind not in {"selected_candidate", "retry_decision"}:
+        raise ResolveError(f"decision binding kind is unsupported: {decision_kind!r}")
+
+    authority_commit = _require_nonempty_string(decision.get("authority_commit"), "decision authority_commit")
+    as_of_date = _require_nonempty_string(decision.get("as_of_date"), "decision as_of_date")
+    candidate_id = _require_nonempty_string(candidate.get("candidate_id"), "candidate candidate_id")
+    candidate_slot_id = _require_nonempty_string(candidate.get("slot_id"), "candidate slot_id")
+    lane = _require_nonempty_string(candidate.get("lane"), "candidate lane")
+    recipe_id = _require_nonempty_string(candidate.get("recipe_id"), "candidate recipe_id")
+    hook_id = _require_nonempty_string(candidate.get("hook_id"), "candidate hook_id")
+    prompt_sha256 = _require_sha256_string(candidate.get("prompt_sha256"), "candidate prompt_sha256")
+
+    binding = {
+        "decision_kind": decision_kind,
+        "decision_artifact_path": str(decision_path),
+        "authority_commit": authority_commit,
+        "as_of_date": as_of_date,
+        "candidate_id": candidate_id,
+        "slot_id": candidate_slot_id,
+        "source_slot_id": candidate_slot_id,
+        "lane": lane,
+        "recipe_id": recipe_id,
+        "hook_id": hook_id,
+        "prompt_sha256": prompt_sha256,
+        "decision_fingerprint_sha256": None,
+        "retry_provenance": None,
+    }
+    if decision_kind == "selected_candidate":
+        binding["decision_fingerprint_sha256"] = _require_sha256_string(
+            decision.get("decision_fingerprint_sha256"),
+            "selected decision decision_fingerprint_sha256",
+        )
+        return binding
+
+    retry_fingerprint = _require_sha256_string(
+        decision.get("retry_decision_fingerprint_sha256"),
+        "retry decision retry_decision_fingerprint_sha256",
+    )
+    retry_attempt = decision.get("retry_attempt")
+    retry_cap = decision.get("retry_cap")
+    if type(retry_attempt) is not int or type(retry_cap) is not int:
+        raise ResolveError("retry decision retry_attempt/retry_cap must both be integers")
+    if retry_attempt != 1 or retry_cap != 1:
+        raise ResolveError("retry decision retry_attempt/retry_cap must remain exactly 1/1")
+    legacy_fingerprint = decision.get("decision_fingerprint_sha256")
+    if legacy_fingerprint is not None and legacy_fingerprint != retry_fingerprint:
+        raise ResolveError(
+            "retry decision carries an ambiguous legacy decision_fingerprint_sha256 that does not match "
+            "retry_decision_fingerprint_sha256"
+        )
+    retry_slot_id = _require_nonempty_string(decision.get("retry_slot_id"), "retry decision retry_slot_id")
+    if retry_slot_id != candidate_slot_id:
+        raise ResolveError(
+            f"retry decision retry_slot_id {retry_slot_id!r} does not match candidate slot_id {candidate_slot_id!r}"
+        )
+    retry_prompt_sha256 = _require_sha256_string(
+        decision.get("retry_prompt_sha256"),
+        "retry decision retry_prompt_sha256",
+    )
+    if retry_prompt_sha256 != prompt_sha256:
+        raise ResolveError(
+            "retry decision retry_prompt_sha256 does not match candidate prompt_sha256"
+        )
+    binding["decision_fingerprint_sha256"] = retry_fingerprint
+    binding["slot_id"] = retry_slot_id
+    binding["source_slot_id"] = _require_nonempty_string(
+        decision.get("original_slot_id"),
+        "retry decision original_slot_id",
+    )
+    binding["retry_provenance"] = {
+        "retry_attempt": retry_attempt,
+        "retry_cap": retry_cap,
+        "original_prompt_sha256": _require_sha256_string(
+            decision.get("original_prompt_sha256"),
+            "retry decision original_prompt_sha256",
+        ),
+        "retry_prompt_sha256": retry_prompt_sha256,
+        "source_original_decision_fingerprint_sha256": _require_sha256_string(
+            decision.get("source_original_decision_fingerprint_sha256"),
+            "retry decision source_original_decision_fingerprint_sha256",
+        ),
+        "source_original_manifest_path": _require_nonempty_string(
+            decision.get("source_original_manifest_path"),
+            "retry decision source_original_manifest_path",
+        ),
+        "source_original_manifest_sha256": _require_sha256_string(
+            decision.get("source_original_manifest_sha256"),
+            "retry decision source_original_manifest_sha256",
+        ),
+        "source_valid_human_rejection_artifact_path": _require_nonempty_string(
+            decision.get("source_valid_human_rejection_artifact_path"),
+            "retry decision source_valid_human_rejection_artifact_path",
+        ),
+        "source_valid_human_rejection_artifact_sha256": _require_sha256_string(
+            decision.get("source_valid_human_rejection_artifact_sha256"),
+            "retry decision source_valid_human_rejection_artifact_sha256",
+        ),
+        "source_retry_plan_correction_artifact_path": _require_nonempty_string(
+            decision.get("source_retry_plan_correction_artifact_path"),
+            "retry decision source_retry_plan_correction_artifact_path",
+        ) if decision.get("source_retry_plan_correction_artifact_path") is not None else None,
+        "source_retry_plan_correction_artifact_sha256": _require_sha256_string(
+            decision.get("source_retry_plan_correction_artifact_sha256"),
+            "retry decision source_retry_plan_correction_artifact_sha256",
+        ) if decision.get("source_retry_plan_correction_artifact_sha256") is not None else None,
+    }
+    return binding
+
+
 # --- Batch 1: read-only resolution (unchanged) ------------------------------
 
 def _load_daily_manifest(date_str: str) -> Dict[str, Any]:
@@ -298,6 +426,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
             raise ResolveError(f"decision binding failed: {exc.detail}") from exc
         except Exception as exc:
             raise ResolveError(f"decision binding failed: {exc}") from exc
+        decision_binding = _normalize_decision_binding(decision_path, decision, candidate, decision_kind)
 
         try:
             manifest_path = _require_repo_contained(
@@ -358,15 +487,15 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
             raise ResolveError(f"reference authority binding failed: {exc.detail}") from exc
 
         top_level_mismatches = {
-            "authority_commit": decision.get("authority_commit"),
+            "authority_commit": decision_binding["authority_commit"],
             "decision_artifact_path": str(decision_path),
-            "decision_fingerprint_sha256": decision.get("decision_fingerprint_sha256"),
-            "candidate_id": candidate.get("candidate_id"),
-            "slot_id": candidate.get("slot_id"),
-            "lane": candidate.get("lane"),
-            "recipe_id": candidate.get("recipe_id"),
-            "hook_id": candidate.get("hook_id"),
-            "prompt_sha256": candidate.get("prompt_sha256"),
+            "decision_fingerprint_sha256": decision_binding["decision_fingerprint_sha256"],
+            "candidate_id": decision_binding["candidate_id"],
+            "slot_id": decision_binding["slot_id"],
+            "lane": decision_binding["lane"],
+            "recipe_id": decision_binding["recipe_id"],
+            "hook_id": decision_binding["hook_id"],
+            "prompt_sha256": decision_binding["prompt_sha256"],
             "image_path": image["path"],
             "image_sha256": image["sha256"],
         }
@@ -381,7 +510,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
         provenance_expected = {
             "manifest_path": str(manifest_path),
             "manifest_sha256": manifest_sha,
-            "date": decision.get("as_of_date"),
+            "date": decision_binding["as_of_date"],
             "provider": manifest.get("provider"),
             "job_type": manifest.get("job_type"),
             "provider_job_id": manifest.get("provider_job_id"),
@@ -486,7 +615,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
         expected_request_binding_sha = lena_photo_qa_disposition._sha256_bytes(
             lena_photo_qa_disposition._canonical_bytes(
                 {
-                    "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
+                    "decision_fingerprint_sha256": decision_binding["decision_fingerprint_sha256"],
                     "image_sha256": image["sha256"],
                     "reference_set_sha256": reference_set_sha,
                 }
@@ -519,6 +648,7 @@ def _resolve_qa(date_str: str, slot_id: str) -> Dict[str, Any]:
             "created_at_utc": qa_result.get("generated_at_utc"),
             "publish_ready": True,
             "publish_ready_reason": "accepted lena_photo_qa_disposition_v1 artifact",
+            "_decision_binding": decision_binding,
             "_qa_path": str(disposition_path),
             "_qa_source": "lena_photo_qa_disposition_v1",
         }
