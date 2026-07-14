@@ -1,0 +1,31 @@
+{
+  "generated_by": "tools/lena_higgsfield_prompt_isolation_test_v1.py",
+  "created_at_utc": "2026-07-13T01:54:24+00:00",
+  "provider": "higgsfield",
+  "cli_version": "1.1.10",
+  "job_type": "text2image_soul_v2",
+  "date": "2026-07-09",
+  "test_slot_id": "readypack0709-pack004-08-wardrobe-test-c",
+  "source_slot_id": "readypack0709-pack004-08-photo",
+  "source_seed_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_library\\lena\\2026-07-09\\readypack0709-pack004-08-photo_seed.png",
+  "source_seed_sha256": "b6b6b17f566b7bceb1d1124d6b3e0770f4de9c538a2b09b060984d889bf15059",
+  "wardrobe_id": "wc_p020",
+  "variant_label": "cherry_red_square_neck",
+  "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+  "cli_soul_name": "Lena",
+  "cli_soul_type": "soul_2",
+  "aspect_ratio": "9:16",
+  "image_prompt": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing just outside a restaurant table set on a city sidewalk, with a confident direct gaze with one hand holding a small bag and the other brushing her hair, a lively sidewalk dining block with candlelit two-top tables, parked cars, small table lamps and folded linen napkins, and warm storefront spill lighting. Wardrobe: cherry red fitted square-neckline mini dress in smooth stretch fabric with a stable full bodice, clean waistline, and continuous one-piece mini-dress construction; gold hoop earrings, strappy nude heeled sandals. Pose: shoulders angled away, face turned back toward the camera. Expression: confident direct gaze at the camera, the faintest hint of a smirk. Camera: candid street-night photo from a friend a few steps behind her, 35mm lens feel, natural movement. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Lighting: mixed storefront glow and city-night ambient light, realistic shadow falloff, slight motion softness. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook.",
+  "prompt_sha256": "cc55da28113a57bf98a92b23917676afc5f27df1dcac61ea71aebb7ede839b28",
+  "prompt_length": 2303,
+  "live_attempt_count": 1,
+  "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+  "provider_status": "completed",
+  "result_urls_sanitized": [
+    "https://d8j0ntlcm91z4.cloudfront.net/user_3GCFHyV58JHXzSoyOx...<redacted len=129>"
+  ],
+  "result_url_count": 1,
+  "saved_image_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_library\\lena\\2026-07-09\\prompt_isolation_tests\\readypack0709-pack004-08-wardrobe-test-c_seed.png",
+  "image_format_detected": ".png",
+  "output_sha256": "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb"
+}
