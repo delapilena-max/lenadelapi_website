@@ -137,6 +137,7 @@ CONFIRMED_LENA_SOUL_TYPE = "soul_2"
 # is not a general-purpose default -- it is the one confirmed value needed
 # to deterministically reproduce those exact slots. See resolve_prompt_source.
 KNOWN_PHOTO_DUMP_PACK_COUNT = 10
+POSE_BANK_PATH = ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_pose_body_language_bank_v1.json"
 
 _PACK_SLOT_ID_PATTERN = re.compile(
     r"^(?P<library_prefix>[A-Za-z0-9]+)-pack(?P<pack_index>\d{3})-"
@@ -209,6 +210,22 @@ def resolve_prompt_source(date_str: str, slot_id: str) -> dict:
 def _extract_pose_text(prompt: str) -> str:
     match = _POSE_SEGMENT_PATTERN.search(prompt)
     return match.group(1) if match else ""
+
+
+def _canonical_pose_text(image: dict[str, Any]) -> str:
+    pose_id = str(image.get("pose_body_language_id") or "").strip()
+    if not pose_id:
+        return ""
+    try:
+        bank = json.loads(POSE_BANK_PATH.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return ""
+    for item in bank.get("combos", []):
+        if not isinstance(item, dict) or item.get("pose_body_language_id") != pose_id:
+            continue
+        text = item.get("text")
+        return text.strip() if isinstance(text, str) else ""
+    return ""
 
 
 # --- Safety-gate validation (dry-run and pre-live) --------------------------
@@ -430,7 +447,7 @@ def build_manifest(
         "text_surface_risk_terms_found": image.get("text_surface_risk_terms_found", []),
         "pose_body_language_id": image.get("pose_body_language_id"),
         "pose_body_language_label": image.get("pose_body_language_label"),
-        "pose_text": _extract_pose_text(prompt),
+        "pose_text": _canonical_pose_text(image),
         # Persisted (2026-07-10) so a real, non-fabricated visual_style
         # (f"{camera_text}; {lighting_text}", matching the Kling package
         # builder's own convention) can be built later without re-parsing

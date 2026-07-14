@@ -11,6 +11,7 @@ import pipeline.identity.lena_higgsfield_identity as identity_mod
 import tools.lena_higgsfield_prompt_isolation_test_v1 as isolation_mod
 from pipeline.higgsfield_lena_api_executor import (
     DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+    build_manifest,
     build_provider_argv,
 )
 from pipeline.identity.lena_higgsfield_identity import (
@@ -175,3 +176,37 @@ def test_executor_never_imports_the_approved_id_set() -> None:
         if line.strip().startswith("import ") or line.strip().startswith("from ")
     ]
     assert not any("APPROVED_CUSTOM_REFERENCE_IDS" in line for line in import_lines)
+
+
+def test_build_manifest_persists_canonical_pose_text_not_prompt_prose(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(executor_mod, "_hard_exclude_reasons", lambda image: [])
+    pose_bank = json.loads(executor_mod.POSE_BANK_PATH.read_text(encoding="utf-8-sig"))
+    pose = next(item for item in pose_bank["combos"] if item["pose_body_language_id"] == "pose_p017")
+    prompt = (
+        "Scene: test scene. "
+        "Pose: touching her hair with one hand, direct confident gaze at the camera. "
+        "Expression: test expression. "
+        "Camera: test camera."
+    )
+    source = {
+        "resolver": "photo_dump_pack",
+        "slot_prefix": "lenagate20260713-pack000",
+        "pack_count": 10,
+        "pack_variety_warnings": [],
+        "image": {
+            "image_prompt": prompt,
+            "pose_body_language_id": pose["pose_body_language_id"],
+            "pose_body_language_label": pose["label"],
+            "validation": {
+                "final_expression_text": "test expression",
+                "expression_safe_fallback_used": False,
+                "expression_safe_fallback_reason": None,
+                "expression_scene_gaze_conflict_terms_found": [],
+            },
+        },
+    }
+
+    manifest = build_manifest("2026-07-13", "slot-01-photo", source, CURRENT_LIVE_ID, None)
+
+    assert manifest["pose_text"] == pose["text"]
+    assert manifest["pose_text"] != "touching her hair with one hand, direct confident gaze at the camera."

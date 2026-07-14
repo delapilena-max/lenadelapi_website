@@ -576,7 +576,12 @@ def _validate_manifest_bank_context(
         wardrobe_by_id[item["outfit_id"]] = item
     pose = pose_by_id.get(manifest["pose_body_language_id"])
     expression = expression_by_id.get(manifest["expression_gaze_id"])
-    if not pose or pose.get("label") != manifest["pose_body_language_label"] or pose.get("text") != manifest["pose_text"]:
+    canonical_pose_text = str(pose.get("text") or "") if pose else ""
+    legacy_pose_text = canonical_pose_text + "." if canonical_pose_text and not canonical_pose_text.endswith(".") else None
+    pose_text_matches = manifest.get("pose_text") == canonical_pose_text or (
+        legacy_pose_text is not None and manifest.get("pose_text") == legacy_pose_text
+    )
+    if not pose or pose.get("label") != manifest["pose_body_language_label"] or not pose_text_matches:
         raise BoundaryError("provenance_mismatch", "manifest pose ID, label, and text do not match committed pose authority")
     if not expression or expression.get("label") != manifest["expression_gaze_label"]:
         raise BoundaryError("provenance_mismatch", "manifest expression ID and label do not match committed expression authority")

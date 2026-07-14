@@ -807,6 +807,25 @@ def test_manifest_context_swapped_away_from_prompt_blocks(harness, field) -> Non
     assert result["reason_codes"] == ["provenance_mismatch"]
 
 
+def test_legacy_pose_text_with_only_trailing_period_passes_committed_authority_check() -> None:
+    manifest, candidate = _real_manifest_context("exp_g001", "standing naturally")
+    manifest["pose_text"] += "."
+    disposition._validate_manifest_bank_context(manifest, candidate, "HEAD")
+
+
+@pytest.mark.parametrize("value", [
+    "weight shifted onto one hip, stance easy and unforced!",
+    "Weight shifted onto one hip, stance easy and unforced",
+    "weight shifted onto one hip, stance easy and unforced..",
+    "weight shifted onto one hip, stance easy and unforced ",
+])
+def test_pose_text_only_allows_exact_legacy_trailing_period(value) -> None:
+    manifest, candidate = _real_manifest_context("exp_g001", "standing naturally")
+    manifest["pose_text"] = value
+    with pytest.raises(disposition.BoundaryError, match="manifest pose ID, label, and text"):
+        disposition._validate_manifest_bank_context(manifest, candidate, "HEAD")
+
+
 def test_failure_memory_never_constructs_none_pose_key() -> None:
     with pytest.raises(disposition.BoundaryError, match="pose_body_language_id"):
         disposition._failure_memory_evidence({"lane": "lane", "pose_body_language_id": None}, lambda: {})
@@ -1013,6 +1032,35 @@ def test_manifest_pose_and_expression_ids_must_match_committed_banks(monkeypatch
         swapped[field] = changed
         with pytest.raises(disposition.BoundaryError, match="manifest"):
             disposition._validate_manifest_bank_context(swapped, candidate, "a" * 40)
+
+
+def test_legacy_trailing_period_tolerance_still_requires_exact_pose_id_and_label(monkeypatch) -> None:
+    pose_bank = {"combos": [{"pose_body_language_id": "pose_p001", "label": "pose_label", "text": "pose text"}]}
+    expression_bank = {"combos": [{"expression_gaze_id": "exp_g001", "label": "gaze_label"}]}
+    wardrobe_catalog = {"outfits": [{"outfit_id": "wc_001", "name": "Canonical Outfit", "prompt": "canonical wardrobe prompt"}]}
+    values = {
+        disposition.POSE_BANK_PATH: json.dumps(pose_bank).encode(),
+        disposition.EXPRESSION_BANK_PATH: json.dumps(expression_bank).encode(),
+        disposition.WARDROBE_CATALOG_PATH: json.dumps(wardrobe_catalog).encode(),
+        disposition.PROMPT_BRAIN_PATH: disposition.PROMPT_BRAIN_PATH.read_bytes(),
+    }
+    monkeypatch.setattr(disposition, "_git_show_bytes", lambda commit, path: values[path])
+    manifest = {
+        "pose_body_language_id": "pose_p001",
+        "pose_body_language_label": "wrong-label",
+        "pose_text": "pose text.",
+        "expression_gaze_id": "exp_g001",
+        "expression_gaze_label": "gaze_label",
+        "expression_text": "expression text",
+        "expression_safe_fallback_used": False,
+        "expression_safe_fallback_reason": None,
+        "expression_scene_conflict_terms": [],
+        "wardrobe_outfit_id": "wc_001",
+        "wardrobe_outfit_name": "Canonical Outfit",
+        "image_prompt": "Expression: expression text. Wardrobe: canonical wardrobe prompt.",
+    }
+    with pytest.raises(disposition.BoundaryError, match="manifest pose ID, label, and text"):
+        disposition._validate_manifest_bank_context(manifest, {"activity": "standing naturally"}, "a" * 40)
 
 
 def _real_manifest_context(expression_id: str, activity: str) -> tuple[dict, dict]:
