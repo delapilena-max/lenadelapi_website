@@ -1,0 +1,321 @@
+{
+  "schema_version": "lena_photo_qa_disposition_v1",
+  "influencer_id": "lena",
+  "generated_at_utc": "2026-07-14T04:16:35Z",
+  "authority_commit": "25ca9e1d5bc00dd766ed3ec36bae4433e8769f02",
+  "decision_artifact_path": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-13\\lena_pre_generation_candidate_25ca9e1d_128799286987.json",
+  "decision_fingerprint_sha256": "12879928698742649ceb9bf817fc82cbad23947b8d9a42743b5fef3a69f05336",
+  "candidate_id": "lenagate2026071325ca9e1d-pack000-01-photo::hcr_006::cbn_004",
+  "slot_id": "lenagate2026071325ca9e1d-pack000-01-photo",
+  "lane": "night out",
+  "recipe_id": "hcr_006",
+  "hook_id": "cbn_004",
+  "prompt_sha256": "48260be45ea28a236dabae2c34876e45aa21fef55e98bf2f63a22ac890b2ce2d",
+  "image_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_library\\lena\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo_seed.png",
+  "image_sha256": "ae53f875421f38750d85757a9dd7336691c9acd5cff555a3f51281e1f062e5a4",
+  "generation_provenance": {
+    "manifest_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_debug\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo\\result_manifest.json",
+    "manifest_sha256": "b49b4557bc527c28ec7f430ef0f820fe6c18d7aca12cbe18578b6a088478984f",
+    "date": "2026-07-13",
+    "field_sources": {
+      "candidate_and_authority": "C:\\projects\\ai\\content_bot\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-13\\lena_pre_generation_candidate_25ca9e1d_128799286987.json",
+      "provider_generation": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_debug\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo\\result_manifest.json",
+      "local_image_hash_and_identity": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_debug\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo\\identity_verification.json"
+    },
+    "provider": "higgsfield",
+    "job_type": "text2image_soul_v2",
+    "provider_job_id": "7dfa558c-65b0-4110-9e6c-8626be992017",
+    "provider_status": "completed",
+    "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+    "soul_name": "Lena",
+    "soul_type": "soul_2"
+  },
+  "identity_reference_provenance": {
+    "authority_id": "lena_visual_reference_authority_v1",
+    "authority_artifact_path": "C:\\projects\\ai\\content_bot\\pipeline\\identity\\lena_visual_reference_authority_v1.json",
+    "authority_artifact_sha256": "cec444199b260ac67628389b1c048e2cf5550d8c182f841c952113baa9c63051",
+    "authority_commit": "2dd04f2b1c187af47ad29e4bd816752e04dcba7d",
+    "authority_artifact_commit": "25ca9e1d5bc00dd766ed3ec36bae4433e8769f02",
+    "reference_set_sha256": "f75b124c7738ee858375bfd45bd46ad5427e29b0e10ac819f289af648627b3d8",
+    "references": [
+      {
+        "path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_library\\lena\\2026-07-09\\prompt_isolation_tests\\readypack0709-pack004-08-wardrobe-test-c_seed.png",
+        "sha256": "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb",
+        "format": "PNG",
+        "width": 1152,
+        "height": 2048,
+        "authority_relative_path": "pipeline/higgsfield_library/lena/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c_seed.png"
+      }
+    ],
+    "authority_semantics": "exact committed authority artifact and reference-set binding"
+  },
+  "qa_inputs": {
+    "identity_evidence_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_debug\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo\\identity_verification.json",
+    "identity_evidence_sha256": "07a22ea9315130fd8eef48e70e20a4a7c83763eff4892c157a77585f528153ce",
+    "identity_verification_result": "pass",
+    "failure_memory": {
+      "pattern_key": [
+        "night out",
+        "pose_p017"
+      ],
+      "soft_flagged": false,
+      "hard_excluded": false,
+      "pattern_counts": {
+        "pass": 0,
+        "fail": 0
+      },
+      "semantics": "read-only aggregate; no reason-specific retry count inferred"
+    },
+    "canonical_qa_contract": {
+      "schema_version": "4",
+      "checklist_keys": [
+        "identity_fidelity",
+        "face_realism_anti_generic_drift",
+        "skin_realism_no_invented_marks",
+        "wardrobe_class_fidelity",
+        "public_scene_clothing_continuity",
+        "outerwear_underlayer_correctness",
+        "body_shape_continuity",
+        "hands_anatomy_sanity",
+        "environment_realism_scene_coherence",
+        "caption_scene_coherence",
+        "pose_action_scene_compliance",
+        "head_framing_safety_margin"
+      ],
+      "hard_gating_checklist_keys": [
+        "identity_fidelity",
+        "face_realism_anti_generic_drift",
+        "skin_realism_no_invented_marks",
+        "public_scene_clothing_continuity",
+        "outerwear_underlayer_correctness",
+        "body_shape_continuity",
+        "hands_anatomy_sanity",
+        "environment_realism_scene_coherence",
+        "caption_scene_coherence",
+        "pose_action_scene_compliance",
+        "head_framing_safety_margin"
+      ],
+      "validator": "pipeline.qa.lena_photo_qa.validate_qa_result",
+      "fresh_unreviewed_template_valid": true
+    }
+  },
+  "qa_checks": {
+    "face_continuity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Facial structure, brows, eyes, nose, lips consistent with reference identity images. Consistent facial identity across both reference and generated images."
+    },
+    "hair_continuity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Long wavy brunette hair with warm balayage highlights, matching reference; styled with hand touching hair as required by pose."
+    },
+    "apparent_age": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Appears to be an adult in mid-20s, consistent with reference images."
+    },
+    "skin_continuity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Warm tan skin tone consistent with reference, no invented marks or blemishes visible."
+    },
+    "body_silhouette_continuity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Curvy hourglass/pear-leaning figure with narrow waist, wide hips, fuller thighs, and proportional bust visible in the fitted skirt and top, consistent with contract description."
+    },
+    "distinctive_marks": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No invented distinguishing marks; earrings and layered necklaces present matching accessory style in reference."
+    },
+    "lena_reference_soul_consistency": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Overall vibe, confident playful expression, and glamorous styling consistent with Lena's established persona."
+    },
+    "required_action": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Model is touching her hair with one raised hand as specified in pose instructions."
+    },
+    "gaze": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Direct confident gaze toward camera with playful raised eyebrow, matching required expression."
+    },
+    "posture": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Standing posture with slight weight shift, one hand raised to hair, other hand at waistband, natural stance while walking toward camera."
+    },
+    "prop_interaction": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Hand naturally interacts with hair; no props required beyond this."
+    },
+    "required_visual_evidence": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Full body visible from head to shoes with visible headroom above hair and space below shoes, satisfying framing requirement."
+    },
+    "environment_plausibility": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Dark venue entrance with doorway spill light, velvet rope, host stand area, and blurred figures in background consistent with a low-lit lounge entrance at night."
+    },
+    "wardrobe_consistency": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Deep plum satin midi skirt with fitted black scoop-neck long-sleeve top, tucked in, matches wardrobe description; strappy heeled sandals and layered gold necklaces present."
+    },
+    "anatomy": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Anatomy appears proportionate and realistic, no distortion observed."
+    },
+    "hands_fingers_limbs": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Hands show correct finger count and natural positioning; one hand in hair, other at waistband."
+    },
+    "reflections": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No mirrors or reflective surfaces requiring contact-consistency checks in this scene."
+    },
+    "object_contact": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Hand-to-hair and hand-to-waistband contact points look natural and grounded."
+    },
+    "impossible_geometry_body_distortion": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No warping or geometric distortion of body or limbs detected."
+    },
+    "composition": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Three-quarter vertical framing with generous headroom and space below shoes, candid nightlife social-photo composition achieved."
+    },
+    "lighting": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Warm venue spill light combined with cooler ambient city-night light, realistic highlight rolloff consistent with flash-adjacent nightlife photography."
+    },
+    "premium_visual_discipline": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Overall polished, editorial-adjacent candid photo quality appropriate for premium content."
+    },
+    "natural_asymmetry": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Slight natural asymmetry in pose and expression, not overly symmetrical or artificial."
+    },
+    "overprocessed_appearance": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Skin and image texture appear natural with slight low-light grain, not overly smoothed or airbrushed."
+    },
+    "visual_clutter": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Background figures are blurred and secondary, not distracting from main subject despite venue setting."
+    },
+    "canonical_lena_personality": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Playful, confident, slightly skeptical amused expression aligns with Lena's established personality traits."
+    },
+    "no_needy_desperate_framing": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Pose and expression read as confident and self-possessed, not needy or desperate."
+    },
+    "no_fake_rich_signaling": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No overt luxury branding or fake-rich signaling; scene reads as a normal night-out venue."
+    },
+    "no_melodrama": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Expression is playful and amused, not melodramatic."
+    },
+    "no_audience_controlled_identity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No audience-choice or poll framing present in image itself."
+    },
+    "platform_safe_framing": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Outfit is fitted and revealing through cleavage and midriff but stays within platform-safe glamour bounds, no explicit exposure."
+    },
+    "no_pornographic_presentation": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Image is glamorous nightlife content, not pornographic in presentation."
+    },
+    "no_unsafe_exposure": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No nipple or genital exposure; cleavage and midriff shown are within platform-safe limits, though top is somewhat sheer at bust which is a mild concern worth noting."
+    },
+    "no_excessive_sexual_signal_stacking": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Sexual signals (cleavage, midriff, fitted skirt) are present but not excessively stacked beyond a single glamorous going-out look."
+    },
+    "contextual_swimwear": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No swimwear present in this scene; not applicable."
+    },
+    "visible_artifacts": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "No obvious rendering artifacts, warped edges, or AI-look distortions detected in the image."
+    },
+    "dimensions": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "locally measured 1152x2048"
+    },
+    "file_integrity": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "Pillow verify and reopen succeeded"
+    },
+    "format": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "locally detected supported format PNG"
+    },
+    "downstream_compatibility": {
+      "status": "pass",
+      "reason_codes": [],
+      "notes": "approved Higgsfield dimensions and supported still-image format"
+    }
+  },
+  "reason_codes": [],
+  "disposition": "accept",
+  "retry_eligible": false,
+  "hard_stop_reason": null,
+  "confidence": "high",
+  "reviewer_type": "bounded_visual_provider",
+  "visual_judgment_source": {
+    "reviewer_type": "bounded_visual_provider",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "observation_schema_version": "lena_visual_observations_v1",
+    "observations_sha256": "e30bc3767add7d8e1ff73e2a85b42eb1b96cd2d2ba79050c103ce1830e0de823",
+    "request_binding_sha256": "75f15321954042be49db9ad26dbe0bb744862535512d13a33a72cf67644bf847"
+  },
+  "provider_called": true,
+  "side_effects_performed": [],
+  "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only"
+}

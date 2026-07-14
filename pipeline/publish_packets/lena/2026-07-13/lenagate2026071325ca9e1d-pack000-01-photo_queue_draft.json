@@ -1,0 +1,34 @@
+{
+  "post_id": "lenagate2026071325ca9e1d-pack000-01-photo",
+  "slot_id": "lenagate2026071325ca9e1d-pack000-01-photo",
+  "media_path": "C:\\projects\\ai\\content_bot\\pipeline\\higgsfield_library\\lena\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo_seed.png",
+  "media_type": "photo",
+  "platforms": [
+    "instagram"
+  ],
+  "caption": "<PLACEHOLDER -- operator must choose a final caption from the publish packet before moving this into the live queue>",
+  "approved_for_live_publish": false,
+  "operator_review_required": true,
+  "metadata": {
+    "avatar_nickname": "Lena",
+    "image_engine": "higgsfield_text2image_soul_v2",
+    "image_prompt": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: stepping out near the entrance of a low-lit lounge, pausing with one hand at her side and a calm unreadable look toward the camera like someone caught her on the way in, a real city-night venue entrance with dark painted walls, soft doorway spill light, a host stand or velvet rope nearby, and blurred people moving behind her. Wardrobe: deep plum satin midi slip skirt with a bias cut; fitted black scoop-neck long-sleeve top tucked in; gold layered necklaces, strappy heeled sandals, fitted through the waist and hips for a hip-hugging silhouette. Pose: touching her hair with one hand, direct confident gaze at the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: flash-adjacent nightlife social photo, 35mm lens, candid friend-shot composition, no mirror. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook.",
+    "publish_packet_path": "C:\\projects\\ai\\content_bot\\pipeline\\publish_packets\\lena\\2026-07-13\\LENA_PUBLISH_PACKET_lenagate2026071325ca9e1d-pack000-01-photo.md",
+    "qa_path": "C:\\projects\\ai\\content_bot\\pipeline\\asset_review\\lena\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-photo__ae53f875421f38750d85757a9dd7336691c9acd5cff555a3f51281e1f062e5a4_qa_disposition.json",
+    "qa_overall": "pass",
+    "source_date": "2026-07-13",
+    "source_slot_id": "lenagate2026071325ca9e1d-pack000-01-photo",
+    "generated_by": "tools/lena_build_publish_packet_v1.py",
+    "queue_draft_only": true,
+    "wardrobe_outfit_id": "wc_p017",
+    "activity": "night out",
+    "pose": "touching her hair with one hand, direct confident gaze at the camera.",
+    "pose_body_language_id": "pose_p017",
+    "expression_gaze_id": "exp_g011",
+    "visual_style": "flash-adjacent nightlife social photo, 35mm lens, candid friend-shot composition, no mirror; warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain",
+    "provider": "higgsfield",
+    "provider_job_id": "7dfa558c-65b0-4110-9e6c-8626be992017",
+    "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+    "resolution": "1152x2048"
+  }
+}
