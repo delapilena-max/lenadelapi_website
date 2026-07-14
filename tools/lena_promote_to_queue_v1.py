@@ -123,6 +123,10 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
     CleanExportVerificationError,
     verify_clean_export,
 )
+from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
+    HumanRejectionGateError,
+    assert_no_matching_human_rejection,
+)
 
 # Explicit provider -> resolver map. No auto-detection, no fallback: an
 # unrecognized provider string is simply not a key here and fails closed.
@@ -611,6 +615,15 @@ def check_promote_to_queue(
 
     queue_draft_path = resolve_queue_draft_output_path(date_str, slot_id, out_dir)
     queue_draft = _load_json_object(queue_draft_path, "queue draft")
+    approval_queue_draft_path = approval.get("queue_draft_path")
+    if approval_queue_draft_path != str(queue_draft_path):
+        raise PromoteError(
+            f"approval queue_draft_path {approval_queue_draft_path!r} does not match the exact queue draft path "
+            f"{str(queue_draft_path)!r}"
+        )
+    approval_publish_packet_path = approval.get("publish_packet_path")
+    if not isinstance(approval_publish_packet_path, str) or not approval_publish_packet_path:
+        raise PromoteError("approval publish_packet_path is missing or empty")
     _validate_queue_draft(
         queue_draft,
         slot_id,
@@ -618,6 +631,29 @@ def check_promote_to_queue(
         approval_facts["approved_caption"],
         approval_facts["hashtag_count"],
     )
+    metadata = queue_draft.get("metadata") if isinstance(queue_draft.get("metadata"), dict) else {}
+    draft_publish_packet_path = metadata.get("publish_packet_path")
+    if draft_publish_packet_path != approval_publish_packet_path:
+        raise PromoteError(
+            f"queue draft metadata.publish_packet_path {draft_publish_packet_path!r} does not match the approval's "
+            f"publish_packet_path {approval_publish_packet_path!r}"
+        )
+    qa_path = metadata.get("qa_path")
+    if not isinstance(qa_path, str) or not qa_path:
+        raise PromoteError("queue draft metadata.qa_path is missing or empty")
+    media_type = str(queue_draft.get("media_type") or "").lower().strip()
+    image_path = Path(str(queue_draft["media_path"])) if media_type in {"photo", "image"} else None
+    try:
+        assert_no_matching_human_rejection(
+            date_str=date_str,
+            slot_id=slot_id,
+            image_path=image_path,
+            publish_packet_path=Path(approval_publish_packet_path),
+            queue_draft_path=queue_draft_path,
+            qa_path=Path(qa_path),
+        )
+    except HumanRejectionGateError as exc:
+        raise PromoteError(str(exc)) from exc
 
     resolved = _revalidate_with_resolver(date_str, slot_id, provider, queue_draft, out_dir, source_slot_id=source_slot_id)
 

@@ -54,6 +54,10 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     resolve_packet_output_path,
     resolve_queue_draft_output_path,
 )
+from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
+    HumanRejectionGateError,
+    assert_no_matching_human_rejection,
+)
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
 MAX_HASHTAGS_PER_CAPTION = 3
@@ -272,6 +276,17 @@ def check_publish_approval(
     queue_draft = _resolve_queue_draft(date_str, slot_id, out_dir, queue_draft_path_override)
     hashtag_count = _validate_caption(approved_caption)
     _validate_operator_fields(approved_by, caption_confirm, live_publish_confirm)
+    try:
+        assert_no_matching_human_rejection(
+            date_str=date_str,
+            slot_id=slot_id,
+            image_path=Path(str(resolved.get("image_path"))) if resolved.get("image_path") else None,
+            publish_packet_path=packet_path,
+            queue_draft_path=Path(queue_draft["path"]),
+            qa_path=Path(str(resolved["qa_path"])),
+        )
+    except HumanRejectionGateError as exc:
+        raise ApprovalCheckError(str(exc)) from exc
 
     approval_output_path = resolve_approval_output_path(date_str, slot_id, out_dir)
 

@@ -62,6 +62,10 @@ from tools.lena_record_publish_approval_v1 import (  # noqa: E402
     _count_hashtags,
     resolve_approval_output_path,
 )
+from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
+    HumanRejectionGateError,
+    assert_no_matching_human_rejection,
+)
 
 
 class ApplyApprovalError(Exception):
@@ -163,6 +167,16 @@ def check_apply_publish_approval(
     queue_draft_path = resolve_queue_draft_output_path(date_str, slot_id, out_dir)
     queue_draft = _load_json_object(queue_draft_path, "queue draft")
 
+    approval_queue_draft_path = approval.get("queue_draft_path")
+    if approval_queue_draft_path != str(queue_draft_path):
+        raise ApplyApprovalError(
+            f"approval queue_draft_path {approval_queue_draft_path!r} does not match the exact queue draft path "
+            f"{str(queue_draft_path)!r}"
+        )
+    approval_publish_packet_path = approval.get("publish_packet_path")
+    if not isinstance(approval_publish_packet_path, str) or not approval_publish_packet_path:
+        raise ApplyApprovalError("approval publish_packet_path is missing or empty")
+
     if queue_draft.get("slot_id") != slot_id:
         raise ApplyApprovalError(
             f"queue draft slot_id {queue_draft.get('slot_id')!r} does not match requested slot {slot_id!r}"
@@ -188,6 +202,29 @@ def check_apply_publish_approval(
             "queue draft caption is neither the placeholder nor the exact approved caption -- "
             "a different, non-placeholder caption is already present; refusing to overwrite it"
         )
+
+    draft_publish_packet_path = metadata.get("publish_packet_path")
+    if draft_publish_packet_path != approval_publish_packet_path:
+        raise ApplyApprovalError(
+            f"queue draft metadata.publish_packet_path {draft_publish_packet_path!r} does not match the approval's "
+            f"publish_packet_path {approval_publish_packet_path!r}"
+        )
+    qa_path = metadata.get("qa_path")
+    if not isinstance(qa_path, str) or not qa_path:
+        raise ApplyApprovalError("queue draft metadata.qa_path is missing or empty")
+    media_type = str(queue_draft.get("media_type") or "").lower().strip()
+    image_path = Path(str(queue_draft["media_path"])) if media_type in {"photo", "image"} else None
+    try:
+        assert_no_matching_human_rejection(
+            date_str=date_str,
+            slot_id=slot_id,
+            image_path=image_path,
+            publish_packet_path=Path(approval_publish_packet_path),
+            queue_draft_path=queue_draft_path,
+            qa_path=Path(qa_path),
+        )
+    except HumanRejectionGateError as exc:
+        raise ApplyApprovalError(str(exc)) from exc
 
     fields_that_would_change: List[str] = [] if already_applied else ["caption"]
 
