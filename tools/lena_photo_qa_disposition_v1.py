@@ -5,9 +5,10 @@ import base64
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Optional
 
 from PIL import Image, UnidentifiedImageError
@@ -38,6 +39,11 @@ POSE_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_pose_body_language_bank
 EXPRESSION_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_expression_gaze_bank_v1.json"
 WARDROBE_CATALOG_PATH = ROOT / "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json"
 PROMPT_BRAIN_PATH = ROOT / "pipeline/prompting/lena_prompt_brain.py"
+CURRENT_LENA_SOUL_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+LENA_REFERENCE_MANIFEST_PATH = (
+    "pipeline/higgsfield_debug/2026-07-09/prompt_isolation_tests/"
+    "readypack0709-pack004-08-wardrobe-test-c/result_manifest.json"
+)
 
 HARD_STOP_CODES = {
     "provenance_mismatch",
@@ -248,29 +254,130 @@ def _git_show_bytes(commit: str, path: Path) -> bytes:
         raise BoundaryError("identity_evidence_invalid", f"authority artifact is not committed at {commit}: {relative}") from exc
 
 
-def _committed_json_authority(path: Path, expected_sha: str, commit: str, schema: str) -> dict[str, Any]:
+def _git_blob_oid(commit: str, path: Path) -> str:
+    try:
+        relative = path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError as exc:
+        raise BoundaryError("identity_evidence_invalid", f"authority input must be inside the repository: {path}") from exc
+    result = subprocess.run(
+        ["git", "rev-parse", f"{commit}:{relative}"], cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    oid = result.stdout.strip()
+    if result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", oid):
+        raise BoundaryError("identity_evidence_invalid", f"authority input is not committed at {commit}: {relative}")
+    return oid
+
+
+def _require_crlf_lf_equivalent(path: Path, committed: bytes) -> None:
+    if not path.is_file():
+        raise BoundaryError("identity_evidence_invalid", f"authority input does not exist locally: {path}")
+    local = path.read_bytes()
+    if committed.replace(b"\r\n", b"\n") != local.replace(b"\r\n", b"\n"):
+        raise BoundaryError("identity_evidence_invalid", f"local authority input differs from committed content: {path}")
+
+
+def _exact_lexical_repo_path(raw: str, label: str) -> Path:
+    if not raw or "\\" in raw:
+        raise BoundaryError("identity_evidence_invalid", f"{label} must use one canonical repository-relative path")
+    relative = PurePosixPath(raw)
+    if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts) or relative.as_posix() != raw:
+        raise BoundaryError("identity_evidence_invalid", f"{label} must use one canonical repository-relative path")
+    lexical = ROOT.resolve().joinpath(*relative.parts)
+    try:
+        resolved = lexical.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise BoundaryError("identity_evidence_invalid", f"{label} does not exist: {raw}") from exc
+    if resolved != lexical:
+        raise BoundaryError("identity_evidence_invalid", f"{label} may not use a symlink or path alias")
+    return lexical
+
+
+def _committed_json_authority(
+    path: Path, expected_sha: str, commit: str, schema: str, *, require_self_commit: bool = True
+) -> dict[str, Any]:
     if not SHA256_RE.fullmatch(str(expected_sha)):
         raise BoundaryError("identity_evidence_invalid", "authority artifact requires an explicit SHA-256")
     committed = _git_show_bytes(commit, path)
     if _sha256_bytes(committed) != expected_sha:
         raise BoundaryError("identity_evidence_invalid", "authority artifact SHA-256 does not match committed bytes")
+    _require_crlf_lf_equivalent(path, committed)
     try:
         value = json.loads(committed.decode("utf-8-sig"))
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise BoundaryError("identity_evidence_invalid", "authority artifact is not valid JSON") from exc
     if not isinstance(value, dict) or value.get("schema_version") != schema:
         raise BoundaryError("identity_evidence_invalid", f"authority artifact must use schema {schema}")
-    if value.get("influencer_id") != "lena" or value.get("authority_commit") != commit:
+    if value.get("influencer_id") != "lena":
+        raise BoundaryError("identity_evidence_invalid", "authority artifact influencer/commit binding is invalid")
+    if require_self_commit and value.get("authority_commit") != commit:
         raise BoundaryError("identity_evidence_invalid", "authority artifact influencer/commit binding is invalid")
     return value
+
+
+def _git_is_ancestor(ancestor: str, descendant: str) -> bool:
+    if not re.fullmatch(r"[0-9a-f]{40}", ancestor) or not re.fullmatch(r"[0-9a-f]{40}", descendant):
+        return False
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=ROOT, capture_output=True, check=False,
+    )
+    return result.returncode == 0
+
+
+def _validate_reference_metadata(authority: dict[str, Any], authority_commit: str) -> None:
+    metadata = authority.get("reference_metadata")
+    if not isinstance(metadata, list) or len(metadata) != 1 or not isinstance(metadata[0], dict):
+        raise BoundaryError("identity_evidence_invalid", "trusted reference authority metadata is incomplete")
+    item = metadata[0]
+    required = {
+        "role": "canonical_face_hair_and_full_body",
+        "format": "PNG",
+        "width": 1152,
+        "height": 2048,
+        "provider": "higgsfield",
+        "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+        "job_type": "text2image_soul_v2",
+        "custom_reference_id": CURRENT_LENA_SOUL_ID,
+        "authority_scope": "identity_continuity_not_style",
+    }
+    if any(item.get(key) != value for key, value in required.items()):
+        raise BoundaryError("identity_evidence_invalid", "trusted reference authority metadata is invalid")
+    manifest_raw = item.get("provenance_manifest")
+    manifest_sha = item.get("provenance_manifest_sha256")
+    manifest_oid = item.get("provenance_manifest_git_blob_oid")
+    if (
+        manifest_raw != LENA_REFERENCE_MANIFEST_PATH or not SHA256_RE.fullmatch(str(manifest_sha))
+        or not isinstance(manifest_oid, str) or not re.fullmatch(r"[0-9a-f]{40}", manifest_oid)
+    ):
+        raise BoundaryError("identity_evidence_invalid", "reference provenance manifest binding is incomplete")
+    manifest_path = _exact_lexical_repo_path(manifest_raw, "reference provenance manifest")
+    committed = _git_show_bytes(authority_commit, manifest_path)
+    if _sha256_bytes(committed) != manifest_sha or _git_blob_oid(authority_commit, manifest_path) != manifest_oid:
+        raise BoundaryError("identity_evidence_invalid", "reference provenance manifest committed-byte binding is invalid")
+    _require_crlf_lf_equivalent(manifest_path, committed)
+    try:
+        manifest = json.loads(committed.decode("utf-8-sig"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise BoundaryError("identity_evidence_invalid", "reference provenance manifest is invalid JSON") from exc
+    expected_manifest = {
+        "provider": required["provider"], "provider_job_id": required["provider_job_id"],
+        "provider_status": "completed", "job_type": required["job_type"],
+        "custom_reference_id": required["custom_reference_id"],
+    }
+    if not isinstance(manifest, dict) or any(manifest.get(key) != value for key, value in expected_manifest.items()):
+        raise BoundaryError("identity_evidence_invalid", "reference provenance manifest identity binding is invalid")
 
 
 def _validate_references(
     specs: Iterable[tuple[Path, str]], authority_path: Path, authority_sha: str, authority_commit: str
 ) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
     authority = _committed_json_authority(
-        authority_path, authority_sha, authority_commit, REFERENCE_AUTHORITY_SCHEMA_VERSION
+        authority_path, authority_sha, authority_commit, REFERENCE_AUTHORITY_SCHEMA_VERSION,
+        require_self_commit=False,
     )
+    reference_commit = authority.get("authority_commit")
+    if not isinstance(reference_commit, str) or not _git_is_ancestor(reference_commit, authority_commit):
+        raise BoundaryError("identity_evidence_invalid", "reference authority commit must be an ancestor of the consuming commit")
     authority_id = authority.get("authority_id")
     allowed = authority.get("references")
     declared_set_sha = authority.get("reference_set_sha256")
@@ -284,7 +391,7 @@ def _validate_references(
             relative = resolved.relative_to(ROOT.resolve()).as_posix()
         except ValueError as exc:
             raise BoundaryError("identity_evidence_invalid", f"identity reference must be repository-contained: {path}") from exc
-        committed_reference = _git_show_bytes(authority_commit, resolved)
+        committed_reference = _git_show_bytes(reference_commit, resolved)
         if _sha256_bytes(committed_reference) != expected_sha:
             raise BoundaryError("identity_evidence_invalid", f"identity reference is not hash-identical to committed authority bytes: {relative}")
         inspected = _inspect_image(resolved, generated=False)
@@ -311,11 +418,13 @@ def _validate_references(
     actual = [{"path": item["authority_relative_path"], "sha256": item["sha256"]} for item in references]
     if allowed != actual or declared_set_sha != reference_set_sha:
         raise BoundaryError("identity_evidence_invalid", "reference set is not exactly authorized by the committed authority artifact")
+    _validate_reference_metadata(authority, reference_commit)
     return references, reference_set_sha, {
         "authority_id": authority_id,
         "authority_artifact_path": str(authority_path.resolve()),
         "authority_artifact_sha256": authority_sha,
-        "authority_commit": authority_commit,
+        "authority_commit": reference_commit,
+        "authority_artifact_commit": authority_commit,
     }
 
 

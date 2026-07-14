@@ -1,0 +1,47 @@
+{
+  "schema_version": "lena_identity_reference_authority_v1",
+  "influencer_id": "lena",
+  "authority_id": "lena_visual_reference_authority_v1",
+  "authority_commit": "2dd04f2b1c187af47ad29e4bd816752e04dcba7d",
+  "created_at_utc": "2026-07-14T01:17:32Z",
+  "reference_set_sha256": "f75b124c7738ee858375bfd45bd46ad5427e29b0e10ac819f289af648627b3d8",
+  "references": [
+    {
+      "path": "pipeline/higgsfield_library/lena/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c_seed.png",
+      "sha256": "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb"
+    }
+  ],
+  "reference_metadata": [
+    {
+      "role": "canonical_face_hair_and_full_body",
+      "format": "PNG",
+      "width": 1152,
+      "height": 2048,
+      "provider": "higgsfield",
+      "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+      "job_type": "text2image_soul_v2",
+      "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+      "provenance_manifest": "pipeline/higgsfield_debug/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c/result_manifest.json",
+      "provenance_manifest_sha256": "25c1635ff4504fe5e3c58420fcc15fb19aa1a4943d0fc841f332b6208d445b00",
+      "provenance_manifest_git_blob_oid": "616f2d524153abbd3bb73fdcaf29530af83c0334",
+      "authority_scope": "identity_continuity_not_style",
+      "authoritative_traits": [
+        "face_continuity",
+        "hair_continuity",
+        "apparent_age",
+        "skin_and_freckle_continuity",
+        "body_silhouette_continuity",
+        "overall_lena_identity_continuity"
+      ],
+      "non_authoritative_traits": [
+        "night_lighting",
+        "makeup",
+        "wardrobe",
+        "pose",
+        "scene",
+        "background",
+        "glamour_intensity"
+      ]
+    }
+  ]
+}

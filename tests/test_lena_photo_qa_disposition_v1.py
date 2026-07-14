@@ -765,6 +765,7 @@ def test_missing_canonical_rubric_fails_before_provider(harness) -> None:
 
 def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(disposition, "ROOT", tmp_path)
+    monkeypatch.setattr(disposition, "_git_is_ancestor", lambda *args: True)
     reference = tmp_path / "refs" / "lena.png"
     reference.parent.mkdir()
     Image.new("RGB", (32, 32), "gray").save(reference)
@@ -774,20 +775,41 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         "authority_id": authority_id,
         "references": [{"path": "refs/lena.png", "sha256": ref_sha}],
     })).hexdigest()
+    manifest_path = tmp_path / "manifest.json"
+    manifest = {
+        "provider": "higgsfield", "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+        "provider_status": "completed", "job_type": "text2image_soul_v2",
+        "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_sha = _sha(manifest_path)
     authority = {
         "schema_version": disposition.REFERENCE_AUTHORITY_SCHEMA_VERSION,
         "influencer_id": "lena", "authority_commit": "a" * 40, "authority_id": authority_id,
         "references": [{"path": "refs/lena.png", "sha256": ref_sha}], "reference_set_sha256": set_sha,
+        "reference_metadata": [{
+            "role": "canonical_face_hair_and_full_body", "format": "PNG", "width": 1152, "height": 2048,
+            "provider": "higgsfield", "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+            "job_type": "text2image_soul_v2", "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+            "authority_scope": "identity_continuity_not_style", "provenance_manifest": "manifest.json",
+            "provenance_manifest_sha256": manifest_sha, "provenance_manifest_git_blob_oid": "b" * 40,
+        }],
     }
     authority_bytes = json.dumps(authority, separators=(",", ":")).encode()
     authority_path = tmp_path / "authority.json"
+    authority_path.write_bytes(authority_bytes)
     def git_show(commit, path):
         if path.resolve() == authority_path.resolve():
             return authority_bytes
         if path.resolve() == reference.resolve():
             return reference.read_bytes()
+        if path.resolve() == manifest_path.resolve():
+            return manifest_path.read_bytes()
         raise disposition.BoundaryError("identity_evidence_invalid", "not committed")
     monkeypatch.setattr(disposition, "_git_show_bytes", git_show)
+    monkeypatch.setattr(disposition, "_git_blob_oid", lambda *args: "b" * 40)
+    monkeypatch.setattr(disposition, "_require_crlf_lf_equivalent", lambda *args: None)
+    monkeypatch.setattr(disposition, "_validate_reference_metadata", lambda *args: None)
     refs, actual_set_sha, _ = disposition._validate_references(
         [(reference, ref_sha)], authority_path, hashlib.sha256(authority_bytes).hexdigest(), "a" * 40
     )
@@ -797,6 +819,7 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         disposition._validate_references([(reference, ref_sha)], authority_path, "0" * 64, "a" * 40)
     authority["reference_set_sha256"] = "0" * 64
     bad_bytes = json.dumps(authority, separators=(",", ":")).encode()
+    authority_path.write_bytes(bad_bytes)
     monkeypatch.setattr(disposition, "_git_show_bytes", lambda commit, path: bad_bytes if path.resolve() == authority_path.resolve() else reference.read_bytes())
     with pytest.raises(disposition.BoundaryError):
         disposition._validate_references([(reference, ref_sha)], authority_path, hashlib.sha256(bad_bytes).hexdigest(), "a" * 40)
@@ -988,9 +1011,10 @@ def test_reference_authority_rejects_outside_repo_before_commit_lookup(tmp_path,
     outside = tmp_path / "outside.png"
     Image.new("RGB", (16, 16), "gray").save(outside)
     monkeypatch.setattr(disposition, "ROOT", repo)
-    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args: {
-        "authority_id": "authority", "references": [], "reference_set_sha256": "0" * 64,
+    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args, **kwargs: {
+        "authority_commit": "b" * 40, "authority_id": "authority", "references": [], "reference_set_sha256": "0" * 64,
     })
+    monkeypatch.setattr(disposition, "_git_is_ancestor", lambda *args: True)
     with pytest.raises(disposition.BoundaryError, match="repository-contained"):
         disposition._validate_references([(outside, _sha(outside))], repo / "authority.json", "1" * 64, "a" * 40)
 
@@ -1000,10 +1024,11 @@ def test_reference_authority_rejects_untracked_and_changed_local_bytes(tmp_path,
     reference = tmp_path / "reference.png"
     Image.new("RGB", (16, 16), "gray").save(reference)
     expected_sha = _sha(reference)
-    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args: {
-        "authority_id": "authority", "references": [{"path": "reference.png", "sha256": expected_sha}],
+    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args, **kwargs: {
+        "authority_commit": "b" * 40, "authority_id": "authority", "references": [{"path": "reference.png", "sha256": expected_sha}],
         "reference_set_sha256": "0" * 64,
     })
+    monkeypatch.setattr(disposition, "_git_is_ancestor", lambda *args: True)
     monkeypatch.setattr(
         disposition, "_git_show_bytes",
         lambda commit, path: (_ for _ in ()).throw(disposition.BoundaryError("identity_evidence_invalid", "not committed")),
@@ -1026,8 +1051,9 @@ def test_reference_authority_rejects_symlink_escape_when_supported(tmp_path, mon
     except OSError:
         pytest.skip("symlink creation is unavailable on this Windows host")
     monkeypatch.setattr(disposition, "ROOT", repo)
-    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args: {
-        "authority_id": "authority", "references": [], "reference_set_sha256": "0" * 64,
+    monkeypatch.setattr(disposition, "_committed_json_authority", lambda *args, **kwargs: {
+        "authority_commit": "b" * 40, "authority_id": "authority", "references": [], "reference_set_sha256": "0" * 64,
     })
+    monkeypatch.setattr(disposition, "_git_is_ancestor", lambda *args: True)
     with pytest.raises(disposition.BoundaryError, match="repository-contained"):
         disposition._validate_references([(link, _sha(outside))], repo / "authority.json", "1" * 64, "a" * 40)
