@@ -15,6 +15,12 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def _legacy_rejection_sha(value: dict) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+
+
 @pytest.fixture
 def bound_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     root = tmp_path / "repo"
@@ -187,3 +193,65 @@ def test_writing_does_not_modify_existing_evidence(bound_source: dict) -> None:
     record._write_pair(rejection, retry, rejection_path, retry_path)
     assert rejection_path.is_file() and retry_path.is_file()
     assert {path: path.read_bytes() for path in protected} == before
+
+
+def test_written_retry_plan_embeds_exact_written_rejection_sha_with_lf_bytes(bound_source: dict) -> None:
+    rejection, retry, rejection_path, retry_path = _build(bound_source)
+    record._write_pair(rejection, retry, rejection_path, retry_path)
+
+    rejection_bytes = rejection_path.read_bytes()
+    written_retry = json.loads(retry_path.read_text(encoding="utf-8"))
+
+    assert b"\r\n" not in rejection_bytes
+    assert written_retry["human_rejection_artifact_sha256"] == hashlib.sha256(rejection_bytes).hexdigest()
+
+
+def test_retry_plan_sha_mismatch_recovery_builds_single_correction_artifact(bound_source: dict) -> None:
+    rejection, retry, rejection_path, retry_path = _build(bound_source)
+    record._write_pair(rejection, retry, rejection_path, retry_path)
+
+    invalid_retry = json.loads(retry_path.read_text(encoding="utf-8"))
+    invalid_retry["human_rejection_artifact_sha256"] = _legacy_rejection_sha(rejection)
+    _write_json(retry_path, invalid_retry)
+
+    correction, correction_path = record.build_retry_plan_sha_correction(
+        rejection_artifact_path=rejection_path,
+        invalid_retry_plan_path=retry_path,
+    )
+
+    assert correction["schema_version"] == record.RETRY_CORRECTION_SCHEMA_VERSION
+    assert correction["valid_human_rejection_artifact_path"] == str(rejection_path.resolve())
+    assert correction["valid_human_rejection_artifact_sha256"] == hashlib.sha256(rejection_path.read_bytes()).hexdigest()
+    assert correction["invalid_retry_plan_artifact_path"] == str(retry_path.resolve())
+    assert correction["invalid_retry_plan_artifact_sha256"] == hashlib.sha256(retry_path.read_bytes()).hexdigest()
+    assert correction["invalid_retry_plan_embedded_rejection_sha256"] == _legacy_rejection_sha(rejection)
+    assert correction["supersedes_invalid_retry_plan_for_execution_only"] is True
+    assert correction["retry_attempt"] == correction["retry_cap"] == 1
+    assert correction["action"] == "correction_record_only_no_provider_call"
+    assert correction_path == record.retry_plan_correction_artifact_path(
+        bound_source["date"], bound_source["slot"], bound_source["image_sha"], bound_source["output"]
+    )
+    assert not correction_path.exists()
+
+    record._write_json_artifact(correction_path, correction)
+    with pytest.raises(record.RejectionError, match="already exists"):
+        record.build_retry_plan_sha_correction(
+            rejection_artifact_path=rejection_path,
+            invalid_retry_plan_path=retry_path,
+        )
+
+
+def test_retry_plan_sha_mismatch_recovery_fails_closed_on_other_retry_defects(bound_source: dict) -> None:
+    rejection, retry, rejection_path, retry_path = _build(bound_source)
+    record._write_pair(rejection, retry, rejection_path, retry_path)
+
+    invalid_retry = json.loads(retry_path.read_text(encoding="utf-8"))
+    invalid_retry["human_rejection_artifact_sha256"] = _legacy_rejection_sha(rejection)
+    invalid_retry["action"] = "queue_now"
+    _write_json(retry_path, invalid_retry)
+
+    with pytest.raises(record.RejectionError, match="only allowed for the demonstrated rejection-file SHA mismatch"):
+        record.build_retry_plan_sha_correction(
+            rejection_artifact_path=rejection_path,
+            invalid_retry_plan_path=retry_path,
+        )

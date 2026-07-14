@@ -15,10 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tools import lena_human_rejection_gate_v1 as rejection_gate  # noqa: E402
 from tools import lena_photo_qa_disposition_v1 as disposition  # noqa: E402
 
 SCHEMA_VERSION = "lena_human_rejection_v1"
 RETRY_SCHEMA_VERSION = "lena_bounded_retry_plan_v1"
+RETRY_CORRECTION_SCHEMA_VERSION = "lena_bounded_retry_plan_correction_v1"
 EXACT_REASON = "Lena identity duplicated on background woman"
 CLASSIFICATION = "identity_related_human_rejection"
 NEXT_ATTEMPT = (
@@ -39,6 +41,10 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _serialize_json_bytes(value: dict[str, Any]) -> bytes:
+    return (json.dumps(value, indent=2, ensure_ascii=True) + "\n").encode("utf-8")
 
 
 def _read_object(path: Path, label: str) -> dict[str, Any]:
@@ -78,6 +84,10 @@ def rejection_artifact_path(date_str: str, slot_id: str, image_sha: str, output_
 
 def retry_plan_artifact_path(date_str: str, slot_id: str, image_sha: str, output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
     return output_root / date_str / f"{slot_id}__{image_sha}_bounded_retry_plan.json"
+
+
+def retry_plan_correction_artifact_path(date_str: str, slot_id: str, image_sha: str, output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
+    return output_root / date_str / f"{slot_id}__{image_sha}_bounded_retry_plan_correction.json"
 
 
 def _validate_source(
@@ -207,6 +217,63 @@ def _count_lineage_rejections(output_root: Path, slot_id: str, decision_fingerpr
     return count
 
 
+def _compose_retry_plan(
+    *,
+    now: str,
+    date_str: str,
+    slot_id: str,
+    retry_attempt: int,
+    decision_path: Path,
+    decision_fingerprint: str,
+    publish_packet_path: Path,
+    publish_packet_sha: str,
+    queue_draft_path: Path,
+    queue_draft_sha: str,
+    manifest_path: Path,
+    manifest_sha: str,
+    image_path: str,
+    image_sha: str,
+    manifest: dict[str, Any],
+    rejection_path: Path,
+    rejection_sha: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": RETRY_SCHEMA_VERSION,
+        "influencer_id": "lena",
+        "planned_at_utc": now,
+        "date": date_str,
+        "slot_id": slot_id,
+        "retry_attempt": retry_attempt,
+        "retry_cap": MAX_RETRIES,
+        "same_concept": True,
+        "next_attempt_instruction": NEXT_ATTEMPT,
+        "original_decision_artifact_path": str(decision_path),
+        "original_decision_artifact_sha256": _sha256_file(decision_path),
+        "decision_fingerprint_sha256": decision_fingerprint,
+        "original_publish_packet_path": str(publish_packet_path),
+        "original_publish_packet_sha256": publish_packet_sha,
+        "original_queue_draft_path": str(queue_draft_path),
+        "original_queue_draft_sha256": queue_draft_sha,
+        "original_manifest_path": str(manifest_path),
+        "original_manifest_sha256": manifest_sha,
+        "original_image_path": image_path,
+        "original_image_sha256": image_sha,
+        "original_provider_job_evidence": {
+            "provider": manifest["provider"],
+            "provider_job_id": manifest["provider_job_id"],
+            "provider_status": manifest["provider_status"],
+            "job_type": manifest["job_type"],
+        },
+        "human_rejection_artifact_path": str(rejection_path.resolve()),
+        "human_rejection_artifact_sha256": rejection_sha,
+        "action": "plan_only_no_provider_call",
+        "forbidden_side_effects": [
+            "higgsfield", "anthropic", "queue", "approval", "promotion", "publish",
+            "r2", "analytics", ".env", "cleanup", "historical_evidence_mutation",
+        ],
+    }
+
+
 def build_rejection_and_retry_plan(
     *, date_str: str, slot_id: str, image_sha: str, disposition_path: Path,
     disposition_sha: str, publish_packet_path: Path, queue_draft_path: Path,
@@ -259,17 +326,137 @@ def build_rejection_and_retry_plan(
         "retry_cap": MAX_RETRIES,
         "historical_artifacts_modified": [],
     }
-    rejection_sha = hashlib.sha256(
-        json.dumps(rejection, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    ).hexdigest()
-    retry = {
-        "schema_version": RETRY_SCHEMA_VERSION,
+    rejection_sha = hashlib.sha256(_serialize_json_bytes(rejection)).hexdigest()
+    retry = _compose_retry_plan(
+        now=now,
+        date_str=date_str,
+        slot_id=slot_id,
+        retry_attempt=prior_count + 1,
+        decision_path=decision_path,
+        decision_fingerprint=source["decision_fingerprint_sha256"],
+        publish_packet_path=publish_packet_path,
+        publish_packet_sha=publish_packet_sha,
+        queue_draft_path=queue_draft_path,
+        queue_draft_sha=queue_draft_sha,
+        manifest_path=manifest_path,
+        manifest_sha=source["generation_provenance"]["manifest_sha256"],
+        image_path=source["image_path"],
+        image_sha=image_sha,
+        manifest=manifest,
+        rejection_path=rejection_path,
+        rejection_sha=rejection_sha,
+    )
+    return rejection, retry, rejection_path, retry_path
+
+
+def build_retry_plan_sha_correction(
+    *, rejection_artifact_path: Path, invalid_retry_plan_path: Path,
+) -> tuple[dict[str, Any], Path]:
+    rejection_artifact_path = _contained_file(str(rejection_artifact_path), "existing rejection artifact")
+    invalid_retry_plan_path = _contained_file(str(invalid_retry_plan_path), "existing invalid retry plan")
+    rejection = _read_object(rejection_artifact_path, "existing rejection artifact")
+    if rejection.get("schema_version") != SCHEMA_VERSION:
+        raise RejectionError("existing rejection artifact schema_version is invalid for retry-plan recovery")
+    date_str = str(rejection.get("date") or "")
+    slot_id = str(rejection.get("slot_id") or "")
+    image_sha = str(rejection.get("image_sha256") or "")
+    if not date_str or not slot_id or not SHA256_RE.fullmatch(image_sha):
+        raise RejectionError("existing rejection artifact date/slot/image binding is incomplete")
+
+    qa_path = _contained_file(rejection.get("qa_disposition_artifact_path"), "QA disposition artifact")
+    qa = _read_object(qa_path, "QA disposition artifact")
+    image_path = _contained_file(qa.get("image_path"), "generated image")
+    publish_packet_path = _contained_file(rejection.get("publish_packet_path"), "publish packet")
+    queue_draft_path = _contained_file(rejection.get("queue_draft_path"), "queue draft")
+    try:
+        rejection_gate._validate_artifact(
+            rejection_artifact_path,
+            date_str=date_str,
+            slot_id=slot_id,
+            image_path=image_path,
+            publish_packet_path=publish_packet_path,
+            queue_draft_path=queue_draft_path,
+            qa_path=qa_path,
+        )
+    except rejection_gate.HumanRejectionGateError as exc:
+        raise RejectionError(f"existing rejection artifact is not valid for retry-plan recovery: {exc}") from exc
+
+    source, decision, manifest, decision_path, manifest_path = _validate_source(
+        date_str, slot_id, image_sha, qa_path, str(rejection["qa_disposition_artifact_sha256"])
+    )
+    publish_packet_path, publish_packet_sha, queue_draft_path, queue_draft_sha = _validate_publish_packet_and_queue_draft(
+        date_str=date_str,
+        slot_id=slot_id,
+        image_sha=image_sha,
+        publish_packet_path=publish_packet_path,
+        queue_draft_path=queue_draft_path,
+        disposition_path=qa_path,
+        source=source,
+        decision=decision,
+        manifest=manifest,
+    )
+
+    expected_retry_path = retry_plan_artifact_path(date_str, slot_id, image_sha, invalid_retry_plan_path.parents[1]).resolve()
+    if invalid_retry_plan_path.resolve() != expected_retry_path:
+        raise RejectionError("existing invalid retry plan path does not match the canonical lineage binding")
+    invalid_retry = _read_object(invalid_retry_plan_path, "existing invalid retry plan")
+    if invalid_retry.get("schema_version") != RETRY_SCHEMA_VERSION:
+        raise RejectionError("existing invalid retry plan schema_version is invalid for retry-plan recovery")
+    if invalid_retry.get("retry_attempt") != 1 or invalid_retry.get("retry_cap") != 1:
+        raise RejectionError("existing invalid retry plan retry attempt/cap must remain exactly 1/1")
+    planned_at_utc = str(invalid_retry.get("planned_at_utc") or "")
+    if not planned_at_utc:
+        raise RejectionError("existing invalid retry plan planned_at_utc is required for retry-plan recovery")
+
+    actual_rejection_sha = _sha256_file(rejection_artifact_path)
+    embedded_rejection_sha = str(invalid_retry.get("human_rejection_artifact_sha256") or "")
+    if not SHA256_RE.fullmatch(embedded_rejection_sha):
+        raise RejectionError("existing invalid retry plan human_rejection_artifact_sha256 is malformed")
+    if embedded_rejection_sha == actual_rejection_sha:
+        raise RejectionError("existing invalid retry plan already matches the exact rejection file SHA-256")
+
+    expected_retry = _compose_retry_plan(
+        now=planned_at_utc,
+        date_str=date_str,
+        slot_id=slot_id,
+        retry_attempt=1,
+        decision_path=decision_path,
+        decision_fingerprint=source["decision_fingerprint_sha256"],
+        publish_packet_path=publish_packet_path,
+        publish_packet_sha=publish_packet_sha,
+        queue_draft_path=queue_draft_path,
+        queue_draft_sha=queue_draft_sha,
+        manifest_path=manifest_path,
+        manifest_sha=source["generation_provenance"]["manifest_sha256"],
+        image_path=source["image_path"],
+        image_sha=image_sha,
+        manifest=manifest,
+        rejection_path=rejection_artifact_path,
+        rejection_sha=actual_rejection_sha,
+    )
+    normalized_retry = dict(invalid_retry)
+    normalized_retry["human_rejection_artifact_sha256"] = actual_rejection_sha
+    if normalized_retry != expected_retry:
+        keys = sorted(set(normalized_retry) | set(expected_retry))
+        mismatches = [key for key in keys if normalized_retry.get(key) != expected_retry.get(key)]
+        raise RejectionError(
+            "retry-plan recovery is only allowed for the demonstrated rejection-file SHA mismatch; "
+            f"other retry-plan defects are present: {', '.join(mismatches)}"
+        )
+
+    correction_path = retry_plan_correction_artifact_path(
+        date_str, slot_id, image_sha, invalid_retry_plan_path.parents[1]
+    )
+    if correction_path.exists():
+        raise RejectionError("retry-plan correction artifact already exists for this exact image lineage")
+    correction = {
+        "schema_version": RETRY_CORRECTION_SCHEMA_VERSION,
         "influencer_id": "lena",
-        "planned_at_utc": now,
+        "corrected_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "date": date_str,
         "slot_id": slot_id,
-        "retry_attempt": prior_count + 1,
-        "retry_cap": MAX_RETRIES,
+        "retry_attempt": 1,
+        "retry_cap": 1,
         "same_concept": True,
         "next_attempt_instruction": NEXT_ATTEMPT,
         "original_decision_artifact_path": str(decision_path),
@@ -283,70 +470,110 @@ def build_rejection_and_retry_plan(
         "original_manifest_sha256": source["generation_provenance"]["manifest_sha256"],
         "original_image_path": source["image_path"],
         "original_image_sha256": image_sha,
-        "original_provider_job_evidence": {
-            "provider": manifest["provider"],
-            "provider_job_id": manifest["provider_job_id"],
-            "provider_status": manifest["provider_status"],
-            "job_type": manifest["job_type"],
-        },
-        "human_rejection_artifact_path": str(rejection_path.resolve()),
-        "human_rejection_artifact_sha256": rejection_sha,
-        "action": "plan_only_no_provider_call",
-        "forbidden_side_effects": [
-            "higgsfield", "anthropic", "queue", "approval", "promotion", "publish",
-            "r2", "analytics", ".env", "cleanup", "historical_evidence_mutation",
-        ],
+        "original_provider_job_evidence": expected_retry["original_provider_job_evidence"],
+        "valid_human_rejection_artifact_path": str(rejection_artifact_path.resolve()),
+        "valid_human_rejection_artifact_sha256": actual_rejection_sha,
+        "invalid_retry_plan_artifact_path": str(invalid_retry_plan_path.resolve()),
+        "invalid_retry_plan_artifact_sha256": _sha256_file(invalid_retry_plan_path),
+        "invalid_retry_plan_embedded_rejection_sha256": embedded_rejection_sha,
+        "supersedes_invalid_retry_plan_for_execution_only": True,
+        "preserves_immutable_historical_artifacts": True,
+        "action": "correction_record_only_no_provider_call",
+        "recovery_reason": "human_rejection_artifact_sha256_mismatch_only",
+        "historical_artifacts_modified": [],
+        "forbidden_side_effects": expected_retry["forbidden_side_effects"],
     }
-    return rejection, retry, rejection_path, retry_path
+    return correction, correction_path
+
+
+def _write_json_artifact(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise RejectionError(f"refusing to overwrite an existing artifact: {path}")
+    fd, raw = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    temp = Path(raw)
+    try:
+        temp.write_bytes(_serialize_json_bytes(value))
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _write_pair(rejection: dict[str, Any], retry: dict[str, Any], rejection_path: Path, retry_path: Path) -> None:
     rejection_path.parent.mkdir(parents=True, exist_ok=True)
     if rejection_path.exists() or retry_path.exists():
         raise RejectionError("refusing to overwrite an existing rejection or retry-plan artifact")
-    temp_paths: list[Path] = []
+    _write_json_artifact(rejection_path, rejection)
     try:
-        for target, value in ((rejection_path, rejection), (retry_path, retry)):
-            fd, raw = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
-            os.close(fd)
-            temp = Path(raw)
-            temp.write_text(json.dumps(value, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
-            temp_paths.append(temp)
-        os.replace(temp_paths[0], rejection_path)
-        os.replace(temp_paths[1], retry_path)
-    finally:
-        for temp in temp_paths:
-            temp.unlink(missing_ok=True)
+        _write_json_artifact(retry_path, retry)
+    except Exception:
+        rejection_path.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Record one bound human rejection and plan one capped retry.")
-    parser.add_argument("--date", required=True)
-    parser.add_argument("--slot", required=True)
-    parser.add_argument("--image-sha256", required=True)
-    parser.add_argument("--qa-disposition", type=Path, required=True)
-    parser.add_argument("--qa-disposition-sha256", required=True)
-    parser.add_argument("--publish-packet", type=Path, required=True)
-    parser.add_argument("--queue-draft", type=Path, required=True)
-    parser.add_argument("--reason", required=True)
+    parser.add_argument("--date")
+    parser.add_argument("--slot")
+    parser.add_argument("--image-sha256")
+    parser.add_argument("--qa-disposition", type=Path)
+    parser.add_argument("--qa-disposition-sha256")
+    parser.add_argument("--publish-packet", type=Path)
+    parser.add_argument("--queue-draft", type=Path)
+    parser.add_argument("--reason")
+    parser.add_argument("--recover-existing-retry-plan-sha-mismatch", action="store_true")
+    parser.add_argument("--existing-rejection-artifact", type=Path)
+    parser.add_argument("--existing-invalid-retry-plan", type=Path)
     parser.add_argument("--write-artifacts", action="store_true")
     args = parser.parse_args()
     try:
-        rejection, retry, rejection_path, retry_path = build_rejection_and_retry_plan(
-            date_str=args.date, slot_id=args.slot, image_sha=args.image_sha256,
-            disposition_path=args.qa_disposition, disposition_sha=args.qa_disposition_sha256,
-            publish_packet_path=args.publish_packet, queue_draft_path=args.queue_draft,
-            reason=args.reason,
-        )
-        if args.write_artifacts:
-            _write_pair(rejection, retry, rejection_path, retry_path)
-        print(json.dumps({
-            "status": "planned" if not args.write_artifacts else "written",
-            "rejection_artifact_path": str(rejection_path.resolve()),
-            "retry_plan_artifact_path": str(retry_path.resolve()),
-            "retry_attempt": retry["retry_attempt"],
-            "retry_cap": retry["retry_cap"],
-        }, sort_keys=True))
+        if args.recover_existing_retry_plan_sha_mismatch:
+            if args.existing_rejection_artifact is None or args.existing_invalid_retry_plan is None:
+                raise RejectionError(
+                    "recovery mode requires --existing-rejection-artifact and --existing-invalid-retry-plan"
+                )
+            correction, correction_path = build_retry_plan_sha_correction(
+                rejection_artifact_path=args.existing_rejection_artifact,
+                invalid_retry_plan_path=args.existing_invalid_retry_plan,
+            )
+            if args.write_artifacts:
+                _write_json_artifact(correction_path, correction)
+            print(json.dumps({
+                "status": "recovery_planned" if not args.write_artifacts else "recovery_written",
+                "retry_plan_correction_artifact_path": str(correction_path.resolve()),
+                "retry_attempt": correction["retry_attempt"],
+                "retry_cap": correction["retry_cap"],
+            }, sort_keys=True))
+        else:
+            required = {
+                "--date": args.date,
+                "--slot": args.slot,
+                "--image-sha256": args.image_sha256,
+                "--qa-disposition": args.qa_disposition,
+                "--qa-disposition-sha256": args.qa_disposition_sha256,
+                "--publish-packet": args.publish_packet,
+                "--queue-draft": args.queue_draft,
+                "--reason": args.reason,
+            }
+            missing = [flag for flag, value in required.items() if value is None]
+            if missing:
+                raise RejectionError("record mode is missing required arguments: " + ", ".join(missing))
+            rejection, retry, rejection_path, retry_path = build_rejection_and_retry_plan(
+                date_str=args.date, slot_id=args.slot, image_sha=args.image_sha256,
+                disposition_path=args.qa_disposition, disposition_sha=args.qa_disposition_sha256,
+                publish_packet_path=args.publish_packet, queue_draft_path=args.queue_draft,
+                reason=args.reason,
+            )
+            if args.write_artifacts:
+                _write_pair(rejection, retry, rejection_path, retry_path)
+            print(json.dumps({
+                "status": "planned" if not args.write_artifacts else "written",
+                "rejection_artifact_path": str(rejection_path.resolve()),
+                "retry_plan_artifact_path": str(retry_path.resolve()),
+                "retry_attempt": retry["retry_attempt"],
+                "retry_cap": retry["retry_cap"],
+            }, sort_keys=True))
         return 0
     except RejectionError as exc:
         print(json.dumps({"status": "blocked", "error": str(exc)}, sort_keys=True))
