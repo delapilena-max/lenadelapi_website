@@ -129,8 +129,8 @@ def test_prep_builds_learning_before_recommendation_and_threads_exact_artifact_p
     assert report["summary"]["learning_artifact_path"] == str(learning_path)
     assert report["summary"]["learning_status"] == "current"
     assert report["summary"]["learning_pending_metrics_count"] == 2
-    assert report["summary"]["next_live_handoff_script_present"] is False
-    assert report["summary"]["next_live_handoff_blocker"] == "missing_script"
+    assert report["summary"]["next_live_handoff_script_present"] is True
+    assert report["summary"]["next_live_handoff_blocker"] == ""
 
 
 @pytest.mark.parametrize(
