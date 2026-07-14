@@ -159,6 +159,12 @@ def test_valid_native_sha_bound_approval_reaches_apply_and_promotion(
     )
     assert promote_checked["approval_binding_source"] == "native"
     assert promote_checked["would_write"] is True
+    second_apply = apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
+    assert second_apply["approval_binding_source"] == "native"
+    assert second_apply["already_applied"] is True
+    assert second_apply["would_write"] is False
+    assert second_apply["fields_that_would_change"] == []
+    assert apply_approval.apply_publish_approval(second_apply) is None
 
 
 def test_missing_or_mismatched_native_hashes_fail_closed(
@@ -206,6 +212,12 @@ def test_valid_correction_path_reaches_apply_and_promotion(
     )
     assert promote_checked["approval_binding_source"] == "corrected"
     assert promote_checked["approval_correction_artifact_path"] == str(correction_path)
+    second_apply = apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
+    assert second_apply["approval_binding_source"] == "corrected"
+    assert second_apply["already_applied"] is True
+    assert second_apply["would_write"] is False
+    assert second_apply["fields_that_would_change"] == []
+    assert apply_approval.apply_publish_approval(second_apply) is None
 
 
 def test_tampered_or_duplicate_correction_fails_closed(
@@ -249,3 +261,58 @@ def test_unrelated_deficient_approval_remains_unaffected(
 
     checked = apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
     assert checked["approval_binding_source"] == "native"
+
+
+def test_wrong_applied_caption_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _seed_photo_item(tmp_path, "wrong-applied-caption-photo")
+    approval_path = _record_real_approval(ctx, monkeypatch, live_publish=True)
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval.pop("publish_packet_sha256")
+    approval.pop("queue_draft_sha256")
+    _write_json(approval_path, approval)
+    correction, correction_path = approval_binding.build_approval_sha_binding_correction(approval_path)
+    approval_binding.write_approval_sha_binding_correction(correction_path, correction)
+
+    draft = json.loads(ctx["draft_path"].read_text(encoding="utf-8"))
+    draft["caption"] = "Different caption"
+    _write_json(ctx["draft_path"], draft)
+
+    with pytest.raises(apply_approval.ApplyApprovalError, match="queue_draft_sha256"):
+        apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
+
+    _stub_promotion(monkeypatch)
+    with pytest.raises(promote_queue.PromoteError, match="queue_draft_sha256"):
+        promote_queue.check_promote_to_queue(
+            ctx["date"], ctx["slot"], "kling", out_dir=ctx["out_dir"], queue_root=tmp_path / "queue"
+        )
+
+
+def test_unrelated_post_apply_draft_mutation_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _seed_photo_item(tmp_path, "post-apply-mutation-photo")
+    approval_path = _record_real_approval(ctx, monkeypatch, live_publish=True)
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval.pop("publish_packet_sha256")
+    approval.pop("queue_draft_sha256")
+    _write_json(approval_path, approval)
+    correction, correction_path = approval_binding.build_approval_sha_binding_correction(approval_path)
+    approval_binding.write_approval_sha_binding_correction(correction_path, correction)
+
+    checked = apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
+    apply_approval.apply_publish_approval(checked)
+
+    draft = json.loads(ctx["draft_path"].read_text(encoding="utf-8"))
+    draft["metadata"]["visual_style"] = "tampered"
+    _write_json(ctx["draft_path"], draft)
+
+    with pytest.raises(apply_approval.ApplyApprovalError, match="queue_draft_sha256"):
+        apply_approval.check_apply_publish_approval(ctx["date"], ctx["slot"], ctx["out_dir"])
+
+    _stub_promotion(monkeypatch)
+    with pytest.raises(promote_queue.PromoteError, match="queue_draft_sha256"):
+        promote_queue.check_promote_to_queue(
+            ctx["date"], ctx["slot"], "kling", out_dir=ctx["out_dir"], queue_root=tmp_path / "queue"
+        )

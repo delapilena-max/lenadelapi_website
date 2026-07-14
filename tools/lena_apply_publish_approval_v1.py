@@ -98,7 +98,7 @@ def check_apply_publish_approval(
         slot_id,
         out_dir,
         require_live_publish_authorization=False,
-        allow_caption_applied_queue_draft=False,
+        allow_caption_applied_queue_draft=True,
         error_cls=ApplyApprovalError,
     )
     approval_path = resolve_approval_output_path(date_str, slot_id, out_dir)

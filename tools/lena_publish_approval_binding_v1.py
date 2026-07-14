@@ -56,6 +56,26 @@ def _count_hashtags(caption: str) -> int:
     return sum(1 for token in caption.split() if token.startswith("#"))
 
 
+def _authoritative_queue_draft_sha256(
+    queue_draft_path: Path,
+    *,
+    allow_caption_applied_queue_draft: bool,
+    approved_caption: str,
+    error_cls: Type[Exception],
+) -> str:
+    current_sha = _sha256_file(queue_draft_path)
+    if not allow_caption_applied_queue_draft:
+        return current_sha
+
+    queue_draft = _read_json_object(queue_draft_path, "queue draft", error_cls)
+    if queue_draft.get("caption") != approved_caption:
+        return current_sha
+
+    normalized_pre_apply = dict(queue_draft)
+    normalized_pre_apply["caption"] = QUEUE_DRAFT_CAPTION_PLACEHOLDER
+    return hashlib.sha256(_serialize_queue_draft_bytes(normalized_pre_apply)).hexdigest()
+
+
 def resolve_approval_output_path(date_str: str, slot_id: str, out_dir: Optional[Path] = None) -> Path:
     base = out_dir if out_dir is not None else DEFAULT_APPROVAL_ROOT
     return base / date_str / f"{slot_id}_approval.json"
@@ -209,14 +229,12 @@ def _collect_native_sha_binding_defects(
 ) -> tuple[list[str], str, str]:
     defects: list[str] = []
     actual_packet_sha = _sha256_file(publish_packet_path)
-    authoritative_draft_sha = _sha256_file(queue_draft_path)
-    queue_draft = None
-    if allow_caption_applied_queue_draft:
-        queue_draft = _read_json_object(queue_draft_path, "queue draft", ValueError)
-        if queue_draft.get("caption") == approved_caption:
-            normalized_pre_apply = dict(queue_draft)
-            normalized_pre_apply["caption"] = QUEUE_DRAFT_CAPTION_PLACEHOLDER
-            authoritative_draft_sha = hashlib.sha256(_serialize_queue_draft_bytes(normalized_pre_apply)).hexdigest()
+    authoritative_draft_sha = _authoritative_queue_draft_sha256(
+        queue_draft_path,
+        allow_caption_applied_queue_draft=allow_caption_applied_queue_draft,
+        approved_caption=approved_caption,
+        error_cls=ValueError,
+    )
 
     native_packet_sha = approval.get("publish_packet_sha256")
     native_draft_sha = approval.get("queue_draft_sha256")
@@ -233,11 +251,7 @@ def _collect_native_sha_binding_defects(
     elif not SHA256_RE.fullmatch(native_draft_sha):
         defects.append("queue_draft_sha256_malformed")
     elif native_draft_sha != authoritative_draft_sha:
-        if allow_caption_applied_queue_draft:
-            if queue_draft is None or queue_draft.get("caption") != approved_caption:
-                defects.append("queue_draft_sha256_mismatch")
-        else:
-            defects.append("queue_draft_sha256_mismatch")
+        defects.append("queue_draft_sha256_mismatch")
 
     return defects, actual_packet_sha, authoritative_draft_sha
 
