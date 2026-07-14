@@ -74,7 +74,9 @@ from __future__ import annotations
 #   python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09 --slot-id readypack0709-pack000-05-photo --live
 
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import re
 import shutil
@@ -266,6 +268,26 @@ def validate_candidate(source: dict, expected_prompt_path: Optional[Path]) -> di
         "hard_exclude_reasons": hard_exclude_reasons,
         "prompt_matches_expected": prompt_matches_expected,
         "all_reasons": reasons,
+    }
+
+
+def render_dry_run_contract(
+    date_str: str,
+    slot_id: str,
+    source: dict,
+    custom_reference_id: str,
+    expected_prompt_path: Optional[Path] = None,
+) -> dict[str, Any]:
+    validation = validate_candidate(source, expected_prompt_path)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        print_dry_run_report(date_str, slot_id, source, custom_reference_id, validation)
+    return {
+        "stdout": output.getvalue(),
+        "validation": validation,
+        "ok": validation["ok"],
+        "date": date_str,
+        "slot_id": slot_id,
     }
 
 
@@ -483,7 +505,18 @@ def build_manifest(
             }
         )
 
+    retry_contract = image.get("retry_execution_contract")
+    if isinstance(retry_contract, dict):
+        manifest["retry_execution_contract"] = retry_contract
+
     return manifest
+
+
+def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str, dict, Path]:
+    from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer  # noqa: E402
+
+    artifact, source = retry_consumer.load_retry_execution_source(retry_decision_artifact)
+    return str(artifact["as_of_date"]), str(artifact["retry_slot_id"]), source, retry_decision_artifact.resolve()
 
 
 # --- Live execution ----------------------------------------------------------
@@ -610,8 +643,9 @@ def print_dry_run_report(date_str: str, slot_id: str, source: dict, custom_refer
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--date", required=True, help="e.g. 2026-07-09")
-    parser.add_argument("--slot-id", required=True, dest="slot_id")
+    parser.add_argument("--date", help="e.g. 2026-07-09")
+    parser.add_argument("--slot-id", dest="slot_id")
+    parser.add_argument("--retry-decision-artifact", type=Path)
     parser.add_argument(
         "--custom-reference-id", dest="custom_reference_id",
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
@@ -633,33 +667,51 @@ def main() -> int:
 
     expected_prompt_path = Path(args.expected_prompt_file) if args.expected_prompt_file else None
 
-    try:
-        source = resolve_prompt_source(args.date, args.slot_id)
-    except PromptSourceError as exc:
-        print(f"[ABORT] {exc}")
-        return 1
+    if args.retry_decision_artifact is not None:
+        if args.date or args.slot_id:
+            print("[ABORT] --retry-decision-artifact is mutually exclusive with --date/--slot-id.")
+            return 1
+        if expected_prompt_path is not None:
+            print("[ABORT] --expected-prompt-file is not supported with --retry-decision-artifact.")
+            return 1
+        try:
+            date_str, slot_id, source, _ = _load_retry_decision_source(args.retry_decision_artifact)
+        except Exception as exc:
+            print(f"[ABORT] {exc}")
+            return 1
+    else:
+        if not args.date or not args.slot_id:
+            print("[ABORT] either --retry-decision-artifact or both --date and --slot-id are required.")
+            return 1
+        date_str = args.date
+        slot_id = args.slot_id
+        try:
+            source = resolve_prompt_source(date_str, slot_id)
+        except PromptSourceError as exc:
+            print(f"[ABORT] {exc}")
+            return 1
 
     validation = validate_candidate(source, expected_prompt_path)
 
     if not live:
-        print_dry_run_report(args.date, args.slot_id, source, args.custom_reference_id, validation)
+        print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
         return 0 if validation["ok"] else 1
 
     # --live: run every dry-run validation first.
-    print_dry_run_report(args.date, args.slot_id, source, args.custom_reference_id, validation)
+    print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
     if not validation["ok"]:
         print("[ABORT] Validation failed -- refusing to make a provider call.")
         return 1
 
     try:
-        live_result = run_live(args.date, args.slot_id, source, args.custom_reference_id)
+        live_result = run_live(date_str, slot_id, source, args.custom_reference_id)
     except ProviderCallError as exc:
         print(f"[FAILED] {exc}")
         print("[FAILED] No manifest written, no artifact saved as successful.")
         return 1
 
-    manifest = build_manifest(args.date, args.slot_id, source, args.custom_reference_id, live_result)
-    mpath = manifest_path(args.date, args.slot_id)
+    manifest = build_manifest(date_str, slot_id, source, args.custom_reference_id, live_result)
+    mpath = manifest_path(date_str, slot_id)
     mpath.parent.mkdir(parents=True, exist_ok=True)
     mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
