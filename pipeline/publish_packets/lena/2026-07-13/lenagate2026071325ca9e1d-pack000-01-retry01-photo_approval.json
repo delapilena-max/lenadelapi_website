@@ -1,0 +1,20 @@
+{
+  "post_id": "lenagate2026071325ca9e1d-pack000-01-retry01-photo",
+  "source_date": "2026-07-13",
+  "publish_packet_path": "C:\\projects\\ai\\content_bot\\pipeline\\publish_packets\\lena\\2026-07-13\\LENA_PUBLISH_PACKET_lenagate2026071325ca9e1d-pack000-01-retry01-photo.md",
+  "queue_draft_path": "C:\\projects\\ai\\content_bot\\pipeline\\publish_packets\\lena\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-retry01-photo_queue_draft.json",
+  "qa_path": "C:\\projects\\ai\\content_bot\\pipeline\\asset_review\\lena\\2026-07-13\\lenagate2026071325ca9e1d-pack000-01-retry01-photo__aa25ba41d0a50f0261933f8f53bbe58d8183f0df37769c1a09655ad6c08de45c_qa_disposition.json",
+  "qa_overall": "pass",
+  "approved_caption": "Tried To Dress Down. Failed.",
+  "hashtag_count": 0,
+  "platforms": [
+    "instagram"
+  ],
+  "approved_by": "Nicolas",
+  "caption_approval_statement": "I approve this caption",
+  "live_publish_statement": null,
+  "approved_at_utc": "2026-07-14T19:20:41+00:00",
+  "manual_one_off_confirmed": true,
+  "generated_by": "tools/lena_record_publish_approval_v1.py",
+  "promotion_status": "not_yet_promoted"
+}
