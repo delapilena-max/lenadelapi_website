@@ -152,6 +152,8 @@ def _bridge_artifact(
         "lane": "night out",
         "recipe_id": "hcr_006",
         "hook_id": "cbn_004",
+        "hook_text": "Tried To Dress Down. Failed.",
+        "caption_seed": "caught me on the way in",
         "prompt_sha256": "5" * 64,
         "image_path": str(image_path),
         "image_sha256": image_sha,
@@ -266,6 +268,8 @@ def _bridge_context(tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPa
         "lane": artifact["lane"],
         "recipe_id": artifact["recipe_id"],
         "hook_id": artifact["hook_id"],
+        "hook_text": artifact["hook_text"],
+        "caption_seed": artifact["caption_seed"],
         "prompt_sha256": artifact["prompt_sha256"],
     }
     manifest = {
@@ -326,6 +330,8 @@ def _retry_decision(ctx: dict, *, fingerprint: str | None = None, retry_slot_id:
         "original_prompt_sha256": "6" * 64,
         "retry_prompt_sha256": ctx["artifact"]["prompt_sha256"],
         "prompt_mutation": {"added_constraint": "Background identity safety"},
+        "hook_text": ctx["artifact"]["hook_text"],
+        "caption_seed": ctx["artifact"]["caption_seed"],
         "source_original_decision_fingerprint_sha256": "7" * 64,
         "source_original_manifest_path": str(ctx["manifest_path"]),
         "source_original_manifest_sha256": disposition._sha256_file(ctx["manifest_path"]),
@@ -348,6 +354,8 @@ def _retry_candidate(ctx: dict) -> dict:
         "lane": ctx["artifact"]["lane"],
         "recipe_id": ctx["artifact"]["recipe_id"],
         "hook_id": ctx["artifact"]["hook_id"],
+        "hook_text": ctx["artifact"]["hook_text"],
+        "caption_seed": ctx["artifact"]["caption_seed"],
         "prompt_sha256": ctx["artifact"]["prompt_sha256"],
     }
 
@@ -383,10 +391,12 @@ def _write_higgsfield_manifest(
         # forwarding never parses this field.
         "image_prompt": "a real test prompt: weight_shift_one_hip, closed_mouth_smile_direct",
         "saved_image_path": str(image_path),
-        "lane": "test lane",
+        "lane": "night out",
         "pose_text": pose_text,
         "provider_job_id": "test-provider-job-id",
         "provider_status": "succeed",
+        "wardrobe_outfit_id": "wc_p017",
+        "wardrobe_outfit_name": "Deep Plum Satin Slip Skirt + Black Scoop Top",
     }
     if pose_body_language_id is not None:
         manifest["pose_body_language_id"] = pose_body_language_id
@@ -506,7 +516,7 @@ def test_higgsfield_existing_identity_and_creative_fields_unchanged(tmp_path: Pa
     assert draft["post_id"] == slot_id
     assert draft["metadata"]["source_slot_id"] == slot_id
     assert draft["metadata"]["wardrobe_outfit_id"] == "wc_p006"
-    assert draft["metadata"]["activity"] == "test lane"
+    assert draft["metadata"]["activity"] == "night out"
     assert draft["metadata"]["provider_job_id"] == "test-provider-job-id"
     assert draft["media_type"] == "photo"
 
@@ -618,6 +628,12 @@ def test_higgsfield_selected_disposition_builds_packet_and_queue_draft_end_to_en
     draft = json.loads(draft_path.read_text(encoding="utf-8"))
     assert f"# Lena Publish Packet -- {ctx['slot']}" in packet_text
     assert "accepted lena_photo_qa_disposition_v1 artifact" in packet_text
+    assert "**Option A (hook-first)**" in packet_text
+    assert "> Tried To Dress Down. Failed." in packet_text
+    assert "**Option B (seed-grounded)**" in packet_text
+    assert "> Caught me on the way in." in packet_text
+    assert "**Option C (scene/outfit-grounded)**" in packet_text
+    assert "> Low lights, late plans, and an outfit that refused to blend in." in packet_text
     assert draft["caption"] == packet_mod.QUEUE_DRAFT_CAPTION_PLACEHOLDER
     assert draft["slot_id"] == ctx["slot"]
     assert draft["metadata"]["qa_path"] == str(ctx["disposition_path"])
@@ -649,7 +665,14 @@ def test_higgsfield_retry_disposition_builds_packet_and_queue_draft_end_to_end(
 
     assert packet_path.exists()
     assert draft_path.exists()
+    packet_text = packet_path.read_text(encoding="utf-8")
     draft = json.loads(draft_path.read_text(encoding="utf-8"))
+    assert "**Option A (hook-first)**" in packet_text
+    assert "> Tried To Dress Down. Failed." in packet_text
+    assert "**Option B (seed-grounded)**" in packet_text
+    assert "> Caught me on the way in." in packet_text
+    assert "**Option C (scene/outfit-grounded)**" in packet_text
+    assert "> Low lights, late plans, and an outfit that refused to blend in." in packet_text
     assert draft["caption"] == packet_mod.QUEUE_DRAFT_CAPTION_PLACEHOLDER
     assert draft["slot_id"] == ctx["slot"]
     assert draft["metadata"]["qa_path"] == str(ctx["disposition_path"])
@@ -689,6 +712,37 @@ def test_higgsfield_resolution_rejects_retry_lineage_slot_mismatch(
     )
 
     with pytest.raises(ResolveError, match="retry decision retry_slot_id .* does not match candidate slot_id"):
+        resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
+
+
+def test_higgsfield_resolution_rejects_missing_caption_seed_for_semantic_disposition(
+    tmp_path: Path, isolated_roots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _bridge_context(tmp_path, isolated_roots, monkeypatch)
+    monkeypatch.setattr(
+        packet_mod.lena_photo_qa_disposition,
+        "_validate_decision",
+        lambda path: (
+            {
+                "authority_commit": ctx["artifact"]["authority_commit"],
+                "decision_fingerprint_sha256": ctx["artifact"]["decision_fingerprint_sha256"],
+                "as_of_date": ctx["date"],
+            },
+            {
+                "candidate_id": ctx["artifact"]["candidate_id"],
+                "slot_id": ctx["slot"],
+                "lane": ctx["artifact"]["lane"],
+                "recipe_id": ctx["artifact"]["recipe_id"],
+                "hook_id": ctx["artifact"]["hook_id"],
+                "hook_text": ctx["artifact"]["hook_text"],
+                "caption_seed": "",
+                "prompt_sha256": ctx["artifact"]["prompt_sha256"],
+            },
+            "selected_candidate",
+        ),
+    )
+
+    with pytest.raises(ResolveError, match="decision caption_seed must be a non-empty string"):
         resolve_packet_inputs_higgsfield(ctx["date"], ctx["slot"])
 
 

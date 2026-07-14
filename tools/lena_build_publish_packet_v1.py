@@ -127,6 +127,12 @@ def _require_sha256_string(value: Any, label: str) -> str:
     return sha
 
 
+def _clean_caption_basis(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return " ".join(part.strip() for part in value.splitlines() if part.strip()).strip()
+
+
 def _normalize_decision_binding(
     decision_path: Path,
     decision: Dict[str, Any],
@@ -157,9 +163,15 @@ def _normalize_decision_binding(
         "recipe_id": recipe_id,
         "hook_id": hook_id,
         "prompt_sha256": prompt_sha256,
+        "hook_text": _clean_caption_basis(candidate.get("hook_text") or decision.get("hook_text")),
+        "caption_seed": _clean_caption_basis(candidate.get("caption_seed") or decision.get("caption_seed")),
         "decision_fingerprint_sha256": None,
         "retry_provenance": None,
     }
+    if not binding["hook_text"]:
+        raise ResolveError("decision hook_text must be a non-empty string")
+    if not binding["caption_seed"]:
+        raise ResolveError("decision caption_seed must be a non-empty string")
     if decision_kind == "selected_candidate":
         binding["decision_fingerprint_sha256"] = _require_sha256_string(
             decision.get("decision_fingerprint_sha256"),
@@ -680,6 +692,11 @@ def _resolved_qa_path(qa_result: Dict[str, Any], date_str: str, slot_id: str) ->
     return str(qa_result.get("_qa_path") or lena_photo_qa.qa_artifact_path(date_str, slot_id))
 
 
+def _qa_decision_binding(qa_result: Dict[str, Any]) -> Dict[str, Any]:
+    binding = qa_result.get("_decision_binding")
+    return binding if isinstance(binding, dict) else {}
+
+
 def _resolve_optional_debug_artifacts(date_str: str, slot_id: str) -> Dict[str, Any]:
     debug_dir = APILENA_DEBUG_ROOT / date_str / slot_id
     result_manifest_path = debug_dir / "result_manifest.json"
@@ -719,6 +736,7 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
 
     metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
     production_scoring = qa_result.get("production_scoring") or {}
+    decision_binding = _qa_decision_binding(qa_result)
     intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
 
     # Contract fields required by instagram_queue_bridge._validate_contract() at
@@ -757,6 +775,8 @@ def resolve_packet_inputs(date_str: str, slot_id: str, out_dir: Optional[Path] =
         "qa_hook_strength": production_scoring.get("hook_strength", {}).get("score"),
         "qa_styling_sexy_platform_safe": production_scoring.get("styling_sexy_platform_safe", {}).get("status"),
         "workorder_caption": slot.get("caption"),
+        "hook_text": decision_binding.get("hook_text"),
+        "caption_seed": decision_binding.get("caption_seed"),
         "wardrobe_outfit_id": metadata.get("wardrobe_outfit_id"),
         "wardrobe_outfit_name": metadata.get("wardrobe_outfit_name"),
         "environment_id": metadata.get("environment_id"),
@@ -816,6 +836,7 @@ def resolve_packet_inputs_video(date_str: str, slot_id: str, out_dir: Optional[P
 
     metadata = slot.get("metadata") if isinstance(slot.get("metadata"), dict) else {}
     production_scoring = qa_result.get("production_scoring") or {}
+    decision_binding = _qa_decision_binding(qa_result)
     intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
 
     # Same "fix the source, don't fabricate a value" discipline the photo
@@ -853,6 +874,8 @@ def resolve_packet_inputs_video(date_str: str, slot_id: str, out_dir: Optional[P
         "qa_hook_strength": production_scoring.get("hook_strength", {}).get("score"),
         "qa_styling_sexy_platform_safe": production_scoring.get("styling_sexy_platform_safe", {}).get("status"),
         "workorder_caption": slot.get("caption"),
+        "hook_text": decision_binding.get("hook_text"),
+        "caption_seed": decision_binding.get("caption_seed"),
         "lane": metadata.get("lane"),
         "activity": slot.get("activity") or metadata.get("activity"),
         "pose": slot.get("pose") or metadata.get("pose"),
@@ -1013,6 +1036,7 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
 
     # Rule zero -- the existing, unmodified gate. Not duplicated here.
     qa_result = _resolve_qa(date_str, slot_id)
+    decision_binding = _qa_decision_binding(qa_result)
 
     production_scoring = qa_result.get("production_scoring") or {}
     intended_packet_path = resolve_packet_output_path(date_str, slot_id, out_dir)
@@ -1060,6 +1084,8 @@ def resolve_packet_inputs_higgsfield(date_str: str, slot_id: str, out_dir: Optio
         # invented. build_caption_options() already handles an empty/missing
         # base caption gracefully.
         "workorder_caption": manifest.get("workorder_caption"),
+        "hook_text": decision_binding.get("hook_text"),
+        "caption_seed": decision_binding.get("caption_seed"),
         "wardrobe_outfit_id": manifest.get("wardrobe_outfit_id"),
         "wardrobe_outfit_name": manifest.get("wardrobe_outfit_name"),
         # Higgsfield's manifest has no environment_id/environment_name field
@@ -1274,6 +1300,56 @@ def _format_caption(base_text: str, hashtags: List[str]) -> str:
     return base_text
 
 
+def _sentence_fragment(text: str) -> str:
+    return _clean_caption_basis(text).rstrip(" .!?")
+
+
+def _sentence(text: str) -> str:
+    base = _sentence_fragment(text)
+    return f"{base}." if base else ""
+
+
+def _sentence_case(text: str) -> str:
+    base = _sentence_fragment(text)
+    if not base:
+        return ""
+    return base[0].upper() + base[1:]
+
+
+def _nightlife_caption(lane: Optional[str], wardrobe_name: Optional[str], environment_name: Optional[str]) -> str:
+    semantic_fields = " ".join(
+        _clean_caption_basis(value).lower()
+        for value in (lane, wardrobe_name, environment_name)
+        if _clean_caption_basis(value)
+    )
+    nightlife_tokens = ("night", "lounge", "late", "satin", "slip skirt", "heeled", "heels")
+    if any(token in semantic_fields for token in nightlife_tokens):
+        return "Low lights, late plans, and an outfit that refused to blend in."
+    raise ResolveError(
+        "caption generation requires semantic scene/outfit grounding strong enough to produce a publishable third option"
+    )
+
+
+def _build_publishable_caption_variants(
+    hook_text: str,
+    caption_seed: str,
+    lane: Optional[str],
+    wardrobe_name: Optional[str],
+    environment_name: Optional[str],
+) -> List[Tuple[str, str]]:
+    hook = _sentence(hook_text)
+    seed = _sentence(_sentence_case(caption_seed))
+    if not hook or not seed:
+        raise ResolveError("caption generation requires non-empty hook_text and caption_seed")
+    semantic_caption = _nightlife_caption(lane, wardrobe_name, environment_name)
+
+    return [
+        ("Option A (hook-first)", hook),
+        ("Option B (seed-grounded)", seed),
+        ("Option C (scene/outfit-grounded)", semantic_caption),
+    ]
+
+
 def build_caption_options(resolved: Dict[str, Any]) -> List[Tuple[str, str]]:
     """Deterministic, mechanical caption-option drafts grounded in the
     workorder's own caption and scene metadata. These are NOT creative
@@ -1281,36 +1357,19 @@ def build_caption_options(resolved: Dict[str, Any]) -> List[Tuple[str, str]]:
     drafts the operator must review/edit, per RULES.md (never auto-select a
     caption). Returns 3-5 (label, text) pairs, each <=3 hashtags."""
     base_text, hashtags = _split_workorder_caption(resolved.get("workorder_caption"))
+    hook_text = _clean_caption_basis(resolved.get("hook_text")) or base_text
+    caption_seed = _clean_caption_basis(resolved.get("caption_seed")) or base_text
     lane = resolved.get("lane")
     wardrobe_name = resolved.get("wardrobe_outfit_name")
     environment_name = resolved.get("environment_name")
-
-    options: List[Tuple[str, str]] = [
-        ("Option A (workorder original)", _format_caption(base_text, hashtags)),
-    ]
-
-    if base_text and "." in base_text:
-        shortened = base_text.split(".")[0].strip()
-        if shortened and shortened != base_text:
-            options.append(("Option B (shortened)", _format_caption(shortened, hashtags)))
-
-    if lane:
-        lane_text = f"{base_text} ({lane})" if base_text else str(lane)
-        options.append(("Option C (lane-anchored)", _format_caption(lane_text, hashtags)))
-
-    if wardrobe_name:
-        wardrobe_text = f"{base_text} -- wearing {wardrobe_name}" if base_text else f"wearing {wardrobe_name}"
-        options.append(("Option D (wardrobe-anchored)", _format_caption(wardrobe_text, hashtags)))
-
-    if environment_name:
-        env_text = f"{environment_name}. {base_text}" if base_text else str(environment_name)
-        options.append(("Option E (scene-anchored)", _format_caption(env_text, hashtags)))
-
-    while len(options) < 3:
-        filler_label = f"Option {chr(65 + len(options))} (base)"
-        options.append((filler_label, _format_caption(base_text, hashtags)))
-
-    return options[:5]
+    options = _build_publishable_caption_variants(
+        hook_text,
+        caption_seed,
+        lane,
+        wardrobe_name,
+        environment_name,
+    )
+    return [(label, _format_caption(text, hashtags)) for label, text in options]
 
 
 # --- Batch 2: Markdown packet assembly ---------------------------------------
