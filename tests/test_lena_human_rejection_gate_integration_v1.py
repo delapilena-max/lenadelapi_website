@@ -20,7 +20,7 @@ from tools.lena_build_publish_packet_v1 import (
 
 def _write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, indent=2), encoding="utf-8")
 
 
 def _sha(path: Path) -> str:
@@ -115,7 +115,9 @@ def _seed_photo_item(tmp_path: Path) -> dict:
         "post_id": slot_id,
         "source_date": date_str,
         "publish_packet_path": str(packet_path.resolve()),
+        "publish_packet_sha256": _sha(packet_path),
         "queue_draft_path": str(draft_path.resolve()),
+        "queue_draft_sha256": _sha(draft_path),
         "qa_path": str(qa_path.resolve()),
         "qa_overall": "pass",
         "approved_caption": approved_caption,

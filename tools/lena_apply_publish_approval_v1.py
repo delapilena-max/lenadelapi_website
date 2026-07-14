@@ -56,15 +56,14 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     resolve_queue_draft_output_path,
 )
 from tools.lena_record_publish_approval_v1 import (  # noqa: E402
-    MAX_HASHTAGS_PER_CAPTION,
-    REQUIRED_CAPTION_CONFIRM_PHRASE,
-    REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE,
-    _count_hashtags,
     resolve_approval_output_path,
 )
 from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
     HumanRejectionGateError,
     assert_no_matching_human_rejection,
+)
+from tools.lena_publish_approval_binding_v1 import (  # noqa: E402
+    resolve_approval_execution_bindings,
 )
 
 
@@ -94,88 +93,29 @@ def check_apply_publish_approval(
     """Read-only. Raises ApplyApprovalError on any hard-fail condition.
     Writes nothing, ever. Returns a dict describing exactly what would
     change (empty list if the approval is already applied)."""
+    approval_facts = resolve_approval_execution_bindings(
+        date_str,
+        slot_id,
+        out_dir,
+        require_live_publish_authorization=False,
+        allow_caption_applied_queue_draft=False,
+        error_cls=ApplyApprovalError,
+    )
     approval_path = resolve_approval_output_path(date_str, slot_id, out_dir)
-    approval = _load_json_object(approval_path, "approval artifact")
-
-    if approval.get("post_id") != slot_id:
-        raise ApplyApprovalError(
-            f"approval post_id {approval.get('post_id')!r} does not match requested slot {slot_id!r}"
-        )
-    if approval.get("source_date") != date_str:
-        raise ApplyApprovalError(
-            f"approval source_date {approval.get('source_date')!r} does not match requested date {date_str!r}"
-        )
-
-    approved_caption = approval.get("approved_caption")
-    if not approved_caption or not str(approved_caption).strip():
-        raise ApplyApprovalError("approval's approved_caption is missing or empty")
-
-    actual_hashtag_count = _count_hashtags(approved_caption)
-    stored_hashtag_count = approval.get("hashtag_count")
-    if actual_hashtag_count != stored_hashtag_count:
-        raise ApplyApprovalError(
-            f"approval hashtag_count {stored_hashtag_count!r} does not match the actual "
-            f"hashtag count ({actual_hashtag_count}) found in approved_caption"
-        )
-    if not (1 <= actual_hashtag_count <= MAX_HASHTAGS_PER_CAPTION):
-        raise ApplyApprovalError(
-            f"hashtag count {actual_hashtag_count} is not between 1 and {MAX_HASHTAGS_PER_CAPTION} inclusive"
-        )
-
-    approved_by = approval.get("approved_by")
-    if not approved_by or not str(approved_by).strip():
-        raise ApplyApprovalError("approval's approved_by is missing or empty")
-
-    # Two-field model (2026-07-10): applying the caption only ever requires
-    # caption approval -- never live_publish_statement, which is
-    # promotion's sole concern. Legacy compatibility, read-only: an
-    # artifact recorded before this split has no caption_approval_statement
-    # field at all; if its old, single "approval_statement" field equals
-    # the ORIGINAL, stricter live-publish phrase, that is accepted as
-    # satisfying this narrower caption-approval requirement (a real
-    # historical live-publish approval necessarily implied caption approval
-    # too) -- never a weakening, and the file itself is never rewritten.
-    caption_statement = approval.get("caption_approval_statement")
-    if caption_statement is None:
-        legacy_statement = approval.get("approval_statement")
-        if legacy_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
-            raise ApplyApprovalError(
-                "approval artifact has neither a valid caption_approval_statement nor a "
-                f"legacy approval_statement matching {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r}"
-            )
-    elif caption_statement != REQUIRED_CAPTION_CONFIRM_PHRASE:
-        raise ApplyApprovalError(
-            f"approval's caption_approval_statement {caption_statement!r} does not exactly match "
-            f"the required phrase {REQUIRED_CAPTION_CONFIRM_PHRASE!r}"
-        )
-
-    # manual_one_off_confirmed is part of the established schema (see the
-    # one real precedent, 2026-07-05-01-photo_approval.json) -- only
-    # enforced if present, since it's not one of this checker's own
-    # required inputs; absence would be a schema question for the recorder,
-    # not something this consumer should silently paper over either way.
-    if "manual_one_off_confirmed" in approval and approval.get("manual_one_off_confirmed") is not True:
-        raise ApplyApprovalError("approval's manual_one_off_confirmed is present but not true")
-
-    if approval.get("promotion_status") != "not_yet_promoted":
-        raise ApplyApprovalError(
-            f"approval promotion_status {approval.get('promotion_status')!r} is not "
-            "'not_yet_promoted' -- refusing to apply a caption for an item that may "
-            "already have been promoted or published"
-        )
+    approved_caption = approval_facts["approved_caption"]
+    actual_hashtag_count = approval_facts["hashtag_count"]
+    approved_by = approval_facts["approved_by"]
 
     queue_draft_path = resolve_queue_draft_output_path(date_str, slot_id, out_dir)
     queue_draft = _load_json_object(queue_draft_path, "queue draft")
 
-    approval_queue_draft_path = approval.get("queue_draft_path")
+    approval_queue_draft_path = approval_facts["queue_draft_path"]
     if approval_queue_draft_path != str(queue_draft_path):
         raise ApplyApprovalError(
             f"approval queue_draft_path {approval_queue_draft_path!r} does not match the exact queue draft path "
             f"{str(queue_draft_path)!r}"
         )
-    approval_publish_packet_path = approval.get("publish_packet_path")
-    if not isinstance(approval_publish_packet_path, str) or not approval_publish_packet_path:
-        raise ApplyApprovalError("approval publish_packet_path is missing or empty")
+    approval_publish_packet_path = approval_facts["publish_packet_path"]
 
     if queue_draft.get("slot_id") != slot_id:
         raise ApplyApprovalError(
@@ -232,6 +172,10 @@ def check_apply_publish_approval(
         "date": date_str,
         "slot_id": slot_id,
         "approval_path": str(approval_path),
+        "approval_sha256": approval_facts["approval_sha256"],
+        "approval_binding_source": approval_facts["approval_binding_source"],
+        "approval_correction_artifact_path": approval_facts["approval_correction_artifact_path"],
+        "approval_correction_artifact_sha256": approval_facts["approval_correction_artifact_sha256"],
         "queue_draft_path": str(queue_draft_path),
         "approved_caption": approved_caption,
         "hashtag_count": actual_hashtag_count,

@@ -105,7 +105,7 @@ def _write_video_workorder(workorder_root: Path, date_str: str, slot_id: str, vi
                 "metadata": {
                     "avatar_nickname": "Lena",
                     "video_prompt": "a real test video prompt",
-                    "lane": "test_lane",
+                    "lane": "late-night lounge",
                 },
             }
         ],

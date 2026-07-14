@@ -113,10 +113,6 @@ from tools.lena_build_publish_packet_v1 import (  # noqa: E402
     resolve_queue_draft_output_path,
 )
 from tools.lena_record_publish_approval_v1 import (  # noqa: E402
-    MAX_HASHTAGS_PER_CAPTION,
-    REQUIRED_CAPTION_CONFIRM_PHRASE,
-    REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE,
-    _count_hashtags,
     resolve_approval_output_path,
 )
 from tools.lena_verify_clean_export_v1 import (  # noqa: E402
@@ -126,6 +122,11 @@ from tools.lena_verify_clean_export_v1 import (  # noqa: E402
 from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
     HumanRejectionGateError,
     assert_no_matching_human_rejection,
+)
+from tools.lena_publish_approval_binding_v1 import (  # noqa: E402
+    _count_hashtags,
+    _validate_approval_shape,
+    resolve_approval_execution_bindings,
 )
 
 # Explicit provider -> resolver map. No auto-detection, no fallback: an
@@ -185,6 +186,21 @@ class PromoteError(Exception):
     raised."""
 
 
+def _validate_approval(approval: Dict[str, Any], date_str: str, slot_id: str) -> Dict[str, Any]:
+    """Compatibility shim for tools that import promotion's approval
+    validator directly. Promotion itself now uses the shared native-or-
+    corrected approval binding path; this helper preserves the historical
+    dict-in/dict-out contract for other read-only validators."""
+    return _validate_approval_shape(
+        approval,
+        date_str,
+        slot_id,
+        require_live_publish_authorization=True,
+        require_bound_files_exist=False,
+        error_cls=PromoteError,
+    )
+
+
 def resolve_promoted_queue_output_path(slot_id: str, queue_root: Optional[Path] = None) -> Path:
     """Target path for the real, live queue item. Defaults to the real
     pipeline/queue/ directory (LIVE_QUEUE_ROOT); queue_root exists only so
@@ -212,108 +228,6 @@ def _sha256_text(text: str) -> str:
 
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _validate_approval(approval: Dict[str, Any], date_str: str, slot_id: str) -> Dict[str, Any]:
-    """Re-checks every rule lena_apply_publish_approval_v1.py already
-    enforces against the same immutable approval artifact. Read-only; raises
-    PromoteError on any hard-fail condition."""
-    if approval.get("source_date") != date_str:
-        raise PromoteError(
-            f"approval source_date {approval.get('source_date')!r} does not match requested date {date_str!r}"
-        )
-    if approval.get("post_id") != slot_id:
-        raise PromoteError(
-            f"approval post_id {approval.get('post_id')!r} does not match requested slot {slot_id!r}"
-        )
-
-    approved_caption = approval.get("approved_caption")
-    if not approved_caption or not str(approved_caption).strip():
-        raise PromoteError("approval's approved_caption is missing or empty")
-
-    actual_hashtag_count = _count_hashtags(approved_caption)
-    stored_hashtag_count = approval.get("hashtag_count")
-    if actual_hashtag_count != stored_hashtag_count:
-        raise PromoteError(
-            f"approval hashtag_count {stored_hashtag_count!r} does not match the actual "
-            f"hashtag count ({actual_hashtag_count}) found in approved_caption"
-        )
-    if not (1 <= actual_hashtag_count <= MAX_HASHTAGS_PER_CAPTION):
-        raise PromoteError(
-            f"hashtag count {actual_hashtag_count} is not between 1 and {MAX_HASHTAGS_PER_CAPTION} inclusive"
-        )
-
-    approved_by = approval.get("approved_by")
-    if not approved_by or not str(approved_by).strip():
-        raise PromoteError("approval's approved_by is missing or empty")
-
-    # Two-field model (2026-07-10): promotion is the ONE place both caption
-    # approval AND live-publish authorization are required -- record/apply
-    # only ever needed caption approval. Legacy compatibility, read-only,
-    # never migrates a file: an artifact recorded before this split has
-    # neither caption_approval_statement nor live_publish_statement, only
-    # the old single "approval_statement" field. If that legacy field
-    # equals the ORIGINAL, stricter live-publish phrase, it is accepted as
-    # satisfying BOTH new requirements at once -- a real historical
-    # live-publish approval necessarily implied caption approval too. This
-    # is reading old, stricter proof as satisfying two newer, narrower
-    # requirements; never a weakening, and Candidate C's own approval file
-    # is never rewritten.
-    caption_statement = approval.get("caption_approval_statement")
-    live_publish_statement = approval.get("live_publish_statement")
-    legacy_statement = approval.get("approval_statement")
-    is_legacy = caption_statement is None and live_publish_statement is None and legacy_statement is not None
-
-    if is_legacy:
-        if legacy_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
-            raise PromoteError(
-                f"legacy approval_statement {legacy_statement!r} does not exactly match "
-                f"the required phrase {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r}"
-            )
-        effective_caption_statement = legacy_statement
-        effective_live_publish_statement = legacy_statement
-    else:
-        if caption_statement != REQUIRED_CAPTION_CONFIRM_PHRASE:
-            raise PromoteError(
-                f"approval's caption_approval_statement {caption_statement!r} does not exactly match "
-                f"the required phrase {REQUIRED_CAPTION_CONFIRM_PHRASE!r}"
-            )
-        if live_publish_statement != REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE:
-            raise PromoteError(
-                f"approval's live_publish_statement {live_publish_statement!r} does not exactly "
-                f"match the required phrase {REQUIRED_LIVE_PUBLISH_CONFIRM_PHRASE!r} -- live publish "
-                "has not been explicitly authorized; caption approval alone is not sufficient to promote"
-            )
-        effective_caption_statement = caption_statement
-        effective_live_publish_statement = live_publish_statement
-
-    # Same optional-but-enforced-if-present rule lena_apply_publish_approval_v1.py
-    # already uses: not one of this checker's own required inputs, but if
-    # present it must be true.
-    if "manual_one_off_confirmed" in approval and approval.get("manual_one_off_confirmed") is not True:
-        raise PromoteError("approval's manual_one_off_confirmed is present but not true")
-
-    if approval.get("promotion_status") != "not_yet_promoted":
-        raise PromoteError(
-            f"approval promotion_status {approval.get('promotion_status')!r} is not "
-            "'not_yet_promoted' -- refusing to promote an item that may already have "
-            "been promoted or published"
-        )
-
-    return {
-        "approved_caption": approved_caption,
-        "hashtag_count": actual_hashtag_count,
-        "approved_by": approved_by,
-        # "approval_statement" kept present (backward-compatible key name --
-        # tools/lena_manual_one_off_preflight_v1.py reads
-        # approval_facts["approval_statement"] unchanged) populated with the
-        # caption-approval value; the two new keys are always also present
-        # for explicit access going forward.
-        "approval_statement": effective_caption_statement,
-        "caption_approval_statement": effective_caption_statement,
-        "live_publish_statement": effective_live_publish_statement,
-        "approved_at_utc": approval.get("approved_at_utc"),
-    }
 
 
 def _validate_queue_draft(
@@ -609,21 +523,25 @@ def check_promote_to_queue(
             "(fails closed, never auto-detected)"
         )
 
+    approval_facts = resolve_approval_execution_bindings(
+        date_str,
+        slot_id,
+        out_dir,
+        require_live_publish_authorization=True,
+        allow_caption_applied_queue_draft=True,
+        error_cls=PromoteError,
+    )
     approval_path = resolve_approval_output_path(date_str, slot_id, out_dir)
-    approval = _load_json_object(approval_path, "approval artifact")
-    approval_facts = _validate_approval(approval, date_str, slot_id)
 
     queue_draft_path = resolve_queue_draft_output_path(date_str, slot_id, out_dir)
     queue_draft = _load_json_object(queue_draft_path, "queue draft")
-    approval_queue_draft_path = approval.get("queue_draft_path")
+    approval_queue_draft_path = approval_facts["queue_draft_path"]
     if approval_queue_draft_path != str(queue_draft_path):
         raise PromoteError(
             f"approval queue_draft_path {approval_queue_draft_path!r} does not match the exact queue draft path "
             f"{str(queue_draft_path)!r}"
         )
-    approval_publish_packet_path = approval.get("publish_packet_path")
-    if not isinstance(approval_publish_packet_path, str) or not approval_publish_packet_path:
-        raise PromoteError("approval publish_packet_path is missing or empty")
+    approval_publish_packet_path = approval_facts["publish_packet_path"]
     _validate_queue_draft(
         queue_draft,
         slot_id,
@@ -693,7 +611,10 @@ def check_promote_to_queue(
         "slot_id": slot_id,
         "provider": provider,
         "approval_path": str(approval_path),
-        "approval_sha256": _sha256_file(approval_path),
+        "approval_sha256": approval_facts["approval_sha256"],
+        "approval_binding_source": approval_facts["approval_binding_source"],
+        "approval_correction_artifact_path": approval_facts["approval_correction_artifact_path"],
+        "approval_correction_artifact_sha256": approval_facts["approval_correction_artifact_sha256"],
         "queue_draft_path": str(queue_draft_path),
         "queue_draft_sha256": _sha256_file(queue_draft_path),
         "target_queue_path": str(target_path),

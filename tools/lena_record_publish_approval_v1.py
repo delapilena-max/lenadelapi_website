@@ -58,6 +58,7 @@ from tools.lena_human_rejection_gate_v1 import (  # noqa: E402
     HumanRejectionGateError,
     assert_no_matching_human_rejection,
 )
+from tools.lena_publish_approval_binding_v1 import _sha256_file  # noqa: E402
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "publish_packets" / "lena"
 MAX_HASHTAGS_PER_CAPTION = 3
@@ -294,7 +295,9 @@ def check_publish_approval(
         "post_id": slot_id,
         "source_date": date_str,
         "publish_packet_path": str(packet_path),
+        "publish_packet_sha256": _sha256_file(packet_path),
         "queue_draft_path": queue_draft["path"],
+        "queue_draft_sha256": _sha256_file(Path(queue_draft["path"])),
         "qa_path": resolved["qa_path"],
         "qa_overall": resolved["qa_overall"],
         "approved_caption": approved_caption,
