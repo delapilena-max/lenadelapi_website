@@ -197,7 +197,8 @@ def _next_step_consistent(prep: dict[str, Any], report: dict[str, Any]) -> tuple
         prep_handoff_path = str(prep_summary.get("next_live_image_handoff_path", "")).strip()
         if prep_handoff_path:
             expected_suffix = f"pipeline/strategy/lena/next_actions/{report.get('date', '')}/lena_next_live_image_handoff_{report.get('date', '')}.json"
-            if prep_handoff_path != expected_suffix:
+            normalized_prep_handoff_path = prep_handoff_path.replace("\\", "/")
+            if not normalized_prep_handoff_path.endswith(expected_suffix):
                 return False, "strategy prep handoff path does not match the current date"
     learning_status = str(report.get("learning_status", "")).strip()
     if learning_status not in {"current", "usable_but_incomplete", "stale_unresolved", "manual_or_future_capability_required", "unavailable"}:
