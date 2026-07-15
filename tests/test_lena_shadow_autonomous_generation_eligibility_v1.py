@@ -89,7 +89,12 @@ def _materialize_canonical_assets(tmp_path: Path) -> None:
     )
 
 
-def _strategy_prep_payload(date_str: str, recipe_id: str = RECIPE_ID) -> dict:
+def _strategy_prep_payload(
+    date_str: str,
+    recipe_id: str = RECIPE_ID,
+    *,
+    handoff_path: str | None = None,
+) -> dict:
     return {
         "report_type": "lena_strategy_autonomy_prep",
         "version": "v1",
@@ -114,7 +119,8 @@ def _strategy_prep_payload(date_str: str, recipe_id: str = RECIPE_ID) -> dict:
             "strategy_gate_blocked": False,
             "recommended_recipe_id": recipe_id,
             "queue_recipes": [recipe_id],
-            "next_live_image_handoff_path": f"pipeline/strategy/lena/next_actions/{date_str}/lena_next_live_image_handoff_{date_str}.json",
+            "next_live_image_handoff_path": handoff_path
+            or f"pipeline/strategy/lena/next_actions/{date_str}/lena_next_live_image_handoff_{date_str}.json",
             "broader_autonomous_generation_ready": True,
             "learning_status": "current",
         },
@@ -202,6 +208,7 @@ def _build_fixture_tree(
     include_handoff: bool = True,
     canonical_missing_asset: str | None = None,
     live_execution_authorized: bool = False,
+    strategy_prep_payload: dict | None = None,
 ) -> None:
     _materialize_canonical_assets(tmp_path)
     if canonical_missing_asset:
@@ -229,7 +236,10 @@ def _build_fixture_tree(
 
     next_actions = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
     if include_strategy_prep:
-        _write_json(next_actions / f"lena_strategy_autonomy_prep_{DATE}.json", _strategy_prep_payload(DATE))
+        _write_json(
+            next_actions / f"lena_strategy_autonomy_prep_{DATE}.json",
+            strategy_prep_payload or _strategy_prep_payload(DATE),
+        )
     if include_next_step:
         _write_json(next_actions / f"lena_next_generation_step_{DATE}.json", _next_step_payload(DATE))
     if include_handoff:
@@ -292,7 +302,21 @@ def test_missing_canonical_assets_fail_closed(tmp_path: Path, monkeypatch: pytes
 
 def test_valid_mocked_inputs_pass_while_authority_remains_frozen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _build_fixture_tree(tmp_path)
+    _build_fixture_tree(
+        tmp_path,
+        strategy_prep_payload=_strategy_prep_payload(
+            DATE,
+            handoff_path=str(
+                tmp_path
+                / "pipeline"
+                / "strategy"
+                / "lena"
+                / "next_actions"
+                / DATE
+                / f"lena_next_live_image_handoff_{DATE}.json"
+            ),
+        ),
+    )
 
     report = builder.build_autonomous_generation_eligibility_shadow(DATE)
 
