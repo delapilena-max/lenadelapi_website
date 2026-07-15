@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import pipeline.higgsfield_lena_api_executor as executor
+import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 
 
@@ -35,6 +36,11 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         handoff_builder,
         "PRE_GENERATION_CANDIDATES",
         tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+    )
+    monkeypatch.setattr(approval_mod, "ROOT", tmp_root)
+    monkeypatch.setattr(
+        approval_mod, "DEFAULT_APPROVAL_ROOT",
+        tmp_root / "pipeline" / "approvals" / "lena" / "generation",
     )
 
 
@@ -360,6 +366,128 @@ def test_retry_decision_path_remains_compatible(
     stdout = capsys.readouterr().out
     assert "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===" in stdout
     assert "provider argv" in stdout
+
+
+def _build_approval_fixture(handoff_path: Path, *, slot_id: str = SLOT_ID, date_str: str = DATE) -> Path:
+    handoff_facts = approval_mod.inspect_handoff_artifact(handoff_path)
+    record = approval_mod.build_generation_approval_record(
+        handoff_facts,
+        operator_id=approval_mod.CANONICAL_OPERATOR_ID,
+        confirmation=approval_mod.confirmation_phrase(slot_id),
+    )
+    out_path = approval_mod.approval_output_path(date_str, slot_id)
+    approval_mod.write_approval_record_atomic(out_path, record)
+    return out_path
+
+
+def test_approval_artifact_requires_handoff_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_approval = tmp_path / "approval.json"
+    fake_approval.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["executor", "--approval-artifact", str(fake_approval)])
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "--approval-artifact requires --handoff-artifact" in stdout
+
+
+def test_dry_run_reports_valid_approval_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path)],
+    )
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
+    assert "operator_id              : nicolas" in stdout
+    assert "is_expired               : False" in stdout
+    assert "authorized_attempts      : 1" in stdout
+    assert "upload_authorized        : False" in stdout
+    assert "publish_authorized       : False" in stdout
+    assert "approval-handoff binding : confirmed exact match to supplied --handoff-artifact" in stdout
+
+
+def test_live_blocked_with_consumption_not_implemented_even_with_valid_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        executor, "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")),
+    )
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "approval_consumption_contract_not_implemented" in stdout
+    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
+
+
+def test_invalid_approval_reported_and_blocks_dry_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval["operator_id"] = "not_nicolas"
+    approval_path.write_text(json.dumps(approval), encoding="utf-8")
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path)],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "approval validation failed" in stdout
+    assert "approval_operator_mismatch" in stdout
+
+
+def test_invalid_approval_also_blocks_live_without_generic_consumption_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval["operator_id"] = "not_nicolas"
+    approval_path.write_text(json.dumps(approval), encoding="utf-8")
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        executor, "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")),
+    )
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "approval_operator_mismatch" in stdout
 
 
 def test_handoff_packet_paths_remain_repo_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

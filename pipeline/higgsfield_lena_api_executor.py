@@ -470,6 +470,59 @@ def print_handoff_dry_run_report(
     print_dry_run_report(report["date"], report["selected_slot_id"], source, custom_reference_id, validation)
 
 
+# --- Generation-approval binding (validation only; no consumption) ---------
+#
+# Reuses tools/lena_higgsfield_generation_approval_v1.py (Nicolas-only,
+# 30-minute-TTL, single-authorized-attempt approval artifacts, immutable and
+# separate from the handoff packet) -- never reimplemented here. Imported
+# lazily, matching this file's existing convention for tools.* imports (see
+# _load_retry_decision_source above). This executor only ever VALIDATES and
+# REPORTS an approval artifact's validity/binding; it never marks an
+# approval consumed and never lets a valid approval unlock --live, since no
+# atomic single-use consumption (claim/receipt) mechanism exists yet.
+
+def _validate_approval_artifact(handoff_path: Path, approval_path: Path) -> dict[str, Any]:
+    from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
+        HiggsfieldGenerationApprovalError,
+        validate_generation_approval_artifact,
+    )
+
+    try:
+        result = validate_generation_approval_artifact(approval_path)
+    except HiggsfieldGenerationApprovalError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+
+    bound_handoff_path = result["handoff_facts"]["handoff_path"]
+    if bound_handoff_path.resolve() != handoff_path.resolve():
+        raise HandoffArtifactError(
+            "approval_handoff_binding_mismatch",
+            f"approval artifact {approval_path} is bound to a different handoff "
+            f"artifact ({bound_handoff_path}) than the one supplied via "
+            f"--handoff-artifact ({handoff_path})",
+        )
+    return result
+
+
+def print_approval_validation_report(approval_path: Path, approval_result: dict[str, Any]) -> None:
+    approval = approval_result["approval"]
+    scope = approval_result["scope_summary"]
+    print()
+    print("=== Higgsfield generation approval -- validation (no consumption) ===")
+    print(f"approval artifact path  : {approval_result['approval_repo_path']}")
+    print(f"approval artifact sha256: {approval_result['approval_sha256']}")
+    print(f"operator_id              : {approval.get('operator_id')}")
+    print(f"approved_at_utc          : {approval_result['approved_at_utc']}")
+    print(f"expires_at_utc           : {approval_result['expires_at_utc']}")
+    print(f"is_expired               : {approval_result['is_expired']}")
+    print(f"authorized_attempts      : {scope['authorized_attempts']}")
+    print(f"upload_authorized        : {scope['upload_authorized']}")
+    print(f"queue_promotion_authorized: {scope['queue_promotion_authorized']}")
+    print(f"publish_authorized       : {scope['publish_authorized']}")
+    print(f"analytics_mutation_authorized: {scope['analytics_mutation_authorized']}")
+    print("approval-handoff binding : confirmed exact match to supplied --handoff-artifact")
+    print("consumption_state        : not_implemented (validation-only; --live stays blocked)")
+
+
 # --- Handoff packet helpers -------------------------------------------------
 
 def _require_handoff(condition: bool, code: str, detail: str) -> None:
@@ -982,6 +1035,14 @@ def main() -> int:
     parser.add_argument("--retry-decision-artifact", type=Path)
     parser.add_argument("--handoff-artifact", type=Path)
     parser.add_argument(
+        "--approval-artifact", type=Path, dest="approval_artifact", default=None,
+        help="Optional, only valid together with --handoff-artifact. A recorded "
+             "generation-approval artifact (tools/lena_record_higgsfield_generation_"
+             "approval_v1.py) to validate and report against the handoff. Validation "
+             "only -- a valid approval does not unlock --live; atomic single-use "
+             "consumption is not implemented yet.",
+    )
+    parser.add_argument(
         "--custom-reference-id", dest="custom_reference_id",
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         help="Higgsfield Soul custom_reference_id (default: Lena's confirmed Soul ID)",
@@ -1002,6 +1063,10 @@ def main() -> int:
 
     expected_prompt_path = Path(args.expected_prompt_file) if args.expected_prompt_file else None
 
+    if args.approval_artifact is not None and args.handoff_artifact is None:
+        print("[ABORT] --approval-artifact requires --handoff-artifact.")
+        return 1
+
     if args.handoff_artifact is not None:
         if args.retry_decision_artifact is not None or args.date or args.slot_id:
             print("[ABORT] --handoff-artifact is mutually exclusive with --retry-decision-artifact and --date/--slot-id.")
@@ -1014,10 +1079,34 @@ def main() -> int:
         except HandoffArtifactError as exc:
             print(f"[ABORT] {exc.code}: {exc.detail}")
             return 1
-        if not live:
-            print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
-            return 0 if validation["ok"] else 1
+
         print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
+
+        approval_result = None
+        approval_error: Optional[HandoffArtifactError] = None
+        if args.approval_artifact is not None:
+            try:
+                approval_result = _validate_approval_artifact(args.handoff_artifact, args.approval_artifact)
+                print_approval_validation_report(args.approval_artifact, approval_result)
+            except HandoffArtifactError as exc:
+                approval_error = exc
+                print(f"[ABORT] approval validation failed: {exc.code}: {exc.detail}")
+
+        if not live:
+            if approval_error is not None:
+                return 1
+            return 0 if validation["ok"] else 1
+
+        if approval_error is not None:
+            return 1
+        if args.approval_artifact is not None:
+            print(
+                "[ABORT] approval_consumption_contract_not_implemented: a validated "
+                "generation approval was supplied, but atomic single-use consumption "
+                "(claim/receipt) is not implemented yet -- live execution remains "
+                "blocked regardless of approval validity."
+            )
+            return 1
         if not report.get("live_execution_authorized"):
             print("[ABORT] --live is not authorized by the handoff artifact.")
             return 1
