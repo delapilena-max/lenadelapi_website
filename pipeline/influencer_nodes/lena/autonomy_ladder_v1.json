@@ -155,11 +155,15 @@
       "level": 3,
       "name": "human_approved_posting",
       "enabled": false,
-      "status": "defined_not_enabled",
+      "status": "frozen_real_mode",
+      "future_placeholder": false,
+      "disabled_by_publish_freeze": true,
+      "disabled_reason": "publish_freeze_active",
       "allowed_actions": [
         "human-approved posting preparation",
         "manual publish review",
-        "approved queue construction"
+        "approved queue construction",
+        "connector dispatch after explicit human approval"
       ],
       "forbidden_actions": [
         "autonomous posting",
@@ -169,12 +173,15 @@
       ],
       "required_artifacts": [
         "publish packet",
-        "approved queue record",
+        "approved queue item",
+        "connector payload",
+        "post log or closure report",
         "manual publish approval"
       ],
       "approval_requirements": {
-        "human_approval_required": true,
-        "per_item_approval_required": true
+        "human_posting_approval_required": true,
+        "per_item_or_batch_approval_required": true,
+        "separate_from_generation_approval": true
       },
       "failure_handling": [
         "keep publish freeze active until policy unlocks it",

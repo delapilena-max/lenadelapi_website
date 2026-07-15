@@ -95,14 +95,32 @@ def test_levels_three_four_and_five_keep_posting_controlled_or_disabled() -> Non
     level4 = _level(payload["levels"], 4)
     level5 = _level(payload["levels"], 5)
 
+    assert level3["future_placeholder"] is False
+    assert level3["disabled_by_publish_freeze"] is True
+    assert level3["disabled_reason"] == "publish_freeze_active"
     assert "human-approved posting preparation" in level3["allowed_actions"]
+    assert "connector dispatch after explicit human approval" in level3["allowed_actions"]
     assert "autonomous posting" in set(level3["forbidden_actions"])
     assert level3["enabled"] is False
-    assert level3["status"] == "defined_not_enabled"
+    assert level3["status"] == "frozen_real_mode"
+    assert level3["required_artifacts"] == [
+        "publish packet",
+        "approved queue item",
+        "connector payload",
+        "post log or closure report",
+        "manual publish approval",
+    ]
+    assert level3["approval_requirements"] == {
+        "human_posting_approval_required": True,
+        "per_item_or_batch_approval_required": True,
+        "separate_from_generation_approval": True,
+    }
+    assert level3["failure_handling"][-1] == "never infer posting approval from generation approval"
 
     for level in (level4, level5):
         assert level["enabled"] is False
         assert level["status"] == "future_only"
+        assert "future_placeholder" not in level
         assert "auto-approval" in set(level["forbidden_actions"])
         assert "implicit escalation" in set(level["forbidden_actions"])
 
