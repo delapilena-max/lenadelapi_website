@@ -1,0 +1,253 @@
+{
+  "version": "v1.0.0",
+  "schema_version": "lena_autonomy_ladder_v1",
+  "node_name": "Lena",
+  "node_role": "Node 1 of the autonomous media engine",
+  "purpose": "Define the operating contract for Lena as the first node in the autonomy ladder.",
+  "publish_freeze": {
+    "active": true,
+    "scope": "All publish paths remain frozen until explicitly replaced by a higher-level policy and corresponding tests.",
+    "frozen_surfaces": [
+      "approved_queue",
+      "autopublish",
+      "manual_publish_automation",
+      "connector_dispatch"
+    ]
+  },
+  "autonomy_rules": {
+    "auto_approval_forbidden": true,
+    "implicit_escalation_forbidden": true,
+    "generation_approval_does_not_imply_posting_approval": true
+  },
+  "levels": [
+    {
+      "level": 0,
+      "name": "dry_run_no_live",
+      "enabled": true,
+      "status": "active",
+      "allowed_actions": [
+        "dry-run strategy prep",
+        "read-only learning reads",
+        "candidate scoring",
+        "dry-run queue planning",
+        "dry-run handoff construction"
+      ],
+      "forbidden_actions": [
+        "provider calls",
+        "posting",
+        "approval consumption",
+        "claims",
+        "receipts",
+        "queue mutation",
+        "publish packets",
+        "auto-approval",
+        "implicit escalation"
+      ],
+      "required_artifacts": [
+        "dry-run reports",
+        "read-only recommendations",
+        "dry-run handoff packets"
+      ],
+      "approval_requirements": {
+        "human_approval_required": false,
+        "per_slot_approval_required": false
+      },
+      "failure_handling": [
+        "regenerate from source inputs",
+        "do not mutate runtime state",
+        "fail closed on any live-provider request"
+      ],
+      "tests_required": [
+        "strategy autonomy dry-run tests",
+        "candidate gate tests"
+      ]
+    },
+    {
+      "level": 1,
+      "name": "candidate_generation_only",
+      "enabled": true,
+      "status": "active",
+      "allowed_actions": [
+        "candidate generation only",
+        "dry-run packet planning",
+        "dry-run queue previews"
+      ],
+      "forbidden_actions": [
+        "provider calls",
+        "posting",
+        "approval consumption",
+        "claims",
+        "receipts",
+        "queue mutation",
+        "publish packets",
+        "auto-approval",
+        "implicit escalation"
+      ],
+      "required_artifacts": [
+        "content packets",
+        "queue dry-runs",
+        "candidate recommendations"
+      ],
+      "approval_requirements": {
+        "human_approval_required": false,
+        "per_slot_approval_required": false
+      },
+      "failure_handling": [
+        "discard partial outputs",
+        "rebuild from canonical source inputs",
+        "fail closed on live escalation"
+      ],
+      "tests_required": [
+        "candidate selection tests",
+        "dry-run queue tests"
+      ]
+    },
+    {
+      "level": 2,
+      "name": "live_higgsfield_generation_with_explicit_approval",
+      "enabled": true,
+      "status": "active",
+      "allowed_actions": [
+        "live Higgsfield generation",
+        "explicit per-slot human approval consumption",
+        "claim creation",
+        "receipt creation",
+        "QA disposition",
+        "bounded retry handoff",
+        "bounded retry execution under separate approval"
+      ],
+      "forbidden_actions": [
+        "publishing",
+        "queue promotion",
+        "auto-approval",
+        "implicit escalation",
+        "autonomous posting",
+        "unbounded retry",
+        "analytics mutation"
+      ],
+      "required_artifacts": [
+        "generation approval",
+        "generation claim",
+        "execution receipt",
+        "QA disposition",
+        "retry handoff",
+        "retry approval when retrying"
+      ],
+      "approval_requirements": {
+        "human_generation_approval_required": true,
+        "human_retry_approval_required": true,
+        "separate_posting_approval_required": true,
+        "per_slot_approval_required": true
+      },
+      "failure_handling": [
+        "retain immutable claim and receipt evidence",
+        "stop after one bounded retry path",
+        "require manual reconciliation before any new approval is used"
+      ],
+      "tests_required": [
+        "Higgsfield approval tests",
+        "Higgsfield claim and receipt tests",
+        "QA disposition tests",
+        "bounded retry tests"
+      ]
+    },
+    {
+      "level": 3,
+      "name": "human_approved_posting",
+      "enabled": false,
+      "status": "frozen_real_mode",
+      "future_placeholder": false,
+      "disabled_by_publish_freeze": true,
+      "disabled_reason": "publish_freeze_active",
+      "allowed_actions": [
+        "human-approved posting preparation",
+        "manual publish review",
+        "approved queue construction",
+        "connector dispatch after explicit human approval"
+      ],
+      "forbidden_actions": [
+        "autonomous posting",
+        "auto-approval",
+        "implicit escalation",
+        "queue promotion without separate human approval"
+      ],
+      "required_artifacts": [
+        "publish packet",
+        "approved queue item",
+        "connector payload",
+        "post log or closure report",
+        "manual publish approval"
+      ],
+      "approval_requirements": {
+        "human_posting_approval_required": true,
+        "per_item_or_batch_approval_required": true,
+        "separate_from_generation_approval": true
+      },
+      "failure_handling": [
+        "keep publish freeze active until policy unlocks it",
+        "stop on any missing approval artifact",
+        "never infer posting approval from generation approval"
+      ],
+      "tests_required": [
+        "publish queue policy tests",
+        "manual approval gate tests"
+      ]
+    },
+    {
+      "level": 4,
+      "name": "bounded_autonomous_posting",
+      "enabled": false,
+      "status": "future_only",
+      "allowed_actions": [
+        "reserved for a future bounded autonomous posting policy"
+      ],
+      "forbidden_actions": [
+        "autonomous posting",
+        "auto-approval",
+        "implicit escalation",
+        "live publish without explicit policy unlock"
+      ],
+      "required_artifacts": [
+        "future policy unlock",
+        "future bounded-posting receipts"
+      ],
+      "approval_requirements": {
+        "future_policy_unlock_required": true
+      },
+      "failure_handling": [
+        "remain disabled until a dedicated policy and tests unlock it"
+      ],
+      "tests_required": [
+        "future contract tests"
+      ]
+    },
+    {
+      "level": 5,
+      "name": "multi_node_autonomous_media_engine",
+      "enabled": false,
+      "status": "future_only",
+      "allowed_actions": [
+        "reserved for a future multi-node operating model"
+      ],
+      "forbidden_actions": [
+        "cross-node autonomy without governance",
+        "auto-approval",
+        "implicit escalation",
+        "live posting without explicit policy unlock"
+      ],
+      "required_artifacts": [
+        "future multi-node governance policy",
+        "future node-level contracts"
+      ],
+      "approval_requirements": {
+        "future_policy_unlock_required": true
+      },
+      "failure_handling": [
+        "remain disabled until a dedicated cross-node contract exists"
+      ],
+      "tests_required": [
+        "future contract tests"
+      ]
+    }
+  ]
+}
