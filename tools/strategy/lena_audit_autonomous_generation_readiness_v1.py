@@ -42,6 +42,8 @@ FACE_SKIN_NEGATIVE_MARKERS = (
     "airbrushed",
     "plastic",
 )
+PAYLOAD_HEADROOM_HARD_BLOCK_BELOW = 30
+PAYLOAD_HEADROOM_WARNING_BELOW = 70
 
 
 def utc_date() -> str:
@@ -127,14 +129,14 @@ def grade_lane(row: dict) -> tuple[str, list[str]]:
         blockers.append("master_identity_missing")
     if row["payload_present"] and not row["blocked_terms_absent"]:
         blockers.append("blocked_terms_present")
-    if row["payload_present"] and row["payload_headroom"] < 30:
+    if row["payload_present"] and row["payload_headroom"] < PAYLOAD_HEADROOM_HARD_BLOCK_BELOW:
         blockers.append("payload_headroom_too_low")
 
     if row["payload_present"] and row["style_source"] == "style_bank":
         warnings.append("style_bank_randomized_wardrobe")
     if row["payload_present"] and not row["environment_controlled"]:
         warnings.append("environment_not_recipe_locked")
-    if row["payload_present"] and row["payload_headroom"] < 70:
+    if row["payload_present"] and row["payload_headroom"] < PAYLOAD_HEADROOM_WARNING_BELOW:
         warnings.append("payload_headroom_narrow")
 
     if blockers:
