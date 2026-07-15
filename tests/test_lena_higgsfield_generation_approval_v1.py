@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -12,11 +13,17 @@ from tools.lena_higgsfield_generation_approval_v1 import (
     APPROVAL_TTL_MINUTES,
     CANONICAL_OPERATOR_ID,
     HiggsfieldGenerationApprovalError,
+    build_generation_claim_record,
+    build_generation_execution_receipt_record,
     build_generation_approval_record,
+    claim_output_path,
     confirmation_phrase,
     inspect_handoff_artifact,
+    receipt_output_path,
     validate_generation_approval_artifact,
+    write_generation_claim_atomic,
     write_approval_record_atomic,
+    write_generation_execution_receipt_atomic,
 )
 
 DATE = "2026-07-14"
@@ -140,6 +147,90 @@ def test_build_and_validate_round_trip_succeeds(tmp_path: Path, monkeypatch: pyt
     assert result["scope_summary"]["publish_authorized"] is False
     assert result["scope_summary"]["analytics_mutation_authorized"] is False
     assert result["handoff_facts"]["slot_id"] == SLOT_ID
+
+
+def test_generation_claim_binds_exact_identity_and_expected_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    approval_result = validate_generation_approval_artifact(approval_path)
+
+    claim = build_generation_claim_record(approval_result)
+
+    assert claim["report_type"] == "lena_higgsfield_generation_claim"
+    assert claim["claim_type"] == "higgsfield_single_generation_consumption_claim"
+    assert claim["approval_artifact_path"].endswith("_higgsfield_generation_approval.json")
+    assert claim["handoff_artifact_path"] == _handoff_repo_path()
+    assert claim["date"] == DATE
+    assert claim["slot_id"] == SLOT_ID
+    assert claim["prompt_sha256"] == PROMPT_SHA
+    assert claim["operator_id"] == CANONICAL_OPERATOR_ID
+    assert claim["provider"] == "Higgsfield"
+    assert claim["executor"] == "Higgsfield CLI repo adapter"
+    assert claim["model"] == "text2image_soul_v2"
+    assert claim["aspect_ratio"] == "9:16"
+    assert claim["custom_reference_id"] == CUSTOM_REFERENCE_ID
+    assert claim["authorized_attempts"] == 1
+    assert claim["consumed_attempt_number"] == 1
+    assert claim["expected_manifest_path"] == f"pipeline/higgsfield_debug/{DATE}/{SLOT_ID}/result_manifest.json"
+    assert claim["expected_output_directory"] == f"pipeline/higgsfield_library/lena/{DATE}"
+    assert claim["expected_output_stem"] == f"{SLOT_ID}_seed"
+    assert claim["allowed_output_extensions"] == [".png", ".jpg", ".webp", ".bin"]
+    assert claim["state"] == "claimed_pending_receipt"
+    assert claim["upload_authorized"] is False
+    assert claim["queue_promotion_authorized"] is False
+    assert claim["publish_authorized"] is False
+    assert claim["analytics_mutation_authorized"] is False
+
+
+def test_generation_execution_receipt_binds_claim_and_failure_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    approval_result = validate_generation_approval_artifact(approval_path)
+    claim_path = claim_output_path(DATE, SLOT_ID)
+    write_generation_claim_atomic(claim_path, build_generation_claim_record(approval_result))
+
+    receipt = build_generation_execution_receipt_record(
+        claim_path,
+        approval_result,
+        outcome="execution_failed",
+        failure_stage="provider_output_parse_failure",
+        error_text="sanitized failure",
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        provider_job_id="job-123",
+        provider_status="processing",
+        output_path=None,
+        image_format_detected=None,
+        actual_manifest_path=None,
+    )
+
+    assert receipt["report_type"] == "lena_higgsfield_generation_execution_receipt"
+    assert receipt["receipt_type"] == "higgsfield_single_generation_execution_receipt"
+    assert receipt["claim_artifact_path"].endswith("_higgsfield_generation_claim.json")
+    assert receipt["approval_artifact_path"].endswith("_higgsfield_generation_approval.json")
+    assert receipt["handoff_artifact_path"] == _handoff_repo_path()
+    assert receipt["date"] == DATE
+    assert receipt["slot_id"] == SLOT_ID
+    assert receipt["prompt_sha256"] == PROMPT_SHA
+    assert receipt["outcome"] == "execution_failed"
+    assert receipt["failure_stage"] == "provider_output_parse_failure"
+    assert receipt["error_text"] == "sanitized failure"
+    assert receipt["subprocess_start_attempted"] is True
+    assert receipt["provider_submission_may_have_occurred"] is True
+    assert receipt["provider_job_id"] == "job-123"
+    assert receipt["provider_status"] == "processing"
+    assert receipt["expected_manifest_path"] == f"pipeline/higgsfield_debug/{DATE}/{SLOT_ID}/result_manifest.json"
+    assert receipt["actual_manifest_path"] is None
+    assert receipt["upload_authorized"] is False
+    assert receipt["queue_promotion_authorized"] is False
+    assert receipt["publish_authorized"] is False
+    assert receipt["analytics_mutation_authorized"] is False
 
 
 def test_confirmation_phrase_names_slot_and_credit_acknowledgement() -> None:
@@ -455,6 +546,68 @@ def test_write_approval_record_atomic_leaves_no_tmp_file_on_success(
     approval_path = _record_and_write(tmp_path, handoff_path)
     leftovers = list(approval_path.parent.glob("*.tmp"))
     assert leftovers == []
+
+
+def test_write_generation_claim_atomic_allows_exactly_one_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    approval_result = validate_generation_approval_artifact(approval_path)
+    claim_record = build_generation_claim_record(approval_result)
+    out_path = claim_output_path(DATE, SLOT_ID)
+    results: list[str] = []
+
+    def _attempt() -> None:
+        try:
+            write_generation_claim_atomic(out_path, claim_record)
+            results.append("claimed")
+        except HiggsfieldGenerationApprovalError as exc:
+            results.append(exc.code)
+
+    thread_a = threading.Thread(target=_attempt)
+    thread_b = threading.Thread(target=_attempt)
+    thread_a.start()
+    thread_b.start()
+    thread_a.join()
+    thread_b.join()
+
+    assert results.count("claimed") == 1
+    assert results.count("generation_claim_already_exists") == 1
+    assert out_path.is_file()
+    assert list(out_path.parent.glob("*.tmp")) == []
+
+
+def test_write_generation_execution_receipt_atomic_refuses_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    approval_result = validate_generation_approval_artifact(approval_path)
+    claim_path = claim_output_path(DATE, SLOT_ID)
+    write_generation_claim_atomic(claim_path, build_generation_claim_record(approval_result))
+    receipt_path = receipt_output_path(DATE, SLOT_ID)
+    receipt_record = build_generation_execution_receipt_record(
+        claim_path,
+        approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        provider_job_id="job-123",
+        provider_status="completed",
+        output_path="C:/fake/path.png",
+        image_format_detected=".png",
+        actual_manifest_path=f"pipeline/higgsfield_debug/{DATE}/{SLOT_ID}/result_manifest.json",
+    )
+    write_generation_execution_receipt_atomic(receipt_path, receipt_record)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        write_generation_execution_receipt_atomic(receipt_path, receipt_record)
+    assert excinfo.value.code == "generation_execution_receipt_already_exists"
 
 
 # --- fail-closed handoff-side gates (reused invariants) -----------------------

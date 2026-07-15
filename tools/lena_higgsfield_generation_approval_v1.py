@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,12 +15,19 @@ DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
 APPROVAL_REPORT_TYPE = "lena_higgsfield_generation_approval"
 APPROVAL_SCHEMA_VERSION = "v1"
 APPROVAL_TYPE = "higgsfield_single_generation"
+CLAIM_REPORT_TYPE = "lena_higgsfield_generation_claim"
+CLAIM_SCHEMA_VERSION = "v1"
+CLAIM_TYPE = "higgsfield_single_generation_consumption_claim"
+RECEIPT_REPORT_TYPE = "lena_higgsfield_generation_execution_receipt"
+RECEIPT_SCHEMA_VERSION = "v1"
+RECEIPT_TYPE = "higgsfield_single_generation_execution_receipt"
 HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
 HANDOFF_SCHEMA_VERSION = "v1"
 HANDOFF_EXECUTION_OWNER = "claude"
 HANDOFF_PROVIDER = "higgsfield"
 HANDOFF_EXECUTOR_TYPE = "higgsfield_cli"
 REPO_EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
+ALLOWED_OUTPUT_EXTENSIONS = (".png", ".jpg", ".webp", ".bin")
 
 CANONICAL_OPERATOR_ID = "nicolas"
 APPROVAL_PROVIDER = "Higgsfield"
@@ -49,6 +57,16 @@ def utcnow() -> datetime:
 def approval_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
     base = out_root if out_root is not None else DEFAULT_APPROVAL_ROOT
     return base / date_str / f"{slot_id}_higgsfield_generation_approval.json"
+
+
+def claim_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
+    base = out_root if out_root is not None else DEFAULT_APPROVAL_ROOT
+    return base / date_str / f"{slot_id}_higgsfield_generation_claim.json"
+
+
+def receipt_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
+    base = out_root if out_root is not None else DEFAULT_APPROVAL_ROOT
+    return base / date_str / f"{slot_id}_higgsfield_generation_execution_receipt.json"
 
 
 def confirmation_phrase(slot_id: str) -> str:
@@ -82,6 +100,18 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def expected_manifest_path(date_str: str, slot_id: str) -> Path:
+    return ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "result_manifest.json"
+
+
+def expected_output_directory(date_str: str) -> Path:
+    return ROOT / "pipeline" / "higgsfield_library" / "lena" / date_str
+
+
+def expected_output_stem(slot_id: str) -> str:
+    return f"{slot_id}_seed"
 
 
 def read_json_object(path: Path, *, code: str, label: str) -> dict[str, Any]:
@@ -587,6 +617,133 @@ def validate_generation_approval_artifact(
     }
 
 
+def build_generation_claim_record(
+    approval_result: dict[str, Any],
+    *,
+    claimed_at: datetime | None = None,
+) -> dict[str, Any]:
+    approval = approval_result["approval"]
+    handoff_facts = approval_result["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    return {
+        "report_type": CLAIM_REPORT_TYPE,
+        "schema_version": CLAIM_SCHEMA_VERSION,
+        "claim_type": CLAIM_TYPE,
+        "claimed_at_utc": (claimed_at or utcnow()).astimezone(timezone.utc).replace(microsecond=0).isoformat(),
+        "approval_artifact_path": approval_result["approval_repo_path"],
+        "approval_artifact_sha256": approval_result["approval_sha256"],
+        "handoff_artifact_path": handoff_facts["handoff_repo_path"],
+        "handoff_artifact_sha256": handoff_facts["handoff_sha256"],
+        "date": date_str,
+        "slot_id": slot_id,
+        "prompt_sha256": handoff_facts["prompt_sha256"],
+        "operator_id": approval["operator_id"],
+        "provider": approval["provider"],
+        "executor": approval["executor"],
+        "model": approval["model"],
+        "aspect_ratio": approval["aspect_ratio"],
+        "soul_name": approval["soul_name"],
+        "soul_type": approval["soul_type"],
+        "custom_reference_id": approval["custom_reference_id"],
+        "authorized_attempts": 1,
+        "consumed_attempt_number": 1,
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "expected_output_directory": repo_relative_path(expected_output_directory(date_str)),
+        "expected_output_stem": expected_output_stem(slot_id),
+        "allowed_output_extensions": list(ALLOWED_OUTPUT_EXTENSIONS),
+        "state": "claimed_pending_receipt",
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+
+
+def build_generation_execution_receipt_record(
+    claim_path: Path,
+    approval_result: dict[str, Any],
+    *,
+    outcome: str,
+    failure_stage: str | None = None,
+    error_text: str | None = None,
+    subprocess_start_attempted: bool,
+    provider_submission_may_have_occurred: bool,
+    provider_job_id: str | None = None,
+    provider_status: str | None = None,
+    output_path: str | None = None,
+    image_format_detected: str | None = None,
+    actual_manifest_path: str | None = None,
+    receipt_written_at: datetime | None = None,
+) -> dict[str, Any]:
+    approval = approval_result["approval"]
+    handoff_facts = approval_result["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    claim_path = claim_path.resolve()
+    return {
+        "report_type": RECEIPT_REPORT_TYPE,
+        "schema_version": RECEIPT_SCHEMA_VERSION,
+        "receipt_type": RECEIPT_TYPE,
+        "receipt_written_at_utc": (receipt_written_at or utcnow()).astimezone(timezone.utc).replace(microsecond=0).isoformat(),
+        "claim_artifact_path": repo_relative_path(claim_path),
+        "claim_artifact_sha256": sha256_file(claim_path),
+        "approval_artifact_path": approval_result["approval_repo_path"],
+        "approval_artifact_sha256": approval_result["approval_sha256"],
+        "handoff_artifact_path": handoff_facts["handoff_repo_path"],
+        "handoff_artifact_sha256": handoff_facts["handoff_sha256"],
+        "date": date_str,
+        "slot_id": slot_id,
+        "prompt_sha256": handoff_facts["prompt_sha256"],
+        "outcome": outcome,
+        "failure_stage": failure_stage,
+        "error_text": error_text,
+        "subprocess_start_attempted": subprocess_start_attempted,
+        "provider_submission_may_have_occurred": provider_submission_may_have_occurred,
+        "provider_job_id": provider_job_id,
+        "provider_status": provider_status,
+        "output_path": output_path,
+        "image_format_detected": image_format_detected,
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "actual_manifest_path": actual_manifest_path,
+        "operator_id": approval["operator_id"],
+        "provider": approval["provider"],
+        "executor": approval["executor"],
+        "model": approval["model"],
+        "aspect_ratio": approval["aspect_ratio"],
+        "soul_name": approval["soul_name"],
+        "soul_type": approval["soul_type"],
+        "custom_reference_id": approval["custom_reference_id"],
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+
+
+def _write_immutable_record_atomic(
+    path: Path,
+    record: dict[str, Any],
+    *,
+    error_code: str,
+    error_label: str,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    payload = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
+    try:
+        temp_path.write_text(payload, encoding="utf-8")
+        os.link(str(temp_path), str(path))
+    except FileExistsError as exc:
+        raise HiggsfieldGenerationApprovalError(
+            error_code,
+            f"refusing to overwrite an existing {error_label}: {path}",
+        ) from exc
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
 def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -603,3 +760,21 @@ def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
         if temp_path.exists():
             temp_path.unlink()
         raise
+
+
+def write_generation_claim_atomic(path: Path, record: dict[str, Any]) -> None:
+    _write_immutable_record_atomic(
+        path,
+        record,
+        error_code="generation_claim_already_exists",
+        error_label="generation claim artifact",
+    )
+
+
+def write_generation_execution_receipt_atomic(path: Path, record: dict[str, Any]) -> None:
+    _write_immutable_record_atomic(
+        path,
+        record,
+        error_code="generation_execution_receipt_already_exists",
+        error_label="generation execution receipt artifact",
+    )
