@@ -661,6 +661,7 @@ def main() -> int:
     report = {
         "report_type": "lena_next_generation_step",
         "version": "v1",
+        "date": args.date,
         "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "dry_run": True,
         "provider_call_enabled": False,

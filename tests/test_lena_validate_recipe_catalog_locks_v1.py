@@ -56,6 +56,12 @@ def _catalog_payloads(*, missing_env: bool = False) -> tuple[dict, dict, dict]:
     return recipes, wardrobe, envs
 
 
+def _catalog_payloads_with_rejected_outfit() -> tuple[dict, dict, dict]:
+    recipes, wardrobe, envs = _catalog_payloads()
+    wardrobe["outfits"][0]["status"] = "rejected"
+    return recipes, wardrobe, envs
+
+
 def test_validator_passes_clean_locked_catalogs(tmp_path: Path) -> None:
     script = _copy_script(tmp_path)
     recipes, wardrobe, envs = _catalog_payloads()
@@ -95,3 +101,23 @@ def test_validator_fails_closed_on_missing_environment_binding(tmp_path: Path) -
     assert result.returncode == 1
     assert "FAIL  TC05  all active recipes have environment_id" in result.stdout
     assert "RECIPE CATALOG LOCK VALIDATION: FAILED" in result.stdout
+
+
+def test_validator_fails_closed_on_rejected_active_outfit(tmp_path: Path) -> None:
+    script = _copy_script(tmp_path)
+    recipes, wardrobe, envs = _catalog_payloads_with_rejected_outfit()
+    _write_json(tmp_path / "pipeline" / "prompt_banks" / "lena" / "lena_high_caliber_prompt_recipe_bank_v1.json", recipes)
+    _write_json(tmp_path / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json", wardrobe)
+    _write_json(tmp_path / "pipeline" / "prompt_banks" / "lena" / "lena_environment_catalog_v1.json", envs)
+
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "FAIL  TC07  active recipe outfits are not rejected and respect risk flags" in result.stdout
+    assert "is rejected" in result.stdout

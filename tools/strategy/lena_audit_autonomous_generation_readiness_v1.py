@@ -21,7 +21,6 @@ GATE_POLICY = (
     / "strategy_autonomy_gate_policy_v1.json"
 )
 PACKET_BASE = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
-PAYLOAD_BASE = ROOT / "pipeline" / "strategy" / "lena" / "kling_payloads"
 OUTPUT_BASE = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
 
 WIN_STATUSES = {
@@ -150,19 +149,21 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
     packet_path = latest_artifact(
         PACKET_BASE, "lena_content_packet_dryrun", recipe_id, date
     )
-    payload_path = latest_artifact(
-        PAYLOAD_BASE, "kling_payload_dryrun", recipe_id, date
-    )
-
     packet = read_json(packet_path) if packet_path else {}
-    payload_env = read_json(payload_path) if payload_path else {}
+    provider_prompt_contract = packet.get("provider_prompt_contract", {})
 
-    payload_chars = payload_env.get("prompt_chars")
-    packet_chars = packet.get("compact_kling_prompt_chars")
-    style_used = payload_env.get("wardrobe_style_used", {})
-    proof_mode = payload_env.get("production_proof_mode", False)
-    outfit_used = payload_env.get("wardrobe_outfit_id_used")
-    env_used = payload_env.get("environment_id_used")
+    payload_chars = provider_prompt_contract.get(
+        "prompt_chars",
+        packet.get("compact_provider_prompt_chars", packet.get("compact_kling_prompt_chars")),
+    )
+    packet_chars = packet.get(
+        "compact_provider_prompt_chars",
+        packet.get("compact_kling_prompt_chars"),
+    )
+    proof_mode = packet.get("production_proof_mode", False)
+    outfit_used = packet.get("wardrobe_outfit_id")
+    env_used = packet.get("environment_id")
+    style_source = "catalog_v1" if outfit_used else "style_bank"
 
     row = {
         "recipe_id": recipe_id,
@@ -175,20 +176,24 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
         "packet_path": str(packet_path) if packet_path else "",
         "packet_compact_chars": packet_chars,
         "packet_compact_headroom": (2499 - packet_chars) if isinstance(packet_chars, int) else None,
-        "payload_present": payload_path is not None,
-        "payload_path": str(payload_path) if payload_path else "",
+        "payload_present": bool(packet_path and provider_prompt_contract),
+        "payload_path": str(packet_path) if packet_path else "",
         "payload_chars": payload_chars,
-        "payload_headroom": (2499 - payload_chars) if isinstance(payload_chars, int) else None,
-        "payload_scene_contract_present": payload_env.get("scene_logic_contract_present", False),
-        "master_identity_body_present": payload_env.get("master_identity_body_present", False),
-        "blocked_terms_absent": payload_env.get("blocked_terms_absent", False),
+        "payload_headroom": provider_prompt_contract.get(
+            "prompt_headroom",
+            (2499 - payload_chars) if isinstance(payload_chars, int) else None,
+        ),
+        "payload_scene_contract_present": provider_prompt_contract.get("scene_logic_contract_present", False),
+        "master_identity_body_present": provider_prompt_contract.get("master_identity_body_present", False),
+        "blocked_terms_absent": provider_prompt_contract.get("blocked_terms_absent", False),
         "proof_mode": proof_mode,
-        "style_source": style_used.get("source", ""),
-        "style_lane": style_used.get("style_lane", style_used.get("category", "")),
+        "style_source": style_source,
+        "style_lane": packet.get("content_pillar", ""),
         "outfit_controlled": bool(outfit_used),
         "environment_controlled": bool(env_used),
         "outfit_used": outfit_used,
         "environment_used": env_used,
+        "provider_prompt_surface_status": provider_prompt_contract.get("surface_status", ""),
     }
 
     grade, reasons = grade_lane(row)

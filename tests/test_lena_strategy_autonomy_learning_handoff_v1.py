@@ -119,16 +119,22 @@ def test_prep_builds_learning_before_recommendation_and_threads_exact_artifact_p
 
     step_names = [step for step, _ in calls]
     assert step_names.index("build_post_outcome_learning_state") < step_names.index("recommend_next_generation_step")
+    assert not any(step.startswith("build_kling_payload_dryrun") for step in step_names)
+    assert not any(step.startswith("build_kling_video_payload_dryrun") for step in step_names)
+    assert step_names.index("build_autonomous_generation_queue_dryrun") < step_names.index("build_next_live_image_handoff")
+    assert "select_pre_generation_candidate" not in step_names
 
     recommend_cmd = next(cmd for step, cmd in calls if step == "recommend_next_generation_step")
     assert "--learning-artifact-path" in recommend_cmd
     assert str(learning_path) in recommend_cmd
-
     report = json.loads((prep_root / date / f"lena_strategy_autonomy_prep_{date}.json").read_text(encoding="utf-8"))
     assert report["status"] == "ok"
     assert report["summary"]["learning_artifact_path"] == str(learning_path)
     assert report["summary"]["learning_status"] == "current"
     assert report["summary"]["learning_pending_metrics_count"] == 2
+    assert report["summary"]["payload_count"] == 0
+    assert report["summary"]["video_payload_count"] == 0
+    assert report["summary"]["provider_routing_mode"] == "higgsfield_forward_no_live"
     assert report["summary"]["next_live_handoff_script_present"] is True
     assert report["summary"]["next_live_handoff_blocker"] == ""
 
@@ -335,3 +341,78 @@ def test_build_recommendation_without_learning_artifact_reports_unavailable_trut
     assert recommendation["learning_validation_state"] == "not_provided"
     assert recommendation["learning_required_follow_up_action"] == "rebuild_and_pass_an_explicit_learning_artifact"
     assert recommendation["rationale"][0] == "Outcome learning is unavailable for this recommendation."
+
+
+def test_recommend_main_writes_date_on_authoritative_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    policy_path = tmp_path / "policy.json"
+    memory_path = tmp_path / "pipeline" / "state" / "memory.json"
+    output_base = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions"
+    world_state = tmp_path / "pipeline" / "state" / "lena_world_state_v1.json"
+    learning_artifact = tmp_path / "learning.json"
+
+    _write_json(
+        policy_path,
+        {
+            "memory_path": "pipeline/state/memory.json",
+            "autonomy_gate": {
+                "required_before_broader_autonomous_generation": [],
+                "autonomous_publishing_unlocked": False,
+            },
+        },
+    )
+    _write_json(
+        memory_path,
+        {
+            "entries": [
+                {
+                    "qa_status": "approved",
+                    "recipe_id": "recipe-a",
+                    "date": DATE,
+                    "skin_face_realism_notes": ["face reads believable"],
+                    "wardrobe_construction_notes": ["single garment continuity held"],
+                }
+            ]
+        },
+    )
+    _write_json(world_state, {})
+    _write_json(
+        learning_artifact,
+        _learning_report(
+            status="current",
+            preferred_recipe_ids=["recipe-a"],
+            published_post_count=1,
+            pending_metrics_count=0,
+            stale_pending_metrics_count=0,
+        ),
+    )
+
+    monkeypatch.setattr(recommend, "POLICY", policy_path)
+    monkeypatch.setattr(recommend, "ROOT", tmp_path)
+    monkeypatch.setattr(recommend, "WORLD_STATE", world_state)
+    monkeypatch.setattr(recommend, "OUTPUT_BASE", output_base)
+    monkeypatch.setattr(recommend, "recipe_exists", lambda recipe_id: recipe_id == "recipe-a")
+    monkeypatch.setattr(
+        recommend,
+        "build_recommendation",
+        lambda *_args, **_kwargs: {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": "recipe-a",
+            "recommended_outfit_id": "wc_a",
+            "recommended_environment_id": "env_a",
+            "next_live_gate": "review",
+            "learning_artifact_path": str(learning_artifact),
+            "learning_status": "current",
+            "learning_availability": "available",
+            "learning_required_follow_up_action": "no_follow_up_required",
+        },
+    )
+    monkeypatch.setattr(sys, "argv", ["recommend", "--date", DATE, "--learning-artifact-path", str(learning_artifact)])
+
+    assert recommend.main() == 0
+
+    report_path = output_base / DATE / f"lena_next_generation_step_{DATE}.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["date"] == DATE
+    assert report["report_type"] == "lena_next_generation_step"

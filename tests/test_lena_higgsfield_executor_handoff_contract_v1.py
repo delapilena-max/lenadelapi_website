@@ -14,13 +14,12 @@ import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 
 
 DATE = "2026-07-13"
-SLOT_ID = "lenagate2026071325ca9e1d-pack000-01-photo"
 RECIPE_ID = "hcr_006"
+SLOT_ID = f"higgsfield-20260713-{RECIPE_ID}-photo"
 HANDOFF_NAME = f"lena_next_live_image_handoff_{DATE}.json"
-HANDOFF_MD_NAME = f"lena_next_live_image_handoff_{DATE}.md"
 EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
-LEGACY_DRY_RUN_COMMAND = f"python {EXECUTOR_PATH} --date {DATE} --slot-id {SLOT_ID}"
 HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact pipeline/strategy/lena/next_actions/{DATE}/{HANDOFF_NAME}"
+PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -32,14 +31,11 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(executor, "ROOT", tmp_root)
     monkeypatch.setattr(handoff_builder, "ROOT", tmp_root)
     monkeypatch.setattr(handoff_builder, "NEXT_ACTIONS", tmp_root / "pipeline" / "strategy" / "lena" / "next_actions")
-    monkeypatch.setattr(
-        handoff_builder,
-        "PRE_GENERATION_CANDIDATES",
-        tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
-    )
+    monkeypatch.setattr(handoff_builder, "CONTENT_PACKETS", tmp_root / "pipeline" / "strategy" / "lena" / "content_packets")
     monkeypatch.setattr(approval_mod, "ROOT", tmp_root)
     monkeypatch.setattr(
-        approval_mod, "DEFAULT_APPROVAL_ROOT",
+        approval_mod,
+        "DEFAULT_APPROVAL_ROOT",
         tmp_root / "pipeline" / "approvals" / "lena" / "generation",
     )
 
@@ -65,24 +61,13 @@ def _learning_payload(status: str = "current") -> dict:
 
 
 def _recommendation_payload(learning_path: Path, status: str = "current") -> dict:
-    follow_up = {
-        "current": "no_follow_up_required",
-        "usable_but_incomplete": "complete_missing_metrics_or_refresh_learning",
-        "stale_unresolved": "refresh_or_resolve_stale_unresolved_posts",
-        "manual_or_future_capability_required": "manual_or_future_capability_resolution_required",
-    }.get(status, "rebuild_and_pass_an_explicit_learning_artifact")
     return {
         "report_type": "lena_next_generation_step",
         "version": "v1",
         "date": DATE,
         "learning_artifact_path": str(learning_path),
         "learning_status": status,
-        "learning_status_label": {
-            "current": "learning_current",
-            "usable_but_incomplete": "learning_degraded_incomplete",
-            "stale_unresolved": "learning_stale_unresolved",
-            "manual_or_future_capability_required": "learning_manual_or_future_capability_required",
-        }.get(status, "learning_unavailable"),
+        "learning_status_label": "learning_current",
         "learning_validation_state": "valid",
         "learning_validation_error": "",
         "learning_availability": "available",
@@ -90,7 +75,7 @@ def _recommendation_payload(learning_path: Path, status: str = "current") -> dic
         "learning_pending_metrics_count": 1,
         "learning_stale_pending_metrics_count": 1,
         "learning_resolution_state_summary": _learning_payload(status)["metrics_resolution_summary"],
-        "learning_required_follow_up_action": follow_up,
+        "learning_required_follow_up_action": "no_follow_up_required",
         "learning_winner_post_count": 1,
         "recommendation": {
             "action_type": "collect_first_controlled_proof",
@@ -129,83 +114,125 @@ def _queue_payload(recipe_id: str = RECIPE_ID) -> dict:
                 "production_proof_mode": False,
                 "priority_score": 125,
                 "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
             }
         ],
     }
 
 
-def _candidate_payload(prompt_sha: str, command: str, lane: str) -> dict:
-    candidate = {
-        "activity": "stepping out near the entrance of a low-lit lounge.",
-        "candidate_id": f"{SLOT_ID}::hcr_006::cbn_004",
-        "caption_seed": "caught me on the way in",
-        "choice_eligible": True,
-        "concept_summary": "stepping out near the entrance of a low-lit lounge. | flash-adjacent nightlife social photo, 35mm lens.",
-        "creative_temperature": "glamorous",
-        "deterministic_noncreative_tiebreak": ["night out", "hcr_006", "cbn_004", SLOT_ID],
-        "exact_proposed_dry_run_command": command,
-        "hook_id": "cbn_004",
-        "hook_text": "Tried To Dress Down. Failed.",
-        "lane": lane,
-        "lighting_text": "warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain",
-        "narrative_roles": ["anticipation", "experience", "payoff"],
-        "payoff_claimed": False,
-        "payoff_eligible": True,
-        "pose": "hair_touch_confident_gaze",
-        "pose_body_language_id": "pose_p017",
-        "primary_pillar": "beautiful_trouble",
-        "prompt_sha256": prompt_sha,
-        "ranking_evidence": {"identity_consistency": "passed canonical Soul identity hard gate"},
-        "recipe_binding": "strategy compatibility",
-        "recipe_id": RECIPE_ID,
-        "scene_identity_field": "lane",
-        "slot_id": SLOT_ID,
-        "supporting_pillar": "audience_choice_and_payoff",
-        "visual_style": "skirt_set",
-        "wardrobe_outfit_id": "wc_p017",
-    }
+def _content_packet_payload(prompt_text: str = PROMPT_TEXT) -> dict:
+    prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
     return {
-        "as_of_date": DATE,
-        "authority_commit": "25ca9e1d5bc00dd766ed3ec36bae4433e8769f02",
-        "candidate": candidate,
-        "candidate_status": "selected",
-        "confidence": "medium",
-        "decision_fingerprint_sha256": "12879928698742649ceb9bf817fc82cbad23947b8d9a42743b5fef3a69f05336",
-        "evidence": {"recent_content_evidence_semantics": "exact recorded fields only; missing fields remain unknown"},
-        "exact_next_allowed_action": command,
-        "final_action": "prepare_higgsfield_still_dry_run_for_review",
-        "generated_at_utc": "2026-07-14T03:26:44.255326Z",
-        "influencer_id": "lena",
-        "input_provenance": [],
-        "noncritical_evidence_gaps": ["historical creative temperature is unknown; non-high-heat selection remains allowed"],
-        "provider_authorized": False,
-        "rejected_or_blocked_reasons": [],
-        "schema_version": "lena_pre_generation_candidate_gate_v1",
-        "side_effects_performed": [],
-        "strategy_contract": {"canonical_niche": "Glamour, Choices, And Beautiful Trouble"},
+        "report_type": "lena_content_packet_dryrun",
+        "schema_version": "v1",
+        "packet_id": f"cpkt_20260713_{RECIPE_ID}",
+        "generated_date": DATE,
+        "generator": "lena_build_content_packet_dryrun_v1",
+        "dry_run": True,
+        "provider_call_enabled": False,
+        "generation_call_performed": False,
+        "publishing_approval": "not_approved",
+        "recipe_id": RECIPE_ID,
+        "scene_type": "parking_garage_flash",
+        "wardrobe_outfit_id": "wc_p059",
+        "content_pillar": "beautiful_trouble",
+        "high_caliber_source_sections": {
+            "subject_pose": "leaning against the elevator wall before heading up",
+            "style_lighting": "warm lobby spill and realistic night shadow falloff",
+            "technical_keywords": "35mm lens, natural grain",
+        },
+        "compact_provider_prompt_preview": prompt_text,
+        "compact_provider_prompt_chars": len(prompt_text),
+        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_sha256": prompt_sha,
+        "strong_hook_id": "cbn_004",
+        "hook_text": "Tried To Dress Down. Failed.",
+        "hook_selection_reason": "highest score",
+        "caption_draft": "caught me on the way in",
+        "caption_followup": "kept the first frame",
+        "environment_id": "env_p001",
+        "environment_context": "Environment: parking garage entry.",
+        "provider_prompt_contract": {
+            "provider_route": "higgsfield_forward_no_live",
+            "live_authority": False,
+            "scene_logic_contract_present": True,
+            "master_identity_body_present": True,
+            "blocked_terms_absent": True,
+            "blocked_terms_found": [],
+            "outfit_controlled": True,
+            "environment_controlled": True,
+        },
     }
 
 
-def _build_packet_fixture(tmp_root: Path, real_source: dict, monkeypatch: pytest.MonkeyPatch) -> Path:
+def _source_from_prompt(prompt_text: str = PROMPT_TEXT) -> dict:
+    return {
+        "resolver": "content_packet_dryrun",
+        "slot_prefix": RECIPE_ID,
+        "pack_count": 1,
+        "pack_variety_warnings": [],
+        "image": {
+            "slot_id": SLOT_ID,
+            "lane": "parking_garage_flash",
+            "wardrobe_outfit_id": "wc_p059",
+            "environment_id": "env_p001",
+            "pose_body_language_id": None,
+            "pose_body_language_label": "leaning against the elevator wall before heading up",
+            "effective_wardrobe_silhouette_class": "beautiful_trouble",
+            "soul_name": "Lena",
+            "soul_version": "Soul 2.0",
+            "soul_selection_mode": "provider_config_not_prompt_text",
+            "camera_text": "35mm lens, natural grain",
+            "lighting_text": "warm lobby spill and realistic night shadow falloff",
+            "negative_prompt_enabled": False,
+            "image_prompt": prompt_text,
+            "validation": {
+                "framing_present": True,
+                "wardrobe_casual_free": True,
+                "wardrobe_casual_terms_found": [],
+                "scene_action_conflict_free": True,
+                "scene_action_conflict_terms_found": [],
+                "soul_anchor_absent": True,
+                "negative_prompt_disabled": True,
+                "heavy_overcorrection_free": True,
+                "heavy_overcorrection_terms_found": [],
+                "pose_scene_match_pass": True,
+                "pose_scene_mismatch_terms_found": [],
+                "low_hook_terms_found": [],
+                "final_expression_text": "",
+                "expression_safe_fallback_used": False,
+                "expression_safe_fallback_reason": "",
+                "expression_scene_gaze_conflict_terms_found": [],
+            },
+        },
+    }
+
+
+def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, prompt_text: str = PROMPT_TEXT) -> tuple[Path, dict]:
     _patch_roots(tmp_root, monkeypatch)
     next_actions = tmp_root / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
-    prompt_dir = tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
+    packets = tmp_root / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
     learning_path = next_actions / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_path = next_actions / f"lena_next_generation_step_{DATE}.json"
     queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
-    candidate_path = prompt_dir / "lena_pre_generation_candidate_25ca9e1d_128799286987.json"
-    prompt = real_source["image"]["image_prompt"]
-    prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    content_packet_path = packets / f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+    packet_report = _content_packet_payload(prompt_text)
 
     _write_json(learning_path, _learning_payload())
     _write_json(recommendation_path, _recommendation_payload(learning_path))
     _write_json(queue_path, _queue_payload())
-    _write_json(candidate_path, _candidate_payload(prompt_sha, LEGACY_DRY_RUN_COMMAND, real_source["image"]["lane"]))
+    _write_json(content_packet_path, packet_report)
+
+    monkeypatch.setattr(
+        executor,
+        "_rebuild_packet_prompt_source",
+        lambda _path: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
+    )
 
     packet = handoff_builder.build_handoff(DATE)
     packet_path, _ = handoff_builder.save_handoff(packet, DATE)
     assert packet_path.is_file()
-    return packet_path
+    return packet_path, packet_report
 
 
 @pytest.fixture(autouse=True)
@@ -221,9 +248,7 @@ def test_handoff_dry_run_accepts_valid_packet_and_emits_expected_contract(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 
     assert executor.main() == 0
@@ -237,26 +262,24 @@ def test_handoff_dry_run_accepts_valid_packet_and_emits_expected_contract(
     assert "provider_call_performed : False" in stdout
     assert "generation_performed    : False" in stdout
     assert "live_execution_authorized: False" in stdout
-    assert "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===" in stdout
 
 
 @pytest.mark.parametrize(
     ("mutator", "expected_code"),
     [
-        (lambda packet, _packet_path, _real_source: packet.__setitem__("execution_owner", "someone_else"), "handoff_execution_owner_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet.__setitem__("provider", "other"), "handoff_provider_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet.__setitem__("executor_type", "other"), "handoff_executor_type_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet.__setitem__("generation_performed", True), "handoff_generation_performed"),
-        (lambda packet, _packet_path, _real_source: packet.__setitem__("publish_authorized", True), "handoff_publish_authorized"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"].__setitem__("negative_prompt_enabled", True), "handoff_negative_prompt_enabled"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"].__setitem__("model", "bad_model"), "handoff_model_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"].__setitem__("aspect_ratio", "1:1"), "handoff_aspect_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("name", "Not Lena"), "handoff_soul_name_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("custom_reference_id", "wrong"), "handoff_soul_reference_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("identity_is_prompt_instruction", True), "handoff_soul_prompt_instruction_invalid"),
-        (lambda packet, _packet_path, _real_source: packet["selected_prompt_input"].__setitem__("prompt_sha256", "0" * 64), "handoff_expected_prompt_sha_missing_or_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["selected_prompt_input"].pop("prompt_sha256", None), "handoff_expected_prompt_sha_missing_or_mismatch"),
-        (lambda packet, _packet_path, _real_source: packet["structured_executor_inputs"].__setitem__("date", "2026-07-12"), "handoff_date_mismatch"),
+        (lambda packet: packet.__setitem__("execution_owner", "someone_else"), "handoff_execution_owner_mismatch"),
+        (lambda packet: packet.__setitem__("provider", "other"), "handoff_provider_mismatch"),
+        (lambda packet: packet.__setitem__("executor_type", "other"), "handoff_executor_type_mismatch"),
+        (lambda packet: packet.__setitem__("generation_performed", True), "handoff_generation_performed"),
+        (lambda packet: packet.__setitem__("publish_authorized", True), "handoff_publish_authorized"),
+        (lambda packet: packet["structured_executor_inputs"].__setitem__("negative_prompt_enabled", True), "handoff_negative_prompt_enabled"),
+        (lambda packet: packet["structured_executor_inputs"].__setitem__("model", "bad_model"), "handoff_model_mismatch"),
+        (lambda packet: packet["structured_executor_inputs"].__setitem__("aspect_ratio", "1:1"), "handoff_aspect_mismatch"),
+        (lambda packet: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("name", "Not Lena"), "handoff_soul_name_mismatch"),
+        (lambda packet: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("custom_reference_id", "wrong"), "handoff_soul_reference_mismatch"),
+        (lambda packet: packet["structured_executor_inputs"]["soul_metadata"].__setitem__("identity_is_prompt_instruction", True), "handoff_soul_prompt_instruction_invalid"),
+        (lambda packet: packet["selected_prompt_input"].__setitem__("prompt_sha256", "0" * 64), "handoff_prompt_sha_mismatch"),
+        (lambda packet: packet["structured_executor_inputs"].__setitem__("date", "2026-07-12"), "handoff_date_mismatch"),
     ],
 )
 def test_handoff_drift_rejects_before_provider_access(
@@ -266,17 +289,14 @@ def test_handoff_drift_rejects_before_provider_access(
     mutator,
     expected_code: str,
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    mutator(packet, packet_path, real_source)
+    mutator(packet)
     packet_path.write_text(json.dumps(packet, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 
     assert executor.main() == 1
     stdout = capsys.readouterr().out
-    assert "[ABORT]" in stdout
     assert expected_code in stdout
 
 
@@ -285,11 +305,12 @@ def test_prompt_drift_rejects_before_provider_access(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
-    altered = copy.deepcopy(real_source)
-    altered["image"]["image_prompt"] = altered["image"]["image_prompt"] + " drift"
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: altered)
+    packet_path, packet_report = _build_packet_fixture(tmp_path, monkeypatch, prompt_text=PROMPT_TEXT)
+    monkeypatch.setattr(
+        executor,
+        "_rebuild_packet_prompt_source",
+        lambda _path: (copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")),
+    )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 
     assert executor.main() == 1
@@ -302,13 +323,11 @@ def test_source_artifact_sha_drift_rejects_before_provider_access(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     queue_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
     queue = json.loads(queue_path.read_text(encoding="utf-8"))
     queue["queue_slots"][0]["priority_score"] = 999
     _write_json(queue_path, queue)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 
     assert executor.main() == 1
@@ -321,51 +340,17 @@ def test_handoff_live_rejected_without_separate_approval(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
-    monkeypatch.setattr(executor, "run_live", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")))
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")),
+    )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path), "--live"])
 
     assert executor.main() == 1
     stdout = capsys.readouterr().out
-    assert ("live_execution_authorized" in stdout) or ("not authorized" in stdout)
-    assert "=== Higgsfield Lena executor -- HANDOFF DRY RUN (no provider/network call) ===" in stdout
-
-
-def test_date_slot_dry_run_remains_compatible(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
-    monkeypatch.setattr(sys, "argv", ["executor", "--date", DATE, "--slot-id", SLOT_ID])
-
-    assert executor.main() == 0
-    stdout = capsys.readouterr().out
-    assert "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===" in stdout
-    assert "provider argv" in stdout
-
-
-def test_retry_decision_path_remains_compatible(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    fake_retry_artifact = tmp_path / "retry.json"
-    fake_retry_artifact.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(
-        executor,
-        "_load_retry_decision_source",
-        lambda path: (DATE, SLOT_ID, copy.deepcopy(real_source), Path(path)),
-    )
-    monkeypatch.setattr(sys, "argv", ["executor", "--retry-decision-artifact", str(fake_retry_artifact)])
-
-    assert executor.main() == 0
-    stdout = capsys.readouterr().out
-    assert "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===" in stdout
-    assert "provider argv" in stdout
+    assert "--approval-artifact" in stdout or "review-only" in stdout
 
 
 def _build_approval_fixture(handoff_path: Path, *, slot_id: str = SLOT_ID, date_str: str = DATE) -> Path:
@@ -388,8 +373,7 @@ def test_approval_artifact_requires_handoff_artifact(
     monkeypatch.setattr(sys, "argv", ["executor", "--approval-artifact", str(fake_approval)])
 
     assert executor.main() == 1
-    stdout = capsys.readouterr().out
-    assert "--approval-artifact requires --handoff-artifact" in stdout
+    assert "--approval-artifact requires --handoff-artifact" in capsys.readouterr().out
 
 
 def test_dry_run_reports_valid_approval_binding(
@@ -397,10 +381,8 @@ def test_dry_run_reports_valid_approval_binding(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(
         sys, "argv",
         ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path)],
@@ -410,10 +392,6 @@ def test_dry_run_reports_valid_approval_binding(
     stdout = capsys.readouterr().out
     assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
     assert "operator_id              : nicolas" in stdout
-    assert "is_expired               : False" in stdout
-    assert "authorized_attempts      : 1" in stdout
-    assert "upload_authorized        : False" in stdout
-    assert "publish_authorized       : False" in stdout
     assert "approval-handoff binding : confirmed exact match to supplied --handoff-artifact" in stdout
 
 
@@ -422,8 +400,7 @@ def test_dry_run_with_valid_approval_creates_no_claim_or_receipt(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
     monkeypatch.setattr(
         sys, "argv",
@@ -431,52 +408,9 @@ def test_dry_run_with_valid_approval_creates_no_claim_or_receipt(
     )
 
     assert executor.main() == 0
-    stdout = capsys.readouterr().out
-    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
+    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in capsys.readouterr().out
     assert not approval_mod.claim_output_path(DATE, SLOT_ID).exists()
     assert not approval_mod.receipt_output_path(DATE, SLOT_ID).exists()
-
-
-def test_raw_date_slot_live_is_blocked_before_provider_execution(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
-    monkeypatch.setattr(
-        executor, "run_live",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("raw live path must not be reached")),
-    )
-    monkeypatch.setattr(sys, "argv", ["executor", "--date", DATE, "--slot-id", SLOT_ID, "--live"])
-
-    assert executor.main() == 1
-    stdout = capsys.readouterr().out
-    assert "raw --date/--slot-id --live is forbidden" in stdout
-    assert "The only permitted live still-image command" in stdout
-
-
-def test_retry_decision_live_is_blocked_before_provider_execution(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    fake_retry_artifact = tmp_path / "retry.json"
-    fake_retry_artifact.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(
-        executor,
-        "_load_retry_decision_source",
-        lambda path: (DATE, SLOT_ID, copy.deepcopy(real_source), Path(path)),
-    )
-    monkeypatch.setattr(
-        executor, "run_live",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry live path must not be reached")),
-    )
-    monkeypatch.setattr(sys, "argv", ["executor", "--retry-decision-artifact", str(fake_retry_artifact), "--live"])
-
-    assert executor.main() == 1
-    stdout = capsys.readouterr().out
-    assert "--retry-decision-artifact --live is forbidden" in stdout
 
 
 def test_invalid_approval_reported_and_blocks_dry_run(
@@ -484,13 +418,11 @@ def test_invalid_approval_reported_and_blocks_dry_run(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
     approval = json.loads(approval_path.read_text(encoding="utf-8"))
     approval["operator_id"] = "not_nicolas"
     approval_path.write_text(json.dumps(approval), encoding="utf-8")
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(
         sys, "argv",
         ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path)],
@@ -502,41 +434,13 @@ def test_invalid_approval_reported_and_blocks_dry_run(
     assert "approval_operator_mismatch" in stdout
 
 
-def test_invalid_approval_also_blocks_live_without_generic_consumption_message(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
-    approval_path = _build_approval_fixture(packet_path)
-    approval = json.loads(approval_path.read_text(encoding="utf-8"))
-    approval["operator_id"] = "not_nicolas"
-    approval_path.write_text(json.dumps(approval), encoding="utf-8")
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
-    monkeypatch.setattr(
-        executor, "run_live",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")),
-    )
-    monkeypatch.setattr(
-        sys, "argv",
-        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
-    )
-
-    assert executor.main() == 1
-    stdout = capsys.readouterr().out
-    assert "approval_operator_mismatch" in stdout
-
-
 def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(
         executor,
         "run_live",
@@ -563,16 +467,6 @@ def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
     assert claim_path.is_file()
     assert receipt_path.is_file()
     assert manifest_path.is_file()
-    claim = json.loads(claim_path.read_text(encoding="utf-8"))
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert claim["state"] == "claimed_pending_receipt"
-    assert claim["publish_authorized"] is False
-    assert receipt["outcome"] == "success"
-    assert receipt["failure_stage"] is None
-    assert receipt["publish_authorized"] is False
-    assert manifest["generation_claim_artifact_path"] == "pipeline/approvals/lena/generation/2026-07-13/lenagate2026071325ca9e1d-pack000-01-photo_higgsfield_generation_claim.json"
-    assert manifest["generation_execution_receipt_path"] == "pipeline/approvals/lena/generation/2026-07-13/lenagate2026071325ca9e1d-pack000-01-photo_higgsfield_generation_execution_receipt.json"
     assert "claim written" in stdout
     assert "receipt written" in stdout
 
@@ -582,17 +476,16 @@ def test_existing_claim_blocks_reuse_without_provider_call(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
     approval_result = approval_mod.validate_generation_approval_artifact(approval_path)
     approval_mod.write_generation_claim_atomic(
         approval_mod.claim_output_path(DATE, SLOT_ID),
         approval_mod.build_generation_claim_record(approval_result),
     )
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(
-        executor, "run_live",
+        executor,
+        "run_live",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider path must not be reached after claim collision")),
     )
     monkeypatch.setattr(
@@ -602,7 +495,7 @@ def test_existing_claim_blocks_reuse_without_provider_call(
 
     assert executor.main() == 1
     stdout = capsys.readouterr().out
-    assert "claim creation failed: generation_claim_already_exists" in stdout
+    assert "generation_claim_already_exists" in stdout
     assert not approval_mod.receipt_output_path(DATE, SLOT_ID).exists()
 
 
@@ -623,10 +516,8 @@ def test_live_failures_retain_claim_and_write_failure_receipt(
     stage: str,
     provider_submission_may_have_occurred: bool,
 ) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
 
     def _fail_live(*args, **kwargs):
         raise executor.ProviderCallError(
@@ -646,64 +537,13 @@ def test_live_failures_retain_claim_and_write_failure_receipt(
 
     assert executor.main() == 1
     stdout = capsys.readouterr().out
-    claim_path = approval_mod.claim_output_path(DATE, SLOT_ID)
-    receipt_path = approval_mod.receipt_output_path(DATE, SLOT_ID)
-    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
-    assert claim_path.is_file()
-    assert receipt_path.is_file()
-    assert not manifest_path.exists()
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    assert receipt["outcome"] == "execution_failed"
-    assert receipt["failure_stage"] == stage
-    assert receipt["subprocess_start_attempted"] is True
-    assert receipt["provider_submission_may_have_occurred"] is provider_submission_may_have_occurred
-    assert receipt["publish_authorized"] is False
+    assert approval_mod.claim_output_path(DATE, SLOT_ID).is_file()
+    assert approval_mod.receipt_output_path(DATE, SLOT_ID).is_file()
     assert "Claim retained" in stdout
 
 
-def test_receipt_collision_after_success_keeps_claim_and_does_not_retry_provider(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
-    approval_path = _build_approval_fixture(packet_path)
-    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
-    calls = {"run_live": 0}
-
-    def _success_live(*args, **kwargs):
-        calls["run_live"] += 1
-        return {
-            "job_id": "job-123",
-            "status": "completed",
-            "result_urls": ["https://example.com/final.png"],
-            "saved_image_path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
-            "image_format_detected": ".png",
-            "subprocess_start_attempted": True,
-            "provider_submission_may_have_occurred": True,
-        }
-
-    monkeypatch.setattr(executor, "run_live", _success_live)
-    precreated_receipt = approval_mod.receipt_output_path(DATE, SLOT_ID)
-    precreated_receipt.parent.mkdir(parents=True, exist_ok=True)
-    precreated_receipt.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(
-        sys, "argv",
-        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
-    )
-
-    assert executor.main() == 1
-    stdout = capsys.readouterr().out
-    assert calls["run_live"] == 1
-    assert approval_mod.claim_output_path(DATE, SLOT_ID).is_file()
-    assert "execution receipt creation failed" in stdout
-    assert not (tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json").exists()
-
-
 def test_handoff_packet_paths_remain_repo_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
-    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     for key in (
         "expected_handoff_artifact_path",

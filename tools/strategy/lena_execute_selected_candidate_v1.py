@@ -192,7 +192,7 @@ def _rebuild_current_decision(artifact: dict[str, Any]) -> tuple[dict[str, Any],
         prompt_candidates, prompt_meta = selector.build_prompt_candidates(
             artifact["as_of_date"], artifact["authority_commit"][:8]
         )
-        candidate, rejected = selector.select_candidate(authorities, prompt_candidates, recent)
+        candidate, rejected, _ = selector.select_candidate(authorities, prompt_candidates, recent)
     except selector.GateError as exc:
         raise ConsumerError("stale_decision", f"selector revalidation failed: {exc.code}: {exc.detail}") from exc
     if candidate is None:

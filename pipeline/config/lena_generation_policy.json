@@ -25,7 +25,7 @@
     "reject_if_avatar_mismatch": true
   },
   "generation": {
-    "image_engine": "kling_image_3.0",
+    "image_engine": "higgsfield_text2image_soul_v2",
     "video_engine": "kling_video_3.0",
     "video_motion_control_required": true,
     "video_resolution": "1080p",
@@ -71,8 +71,8 @@
   },
   "caption_rules": {
     "max_emojis": 2,
-    "hashtag_count_min": 5,
-    "hashtag_count_max": 9,
+    "hashtag_count_min": 0,
+    "hashtag_count_max": 3,
     "must_match_activity": true,
     "must_match_visual_style": true,
     "reject_generic_caption_patterns": [

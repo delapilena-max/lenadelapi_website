@@ -131,7 +131,12 @@ def published(timestamp, temperature=None):
 
 
 def select(auth=None, candidates=None, history=None):
-    return gate.select_candidate(auth or authorities(), candidates or [curator()], history or recent())
+    selected, reasons, _ = gate.select_candidate(
+        auth or authorities(),
+        candidates or [curator()],
+        history or recent(),
+    )
+    return selected, reasons
 
 
 def test_real_canonical_strategy_is_consumed_and_legacy_selectors_are_not_authority():
@@ -509,6 +514,49 @@ def test_matching_rerun_reuses_byte_identical_artifact_and_conflict_refuses_over
     path.write_text(json.dumps(corrupted), encoding="utf-8")
     with pytest.raises(gate.GateError, match="refusing to overwrite"):
         gate.write_decision(core, tmp_path)
+
+
+def test_required_recipe_binding_filters_on_canonical_recipe_selection_not_raw_prompt_candidates():
+    scn_a = scene("lane a", pillar="p1")
+    scn_b = scene("lane b", pillar="p2")
+    rec_a = recipe("hcr_a", pillar="p1")
+    rec_b = recipe("hcr_b", pillar="p2")
+    auth = authorities([scn_a, scn_b], [rec_a, rec_b], [hook()])
+    prompt_candidates = [
+        curator(image("lane a", "slot-a")),
+        curator(image("lane b", "slot-b")),
+    ]
+
+    selected, reasons, saw_required = gate.select_candidate(
+        auth,
+        prompt_candidates,
+        recent(),
+        required_recipe_id="hcr_b",
+    )
+
+    assert saw_required is True
+    assert selected is not None
+    assert selected["recipe_id"] == "hcr_b"
+    assert "required_recipe_candidate_missing" in {item["reason"] for item in reasons}
+
+
+def test_required_recipe_missing_raises_even_when_other_candidates_exist(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "_git", lambda *args: "a" * 40)
+    monkeypatch.setattr(gate, "verify_authority_inputs_clean", lambda *args, **kwargs: None)
+    auth = authorities([scene("lane a", pillar="p1")], [recipe("hcr_a", pillar="p1")], [hook()])
+    prompt_candidates = [curator(image("lane a", "slot-a"))]
+
+    with pytest.raises(gate.GateError) as error:
+        gate.run_gate(
+            "2026-07-14",
+            tmp_path,
+            required_recipe_id="hcr_missing",
+            authority_loader=lambda: auth,
+            recent_loader=recent,
+            prompt_builder=lambda *_args: (prompt_candidates, {}),
+        )
+
+    assert error.value.code == "required_recipe_candidate_missing"
 
 
 @pytest.mark.parametrize(

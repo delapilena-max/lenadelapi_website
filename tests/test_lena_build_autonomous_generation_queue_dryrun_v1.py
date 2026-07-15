@@ -204,8 +204,8 @@ def test_build_queue_is_deterministic_and_applies_boosts_and_penalties(
     assert "post-outcome note: winner follow-up" in report["queue_slots"][0]["why"]
     assert "engagement-state note: comments favor public lane" in report["queue_slots"][1]["why"]
     assert any("temporarily repetitive" in reason for reason in report["queue_slots"][2]["why"])
-    assert report["queue_slots"][2]["recommended_payload_command"].startswith(
-        "python tools/strategy/lena_build_kling_payload_dryrun_v1.py --packet "
+    assert report["queue_slots"][2]["recommended_handoff_command"] == (
+        f"python tools/strategy/lena_build_next_live_image_handoff_v1.py --date {DATE}"
     )
 
 

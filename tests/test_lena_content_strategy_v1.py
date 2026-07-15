@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 
@@ -146,6 +147,27 @@ def test_hook_expansion_is_complete_unique_and_recipe_links_are_valid():
     assert set(recipes["valid_hook_categories"]) == categories
     for recipe in recipes["recipes"]:
         assert set(recipe["linked_hook_categories"]) <= categories
+
+
+def test_source_caption_contracts_remain_hashtag_light_and_packet_safe() -> None:
+    recipes = read_json(PROMPTS / "lena_high_caliber_prompt_recipe_bank_v1.json")
+    hooks = read_json(PROMPTS / "strong_hook_bank_v1.json")
+
+    for recipe in recipes["recipes"]:
+        caption = recipe.get("caption_draft", "")
+        hashtags = re.findall(r"#[A-Za-z0-9_]+", caption)
+        assert hashtags == []
+        assert len(hashtags) <= 3
+
+    for hook in hooks["hooks"]:
+        for field in (
+            "caption_followup",
+            "optional_reels_opening_line",
+            "suggested_comment_reply_angle",
+        ):
+            hashtags = re.findall(r"#[A-Za-z0-9_]+", hook.get(field, "") or "")
+            assert hashtags == []
+            assert len(hashtags) <= 3
 
 
 def test_historical_assets_authority_and_dormant_policy_boundaries_are_explicit():

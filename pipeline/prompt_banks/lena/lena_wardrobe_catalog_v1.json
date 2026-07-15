@@ -1,7 +1,8 @@
 {
   "schema_version": "1",
   "description": "Lena Wardrobe Catalog v1 — repo-native, clothes-only, no third-party tools",
-  "wardrobe_rule": "Wardrobe may style Lena but must not redefine her face, hair, body, skin tone, or proportions. Lena's identity comes from the approved character element and reference images. Outfit prompt text describes clothes only. Body preservation belongs to the master identity brief and character element — not outfit strings. Wardrobe should default to modern, sexy, attractive, and believable for Lena unless the real-world situation, platform safety, or garment stability makes that specific outfit inappropriate for the lane.",
+  "wardrobe_rule": "Wardrobe may style Lena but must not redefine her face, hair, body, skin tone, or proportions. Lena's identity comes from the approved character element and reference images. Outfit prompt text describes clothes only. Body preservation belongs to the master identity brief and character element — not outfit strings. Wardrobe should default to modern, sexy, model-like, attractive, graceful, varied, and believable for Lena unless the real-world situation, platform safety, or garment stability makes that specific outfit inappropriate for the lane. Do not steer Lena toward conservative, frumpy, corporate, or businesslike styling; tailored pieces must read as fashion, nightlife, street-style, or model-off-duty looks.",
+  "style_doctrine": "Common sense first: specify real garment classes, fabric, fit, neckline, waist relationship, layering, shoes, and accessories. Intentional skin can be correct for home, casualwear, nightlife, patio, street-style, or model looks. The failure is not midriff itself; the failure is accidental garment drift, underwear replacing fashion, mismatched scene logic, or repetitive styling. Use diverse modern silhouettes: dresses, bodysuits, tanks, corset-style fashion tops, halter tops, off-shoulder tops, denim, trousers, satin skirts, mini skirts, leather, knits, tailored shorts, boots, heels, sneakers, and layered jackets when appropriate.",
   "avoid_terms_policy": "avoid_terms are QA and filtering metadata only. They are never injected into provider prompts.",
   "omitted_fields": {
     "hair": "Intentionally absent. Lena's hair comes from the approved character element and reference images.",
@@ -14,8 +15,8 @@
     "high_risk": "Structurally risky class. Requires explicit per-scene approval before any live use."
   },
   "risk_tag_reference": {
-    "crop_risk": "Top hem may create midriff gap depending on model rendering or pose.",
-    "midriff_risk": "Outfit combo known to produce midriff exposure. Requires gap-closing garment structure.",
+    "crop_risk": "Cropped garment can be intentional and attractive; risk means the model may create unstable or unintended garment gaps depending on pose.",
+    "midriff_risk": "Midriff may be intentional for sexy home, casual, going-out, street-style, or model styling; risk means unplanned exposure or garment drift, not that midriff is forbidden.",
     "body_hide_risk": "Outfit conceals natural silhouette; proportion drift or slimming possible.",
     "identity_drift_risk": "Outfit archetype has caused identity shift in testing.",
     "gymwear_drift_risk": "Athletic set causes body slimming drift when rendered in non-gym context.",
@@ -1282,7 +1283,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "champagne satin bias-cut midi slip dress with a draped cowl neckline, thin straps, and a clean flowing hem; strappy heeled sandals, layered gold chains",
+      "prompt": "champagne satin bias-cut midi slip dress with a draped cowl neckline, thin straps, full bodice continuity from neckline through waist, and a clean flowing hem; render as one continuous public dress garment, never split into a top and skirt; strappy heeled sandals, layered gold chains",
       "avoid_terms": [
         "bralette",
         "bikini top",
@@ -1306,7 +1307,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "structured black double-breasted mini blazer dress, fitted at the waist with a thin gold chain belt; strappy heeled mules",
+      "prompt": "structured black double-breasted mini blazer dress, fitted at the waist with a thin gold chain belt, built as one continuous tailored dress with full front coverage and a real skirt hem; never render as an open blazer over bare skin or separate shorts; strappy heeled mules",
       "avoid_terms": [
         "bralette",
         "shorts",
@@ -1330,7 +1331,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "rich burgundy silk-look wrap mini dress with a plunging V-neckline and a self-tie at the waist; strappy heeled sandals, small gold hoop earrings",
+      "prompt": "rich burgundy silk-look wrap mini dress with a plunging V-neckline, secure overlapping wrap bodice, self-tie at the waist, and continuous dress fabric from neckline to hem; cleavage is intentional but the garment stays a real public dress, never a separated top and skirt; strappy heeled sandals, small gold hoop earrings",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -1354,7 +1355,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "deep emerald fitted off-shoulder mini dress in stretch fabric with a straight neckline and short hem; delicate drop earrings, strappy heeled sandals",
+      "prompt": "deep emerald fitted off-shoulder mini dress in stretch fabric with a straight neckline, stable full bodice, and short hem; render as one continuous dress garment with no midriff gap or separated waistband; delicate drop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini top",
@@ -1378,7 +1379,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "blush dusty rose satin midi slip dress with delicate lace-trim at the hem and neckline; small pearl earrings, nude kitten heels",
+      "prompt": "blush dusty rose satin midi slip dress with delicate fabric trim at the hem and neckline, full bodice continuity, and a clean midi hem; render as a single public dress garment, not sleepwear-coded and not a separated top/skirt; small pearl earrings, nude kitten heels",
       "avoid_terms": [
         "bralette",
         "bikini top",
@@ -1402,7 +1403,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "sleek ivory white one-shoulder mini dress in smooth jersey with an asymmetric neckline; gold statement earring on the exposed shoulder side, strappy heeled sandals",
+      "prompt": "sleek ivory white one-shoulder mini dress in smooth jersey with an asymmetric neckline, secure continuous bodice, and one-piece mini-dress construction from shoulder to hem; gold statement earring on the exposed shoulder side, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini top",
@@ -1451,7 +1452,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "cobalt blue satin bias-cut mini dress with a V-neckline and thin adjustable straps; gold hoop earrings, strappy heeled sandals",
+      "prompt": "cobalt blue satin bias-cut mini dress with a V-neckline, thin adjustable straps, full bodice continuity, and a single continuous skirt hem; keep it a real public mini dress, never a two-piece set; gold hoop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini top",
@@ -1475,7 +1476,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "caramel brown velvet fitted midi dress with a square neckline and a subtle side slit; gold stacked rings, strappy heeled sandals",
+      "prompt": "caramel brown velvet fitted midi dress with a square neckline, full continuous bodice, clean waistline, and a subtle side slit; render as one real dress garment with no exposed midriff seam; gold stacked rings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bodycon",
@@ -1499,7 +1500,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "bright fuchsia pink fitted ribbed knit mini dress with a scoop neckline and slight stretch; small gold hoops, strappy heeled sandals",
+      "prompt": "bright fuchsia pink fitted ribbed knit mini dress with a scoop neckline, slight stretch, full-length continuous knit bodice, and clean mini hem; render as one fitted dress, never cropped into a top; small gold hoops, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bodycon",
@@ -1523,7 +1524,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "bronze gold metallic fitted mini dress in a stretch sequin-like fabric with a square neckline; gold drop earrings, strappy heeled sandals",
+      "prompt": "bronze gold metallic fitted mini dress in a stretch sequin-like fabric with a square neckline, full bodice continuity, and a clean one-piece mini-dress silhouette; gold drop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -1595,7 +1596,7 @@
       "coverage_level": "full",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "nude caramel fitted mock-neck knit midi dress in soft ribbed fabric with a clean hem; delicate gold chain bracelet, pointed-toe heeled boots",
+      "prompt": "nude caramel fitted mock-neck knit midi dress in soft ribbed fabric with a continuous torso panel, clean waistline, and clean hem; render as one modest public dress garment with no garment splitting; delicate gold chain bracelet, pointed-toe heeled boots",
       "avoid_terms": [
         "bralette",
         "bodycon",
@@ -1619,7 +1620,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "black asymmetric wrap mini dress with one shoulder and a draped side; gold statement drop earring, strappy heeled sandals",
+      "prompt": "black asymmetric wrap mini dress with one shoulder, secure full bodice coverage, a draped side, and continuous fabric from neckline through skirt hem; keep as one real dress, never separated into top and skirt; gold statement drop earring, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -1643,7 +1644,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "royal cobalt fitted square-neck knit mini dress in a medium stretch; stacked gold rings, strappy heeled sandals",
+      "prompt": "royal cobalt fitted square-neck knit mini dress in medium stretch fabric with a full continuous bodice, clean waistline, and one-piece mini hem; stacked gold rings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bodycon",
@@ -1691,7 +1692,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "emerald green structured fitted blazer and matching tailored high-waist wide-leg shorts in the same fabric; thin gold chain, pointed-toe heeled sandals",
+      "prompt": "emerald green structured fitted blazer worn closed over a simple opaque full-length black scoop-neck top; matching tailored high-waist wide-leg shorts in the same fabric with real public short construction, not micro shorts; thin gold chain, pointed-toe heeled sandals",
       "avoid_terms": [
         "bralette",
         "biker shorts",
@@ -1739,7 +1740,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "cherry red fitted square-neckline mini dress in smooth stretch fabric; gold hoop earrings, strappy nude heeled sandals",
+      "prompt": "cherry red fitted square-neckline mini dress in smooth stretch fabric with a stable full bodice, clean waistline, and continuous one-piece mini-dress construction; gold hoop earrings, strappy nude heeled sandals",
       "avoid_terms": [
         "bralette",
         "bodycon",
@@ -1764,7 +1765,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "oversized chocolate brown faux-leather structured blazer worn open; high-waist black fitted mini skirt; thin gold chain necklace, strappy heeled mules The black mini skirt is short, ending high on the mid-thigh with bare legs fully visible (leggy); keep it a real mini SKIRT, never long pants or jeans, and never tight underwear-like short-shorts. Classy and Instagram-safe: no underwear, no rendering the bottoms as briefs or booty-shorts.",
+      "prompt": "oversized chocolate brown faux-leather structured blazer worn open over a fitted ivory full-length scoop-neck top tucked into a high-waist black fitted mini skirt; thin gold chain necklace, strappy heeled mules. The black mini skirt is short, ending high on the mid-thigh with bare legs fully visible (leggy); keep it a real tailored mini skirt, never long pants or jeans, and never tight micro short-shorts. Classy and Instagram-safe: render the bottoms as a structured public mini skirt, not briefs or booty-shorts.",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -1837,7 +1838,7 @@
       "coverage_level": "full",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "long belted camel trench coat, double-breasted front; black fitted mini skirt visible below the coat hem; pointed heeled boots, small shoulder bag",
+      "prompt": "long belted camel trench coat, double-breasted front, worn over a simple opaque fitted black full-length scoop-neck top tucked into a black fitted mini skirt visible below the coat hem; pointed heeled boots, small shoulder bag",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -1845,7 +1846,7 @@
         "navel"
       ],
       "status": "untested",
-      "notes": ""
+      "notes": "Patched 2026-07-03 after public record-store render drifted the undefined underlayer into a bra-like exposed-midriff read. This trench look must always include the fitted full-length black top under the coat."
     },
     {
       "outfit_id": "wc_p025",
@@ -1861,7 +1862,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "structured black double-breasted blazer vest, fitted; high-waist cream tailored wide-leg trousers; small gold hoop earrings, strappy heeled sandals",
+      "prompt": "structured black double-breasted blazer vest worn closed over a simple opaque full-length white scoop-neck top; high-waist cream tailored wide-leg trousers with a clean waistband and pressed drape; small gold hoop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -1885,7 +1886,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "fitted burgundy faux-leather moto jacket with silver zipper detail; high-rise dark-wash straight-leg jeans; black pointed ankle boots, small hoop earrings",
+      "prompt": "fitted burgundy faux-leather moto jacket with silver zipper detail worn over a simple opaque full-length black ribbed tee tucked into high-rise dark-wash straight-leg jeans; black pointed ankle boots, small hoop earrings",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -2063,8 +2064,8 @@
         "shorts",
         "navel"
       ],
-      "status": "untested",
-      "notes": "Cami-lock added 2026-06-30 after the sheer top drifted the base cami into an exposed bra on a public street lane; base must read as a full opaque tank.",
+      "status": "rejected",
+      "notes": "Retired 2026-06-30. Even with the cami-lock wording, this sheer-over-base look kept drifting into exposed-bra / bra-as-outerwear territory on public lanes. Preserve only as a historical failed test artifact; do not use for production or autonomous rotation.",
       "daypart": "night_only",
       "context_note": "Sheer-over-base look reads as bra-as-outerwear and reliably drifts on daytime public lanes; reserve for night / going-out lanes only."
     },
@@ -2186,7 +2187,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "blush pink satin slip mini dress with thin straps and a simple bias-cut silhouette; small pearl earrings",
+      "prompt": "blush pink satin slip-style mini dress with thin straps layered over a simple opaque fitted blush-toned full-length underlayer that fully covers the chest and torso; small pearl earrings",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2747,7 +2748,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "deep teal satin off-shoulder mini dress with a clean fitted silhouette; statement gold drop earrings, strappy heeled sandals",
+      "prompt": "deep teal satin off-shoulder mini dress with a clean fitted silhouette, stable full bodice, continuous one-piece construction, and a real mini hem; statement gold drop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2771,7 +2772,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "fitted all-black mock-neck mini dress in smooth jersey; bold layered gold chain necklace; strappy black heeled sandals, gold hoops",
+      "prompt": "fitted all-black mock-neck mini dress in smooth jersey with a continuous torso panel, clean waistline, and one-piece mini hem; bold layered gold chain necklace; strappy black heeled sandals, gold hoops",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2795,7 +2796,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "copper bronze metallic fitted midi dress with a halter neckline; an actual dress garment only -- cleavage and a plunge neckline are fine, but it must never be a bra, bralette, lingerie, or underwear worn as the outfit; gold drop earrings, strappy heeled sandals",
+      "prompt": "copper bronze metallic fitted midi dress with a halter neckline; an actual continuous public dress garment only -- cleavage and a plunge neckline are fine, but the outfit must stay a real dress with full bodice continuity and no separated top-piece drift; gold drop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bra",
         "bralette",
@@ -2821,7 +2822,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "ivory white halter-neck mini dress in a smooth lightweight fabric; delicate gold layered necklaces, strappy flat sandals",
+      "prompt": "ivory white halter-neck mini dress in a smooth lightweight fabric with a secure halter bodice, full bodice continuity, and one-piece mini-dress construction; delicate gold layered necklaces, strappy flat sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2845,7 +2846,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "midnight blue sequin-finish mini dress with a V-neckline and fitted silhouette; small gold hoops, strappy heeled sandals",
+      "prompt": "midnight blue sequin-finish mini dress with a V-neckline, full continuous bodice, fitted one-piece silhouette, and a clean mini hem; small gold hoops, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2870,7 +2871,7 @@
       "coverage_level": "full",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "cream silk-look draped cowl-neck midi dress with a clean hem; layered delicate gold chain necklaces; strappy gold sandals",
+      "prompt": "cream silk-look draped cowl-neck midi dress with full bodice continuity, a clean waist fall, and a clean midi hem; render as one continuous public dress garment; layered delicate gold chain necklaces; strappy gold sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -2992,7 +2993,7 @@
       "coverage_level": "partial",
       "body_visibility": "full_body",
       "risk_tags": [],
-      "prompt": "deep berry wine satin mini dress with thin straps and a subtle cowl drape; small gold hoop earrings, strappy heeled sandals",
+      "prompt": "deep berry wine satin mini dress with thin straps, a subtle cowl drape, full bodice continuity, and one-piece mini-dress construction; small gold hoop earrings, strappy heeled sandals",
       "avoid_terms": [
         "bralette",
         "bikini",
@@ -3017,7 +3018,7 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "fitted charcoal faux-leather structured jacket; black high-waist straight-leg jeans; black pointed ankle boots, small gold hoop",
+      "prompt": "fitted charcoal faux-leather structured jacket worn over a simple opaque full-length white fitted tee tucked into black high-waist straight-leg jeans; black pointed ankle boots, small gold hoop",
       "avoid_terms": [
         "bralette",
         "crop",
@@ -3185,7 +3186,7 @@
     },
     {
       "outfit_id": "wc_p078",
-      "name": "Black Oversized Blazer + Cream Wide-Leg + White Fitted Tee",
+      "name": "Black Oversized Blazer + Cream Pleated Mini Skirt + White Fitted Tee",
       "style_lane": "elevated_casual",
       "production_lane": "cafe_styled",
       "scene_fit": [
@@ -3198,15 +3199,331 @@
       "coverage_level": "full",
       "body_visibility": "three_quarter",
       "risk_tags": [],
-      "prompt": "black oversized structured blazer; cream high-waist ribbed wide-leg trousers; simple white fitted crew-neck tee underneath; small gold studs",
+      "prompt": "black oversized structured blazer; cream high-waist pleated mini skirt with real skirt construction and a clean waistband; simple white fitted crew-neck tee underneath; small gold studs",
       "avoid_terms": [
         "bralette",
         "crop",
         "shorts",
         "navel"
       ],
+      "status": "rejected",
+      "notes": "Rejected after live proof failure on 2026-07-03. Kling ignored the pleated mini-skirt specification and rendered shapewear / biker-shorts-like lower-body drift instead of a real mini skirt, while face fidelity also drifted too generic. Do not use in production without redesign."
+    },
+    {
+      "outfit_id": "wc_p079",
+      "name": "Black Sculpted Bodysuit + Relaxed Low-Rise Denim",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "errand",
+        "editorial"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black sculpted square-neck bodysuit in smooth stretch fabric; relaxed low-rise medium-wash straight jeans with a real waistband and soft break at the shoe; slim black belt, small gold hoops, pointed black ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
       "status": "untested",
-      "notes": ""
+      "notes": "Approved after 2026-07-03 live proof rerender. Bodysuit stayed a real one-piece public-fashion garment with the torso properly connected into the waistband instead of drifting into a bra-top read."
+    },
+    {
+      "outfit_id": "wc_p080",
+      "name": "Ivory Halter Knit Top + Dark Denim Maxi Skirt",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "coffee_shop",
+        "record_store"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "ivory fitted halter knit top with a clean high neck and open shoulders; dark indigo denim maxi skirt with a front slit and real waistband; delicate gold chain, small shoulder bag, black kitten-heel sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "rejected",
+      "notes": "Rejected after repeated live proof failures on 2026-07-03. Kling repeatedly converted the full-length halter + denim maxi-skirt concept into a cropped knit top plus bodycon skirt drift despite strengthened prompt locks. Do not use in production without redesign."
+    },
+    {
+      "outfit_id": "wc_p081",
+      "name": "Chocolate Strapless Corset-Style Top + Satin Midi Skirt",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "dinner_social",
+        "night_out",
+        "rooftop"
+      ],
+      "season": "warm",
+      "occasion": "going_out",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "chocolate brown strapless corset-style fashion top with structured seams and real top construction; black bias-cut satin midi skirt sitting at the natural waist; gold cuff bracelet, small black clutch, strappy black heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Night-out eye-candy look with structure and class; top must read as fashion top, not undergarment."
+    },
+    {
+      "outfit_id": "wc_p082",
+      "name": "White Ribbed Tank + Black Leather Mini Skirt + Tall Boots",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "record_store",
+        "flower_shop"
+      ],
+      "season": "all",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "fitted white ribbed tank top with a scoop neckline and real side coverage; black leather mini skirt with a clean high-waist band; tall black knee-high boots, narrow black sunglasses, small gold hoops",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "micro shorts"
+      ],
+      "status": "untested",
+      "notes": "Classic modern street-style eye candy; simple, leggy, not businesslike."
+    },
+    {
+      "outfit_id": "wc_p083",
+      "name": "Sage One-Shoulder Knit Top + Cream Tailored Shorts",
+      "style_lane": "elevated_casual",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "brunch",
+        "street",
+        "coffee_shop"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "sage green fitted one-shoulder knit top with one full shoulder strap and clean torso fit; cream tailored high-waist shorts with pleats and real public short construction; woven mini bag, gold hoops, tan heeled sandals",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "bike shorts"
+      ],
+      "status": "rejected",
+      "notes": "Rejected after live proof failure on 2026-07-03. Kling repeatedly shortened the one-shoulder top into a cropped midriff-baring version and converted the tailored shorts concept into legging / shapewear-like lower-body drift instead of real public shorts. Do not use in production without redesign."
+    },
+    {
+      "outfit_id": "wc_p084",
+      "name": "Black Mesh-Sleeve Top + Dark Straight Jeans",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social",
+        "bar"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "black fitted going-out top with opaque front panel, sheer long mesh sleeves, and a clean square neckline; dark high-waist straight jeans with a real waistband; silver hoop earrings, black pointed heels, small shoulder bag",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Sexy nightlife top with opaque front panel; not a sheer-base failure look."
+    },
+    {
+      "outfit_id": "wc_p085",
+      "name": "Cream Off-Shoulder Sweater + Satin Mini Skirt",
+      "style_lane": "elevated_casual",
+      "production_lane": "cafe_styled",
+      "scene_fit": [
+        "coffee_shop",
+        "bookstore",
+        "museum"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "cream off-shoulder fitted knit sweater with a soft foldover neckline and stable torso fit; champagne satin mini skirt with a clean waistband; delicate necklace, tan suede ankle boots, small leather shoulder bag",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Soft sexy cafe/bookstore look; cozy fabric but still model-like."
+    },
+    {
+      "outfit_id": "wc_p086",
+      "name": "Red Fitted Tank + Low-Slung Black Cargo Maxi Skirt",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "record_store",
+        "city_bench"
+      ],
+      "season": "warm",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "red fitted scoop-neck tank top with real side coverage; low-slung black cargo maxi skirt with a clean waistband, long column shape, and side pockets; chunky silver hoops, black shoulder bag, sleek black sneakers",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "micro shorts"
+      ],
+      "status": "untested",
+      "notes": "Modern streetwear silhouette; sexy through fit and waistline, not through garment failure."
+    },
+    {
+      "outfit_id": "wc_p087",
+      "name": "Black Long-Sleeve Cutout Top + Blue Straight Jeans",
+      "style_lane": "street",
+      "production_lane": "street_glam",
+      "scene_fit": [
+        "street",
+        "coffee_shop",
+        "city_bench"
+      ],
+      "season": "cool",
+      "occasion": "street",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "midriff_risk"
+      ],
+      "prompt": "black fitted long-sleeve knit top with one intentional small side-waist cutout and otherwise full torso coverage; medium-wash straight-leg jeans with a clean waistband; gold huggie earrings, black heeled boots, small shoulder bag",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Intentional cutout is allowed; risk is only if the top collapses into a random crop or open underlayer."
+    },
+    {
+      "outfit_id": "wc_p088",
+      "name": "Ivory Buttoned Cardigan Top + Vintage Jeans",
+      "style_lane": "elevated_casual",
+      "production_lane": "cafe_styled",
+      "scene_fit": [
+        "coffee_shop",
+        "bookstore",
+        "laundry_day"
+      ],
+      "season": "cool",
+      "occasion": "daily",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "ivory fitted ribbed cardigan worn buttoned as a real top with a shallow V neckline; vintage medium-wash high-waist straight jeans; gold pendant necklace, brown leather belt, tan ankle boots",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Casual modern top, not officewear; good for coffee/bookstore/laundromat."
+    },
+    {
+      "outfit_id": "wc_p089",
+      "name": "Silver Halter Top + Black Wide-Leg Trousers",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "night_out",
+        "dinner_social",
+        "lobby_bar"
+      ],
+      "season": "all",
+      "occasion": "night_out",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [],
+      "prompt": "silver metallic halter fashion top with a secure high-neck tie and open shoulders; black high-waist fluid wide-leg trousers with a clean waistband; silver hoops, small black clutch, strappy black heels",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Night-out trouser look that is still eye candy and not corporate."
+    },
+    {
+      "outfit_id": "wc_p090",
+      "name": "Mocha Jersey Maxi Dress with Side Slit",
+      "style_lane": "going_out",
+      "production_lane": "going_out",
+      "scene_fit": [
+        "dinner_social",
+        "wine_bar",
+        "rooftop"
+      ],
+      "season": "all",
+      "occasion": "going_out",
+      "coverage_level": "partial",
+      "body_visibility": "full_body",
+      "risk_tags": [],
+      "prompt": "mocha brown body-skimming jersey maxi dress with a low scoop neckline, one continuous dress body from neckline to hem, and a thigh-high side slit; thin gold bangles, strappy nude heels, small cream clutch",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "shorts"
+      ],
+      "status": "untested",
+      "notes": "Elegant eye-candy dress with length and slit; sexy through silhouette, not exposure drift."
+    },
+    {
+      "outfit_id": "wc_p091",
+      "name": "Charcoal Cropped Fleece Pullover + Flared Leggings — Home Casual",
+      "style_lane": "cozy",
+      "production_lane": "apartment_elevated",
+      "scene_fit": [
+        "apartment_morning",
+        "late_kitchen",
+        "laundry_day"
+      ],
+      "season": "cool",
+      "occasion": "apartment",
+      "coverage_level": "partial",
+      "body_visibility": "three_quarter",
+      "risk_tags": [
+        "midriff_risk"
+      ],
+      "prompt": "charcoal soft cropped fleece pullover with intentional casual midriff, fitted black high-waist flared leggings, white ribbed socks, small gold hoops; relaxed at-home styling with real fabric folds and a clean waistband",
+      "avoid_terms": [
+        "bralette",
+        "bikini",
+        "micro shorts"
+      ],
+      "status": "untested",
+      "notes": "At-home casualwear can show intentional midriff. Not for formal, businesslike, or polished public lanes."
     }
   ]
 }
