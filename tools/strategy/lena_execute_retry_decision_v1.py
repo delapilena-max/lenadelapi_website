@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline import higgsfield_lena_api_executor as executor  # noqa: E402
 from tools import lena_human_rejection_gate_v1 as rejection_gate  # noqa: E402
 from tools import lena_record_human_rejection_v1 as rejection_record  # noqa: E402
@@ -452,6 +453,15 @@ def evaluate_retry_correction(
     write_decision: bool = False,
     live_requested: bool = False,
 ) -> dict[str, Any]:
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_execute_retry_decision_v1",
+            level=1,
+            action="candidate generation only",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
+
     if bool(correction_artifact_path) == bool(retry_decision_artifact_path):
         raise RetryDecisionError("argument_conflict", "exactly one of correction_artifact_path or retry_decision_artifact_path is required")
 

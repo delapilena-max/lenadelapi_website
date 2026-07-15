@@ -2,8 +2,13 @@ from __future__ import annotations
 import argparse, csv, hashlib, json, re
 from datetime import date, datetime
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from pipeline.influencer_nodes.lena import autonomy_ladder
 NODE = ROOT / "pipeline" / "influencer_nodes" / "lena"
 
 QUEUE_FIELDS = [
@@ -222,6 +227,16 @@ def main():
     ap.add_argument("--platforms", default="")
     ap.add_argument("--replace", action="store_true")
     args = ap.parse_args()
+
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_build_approved_publish_queue_v2_8",
+            level=3,
+            action="human-approved posting preparation",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        print(json.dumps({"ok": False, "version": "v2.8.2", "error": exc.code, "detail": exc.detail}, indent=2, ensure_ascii=False))
+        return 1
 
     policy = load_policy()
     explicit_platforms = canon_platforms(args.platforms, policy)

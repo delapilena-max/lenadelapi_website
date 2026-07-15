@@ -97,6 +97,8 @@ if str(ROOT) not in sys.path:
 if str(DIAGNOSTICS_DIR) not in sys.path:
     sys.path.insert(0, str(DIAGNOSTICS_DIR))
 
+from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+
 # Reuses the already-committed, already-validated pack builder/report --
 # the single source of truth for what a photo-dump-pack slot's final
 # image_prompt and metadata actually are. Never reimplemented here.
@@ -1416,6 +1418,23 @@ def main() -> int:
         return 1
     if args.approval_artifact is not None and args.retry_approval_artifact is not None:
         print("[ABORT] --approval-artifact and --retry-approval-artifact are mutually exclusive.")
+        return 1
+
+    try:
+        if args.live or args.approval_artifact is not None or args.retry_approval_artifact is not None:
+            autonomy_ladder.assert_allowed(
+                "pipeline_higgsfield_lena_api_executor",
+                level=2,
+                action="explicit per-slot human approval consumption",
+            )
+        else:
+            autonomy_ladder.assert_allowed(
+                "pipeline_higgsfield_lena_api_executor",
+                level=0,
+                action="dry-run strategy prep",
+            )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        print(f"[ABORT] {exc.code}: {exc.detail}")
         return 1
 
     if args.handoff_artifact is not None:
