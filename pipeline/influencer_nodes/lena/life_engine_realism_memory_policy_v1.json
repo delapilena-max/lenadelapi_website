@@ -1,0 +1,107 @@
+{
+  "version": "v1.0.0",
+  "name": "Lena Life Engine Realism Memory Policy",
+  "purpose": "Turn image QA into persistent life-engine memory so Lena learns believable real-woman account realism instead of generating isolated pretty images.",
+  "scope": [
+    "photo generation review",
+    "prompt refinement",
+    "asset approval support",
+    "daily-life continuity",
+    "autonomous generation quality memory"
+  ],
+  "core_rule": "Store not just whether an image won or lost, but why it felt real or fake across face, skin, body, wardrobe, environment, lighting, and account continuity.",
+  "memory_path": "pipeline/state/lena_life_engine_realism_memory_v1.json",
+  "remember_after_generation_review": [
+    "task_id",
+    "date",
+    "recipe_id",
+    "outfit_id",
+    "environment_id",
+    "provider",
+    "qa_status",
+    "qa_rejection_reasons",
+    "identity_consistency_notes",
+    "skin_face_realism_notes",
+    "body_proportion_notes",
+    "wardrobe_construction_notes",
+    "environment_realism_notes",
+    "camera_realism_notes",
+    "social_account_believability_notes",
+    "micro_detail_notes",
+    "prompt_clues_that_helped",
+    "prompt_clues_that_hurt"
+  ],
+  "realism_axes": {
+    "face_skin_realism": [
+      "visible pores",
+      "fine facial texture",
+      "faint under-eye or lower-lid texture",
+      "natural lip texture",
+      "individual brow hairs",
+      "real eyelashes with tiny shadows",
+      "flyaway hair strands",
+      "uneven natural catchlights",
+      "room-light falloff on skin"
+    ],
+    "body_realism": [
+      "curvy proportions held",
+      "no slimming drift",
+      "natural posture",
+      "realistic limbs and hands",
+      "fabric tension follows body"
+    ],
+    "wardrobe_realism": [
+      "single-garment continuity",
+      "no garment splitting",
+      "seams and hems behave naturally",
+      "fabric stretch/compression looks real",
+      "outfit matches scene and social context"
+    ],
+    "environment_realism": [
+      "lived-in details",
+      "real room shadows",
+      "believable mirror behavior",
+      "non-stock composition",
+      "no fake luxury drift"
+    ],
+    "account_realism": [
+      "feels like a real woman's social account",
+      "fits Lena's daily-life arc",
+      "not random glamour render",
+      "repeatable as a life lane, not a one-off fluke"
+    ]
+  },
+  "hard_failure_patterns": [
+    "plastic or poreless face",
+    "beauty-filter finish",
+    "CGI or doll-like facial finish",
+    "garment split into separate top and skirt when prompt calls for dress",
+    "unplanned exposed midriff",
+    "body slimming drift",
+    "hotel-like or stock-photo environment drift",
+    "over-polished scene that stops feeling like a real account"
+  ],
+  "winner_patterns_to_repeat": [
+    "one-piece wardrobe continuity",
+    "fuller curvy body read without distortion",
+    "mirror or room context that feels lived-in",
+    "phone-camera realism over studio glamour",
+    "micro skin and hair details visible at normal viewing distance"
+  ],
+  "decision_rules": {
+    "one_win_is_not_a_system": true,
+    "two_wins_in_same_lane_with_same_quality_axes": "promote lane to repeatable proof lane",
+    "repeat_same_failure_twice": "convert failure into catalog guardrail or prompt ban",
+    "if_face_skin_is_only_remaining_issue": "keep same outfit and environment lane, refine only micro-detail skin realism and avoid changing body-winning variables",
+    "if_body_and_wardrobe_fail": "change garment construction before scene experimentation"
+  },
+  "autonomy_gate": {
+    "required_before_broader_autonomous_generation": [
+      "at least 3 publishable-quality wins",
+      "at least 2 wins with strong face/skin realism",
+      "at least 2 wins proving one-piece dress continuity or equivalent garment stability",
+      "documented realism memory from both wins and failures"
+    ],
+    "autonomous_publishing_unlocked": false
+  }
+}

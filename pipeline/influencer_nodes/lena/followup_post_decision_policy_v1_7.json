@@ -1,0 +1,17 @@
+{
+  "version": "v1.7.0",
+  "signals_to_followups": {
+    "outfit_request": "make second-look or outfit breakdown post",
+    "routine_request": "make simple routine/stretch post",
+    "audio_question": "track and pin audio; use similar audio mood later",
+    "flirty": "use date-choice pinned comment or Coffee Date Court follow-up",
+    "high_saves": "create clearer saveable checklist/version",
+    "high_comments": "create part two or audience-choice post",
+    "high_shares": "repeat format with new hook"
+  },
+  "rules": [
+    "Do follow-ups within 24-72 hours when signals are strong.",
+    "Do not overreact to one random comment.",
+    "Use metrics + engagement logs together."
+  ]
+}
