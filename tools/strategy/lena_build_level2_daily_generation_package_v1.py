@@ -141,6 +141,48 @@ def _summary_from(report: dict[str, Any] | None, keys: list[str]) -> dict[str, A
     return {key: report.get(key) for key in keys}
 
 
+def _diagnostic_entry(
+    *,
+    expected_artifact: str,
+    artifact_exists: bool,
+    blocking: bool,
+    diagnostic: str,
+    safe_next_step: str,
+) -> dict[str, Any]:
+    return {
+        "expected_artifact": expected_artifact,
+        "artifact_exists": artifact_exists,
+        "blocking": blocking,
+        "diagnostic": diagnostic,
+        "safe_next_step": safe_next_step,
+    }
+
+
+def _artifact_diagnostic(
+    path: Path | None,
+    report: dict[str, Any] | None,
+    *,
+    expected_artifact: str,
+    blocking: bool,
+    diagnostic: str,
+    safe_next_step: str,
+) -> dict[str, Any]:
+    artifact_exists = bool(path and path.is_file())
+    return {
+        "source_artifact_path": repo_relative_path(path),
+        "source_artifact_present": report is not None,
+        "source_report_type": report.get("report_type", "") if report else "",
+        "source_schema_version": report.get("schema_version", "") if report else "",
+        "diagnostic": _diagnostic_entry(
+            expected_artifact=expected_artifact,
+            artifact_exists=artifact_exists,
+            blocking=blocking,
+            diagnostic=diagnostic,
+            safe_next_step=safe_next_step,
+        ),
+    }
+
+
 def _candidate_slot_id(date_str: str, candidate_selection: dict[str, Any] | None, handoff: dict[str, Any] | None) -> str:
     if handoff:
         slot_id = str(handoff.get("selected_slot_id") or handoff.get("queue_head", {}).get("slot_id") or "").strip()
@@ -156,9 +198,18 @@ def _candidate_slot_id(date_str: str, candidate_selection: dict[str, Any] | None
 def build_strategy_plan_state(date_str: str) -> dict[str, Any]:
     path = strategy_prep_path(date_str)
     report = load_report(path, report_type=STRATEGY_PREP_REPORT_TYPE)
+    expected_artifact = str(path.relative_to(ROOT).as_posix())
+    safe_next_step = f"python -m tools.strategy.lena_run_strategy_autonomy_prep_v1 --date {date_str}"
     if report is None:
         return {
-            **_section_base(path, None),
+            **_artifact_diagnostic(
+                path,
+                None,
+                expected_artifact=expected_artifact,
+                blocking=True,
+                diagnostic="the strategy plan state is missing, so the package cannot summarize the upstream plan report.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "blocked_missing_input",
             "summary": {},
         }
@@ -167,7 +218,14 @@ def build_strategy_plan_state(date_str: str) -> dict[str, Any]:
     if not isinstance(summary, dict):
         summary = {}
     return {
-        **_section_base(path, report),
+        **_artifact_diagnostic(
+            path,
+            report,
+            expected_artifact=expected_artifact,
+            blocking=False,
+            diagnostic="strategy plan state present and ready for package summary.",
+            safe_next_step=safe_next_step,
+        ),
         "status": "ready",
         "summary": {
             "strategy_gate_blocked": summary.get("strategy_gate_blocked"),
@@ -183,9 +241,18 @@ def build_strategy_plan_state(date_str: str) -> dict[str, Any]:
 def build_candidate_selection_state(date_str: str) -> dict[str, Any]:
     path = next_step_path(date_str)
     report = load_report(path, report_type=NEXT_STEP_REPORT_TYPE)
+    expected_artifact = str(path.relative_to(ROOT).as_posix())
+    safe_next_step = f"python -m tools.strategy.lena_recommend_next_generation_step_v1 --date {date_str}"
     if report is None:
         return {
-            **_section_base(path, None),
+            **_artifact_diagnostic(
+                path,
+                None,
+                expected_artifact=expected_artifact,
+                blocking=True,
+                diagnostic="the candidate selection report is missing, so the package cannot summarize the next candidate.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "blocked_missing_input",
             "summary": {},
         }
@@ -194,7 +261,14 @@ def build_candidate_selection_state(date_str: str) -> dict[str, Any]:
     if not isinstance(recommendation, dict):
         recommendation = {}
     return {
-        **_section_base(path, report),
+        **_artifact_diagnostic(
+            path,
+            report,
+            expected_artifact=expected_artifact,
+            blocking=False,
+            diagnostic="candidate selection report present and suitable for package summary.",
+            safe_next_step=safe_next_step,
+        ),
         "status": "ready",
         "summary": {
             "action_type": recommendation.get("action_type", ""),
@@ -212,11 +286,20 @@ def build_candidate_selection_state(date_str: str) -> dict[str, Any]:
 def build_live_generation_handoff_state(date_str: str, candidate_selection: dict[str, Any] | None) -> tuple[dict[str, Any], str]:
     path = handoff_path(date_str)
     report = load_report(path, report_type=HANDOFF_REPORT_TYPE)
+    expected_artifact = str(path.relative_to(ROOT).as_posix())
+    safe_next_step = f"python -m tools.strategy.lena_build_next_live_image_handoff_v1 --date {date_str}"
     slot_id = _candidate_slot_id(date_str, candidate_selection, report)
     if report is None:
         return (
             {
-                **_section_base(path, None),
+                **_artifact_diagnostic(
+                    path,
+                    None,
+                    expected_artifact=expected_artifact,
+                    blocking=True,
+                    diagnostic="the live-generation handoff is missing, so the package cannot summarize the boundary-ready packet.",
+                    safe_next_step=safe_next_step,
+                ),
                 "status": "blocked_missing_input",
                 "summary": {
                     "selected_slot_id": slot_id,
@@ -227,7 +310,14 @@ def build_live_generation_handoff_state(date_str: str, candidate_selection: dict
 
     return (
         {
-            **_section_base(path, report),
+            **_artifact_diagnostic(
+                path,
+                report,
+                expected_artifact=expected_artifact,
+                blocking=False,
+                diagnostic="live-generation handoff present and ready for package summary.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "ready",
             "summary": {
                 "selected_slot_id": report.get("selected_slot_id", ""),
@@ -250,15 +340,90 @@ def build_live_generation_handoff_state(date_str: str, candidate_selection: dict
 
 
 def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]:
+    expected_generation_artifact = (
+        repo_relative_path(approval_paths(date_str, slot_id)[0])
+        if approval_paths(date_str, slot_id)
+        else str(
+            Path("pipeline")
+            / "approvals"
+            / "lena"
+            / "generation"
+            / date_str
+            / f"{slot_id or '<slot_id>'}_higgsfield_generation_approval.json"
+        )
+    )
+    expected_claim_artifact = repo_relative_path(claim_path(date_str, slot_id)) if slot_id else str(
+        Path("pipeline")
+        / "approvals"
+        / "lena"
+        / "generation"
+        / date_str
+        / "<slot_id>_higgsfield_generation_claim.json"
+    )
+    expected_receipt_artifact = repo_relative_path(receipt_path(date_str, slot_id)) if slot_id else str(
+        Path("pipeline")
+        / "approvals"
+        / "lena"
+        / "generation"
+        / date_str
+        / "<slot_id>_higgsfield_generation_execution_receipt.json"
+    )
+    safe_next_step = (
+        "tools/lena_higgsfield_generation_approval_v1.py library entrypoints "
+        "(build_generation_approval_record, build_generation_claim_record, "
+        "build_generation_execution_receipt_record; no CLI entrypoint is defined)"
+    )
     if not slot_id:
         return {
             "status": "approval_pending",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact=expected_generation_artifact,
+                artifact_exists=False,
+                blocking=True,
+                diagnostic="the approval boundary cannot be completed until a live-generation handoff yields a slot_id.",
+                safe_next_step=safe_next_step,
+            ),
             "generation_approval": {
                 "source_artifact_path": "",
                 "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_generation_artifact,
+                    artifact_exists=False,
+                    blocking=True,
+                    diagnostic="the generation approval artifact is missing because no slot_id is available yet.",
+                    safe_next_step=safe_next_step,
+                ),
             },
-            "claim": {"source_artifact_path": "", "source_artifact_present": False, "status": "missing"},
-            "receipt": {"source_artifact_path": "", "source_artifact_present": False, "status": "missing"},
+        "claim": {
+                "source_artifact_path": "",
+                "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_claim_artifact,
+                    artifact_exists=False,
+                    blocking=True,
+                    diagnostic="the claim artifact is missing because no slot_id is available yet.",
+                    safe_next_step=safe_next_step,
+                ),
+                "status": "missing",
+            },
+        "receipt": {
+                "source_artifact_path": "",
+                "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_receipt_artifact,
+                    artifact_exists=False,
+                    blocking=True,
+                    diagnostic="the receipt artifact is missing because no slot_id is available yet.",
+                    safe_next_step=safe_next_step,
+                ),
+                "status": "missing",
+            },
         }
 
     candidates = approval_paths(date_str, slot_id)
@@ -267,19 +432,51 @@ def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]
     if approval is None:
         return {
             "status": "approval_pending",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact=expected_generation_artifact,
+                artifact_exists=bool(approval_path and approval_path.is_file()),
+                blocking=True,
+                diagnostic="the approval boundary is waiting on a committed approval artifact for the selected slot.",
+                safe_next_step=safe_next_step,
+            ),
             "generation_approval": {
-                **_section_base(approval_path, None),
+                **_artifact_diagnostic(
+                    approval_path,
+                    None,
+                    expected_artifact=expected_generation_artifact,
+                    blocking=True,
+                    diagnostic="the generation approval artifact is missing; the approval boundary is still incomplete.",
+                    safe_next_step=safe_next_step,
+                ),
                 "status": "missing",
                 "summary": {},
             },
             "claim": {
                 "source_artifact_path": repo_relative_path(claim_path(date_str, slot_id)),
                 "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_claim_artifact,
+                    artifact_exists=claim_path(date_str, slot_id).is_file(),
+                    blocking=True,
+                    diagnostic="the claim record is missing; the approval boundary still needs a claim record for auditability.",
+                    safe_next_step=safe_next_step,
+                ),
                 "status": "missing",
             },
             "receipt": {
                 "source_artifact_path": repo_relative_path(receipt_path(date_str, slot_id)),
                 "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_receipt_artifact,
+                    artifact_exists=receipt_path(date_str, slot_id).is_file(),
+                    blocking=True,
+                    diagnostic="the receipt record is missing; the approval boundary still needs a receipt record for auditability.",
+                    safe_next_step=safe_next_step,
+                ),
                 "status": "missing",
             },
         }
@@ -288,8 +485,22 @@ def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]
     receipt = load_report(receipt_path(date_str, slot_id), report_type="lena_higgsfield_generation_execution_receipt")
     return {
         "status": "approved",
+        "diagnostic": _diagnostic_entry(
+            expected_artifact=expected_generation_artifact,
+            artifact_exists=True,
+            blocking=False,
+            diagnostic="approval boundary artifacts are present and ready for package summary.",
+            safe_next_step=safe_next_step,
+        ),
         "generation_approval": {
-            **_section_base(approval_path, approval),
+            **_artifact_diagnostic(
+                approval_path,
+                approval,
+                expected_artifact=expected_generation_artifact,
+                blocking=False,
+                diagnostic="generation approval artifact present and suitable for package summary.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "recorded",
             "summary": {
                 "operator_id": approval.get("operator_id", ""),
@@ -304,7 +515,14 @@ def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]
             },
         },
         "claim": {
-            **_section_base(claim_path(date_str, slot_id), claim),
+            **_artifact_diagnostic(
+                claim_path(date_str, slot_id),
+                claim,
+                expected_artifact=expected_claim_artifact,
+                blocking=False,
+                diagnostic="claim record present and suitable for package summary.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "recorded" if claim else "missing",
             "summary": _summary_from(
                 claim,
@@ -324,7 +542,14 @@ def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]
             ),
         },
         "receipt": {
-            **_section_base(receipt_path(date_str, slot_id), receipt),
+            **_artifact_diagnostic(
+                receipt_path(date_str, slot_id),
+                receipt,
+                expected_artifact=expected_receipt_artifact,
+                blocking=False,
+                diagnostic="receipt record present and suitable for package summary.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "recorded" if receipt else "missing",
             "summary": _summary_from(
                 receipt,
@@ -350,9 +575,24 @@ def build_qa_disposition_state(date_str: str, slot_id: str) -> dict[str, Any]:
     candidates = qa_paths(date_str, slot_id)
     qa_path = candidates[0] if candidates else None
     qa_report = load_report(qa_path, schema_version=QA_SCHEMA_VERSION) if qa_path else None
+    expected_artifact = repo_relative_path(qa_path) if qa_path else str(
+        Path("pipeline") / "asset_review" / "lena" / date_str / f"{slot_id or '<slot_id>'}__<image_sha>_qa_disposition.json"
+    )
+    safe_next_step = (
+        "python -m tools.lena_photo_qa_disposition_v1 --decision-artifact <decision> --manifest <manifest> "
+        "--image <image> --expected-image-sha256 <sha256> --identity-evidence <path> "
+        "--identity-reference-authority-artifact <path> --identity-reference-authority-sha256 <sha256>"
+    )
     if qa_report is None:
         return {
-            **_section_base(qa_path, None),
+            **_artifact_diagnostic(
+                qa_path,
+                None,
+                expected_artifact=expected_artifact,
+                blocking=True,
+                diagnostic="the QA disposition artifact is missing, so readiness cannot be concluded.",
+                safe_next_step=safe_next_step,
+            ),
             "status": "blocked_missing_input",
             "summary": {},
         }
@@ -365,7 +605,14 @@ def build_qa_disposition_state(date_str: str, slot_id: str) -> dict[str, Any]:
     else:
         status = "ready"
     return {
-        **_section_base(qa_path, qa_report),
+        **_artifact_diagnostic(
+            qa_path,
+            qa_report,
+            expected_artifact=expected_artifact,
+            blocking=status != "ready",
+            diagnostic="QA disposition present; readiness can be summarized without calling the visual-review provider.",
+            safe_next_step=safe_next_step,
+        ),
         "status": status,
         "summary": {
             "disposition": qa_report.get("disposition", ""),
@@ -387,12 +634,42 @@ def build_retry_recommendation_state(date_str: str, qa_state: dict[str, Any], sl
     retry_handoff_candidates = retry_handoff_paths(date_str)
     retry_handoff_path = retry_handoff_candidates[0] if retry_handoff_candidates else None
     retry_handoff = load_report(retry_handoff_path, schema_version=RETRY_HANDOFF_SCHEMA_VERSION) if retry_handoff_path else None
+    expected_retry_decision = repo_relative_path(retry_decision_path) if retry_decision_path else str(
+        Path("pipeline") / "strategy" / "lena" / "retry_decisions" / date_str / "<retry_decision>_retry_decision.json"
+    )
+    expected_retry_handoff = repo_relative_path(retry_handoff_path) if retry_handoff_path else str(
+        Path("pipeline") / "strategy" / "lena" / "retry_handoffs" / date_str / "<retry_handoff>_retry_handoff.json"
+    )
+    retry_decision_safe_next_step = (
+        "python -m tools.strategy.lena_execute_retry_decision_v1 --correction-artifact <path> --output-root pipeline/strategy/lena/retry_decisions --write-decision"
+    )
+    retry_handoff_safe_next_step = (
+        "python -m tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 --handoff-artifact <path> --execution-receipt <path> --output-root pipeline/strategy/lena/retry_handoffs --write-artifact"
+    )
+    retry_blocking = qa_state.get("status") == "retry_recommended"
 
     if retry_decision is not None:
         return {
             "status": "retry_recommended",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact={
+                    "retry_decision": expected_retry_decision,
+                    "retry_handoff": expected_retry_handoff,
+                },
+                artifact_exists=True,
+                blocking=retry_blocking,
+                diagnostic="retry follow-up artifacts are present or discoverable; this section remains report-only.",
+                safe_next_step=f"{retry_decision_safe_next_step} | {retry_handoff_safe_next_step}",
+            ),
             "retry_decision": {
-                **_section_base(retry_decision_path, retry_decision),
+                **_artifact_diagnostic(
+                    retry_decision_path,
+                    retry_decision,
+                    expected_artifact=expected_retry_decision,
+                    blocking=retry_blocking,
+                    diagnostic="retry decision present; this is a follow-up artifact, not a default blocking prerequisite.",
+                    safe_next_step=retry_decision_safe_next_step,
+                ),
                 "status": retry_decision.get("state", "ready"),
                 "summary": {
                     "retry_decision_fingerprint_sha256": retry_decision.get("retry_decision_fingerprint_sha256", ""),
@@ -408,7 +685,14 @@ def build_retry_recommendation_state(date_str: str, qa_state: dict[str, Any], sl
                 },
             },
             "retry_handoff": {
-                **_section_base(retry_handoff_path, retry_handoff),
+                **_artifact_diagnostic(
+                    retry_handoff_path,
+                    retry_handoff,
+                    expected_artifact=expected_retry_handoff,
+                    blocking=retry_blocking,
+                    diagnostic="retry handoff present or pending as a follow-up artifact, not as a default blocking prerequisite.",
+                    safe_next_step=retry_handoff_safe_next_step,
+                ),
                 "status": "recorded" if retry_handoff else "missing",
                 "summary": _summary_from(
                     retry_handoff,
@@ -430,15 +714,43 @@ def build_retry_recommendation_state(date_str: str, qa_state: dict[str, Any], sl
     if qa_state.get("status") == "retry_recommended":
         return {
             "status": "retry_recommended",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact={
+                    "retry_decision": expected_retry_decision,
+                    "retry_handoff": expected_retry_handoff,
+                },
+                artifact_exists=False,
+                blocking=True,
+                diagnostic="QA recommends retry follow-up, so the retry surface is informative and reviewable.",
+                safe_next_step=f"{retry_decision_safe_next_step} | {retry_handoff_safe_next_step}",
+            ),
             "retry_decision": {
                 "source_artifact_path": "",
                 "source_artifact_present": False,
+                "source_report_type": "",
+                "source_schema_version": "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_retry_decision,
+                    artifact_exists=False,
+                    blocking=True,
+                    diagnostic="retry is explicitly recommended by QA, so a retry decision becomes an operator-useful follow-up artifact.",
+                    safe_next_step=retry_decision_safe_next_step,
+                ),
                 "status": "missing",
                 "summary": {},
             },
             "retry_handoff": {
                 "source_artifact_path": repo_relative_path(retry_handoff_path),
                 "source_artifact_present": retry_handoff is not None,
+                "source_report_type": retry_handoff.get("report_type", "") if retry_handoff else "",
+                "source_schema_version": retry_handoff.get("schema_version", "") if retry_handoff else "",
+                "diagnostic": _diagnostic_entry(
+                    expected_artifact=expected_retry_handoff,
+                    artifact_exists=bool(retry_handoff_path and retry_handoff_path.is_file()),
+                    blocking=True,
+                    diagnostic="retry is explicitly recommended by QA, so a retry handoff reference is helpful even if only as a follow-up artifact.",
+                    safe_next_step=retry_handoff_safe_next_step,
+                ),
                 "status": "recorded" if retry_handoff else "missing",
                 "summary": _summary_from(
                     retry_handoff,
@@ -459,9 +771,28 @@ def build_retry_recommendation_state(date_str: str, qa_state: dict[str, Any], sl
 
     return {
         "status": "not_needed",
+        "diagnostic": _diagnostic_entry(
+            expected_artifact={
+                "retry_decision": expected_retry_decision,
+                "retry_handoff": expected_retry_handoff,
+            },
+            artifact_exists=bool(retry_decision_path and retry_decision_path.is_file()) or bool(retry_handoff_path and retry_handoff_path.is_file()),
+            blocking=False,
+            diagnostic="retry is not needed for the current package, so this remains optional.",
+            safe_next_step=f"{retry_decision_safe_next_step} | {retry_handoff_safe_next_step}",
+        ),
         "retry_decision": {
             "source_artifact_path": repo_relative_path(retry_decision_path),
             "source_artifact_present": retry_decision is not None,
+            "source_report_type": retry_decision.get("report_type", "") if retry_decision else "",
+            "source_schema_version": retry_decision.get("schema_version", "") if retry_decision else "",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact=expected_retry_decision,
+                artifact_exists=bool(retry_decision_path and retry_decision_path.is_file()),
+                blocking=False,
+                diagnostic="retry is not needed for the current package, so this remains optional.",
+                safe_next_step=retry_decision_safe_next_step,
+            ),
             "status": "recorded" if retry_decision else "missing",
             "summary": _summary_from(
                 retry_decision,
@@ -482,6 +813,15 @@ def build_retry_recommendation_state(date_str: str, qa_state: dict[str, Any], sl
         "retry_handoff": {
             "source_artifact_path": repo_relative_path(retry_handoff_path),
             "source_artifact_present": retry_handoff is not None,
+            "source_report_type": retry_handoff.get("report_type", "") if retry_handoff else "",
+            "source_schema_version": retry_handoff.get("schema_version", "") if retry_handoff else "",
+            "diagnostic": _diagnostic_entry(
+                expected_artifact=expected_retry_handoff,
+                artifact_exists=bool(retry_handoff_path and retry_handoff_path.is_file()),
+                blocking=False,
+                diagnostic="retry is not needed for the current package, so the retry handoff remains optional and informational.",
+                safe_next_step=retry_handoff_safe_next_step,
+            ),
             "status": "recorded" if retry_handoff else "missing",
             "summary": _summary_from(
                 retry_handoff,

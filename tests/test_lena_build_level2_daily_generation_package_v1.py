@@ -27,6 +27,19 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(package_builder, "RETRY_HANDOFFS_ROOT", tmp_path / "pipeline" / "strategy" / "lena" / "retry_handoffs")
 
 
+def _file_snapshot(root: Path) -> set[Path]:
+    return {path.relative_to(root) for path in root.rglob("*") if path.is_file()}
+
+
+def _assert_diag(section: dict, *, expected_suffix: str, exists: bool, blocking: bool, safe_step_contains: str) -> None:
+    diag = section["diagnostic"]
+    assert diag["expected_artifact"].replace("\\", "/").endswith(expected_suffix)
+    assert diag["artifact_exists"] is exists
+    assert diag["blocking"] is blocking
+    assert isinstance(diag["diagnostic"], str) and diag["diagnostic"]
+    assert safe_step_contains in diag["safe_next_step"]
+
+
 def _strategy_prep_payload() -> dict:
     return {
         "report_type": "lena_strategy_autonomy_prep",
@@ -233,9 +246,11 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _build_fixture_tree(tmp_path)
+    before = _file_snapshot(tmp_path)
 
     report = package_builder.build_level2_daily_generation_package(DATE)
     output_path = package_builder.write_package(report, DATE)
+    after = _file_snapshot(tmp_path)
 
     assert output_path == package_builder.package_path(DATE)
     assert output_path.is_file()
@@ -255,10 +270,50 @@ def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, mon
     assert report["autonomy_ladder_status"]["level_5_state"] == "future_only"
     assert report["final_operator_report"]["status"] == "ready_for_operator_review"
     assert report["next_allowed_action"]["action"] == "await_human_review_within_level_2_contract"
+    assert after - before == {Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_level2_daily_generation_package_{DATE}.json"}
 
     serialized = json.dumps(report, sort_keys=True)
     assert "C:\\projects\\ai\\content_bot" not in serialized
     assert "content_bot_pr_clean" not in serialized
+    assert not hasattr(package_builder, "subprocess")
+    assert not hasattr(package_builder, "run_step")
+    assert "subprocess" not in package_builder.__dict__
+    assert "run_step" not in package_builder.__dict__
+
+    _assert_diag(
+        report["strategy_plan_state"],
+        expected_suffix=f"pipeline/strategy/lena/next_actions/{DATE}/lena_strategy_autonomy_prep_{DATE}.json",
+        exists=True,
+        blocking=False,
+        safe_step_contains="lena_run_strategy_autonomy_prep_v1",
+    )
+    _assert_diag(
+        report["candidate_selection_state"],
+        expected_suffix=f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_generation_step_{DATE}.json",
+        exists=True,
+        blocking=False,
+        safe_step_contains="lena_recommend_next_generation_step_v1",
+    )
+    _assert_diag(
+        report["live_generation_handoff_state"],
+        expected_suffix=f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json",
+        exists=True,
+        blocking=False,
+        safe_step_contains="lena_build_next_live_image_handoff_v1",
+    )
+    assert report["approval_boundary_state"]["diagnostic"]["blocking"] is False
+    assert "library entrypoints" in report["approval_boundary_state"]["diagnostic"]["safe_next_step"]
+    assert report["approval_boundary_state"]["generation_approval"]["diagnostic"]["artifact_exists"] is True
+    assert report["approval_boundary_state"]["claim"]["diagnostic"]["artifact_exists"] is True
+    assert report["approval_boundary_state"]["receipt"]["diagnostic"]["artifact_exists"] is True
+    _assert_diag(
+        report["qa_disposition_state"],
+        expected_suffix=f"pipeline/asset_review/lena/{DATE}/{SLOT_ID}__aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899_qa_disposition.json",
+        exists=True,
+        blocking=False,
+        safe_step_contains="--decision-artifact",
+    )
+    assert report["retry_recommendation_state"]["diagnostic"]["blocking"] is False
 
 
 def test_missing_upstream_input_produces_blocked_missing_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,6 +325,11 @@ def test_missing_upstream_input_produces_blocked_missing_input(tmp_path: Path, m
     assert report["candidate_selection_state"]["status"] == "blocked_missing_input"
     assert report["final_operator_report"]["status"] == "blocked_missing_input"
     assert report["next_allowed_action"]["action"] == "resolve_missing_upstream_input"
+    assert report["candidate_selection_state"]["diagnostic"]["artifact_exists"] is False
+    assert report["candidate_selection_state"]["diagnostic"]["blocking"] is True
+    assert "lena_recommend_next_generation_step_v1" in report["candidate_selection_state"]["diagnostic"]["safe_next_step"]
+    assert report["live_generation_handoff_state"]["diagnostic"]["artifact_exists"] is True
+    assert report["strategy_plan_state"]["diagnostic"]["artifact_exists"] is True
 
 
 def test_missing_approval_produces_approval_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -282,6 +342,11 @@ def test_missing_approval_produces_approval_pending(tmp_path: Path, monkeypatch:
     assert report["approval_boundary_state"]["generation_approval"]["status"] == "missing"
     assert report["final_operator_report"]["status"] == "approval_pending"
     assert report["next_allowed_action"]["action"] == "obtain_explicit_generation_approval"
+    assert report["approval_boundary_state"]["diagnostic"]["blocking"] is True
+    assert report["approval_boundary_state"]["generation_approval"]["diagnostic"]["artifact_exists"] is False
+    assert report["approval_boundary_state"]["claim"]["diagnostic"]["artifact_exists"] is True
+    assert report["approval_boundary_state"]["receipt"]["diagnostic"]["artifact_exists"] is True
+    assert "library entrypoints" in report["approval_boundary_state"]["diagnostic"]["safe_next_step"]
 
 
 def test_qa_failure_produces_qa_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -293,6 +358,9 @@ def test_qa_failure_produces_qa_blocked(tmp_path: Path, monkeypatch: pytest.Monk
     assert report["qa_disposition_state"]["status"] == "qa_blocked"
     assert report["final_operator_report"]["status"] == "qa_blocked"
     assert report["next_allowed_action"]["action"] == "review_qa_and_prepare_retry_recommendation_only"
+    assert report["qa_disposition_state"]["diagnostic"]["artifact_exists"] is True
+    assert report["qa_disposition_state"]["diagnostic"]["blocking"] is True
+    assert "--expected-image-sha256" in report["qa_disposition_state"]["diagnostic"]["safe_next_step"]
 
 
 def test_retry_needed_reports_recommendation_only_and_does_not_execute_retry(
@@ -309,4 +377,8 @@ def test_retry_needed_reports_recommendation_only_and_does_not_execute_retry(
     assert report["retry_recommendation_state"]["retry_decision"]["status"] == "missing"
     assert report["final_operator_report"]["status"] == "retry_recommended"
     assert report["next_allowed_action"]["action"] == "prepare_retry_handoff_reference_only"
+    assert report["retry_recommendation_state"]["retry_decision"]["diagnostic"]["blocking"] is True
+    assert report["retry_recommendation_state"]["retry_handoff"]["diagnostic"]["blocking"] is True
+    assert "lena_execute_retry_decision_v1" in report["retry_recommendation_state"]["retry_decision"]["diagnostic"]["safe_next_step"]
+    assert "lena_prepare_higgsfield_retry_handoff_v1" in report["retry_recommendation_state"]["retry_handoff"]["diagnostic"]["safe_next_step"]
     assert not (tmp_path / "pipeline" / "strategy" / "lena" / "retry_decisions" / DATE).exists()
