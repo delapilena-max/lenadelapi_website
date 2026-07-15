@@ -1,0 +1,24 @@
+{
+  "version": "v1.0.0",
+  "name": "Lena Strategy Autonomy Gate Policy",
+  "purpose": "Define hard-stop conditions for the image-strategy autonomy path so aggregate readiness can never hide critical structural failures.",
+  "require_all_priority_lanes_ready": true,
+  "critical_blocker_reasons": [
+    "recipe_missing",
+    "recipe_scene_contract_missing",
+    "packet_missing",
+    "payload_missing",
+    "payload_scene_contract_missing",
+    "master_identity_missing",
+    "blocked_terms_present",
+    "payload_headroom_too_low"
+  ],
+  "critical_warning_reasons": [
+    "style_bank_randomized_wardrobe",
+    "environment_not_recipe_locked"
+  ],
+  "soft_warning_reasons": [
+    "payload_headroom_narrow"
+  ],
+  "note": "Broader autonomous generation should remain blocked whenever aggregate readiness is below threshold or any critical lane failure remains unresolved."
+}

@@ -1,0 +1,93 @@
+{
+  "version": "v1.3.1",
+  "buckets": {
+    "reach": {
+      "purpose": "Discovery by strangers.",
+      "formats": [
+        "short Reels",
+        "movement",
+        "gym/stretch flow",
+        "outfit transition",
+        "beach/pool/sauna",
+        "playful POV overlay added after generation"
+      ],
+      "metrics": [
+        "reach",
+        "shares",
+        "watch_time_seconds",
+        "completion_rate",
+        "follows"
+      ],
+      "rules": [
+        "First frame instantly readable.",
+        "Reels 5 to 12 seconds at first.",
+        "Loopable and music-ready."
+      ]
+    },
+    "trust": {
+      "purpose": "Make Lena feel like a real ongoing person.",
+      "formats": [
+        "apartment",
+        "coffee",
+        "skincare",
+        "messy hair",
+        "post-gym recovery",
+        "kitchen wellness",
+        "balcony",
+        "casual moments"
+      ],
+      "metrics": [
+        "saves",
+        "profile_visits",
+        "comments"
+      ],
+      "rules": [
+        "Camera-roll realism.",
+        "Real human reason.",
+        "Not over-polished."
+      ]
+    },
+    "engagement": {
+      "purpose": "Comments, replies, shares, relatability.",
+      "formats": [
+        "relatable captions",
+        "soft jokes",
+        "this is your sign",
+        "question captions",
+        "polls/stories later"
+      ],
+      "metrics": [
+        "comments",
+        "shares",
+        "saves",
+        "replies"
+      ],
+      "rules": [
+        "Short, human, playful.",
+        "No corporate captions.",
+        "Overlay text only in post-production."
+      ]
+    },
+    "identity": {
+      "purpose": "Repeatable Lena brand.",
+      "formats": [
+        "wellness",
+        "fitness",
+        "confident but warm",
+        "slightly funny",
+        "realistic lifestyle"
+      ],
+      "metrics": [
+        "follows",
+        "profile_visits",
+        "saves",
+        "grid_cohesion"
+      ],
+      "rules": [
+        "Same person.",
+        "Consistent face/body/style.",
+        "First 12 to 18 posts must look like a real creator life."
+      ]
+    }
+  }
+}

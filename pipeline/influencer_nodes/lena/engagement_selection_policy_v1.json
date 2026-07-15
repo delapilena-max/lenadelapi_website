@@ -1,0 +1,44 @@
+{
+  "version": "v1.0.0",
+  "name": "Lena Engagement-to-Selection Policy",
+  "purpose": "Translate logged engagement demand into recipe promotion pressure so audience interest can influence the next content rotations without overriding continuity guardrails.",
+  "signals_path": "pipeline/analytics/lena_engagement_signals_v1_6.csv",
+  "state_path": "pipeline/state/lena_engagement_demand_state_v1.json",
+  "report_dir": "pipeline/strategy/lena/next_actions",
+  "minimum_signal_count_to_activate": 1,
+  "max_signal_count_per_class_for_scoring": 3,
+  "default_primary_boost": 14,
+  "default_secondary_boost": 7,
+  "signal_class_map": {
+    "outfit_request": {
+      "preferred_recipe_ids": ["hcr_002", "hcr_010", "hcr_006", "hcr_005"],
+      "secondary_recipe_ids": ["hcr_008", "hcr_009"],
+      "notes": "Outfit demand should favor looks people can ask about again, preferably outside the repeated home-proof lane."
+    },
+    "routine_request": {
+      "preferred_recipe_ids": ["hcr_004"],
+      "secondary_recipe_ids": ["hcr_007"],
+      "notes": "Routine demand should favor repeatable fitness/wellness lanes before adding more mirror-only proof content."
+    },
+    "food_question": {
+      "preferred_recipe_ids": ["hcr_007"],
+      "secondary_recipe_ids": [],
+      "notes": "Food curiosity supports kitchen and simple lifestyle follow-ups."
+    },
+    "flirty": {
+      "preferred_recipe_ids": ["hcr_002", "hcr_006", "hcr_008", "hcr_009"],
+      "secondary_recipe_ids": ["hcr_010"],
+      "notes": "Flirty engagement should favor public-world charisma lanes, not repetitive apartment proof loops."
+    },
+    "audio_question": {
+      "preferred_recipe_ids": ["hcr_004"],
+      "secondary_recipe_ids": [],
+      "notes": "Audio curiosity is strongest on movement or reel-friendly lanes."
+    },
+    "compliment": {
+      "preferred_recipe_ids": ["hcr_002", "hcr_010"],
+      "secondary_recipe_ids": ["hcr_008", "hcr_009"],
+      "notes": "Warmth/compliment signals can support broader public-world promotion when continuity says the account needs range."
+    }
+  }
+}
