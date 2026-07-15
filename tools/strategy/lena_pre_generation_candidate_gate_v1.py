@@ -465,10 +465,17 @@ def _rank_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
     return substantive + tie
 
 
-def select_candidate(authorities: dict[str, Any], prompt_candidates: list[dict[str, Any]], recent: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def select_candidate(
+    authorities: dict[str, Any],
+    prompt_candidates: list[dict[str, Any]],
+    recent: dict[str, Any],
+    *,
+    required_recipe_id: str = "",
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]], bool]:
     rejected: Counter[str] = Counter()
     valid: list[dict[str, Any]] = []
     blocked = set(authorities["scene_bank"].get("production_blocked_lanes", []))
+    saw_required_recipe = False
     for curator in prompt_candidates:
         image = curator.get("image", {})
         lane = image.get("lane")
@@ -480,6 +487,10 @@ def select_candidate(authorities: dict[str, Any], prompt_candidates: list[dict[s
         reasons = _candidate_hard_gate(image, scene, blocked, authorities["strategy"], recent["records"], recipe)
         if recipe is None:
             reasons.append("no_compatible_active_recipe")
+        elif required_recipe_id and recipe["id"] != required_recipe_id:
+            reasons.append("required_recipe_candidate_missing")
+        else:
+            saw_required_recipe = True
         hook = _best_hook(recipe, authorities["hooks"]) if recipe else None
         if hook is None:
             reasons.append("no_safe_linked_hook")
@@ -546,9 +557,9 @@ def select_candidate(authorities: dict[str, Any], prompt_candidates: list[dict[s
         candidate["_prompt"] = image["image_prompt"]
         valid.append(candidate)
     if not valid:
-        return None, [{"reason": key, "candidate_count": value} for key, value in sorted(rejected.items())]
+        return None, [{"reason": key, "candidate_count": value} for key, value in sorted(rejected.items())], saw_required_recipe
     selected = min(valid, key=_rank_key)
-    return selected, [{"reason": key, "candidate_count": value} for key, value in sorted(rejected.items())]
+    return selected, [{"reason": key, "candidate_count": value} for key, value in sorted(rejected.items())], saw_required_recipe
 
 
 def _critical_gap_notes(recent: dict[str, Any]) -> list[str]:
@@ -634,6 +645,7 @@ def run_gate(
     as_of_date: str,
     output_root: Path = OUTPUT_ROOT,
     *,
+    required_recipe_id: str = "",
     verify_clean: bool = True,
     authority_loader: Callable[[], dict[str, Any]] | None = None,
     recent_loader: Callable[[], dict[str, Any]] | None = None,
@@ -645,7 +657,17 @@ def run_gate(
     authorities = authority_loader() if authority_loader else load_authorities()
     recent = recent_loader() if recent_loader else load_recent_content()
     candidates, prompt_meta = prompt_builder(as_of_date, authority_commit[:8])
-    candidate, rejected = select_candidate(authorities, candidates, recent)
+    candidate, rejected, saw_required_recipe = select_candidate(
+        authorities,
+        candidates,
+        recent,
+        required_recipe_id=required_recipe_id,
+    )
+    if required_recipe_id and not saw_required_recipe:
+        raise GateError(
+            "required_recipe_candidate_missing",
+            f"no candidate available for required recipe {required_recipe_id!r}",
+        )
     core = _decision_core(authority_commit, as_of_date, authorities, candidate, rejected, recent, prompt_meta)
     return write_decision(core, output_root)
 
@@ -654,9 +676,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Select Lena's next ordinary Higgsfield still candidate locally.")
     parser.add_argument("--date", required=True, help="Decision date (YYYY-MM-DD).")
     parser.add_argument("--out-dir", type=Path, default=OUTPUT_ROOT, help="Artifact root; defaults to the canonical strategy path.")
+    parser.add_argument("--required-recipe-id", default="", help="Optional required recipe binding for canonical downstream handoff alignment.")
     args = parser.parse_args()
     try:
-        path, decision, reused = run_gate(args.date, args.out_dir)
+        path, decision, reused = run_gate(args.date, args.out_dir, required_recipe_id=args.required_recipe_id)
     except GateError as exc:
         print(json.dumps({"candidate_status": "blocked", "reason": exc.code, "detail": exc.detail, "provider_authorized": False}, sort_keys=True))
         return 2

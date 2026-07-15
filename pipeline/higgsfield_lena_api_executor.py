@@ -347,25 +347,24 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     recommendation_path = _resolve_repo_path(report.get("source_recommendation_artifact_path", ""))
     learning_path = _resolve_repo_path(report.get("source_learning_artifact_path", ""))
     queue_path = _resolve_repo_path(report.get("source_queue_dry_run_artifact_path", ""))
-    candidate_path = _resolve_repo_path(report.get("selected_prompt_input_artifact_path", ""))
+    packet_path = _resolve_repo_path(report.get("selected_prompt_input_artifact_path", ""))
     for label, path_value in (
         ("recommendation", recommendation_path),
         ("learning", learning_path),
         ("queue", queue_path),
-        ("selected candidate", candidate_path),
+        ("selected prompt input", packet_path),
     ):
         _require_handoff(path_value.is_file(), "handoff_missing_source_artifact", f"{handoff_path} missing required {label} artifact: {path_value}")
 
     _require_handoff(report.get("source_recommendation_artifact_sha256") == _sha256_file(recommendation_path), "handoff_recommendation_sha_mismatch", f"{handoff_path} recommendation sha mismatch")
     _require_handoff(report.get("source_learning_artifact_sha256") == _sha256_file(learning_path), "handoff_learning_sha_mismatch", f"{handoff_path} learning sha mismatch")
     _require_handoff(report.get("source_queue_dry_run_artifact_sha256") == _sha256_file(queue_path), "handoff_queue_sha_mismatch", f"{handoff_path} queue sha mismatch")
-    _require_handoff(report.get("selected_prompt_input_artifact_sha256") == _sha256_file(candidate_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected candidate artifact sha mismatch")
+    _require_handoff(report.get("selected_prompt_input_artifact_sha256") == _sha256_file(packet_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected prompt input artifact sha mismatch")
 
     recommendation = load_report(recommendation_path, expected_report_type="lena_next_generation_step", expected_date=date_str)
     learning_path_loaded, learning = load_learning_report(recommendation, date_str)
     queue_loaded_path, queue_report = load_queue_report(date_str)
-    candidate_report = load_candidate_report(candidate_path, date_str)
-    candidate = candidate_report.get("candidate", {})
+    packet_report = load_content_packet_report(packet_path, date_str)
 
     _require_handoff(learning_path_loaded == learning_path, "handoff_learning_path_mismatch", f"{handoff_path} learning artifact path mismatch")
     _require_handoff(queue_loaded_path == queue_path, "handoff_queue_path_mismatch", f"{handoff_path} queue artifact path mismatch")
@@ -378,31 +377,34 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
 
     queue_head = queue_report.get("queue_slots", [])[0]
     _require_handoff(queue_head.get("recipe_id") == recommendation.get("recommendation", {}).get("recommended_recipe_id"), "handoff_queue_head_mismatch", f"{handoff_path} queue head mismatch")
-    _require_handoff(candidate.get("recipe_id") == queue_head.get("recipe_id"), "handoff_candidate_recipe_mismatch", f"{handoff_path} selected candidate recipe mismatch")
-    _require_handoff(candidate.get("candidate_id") == report.get("selected_prompt_input", {}).get("candidate_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected candidate id mismatch")
-    _require_handoff(candidate.get("prompt_sha256") == report.get("selected_prompt_input", {}).get("prompt_sha256"), "handoff_expected_prompt_sha_missing_or_mismatch", f"{handoff_path} expected prompt sha mismatch")
-    _require_handoff(candidate_report.get("decision_fingerprint_sha256") == report.get("selected_prompt_input", {}).get("decision_fingerprint_sha256"), "handoff_decision_fingerprint_mismatch", f"{handoff_path} decision fingerprint mismatch")
-    _require_handoff(candidate.get("exact_proposed_dry_run_command") == report.get("selected_prompt_input", {}).get("exact_proposed_dry_run_command"), "handoff_candidate_command_mismatch", f"{handoff_path} candidate dry-run command mismatch")
+    _require_handoff(packet_report.get("recipe_id") == queue_head.get("recipe_id"), "handoff_candidate_recipe_mismatch", f"{handoff_path} selected prompt input recipe mismatch")
+    _require_handoff(packet_report.get("packet_id") == report.get("selected_prompt_input", {}).get("packet_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected prompt input packet id mismatch")
+    _require_handoff(packet_report.get("strong_hook_id") == report.get("selected_prompt_input", {}).get("hook_id"), "handoff_hook_id_mismatch", f"{handoff_path} selected prompt input hook id mismatch")
+    _require_handoff(packet_report.get("hook_text") == report.get("selected_prompt_input", {}).get("hook_text"), "handoff_hook_text_mismatch", f"{handoff_path} selected prompt input hook text mismatch")
+    _require_handoff(packet_report.get("caption_draft") == report.get("selected_prompt_input", {}).get("caption_seed"), "handoff_caption_seed_mismatch", f"{handoff_path} selected prompt input caption seed mismatch")
+    _require_handoff(report.get("selected_prompt_input", {}).get("exact_proposed_dry_run_command") == expected_dry, "handoff_candidate_command_mismatch", f"{handoff_path} selected prompt input dry-run command mismatch")
 
-    source = resolve_prompt_source(date_str, slot_id)
+    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path)
     image = source.get("image", {})
     prompt = image.get("image_prompt")
     _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
     regenerated_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     expected_sha = str(report.get("selected_prompt_input", {}).get("prompt_sha256", ""))
     _require_handoff(expected_sha and regenerated_sha == expected_sha, "handoff_prompt_sha_mismatch", f"{handoff_path} regenerated prompt SHA does not match packet expectation")
-    _require_handoff(candidate.get("prompt_sha256") == regenerated_sha, "handoff_prompt_candidate_sha_mismatch", f"{handoff_path} candidate prompt sha mismatch")
+    _require_handoff(str(packet_report.get("compact_provider_prompt_sha256", "")).strip() == regenerated_sha, "handoff_prompt_candidate_sha_mismatch", f"{handoff_path} prompt input sha mismatch")
     _require_handoff(image.get("slot_id") == slot_id, "handoff_slot_mismatch", f"{handoff_path} regenerated slot mismatch")
-    _require_handoff(image.get("lane") == candidate.get("lane"), "handoff_lane_mismatch", f"{handoff_path} regenerated lane mismatch")
+    _require_handoff(image.get("lane") == report.get("selected_prompt_input", {}).get("lane"), "handoff_lane_mismatch", f"{handoff_path} regenerated lane mismatch")
     _require_handoff(image.get("soul_name") == CONFIRMED_LENA_SOUL_NAME, "handoff_soul_name_mismatch", f"{handoff_path} regenerated soul name mismatch")
     _require_handoff(image.get("soul_version") == CONFIRMED_LENA_SOUL_TYPE, "handoff_soul_version_mismatch", f"{handoff_path} regenerated soul version mismatch")
     _require_handoff(image.get("soul_selection_mode") == "provider_config_not_prompt_text", "handoff_soul_selection_mode_mismatch", f"{handoff_path} regenerated soul selection mode mismatch")
     _require_handoff(image.get("negative_prompt_enabled") is False, "handoff_negative_prompt_enabled", f"{handoff_path} regenerated prompt must keep negative_prompt disabled")
-    _require_handoff(report.get("selected_prompt_input", {}).get("artifact_sha256") == _sha256_file(candidate_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected candidate artifact sha mismatch")
+    _require_handoff(report.get("selected_prompt_input", {}).get("artifact_sha256") == _sha256_file(packet_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected prompt input artifact sha mismatch")
+    _require_handoff(packet_report.get("compact_provider_prompt_preview") == prompt, "handoff_prompt_text_mismatch", f"{handoff_path} selected prompt input text mismatch")
+    _require_handoff(rebuilt_packet.get("compact_provider_prompt_preview") == prompt, "handoff_rebuilt_prompt_text_mismatch", f"{handoff_path} rebuilt prompt text mismatch")
     validation = validate_candidate(source, None)
     _require_handoff(validation["ok"], "handoff_prompt_validation_failed", f"{handoff_path} regenerated prompt does not satisfy the existing dry-run validation gates")
-    _require_handoff(report.get("selected_prompt_input_artifact_path") == report.get("selected_prompt_input", {}).get("artifact_path"), "handoff_candidate_path_mismatch", f"{handoff_path} selected candidate path mismatch")
-    _require_handoff(report.get("selected_prompt_input_artifact_path") == _repo_relative_path(candidate_path), "handoff_candidate_path_mismatch", f"{handoff_path} selected candidate path mismatch")
+    _require_handoff(report.get("selected_prompt_input_artifact_path") == report.get("selected_prompt_input", {}).get("artifact_path"), "handoff_candidate_path_mismatch", f"{handoff_path} selected prompt input path mismatch")
+    _require_handoff(report.get("selected_prompt_input_artifact_path") == _repo_relative_path(packet_path), "handoff_candidate_path_mismatch", f"{handoff_path} selected prompt input path mismatch")
     _require_handoff(report.get("expected_handoff_artifact_path") == _repo_relative_path(handoff_path), "handoff_artifact_path_mismatch", f"{handoff_path} packet path mismatch")
     _require_handoff(report.get("expected_handoff_markdown_path") == _repo_relative_path(_handoff_markdown_path(date_str)), "handoff_markdown_path_mismatch", f"{handoff_path} markdown path mismatch")
     _require_handoff(structured.get("date") == date_str, "handoff_date_mismatch", f"{handoff_path} structured date mismatch")
@@ -572,7 +574,7 @@ def load_queue_report(expected_date: str) -> tuple[Path, dict[str, Any]]:
     return path.resolve(), queue_report
 
 
-def load_candidate_report(path: Path, expected_date: str) -> dict[str, Any]:
+def load_content_packet_report(path: Path, expected_date: str) -> dict[str, Any]:
     _require_handoff(path.is_file(), "handoff_missing_artifact", f"missing required artifact: {path}")
     try:
         report = json.loads(path.read_text(encoding="utf-8"))
@@ -580,32 +582,77 @@ def load_candidate_report(path: Path, expected_date: str) -> dict[str, Any]:
         raise HandoffArtifactError("handoff_unreadable_artifact", f"{path}: {exc}") from exc
     _require_handoff(isinstance(report, dict), "handoff_malformed_artifact", f"{path} must contain a JSON object")
     _require_handoff(
-        report.get("schema_version") == "lena_pre_generation_candidate_gate_v1",
+        report.get("report_type") == "lena_content_packet_dryrun",
         "handoff_wrong_report_type",
-        f"{path} has schema_version {report.get('schema_version')!r}, expected 'lena_pre_generation_candidate_gate_v1'",
+        f"{path} has report_type {report.get('report_type')!r}, expected 'lena_content_packet_dryrun'",
     )
     _require_handoff(
-        str(report.get("as_of_date", "")).strip() == expected_date,
+        str(report.get("generated_date", "")).strip() == expected_date,
         "handoff_date_mismatch",
-        f"{path} has as_of_date {report.get('as_of_date')!r}, expected {expected_date!r}",
+        f"{path} has generated_date {report.get('generated_date')!r}, expected {expected_date!r}",
     )
     _require_handoff(
-        report.get("candidate_status") == "selected",
-        "handoff_candidate_not_selected",
-        f"{path} is not a selected candidate artifact",
-    )
-    candidate = report.get("candidate")
-    _require_handoff(
-        isinstance(candidate, dict),
-        "handoff_missing_selected_candidate",
-        f"{path} does not contain a selected candidate object",
-    )
-    _require_handoff(
-        candidate.get("candidate_id") and candidate.get("slot_id"),
-        "handoff_candidate_identity_missing",
-        f"{path} is missing candidate_id or slot_id",
+        isinstance(report.get("compact_provider_prompt_preview"), str)
+        and bool(str(report.get("compact_provider_prompt_preview", "")).strip()),
+        "handoff_packet_prompt_missing",
+        f"{path} must contain a compact_provider_prompt_preview",
     )
     return report
+
+
+def _rebuild_packet_prompt_source(packet_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
+
+    packet_report = load_content_packet_report(packet_path, str(json.loads(packet_path.read_text(encoding="utf-8")).get("generated_date", "")).strip())
+    rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(packet_report)
+    prompt = str(rebuilt_packet.get("compact_provider_prompt_preview", "")).strip()
+    _require_handoff(
+        bool(prompt),
+        "handoff_prompt_missing",
+        f"{packet_path} rebuilt packet did not produce a prompt",
+    )
+    slot_id = f"higgsfield-{packet_report['generated_date'].replace('-', '')}-{packet_report['recipe_id']}-photo"
+    source = {
+        "resolver": "content_packet_dryrun",
+        "slot_prefix": packet_report["recipe_id"],
+        "pack_count": 1,
+        "pack_variety_warnings": [],
+        "image": {
+            "slot_id": slot_id,
+            "lane": packet_report.get("scene_type", ""),
+            "wardrobe_outfit_id": packet_report.get("wardrobe_outfit_id"),
+            "environment_id": packet_report.get("environment_id"),
+            "pose_body_language_id": None,
+            "pose_body_language_label": packet_report.get("high_caliber_source_sections", {}).get("subject_pose", ""),
+            "effective_wardrobe_silhouette_class": packet_report.get("content_pillar", ""),
+            "soul_name": CONFIRMED_LENA_SOUL_NAME,
+            "soul_version": CONFIRMED_LENA_SOUL_TYPE,
+            "soul_selection_mode": "provider_config_not_prompt_text",
+            "camera_text": packet_report.get("high_caliber_source_sections", {}).get("technical_keywords", ""),
+            "lighting_text": packet_report.get("high_caliber_source_sections", {}).get("style_lighting", ""),
+            "negative_prompt_enabled": False,
+            "image_prompt": prompt,
+            "validation": {
+                "framing_present": True,
+                "wardrobe_casual_free": True,
+                "wardrobe_casual_terms_found": [],
+                "scene_action_conflict_free": True,
+                "scene_action_conflict_terms_found": [],
+                "soul_anchor_absent": True,
+                "negative_prompt_disabled": True,
+                "heavy_overcorrection_free": True,
+                "heavy_overcorrection_terms_found": [],
+                "pose_scene_match_pass": True,
+                "pose_scene_mismatch_terms_found": [],
+                "low_hook_terms_found": [],
+                "final_expression_text": "",
+                "expression_safe_fallback_used": False,
+                "expression_safe_fallback_reason": "",
+                "expression_scene_gaze_conflict_terms_found": [],
+            },
+        },
+    }
+    return packet_report, source
 
 
 def _load_handoff_report(handoff_path: Path) -> dict[str, Any]:

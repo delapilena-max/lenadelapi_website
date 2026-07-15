@@ -286,9 +286,9 @@ def build_queue(
                     "python tools/strategy/lena_build_content_packet_dryrun_v1.py "
                     f"--recipe {lane['recipe_id']} --date {date_str}"
                 ),
-                "recommended_payload_command": (
-                    "python tools/strategy/lena_build_kling_payload_dryrun_v1.py "
-                    f"--packet {lane['packet_path']}"
+                "recommended_handoff_command": (
+                    "python tools/strategy/lena_build_next_live_image_handoff_v1.py "
+                    f"--date {date_str}"
                 ),
             }
         )

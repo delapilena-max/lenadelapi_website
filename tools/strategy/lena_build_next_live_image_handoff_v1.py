@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
-PRE_GENERATION_CANDIDATES = ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates"
+CONTENT_PACKETS = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
 
 REPO_EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
 EXECUTION_OWNER = "claude"
@@ -68,15 +68,20 @@ def handoff_markdown_path(date_str: str) -> Path:
     return dated_path(NEXT_ACTIONS, date_str, f"lena_next_live_image_handoff_{date_str}.md")
 
 
+def content_packet_path(date_str: str, recipe_id: str) -> Path:
+    return dated_path(
+        CONTENT_PACKETS,
+        date_str,
+        f"lena_content_packet_dryrun_{date_str}_{recipe_id}.json",
+    )
+
+
+def canonical_slot_id(date_str: str, recipe_id: str) -> str:
+    return f"higgsfield-{date_str.replace('-', '')}-{recipe_id}-photo"
+
+
 def learning_path_from_recommendation(recommendation: dict) -> Path:
     return Path(str(recommendation.get("learning_artifact_path", "")).strip())
-
-
-def selected_candidate_paths(date_str: str) -> list[Path]:
-    directory = PRE_GENERATION_CANDIDATES / date_str
-    if not directory.is_dir():
-        return []
-    return sorted(directory.glob("lena_pre_generation_candidate_*.json"))
 
 
 def repo_relative_path(path: Path) -> str:
@@ -85,34 +90,6 @@ def repo_relative_path(path: Path) -> str:
         return resolved.relative_to(ROOT).as_posix()
     except ValueError:
         return resolved.as_posix()
-
-
-def repo_executor_command(date_str: str, slot_id: str, *, live: bool = False) -> str:
-    parts = [
-        "python",
-        REPO_EXECUTOR_PATH,
-        "--date",
-        date_str,
-        "--slot-id",
-        slot_id,
-    ]
-    if live:
-        parts.append("--live")
-    return " ".join(parts)
-
-
-def repo_executor_argv(date_str: str, slot_id: str, *, live: bool = False) -> list[str]:
-    argv = [
-        "python",
-        REPO_EXECUTOR_PATH,
-        "--date",
-        date_str,
-        "--slot-id",
-        slot_id,
-    ]
-    if live:
-        argv.append("--live")
-    return argv
 
 
 def handoff_executor_command(handoff_artifact_path: str, *, live: bool = False) -> str:
@@ -154,7 +131,7 @@ def load_report(
     _require(path.is_file(), "missing_artifact", f"missing required artifact: {path}")
     try:
         report = read_json(path)
-    except Exception as exc:  # pragma: no cover - defensive fail closed
+    except Exception as exc:  # pragma: no cover
         raise HandoffBuildError(f"[ABORT] unreadable_artifact: {path}: {exc}") from exc
     _require(
         report.get("report_type") == expected_report_type,
@@ -171,38 +148,32 @@ def load_report(
     return report
 
 
-def load_candidate_report(path: Path, expected_date: str) -> dict:
+def load_content_packet_report(path: Path, expected_date: str, expected_recipe_id: str) -> dict:
     _require(path.is_file(), "missing_artifact", f"missing required artifact: {path}")
     try:
         report = read_json(path)
-    except Exception as exc:  # pragma: no cover - defensive fail closed
+    except Exception as exc:  # pragma: no cover
         raise HandoffBuildError(f"[ABORT] unreadable_artifact: {path}: {exc}") from exc
     _require(
-        report.get("schema_version") == "lena_pre_generation_candidate_gate_v1",
+        report.get("report_type") == "lena_content_packet_dryrun",
         "wrong_report_type",
-        f"{path} has schema_version {report.get('schema_version')!r}, expected 'lena_pre_generation_candidate_gate_v1'",
-    )
-    report_date = str(report.get("as_of_date", "")).strip()
-    _require(
-        report_date == expected_date,
-        "date_mismatch",
-        f"{path} has as_of_date {report_date!r}, expected {expected_date!r}",
+        f"{path} has report_type {report.get('report_type')!r}, expected 'lena_content_packet_dryrun'",
     )
     _require(
-        report.get("candidate_status") == "selected",
-        "candidate_not_selected",
-        f"{path} is not a selected candidate artifact",
-    )
-    candidate = report.get("candidate")
-    _require(
-        isinstance(candidate, dict),
-        "missing_selected_candidate",
-        f"{path} does not contain a selected candidate object",
+        str(report.get("generated_date", "")).strip() == expected_date,
+        "packet_date_mismatch",
+        f"{path} has generated_date {report.get('generated_date')!r}, expected {expected_date!r}",
     )
     _require(
-        candidate.get("candidate_id") and candidate.get("slot_id"),
-        "candidate_identity_missing",
-        f"{path} is missing candidate_id or slot_id",
+        str(report.get("recipe_id", "")).strip() == expected_recipe_id,
+        "packet_recipe_mismatch",
+        f"{path} has recipe_id {report.get('recipe_id')!r}, expected {expected_recipe_id!r}",
+    )
+    prompt = str(report.get("compact_provider_prompt_preview", "")).strip()
+    _require(
+        bool(prompt),
+        "packet_prompt_missing",
+        f"{path} does not contain a compact_provider_prompt_preview",
     )
     return report
 
@@ -220,17 +191,6 @@ def load_learning_report(recommendation: dict, expected_date: str) -> tuple[Path
         expected_date=expected_date,
     )
     return learning_path, learning
-
-
-def load_selected_candidate(date_str: str) -> tuple[Path, dict]:
-    paths = selected_candidate_paths(date_str)
-    _require(
-        len(paths) == 1,
-        "selected_candidate_ambiguity",
-        f"expected exactly one selected-candidate artifact for {date_str}, found {len(paths)}",
-    )
-    path = paths[0]
-    return path, load_candidate_report(path, date_str)
 
 
 def load_queue_report(date_str: str) -> tuple[Path, dict]:
@@ -272,7 +232,6 @@ def build_handoff(date_str: str) -> dict:
 
     learning_path, learning = load_learning_report(recommendation, date_str)
     queue_path, queue_report = load_queue_report(date_str)
-    candidate_path, selected_candidate_report = load_selected_candidate(date_str)
 
     learning_summary = learning.get("metrics_resolution_summary", {})
     _require(
@@ -320,6 +279,7 @@ def build_handoff(date_str: str) -> dict:
         "learning_follow_up_mismatch",
         "recommendation follow-up action does not match the learning status",
     )
+
     queue_slots = queue_report.get("queue_slots", [])
     queue_head = queue_slots[0]
     _require(
@@ -335,22 +295,33 @@ def build_handoff(date_str: str) -> dict:
             "active proof lane lock does not match queue head",
         )
 
-    candidate = selected_candidate_report.get("candidate", {})
-    slot_id = str(candidate.get("slot_id", "")).strip()
-    _require(
-        candidate.get("recipe_id") == queue_head.get("recipe_id"),
-        "candidate_recipe_mismatch",
-        "selected candidate recipe does not match queue head",
-    )
-    expected_command = repo_executor_command(date_str, slot_id)
-    _require(
-        str(candidate.get("exact_proposed_dry_run_command", "")).strip() == expected_command,
-        "candidate_command_mismatch",
-        "selected candidate does not point at the exact Higgsfield repo adapter dry-run command",
-    )
+    recipe_id = str(queue_head.get("recipe_id", "")).strip()
+    packet_path = content_packet_path(date_str, recipe_id)
+    packet = load_content_packet_report(packet_path, date_str, recipe_id)
+    prompt_text = str(packet.get("compact_provider_prompt_preview", "")).strip()
+    prompt_sha256 = str(packet.get("compact_provider_prompt_sha256", "")).strip() or sha256_bytes(prompt_text.encode("utf-8"))
+    slot_id = canonical_slot_id(date_str, recipe_id)
 
-    selected_prompt_text = selected_candidate_report.get("_prompt")
-    prompt_text_available = isinstance(selected_prompt_text, str) and bool(selected_prompt_text.strip())
+    _require(
+        str(packet.get("environment_id", "")).strip() == str(queue_head.get("environment_used", "")).strip(),
+        "packet_environment_mismatch",
+        "queue head environment does not match the selected content packet",
+    )
+    _require(
+        str(packet.get("wardrobe_outfit_id", "")).strip() == str(queue_head.get("outfit_used", "")).strip(),
+        "packet_outfit_mismatch",
+        "queue head outfit does not match the selected content packet",
+    )
+    _require(
+        packet.get("provider_prompt_contract", {}).get("provider_route") == "higgsfield_forward_no_live",
+        "packet_provider_route_mismatch",
+        "selected content packet is not bound to the Higgsfield-forward no-live route",
+    )
+    _require(
+        packet.get("provider_prompt_contract", {}).get("live_authority") is False,
+        "packet_live_authority_invalid",
+        "selected content packet must remain no-live authority only",
+    )
 
     handoff_json_rel_path = repo_relative_path(handoff_json_path(date_str))
     handoff_md_rel_path = repo_relative_path(handoff_markdown_path(date_str))
@@ -370,38 +341,44 @@ def build_handoff(date_str: str) -> dict:
         "expected_handoff_artifact_path": handoff_json_rel_path,
         "expected_handoff_markdown_path": handoff_md_rel_path,
         "selected_slot_id": slot_id,
-        "selected_recipe_id": candidate.get("recipe_id", ""),
-        "selected_lane": candidate.get("lane", ""),
-        "selected_hook_id": candidate.get("hook_id", ""),
-        "selected_hook_text": candidate.get("hook_text", ""),
-        "selected_caption_seed": candidate.get("caption_seed", ""),
+        "selected_recipe_id": recipe_id,
+        "selected_lane": packet.get("scene_type", ""),
+        "selected_hook_id": packet.get("strong_hook_id", ""),
+        "selected_hook_text": packet.get("hook_text", ""),
+        "selected_caption_seed": packet.get("caption_draft", ""),
         "source_recommendation_artifact_path": repo_relative_path(recommendation_path),
         "source_recommendation_artifact_sha256": sha256_file(recommendation_path),
         "source_learning_artifact_path": repo_relative_path(learning_path),
         "source_learning_artifact_sha256": sha256_file(learning_path),
         "source_queue_dry_run_artifact_path": repo_relative_path(queue_path),
         "source_queue_dry_run_artifact_sha256": sha256_file(queue_path),
-        "selected_prompt_input_artifact_path": repo_relative_path(candidate_path),
-        "selected_prompt_input_artifact_sha256": sha256_file(candidate_path),
+        "selected_prompt_input_artifact_path": repo_relative_path(packet_path),
+        "selected_prompt_input_artifact_sha256": sha256_file(packet_path),
         "selected_prompt_input": {
-            "artifact_path": repo_relative_path(candidate_path),
-            "artifact_sha256": sha256_file(candidate_path),
-            "candidate_id": candidate.get("candidate_id", ""),
-            "decision_fingerprint_sha256": selected_candidate_report.get("decision_fingerprint_sha256", ""),
-            "prompt_sha256": candidate.get("prompt_sha256", ""),
-            "prompt_text": selected_prompt_text if prompt_text_available else None,
-            "prompt_text_status": (
-                "available" if prompt_text_available else "not_persisted_in_authoritative_artifact"
+            "artifact_path": repo_relative_path(packet_path),
+            "artifact_sha256": sha256_file(packet_path),
+            "artifact_report_type": packet.get("report_type", ""),
+            "packet_id": packet.get("packet_id", ""),
+            "prompt_sha256": prompt_sha256,
+            "prompt_text": prompt_text,
+            "prompt_text_status": "available",
+            "prompt_text_available": True,
+            "exact_proposed_dry_run_command": dry_run_command,
+            "lane": packet.get("scene_type", ""),
+            "recipe_id": packet.get("recipe_id", ""),
+            "hook_id": packet.get("strong_hook_id", ""),
+            "hook_text": packet.get("hook_text", ""),
+            "caption_seed": packet.get("caption_draft", ""),
+            "activity": packet.get("high_caliber_source_sections", {}).get("subject_pose", ""),
+            "concept_summary": " | ".join(
+                part
+                for part in (
+                    packet.get("scene_type", ""),
+                    packet.get("high_caliber_source_sections", {}).get("subject_pose", ""),
+                    packet.get("high_caliber_source_sections", {}).get("style_lighting", ""),
+                )
+                if part
             ),
-            "prompt_text_available": prompt_text_available,
-            "exact_proposed_dry_run_command": candidate.get("exact_proposed_dry_run_command", ""),
-            "lane": candidate.get("lane", ""),
-            "recipe_id": candidate.get("recipe_id", ""),
-            "hook_id": candidate.get("hook_id", ""),
-            "hook_text": candidate.get("hook_text", ""),
-            "caption_seed": candidate.get("caption_seed", ""),
-            "activity": candidate.get("activity", ""),
-            "concept_summary": candidate.get("concept_summary", ""),
         },
         "structured_executor_inputs": {
             "date": date_str,
@@ -419,31 +396,19 @@ def build_handoff(date_str: str) -> dict:
                 "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
                 "identity_is_prompt_instruction": False,
             },
-            "selected_prompt_input_artifact_path": repo_relative_path(candidate_path),
-            "selected_prompt_input_artifact_sha256": sha256_file(candidate_path),
-            "selected_prompt_sha256": candidate.get("prompt_sha256", ""),
-            "selected_prompt_text": selected_prompt_text if prompt_text_available else None,
-            "selected_prompt_text_status": (
-                "available" if prompt_text_available else "not_persisted_in_authoritative_artifact"
-            ),
-            "selected_prompt_text_available": prompt_text_available,
+            "selected_prompt_input_artifact_path": repo_relative_path(packet_path),
+            "selected_prompt_input_artifact_sha256": sha256_file(packet_path),
+            "selected_prompt_sha256": prompt_sha256,
+            "selected_prompt_text": prompt_text,
+            "selected_prompt_text_status": "available",
+            "selected_prompt_text_available": True,
             "handoff_artifact_path": handoff_json_rel_path,
             "handoff_markdown_path": handoff_md_rel_path,
             "expected_image_path": repo_relative_path(
-                ROOT
-                / "pipeline"
-                / "higgsfield_library"
-                / "lena"
-                / date_str
-                / f"{slot_id}_seed.png"
+                ROOT / "pipeline" / "higgsfield_library" / "lena" / date_str / f"{slot_id}_seed.png"
             ),
             "expected_manifest_path": repo_relative_path(
-                ROOT
-                / "pipeline"
-                / "higgsfield_debug"
-                / date_str
-                / slot_id
-                / "result_manifest.json"
+                ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "result_manifest.json"
             ),
             "dry_run_command": dry_run_command,
             "dry_run_argv": handoff_executor_argv(handoff_json_rel_path),
@@ -494,10 +459,6 @@ def build_handoff(date_str: str) -> dict:
         "dry_run_executor_contract_state": "ready",
         "live_execution_state": "blocked",
         "live_blockers": [
-            "exact_prompt_text_not_persisted_in_authoritative_prompt_artifact",
-            "manual_operator_approval_required",
-            "generation_approval_required",
-        ] if not prompt_text_available else [
             "manual_operator_approval_required",
             "generation_approval_required",
         ],
@@ -518,11 +479,11 @@ def build_handoff(date_str: str) -> dict:
             "recommendation_artifact_valid": True,
             "learning_artifact_valid": True,
             "queue_artifact_valid": True,
-            "selected_candidate_valid": True,
+            "selected_prompt_input_valid": True,
             "queue_head_matches_recommendation": True,
-            "candidate_matches_queue_head": True,
-            "candidate_command_matches_repo_executor": True,
-            "prompt_text_available": prompt_text_available,
+            "selected_prompt_input_matches_queue_head": True,
+            "selected_prompt_input_matches_repo_executor": True,
+            "prompt_text_available": True,
             "live_prompt_byte_check_required": True,
             "handoff_artifact_path": handoff_json_rel_path,
             "handoff_markdown_path": handoff_md_rel_path,

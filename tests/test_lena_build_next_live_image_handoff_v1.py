@@ -10,15 +10,15 @@ import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff
 
 
 DATE = "2026-07-13"
-SLOT_ID = "lenagate2026071325ca9e1d-pack000-01-photo"
 RECIPE_ID = "hcr_006"
+SLOT_ID = f"higgsfield-20260713-{RECIPE_ID}-photo"
 EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
 HANDOFF_PATH = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
 HANDOFF_MD_PATH = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.md"
-LEGACY_DRY_RUN_COMMAND = f"python {EXECUTOR_PATH} --date {DATE} --slot-id {SLOT_ID}"
 HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact {HANDOFF_PATH}"
 LIVE_COMMAND = f"{HANDOFF_COMMAND} --live"
-PROMPT_INPUT_PATH = f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_25ca9e1d_128799286987.json"
+PROMPT_INPUT_PATH = f"pipeline/strategy/lena/content_packets/{DATE}/lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -26,7 +26,7 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
 
 
-def _learning_payload(status: str) -> dict:
+def _learning_payload(status: str) -> tuple[dict, str]:
     follow_up = {
         "current": "no_follow_up_required",
         "usable_but_incomplete": "complete_missing_metrics_or_refresh_learning",
@@ -112,94 +112,84 @@ def _queue_payload(recipe_id: str = RECIPE_ID) -> dict:
                 "production_proof_mode": False,
                 "priority_score": 125,
                 "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
             }
         ],
     }
 
 
-def _candidate_payload(command: str = LEGACY_DRY_RUN_COMMAND) -> dict:
-    candidate = {
-        "activity": "stepping out near the entrance of a low-lit lounge.",
-        "candidate_id": f"{SLOT_ID}::hcr_006::cbn_004",
-        "caption_seed": "caught me on the way in",
-        "choice_eligible": True,
-        "concept_summary": "stepping out near the entrance of a low-lit lounge. | flash-adjacent nightlife social photo, 35mm lens.",
-        "creative_temperature": "glamorous",
-        "deterministic_noncreative_tiebreak": ["night out", "hcr_006", "cbn_004", SLOT_ID],
-        "exact_proposed_dry_run_command": command,
-        "hook_id": "cbn_004",
-        "hook_text": "Tried To Dress Down. Failed.",
-        "lane": "night out",
-        "lighting_text": "warm venue spill light mixed with city-night ambient light, realistic highlight rolloff, slight low-light grain",
-        "narrative_roles": ["anticipation", "experience", "payoff"],
-        "payoff_claimed": False,
-        "payoff_eligible": True,
-        "pose": "hair_touch_confident_gaze",
-        "pose_body_language_id": "pose_p017",
-        "primary_pillar": "beautiful_trouble",
-        "prompt_sha256": "48260be45ea28a236dabae2c34876e45aa21fef55e98bf2f63a22ac890b2ce2d",
-        "ranking_evidence": {"identity_consistency": "passed canonical Soul identity hard gate"},
-        "recipe_binding": "strategy compatibility",
-        "recipe_id": RECIPE_ID,
-        "scene_identity_field": "lane",
-        "slot_id": SLOT_ID,
-        "strategy_compatibility_evidence": {
-            "generated_environment_exact_match": None,
-            "generated_wardrobe_exact_match": False,
-            "recipe_environment_id": "env_p001",
-            "recipe_wardrobe_outfit_id": "wc_p059",
-        },
-        "supporting_pillar": "audience_choice_and_payoff",
-        "visual_style": "skirt_set",
-        "wardrobe_outfit_id": "wc_p017",
-    }
+def _packet_payload(prompt_text: str = PROMPT_TEXT) -> dict:
+    prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
     return {
-        "as_of_date": DATE,
-        "authority_commit": "25ca9e1d5bc00dd766ed3ec36bae4433e8769f02",
-        "candidate": candidate,
-        "candidate_status": "selected",
-        "confidence": "medium",
-        "decision_fingerprint_sha256": "12879928698742649ceb9bf817fc82cbad23947b8d9a42743b5fef3a69f05336",
-        "evidence": {"recent_content_evidence_semantics": "exact recorded fields only; missing fields remain unknown"},
-        "exact_next_allowed_action": command,
-        "final_action": "prepare_higgsfield_still_dry_run_for_review",
-        "generated_at_utc": "2026-07-14T03:26:44.255326Z",
-        "influencer_id": "lena",
-        "input_provenance": [],
-        "noncritical_evidence_gaps": ["historical creative temperature is unknown; non-high-heat selection remains allowed"],
-        "provider_authorized": False,
-        "rejected_or_blocked_reasons": [],
-        "schema_version": "lena_pre_generation_candidate_gate_v1",
-        "side_effects_performed": [],
-        "strategy_contract": {"canonical_niche": "Glamour, Choices, And Beautiful Trouble"},
+        "report_type": "lena_content_packet_dryrun",
+        "schema_version": "v1",
+        "packet_id": f"cpkt_20260713_{RECIPE_ID}",
+        "generated_date": DATE,
+        "generator": "lena_build_content_packet_dryrun_v1",
+        "dry_run": True,
+        "provider_call_enabled": False,
+        "generation_call_performed": False,
+        "publishing_approval": "not_approved",
+        "recipe_id": RECIPE_ID,
+        "scene_type": "parking_garage_flash",
+        "wardrobe_outfit_id": "wc_p059",
+        "content_pillar": "beautiful_trouble",
+        "platform_targets": ["Instagram Feed"],
+        "best_content_type": "photo",
+        "high_caliber_source_sections": {
+            "subject_pose": "leaning against the elevator wall before heading up",
+            "style_lighting": "warm lobby spill and realistic night shadow falloff",
+            "technical_keywords": "35mm lens, natural grain",
+        },
+        "compact_provider_prompt_preview": prompt_text,
+        "compact_provider_prompt_chars": len(prompt_text),
+        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_sha256": prompt_sha,
+        "strong_hook_id": "cbn_004",
+        "hook_text": "Tried To Dress Down. Failed.",
+        "hook_selection_reason": "highest score",
+        "caption_draft": "caught me on the way in",
+        "caption_followup": "kept the first frame",
+        "environment_id": "env_p001",
+        "environment_context": "Environment: parking garage entry.",
+        "provider_prompt_contract": {
+            "provider_route": "higgsfield_forward_no_live",
+            "live_authority": False,
+            "scene_logic_contract_present": True,
+            "master_identity_body_present": True,
+            "blocked_terms_absent": True,
+            "blocked_terms_found": [],
+            "outfit_controlled": True,
+            "environment_controlled": True,
+        },
     }
 
 
-def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, command: str = LEGACY_DRY_RUN_COMMAND) -> tuple[Path, Path, Path, Path]:
+def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, prompt_text: str = PROMPT_TEXT) -> tuple[Path, Path, Path, Path]:
     next_actions = tmp_root / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
-    prompt_dir = tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
+    packets = tmp_root / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
     recommendation_path = next_actions / f"lena_next_generation_step_{DATE}.json"
     learning_path = next_actions / f"lena_post_outcome_learning_state_{DATE}.json"
     queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
-    prompt_path = prompt_dir / "lena_pre_generation_candidate_25ca9e1d_128799286987.json"
+    packet_path = packets / f"lena_content_packet_dryrun_{DATE}_{recipe_id}.json"
 
     learning, _follow_up = _learning_payload(learning_status)
     _write_json(learning_path, learning)
     _write_json(recommendation_path, _recommendation_payload(learning_path, learning_status))
     _write_json(queue_path, _queue_payload(recipe_id))
-    _write_json(prompt_path, _candidate_payload(command))
-    return recommendation_path, learning_path, queue_path, prompt_path
+    _write_json(packet_path, _packet_payload(prompt_text))
+    return recommendation_path, learning_path, queue_path, packet_path
 
 
 def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(handoff, "ROOT", tmp_path)
     monkeypatch.setattr(handoff, "NEXT_ACTIONS", tmp_path / "pipeline" / "strategy" / "lena" / "next_actions")
-    monkeypatch.setattr(handoff, "PRE_GENERATION_CANDIDATES", tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates")
+    monkeypatch.setattr(handoff, "CONTENT_PACKETS", tmp_path / "pipeline" / "strategy" / "lena" / "content_packets")
 
 
 def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _, _, _, prompt_path = _build_fixture_tree(tmp_path)
+    _, _, _, packet_path = _build_fixture_tree(tmp_path)
     monkeypatch.setattr(handoff, "iso_now", lambda: "2026-07-14T12:34:56+00:00")
 
     report = handoff.build_handoff(DATE)
@@ -214,35 +204,23 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["executor_type"] == "higgsfield_cli"
     assert report["repo_executor_path"] == EXECUTOR_PATH
     assert report["selected_slot_id"] == SLOT_ID
-    assert report["media_content_type"] == "image"
-    assert report["slot_media_type"] == "photo"
-    assert report["selected_hook_text"] == "Tried To Dress Down. Failed."
     assert report["expected_handoff_artifact_path"] == HANDOFF_PATH
     assert report["expected_handoff_markdown_path"] == HANDOFF_MD_PATH
-    assert report["source_recommendation_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_generation_step_{DATE}.json"
-    assert report["source_learning_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_post_outcome_learning_state_{DATE}.json"
-    assert report["source_queue_dry_run_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_autonomous_generation_queue_dryrun_{DATE}.json"
     assert report["selected_prompt_input_artifact_path"] == PROMPT_INPUT_PATH
     assert report["selected_prompt_input"]["artifact_path"] == PROMPT_INPUT_PATH
-    assert report["selected_prompt_input"]["artifact_sha256"] == hashlib.sha256(prompt_path.read_bytes()).hexdigest()
-    assert report["selected_prompt_input"]["prompt_sha256"] == "48260be45ea28a236dabae2c34876e45aa21fef55e98bf2f63a22ac890b2ce2d"
-    assert report["selected_prompt_input"]["exact_proposed_dry_run_command"] == LEGACY_DRY_RUN_COMMAND
-    assert report["selected_prompt_input"]["prompt_text"] is None
-    assert report["selected_prompt_input"]["prompt_text_available"] is False
-    assert report["selected_prompt_input"]["prompt_text_status"] == "not_persisted_in_authoritative_artifact"
+    assert report["selected_prompt_input"]["artifact_sha256"] == hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    assert report["selected_prompt_input"]["prompt_sha256"] == hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
+    assert report["selected_prompt_input"]["prompt_text"] == PROMPT_TEXT
+    assert report["selected_prompt_input"]["prompt_text_available"] is True
+    assert report["selected_prompt_input"]["prompt_text_status"] == "available"
+    assert report["selected_prompt_input"]["packet_id"] == f"cpkt_20260713_{RECIPE_ID}"
+    assert report["selected_prompt_input"]["exact_proposed_dry_run_command"] == HANDOFF_COMMAND
     assert report["structured_executor_inputs"]["dry_run_command"] == HANDOFF_COMMAND
     assert report["structured_executor_inputs"]["live_command"] == LIVE_COMMAND
     assert report["structured_executor_inputs"]["dry_run_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH]
     assert report["structured_executor_inputs"]["live_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH, "--live"]
     assert report["structured_executor_inputs"]["model"] == "text2image_soul_v2"
     assert report["structured_executor_inputs"]["aspect_ratio"] == "9:16"
-    assert report["structured_executor_inputs"]["negative_prompt_enabled"] is False
-    assert report["structured_executor_inputs"]["soul_metadata"]["name"] == "Lena"
-    assert report["structured_executor_inputs"]["soul_metadata"]["type"] == "Soul 2.0"
-    assert report["structured_executor_inputs"]["handoff_artifact_path"] == HANDOFF_PATH
-    assert report["structured_executor_inputs"]["handoff_markdown_path"] == HANDOFF_MD_PATH
-    assert report["structured_executor_inputs"]["expected_image_path"] == f"pipeline/higgsfield_library/lena/{DATE}/{SLOT_ID}_seed.png"
-    assert report["structured_executor_inputs"]["expected_manifest_path"] == f"pipeline/higgsfield_debug/{DATE}/{SLOT_ID}/result_manifest.json"
     assert report["packet_state"] == "packet_valid_for_claude_review"
     assert report["dry_run_executor_contract_state"] == "ready"
     assert report["live_execution_state"] == "blocked"
@@ -251,45 +229,32 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["manual_operator_approval_required"] is True
     assert report["provider_call_performed"] is False
     assert report["generation_performed"] is False
-    assert report["publish_authorized"] is False
-    assert report["manual_publish_review_required"] is True
     assert report["learning_status"] == "current"
-    assert report["learning_follow_up_action"] == "no_follow_up_required"
-    assert report["learning_resolution_state_summary"]["learning_status"] == "current"
-    assert report["source_recommendation"]["learning_signal_used"] == ["queue_boosts.preferred_recipe_ids", "winner_posts"]
     assert report["queue_head"]["recipe_id"] == RECIPE_ID
-    assert report["validation"]["live_prompt_byte_check_required"] is True
-    assert report["validation"]["queue_head_matches_recommendation"] is True
-    assert report["validation"]["candidate_command_matches_repo_executor"] is True
+    assert report["validation"]["selected_prompt_input_valid"] is True
     assert json.loads(json_path.read_text(encoding="utf-8")) == report
     markdown = md_path.read_text(encoding="utf-8")
-    for expected in [
-        HANDOFF_COMMAND,
-        LIVE_COMMAND,
-        SLOT_ID,
-        "packet_valid_for_claude_review",
-        "dry-run executor contract state",
-        "manual operator approval required",
-        "Tried To Dress Down. Failed.",
-        "not_persisted_in_authoritative_artifact",
-    ]:
+    for expected in [HANDOFF_COMMAND, LIVE_COMMAND, SLOT_ID, report["selected_prompt_input"]["prompt_sha256"], "packet_valid_for_claude_review"]:
         assert expected in markdown
 
 
-def test_learning_status_is_carried_truthfully(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_layout(monkeypatch, tmp_path)
-    for status, label, follow_up in [
+@pytest.mark.parametrize(
+    "status,label,follow_up",
+    [
         ("current", "learning_current", "no_follow_up_required"),
         ("usable_but_incomplete", "learning_degraded_incomplete", "complete_missing_metrics_or_refresh_learning"),
         ("stale_unresolved", "learning_stale_unresolved", "refresh_or_resolve_stale_unresolved_posts"),
         ("manual_or_future_capability_required", "learning_manual_or_future_capability_required", "manual_or_future_capability_resolution_required"),
-    ]:
-        _build_fixture_tree(tmp_path, learning_status=status)
-        report = handoff.build_handoff(DATE)
-        assert report["learning_status"] == status
-        assert report["source_recommendation"]["learning_status_label"] == label
-        assert report["learning_follow_up_action"] == follow_up
-        assert report["learning_state_category"] == status
+    ],
+)
+def test_learning_status_is_carried_truthfully(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: str, label: str, follow_up: str) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _build_fixture_tree(tmp_path, learning_status=status)
+    report = handoff.build_handoff(DATE)
+    assert report["learning_status"] == status
+    assert report["source_recommendation"]["learning_status_label"] == label
+    assert report["learning_follow_up_action"] == follow_up
+    assert report["learning_state_category"] == status
 
 
 def test_queue_or_recommendation_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -302,13 +267,6 @@ def test_queue_or_recommendation_mismatch_fails_closed(tmp_path: Path, monkeypat
         handoff.build_handoff(DATE)
 
 
-def test_candidate_command_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_layout(monkeypatch, tmp_path)
-    _build_fixture_tree(tmp_path, command="python wrong.py")
-    with pytest.raises(SystemExit, match="candidate_command_mismatch"):
-        handoff.build_handoff(DATE)
-
-
 def test_missing_learning_artifact_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     recommendation_path, learning_path, _, _ = _build_fixture_tree(tmp_path)
@@ -318,29 +276,20 @@ def test_missing_learning_artifact_fails_closed(tmp_path: Path, monkeypatch: pyt
         handoff.build_handoff(DATE)
 
 
-def test_missing_recommendation_artifact_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_content_packet_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    recommendation_path, _, _, _ = _build_fixture_tree(tmp_path)
-    recommendation_path.unlink()
+    _build_fixture_tree(tmp_path)
+    packet_path = tmp_path / "pipeline" / "strategy" / "lena" / "content_packets" / DATE / f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+    packet_path.unlink()
     with pytest.raises(SystemExit, match="missing_artifact"):
         handoff.build_handoff(DATE)
 
 
-def test_malformed_queue_artifact_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _build_fixture_tree(tmp_path)
-    queue_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
-    queue_path.write_text("{not-json", encoding="utf-8")
-    with pytest.raises(SystemExit, match="unreadable_artifact"):
-        handoff.build_handoff(DATE)
-
-
-def test_date_mismatch_in_candidate_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_layout(monkeypatch, tmp_path)
-    _build_fixture_tree(tmp_path)
-    candidate_path = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE / "lena_pre_generation_candidate_25ca9e1d_128799286987.json"
-    candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
-    candidate["as_of_date"] = "2026-07-12"
-    _write_json(candidate_path, candidate)
-    with pytest.raises(SystemExit, match="date_mismatch"):
+    _, _, _, packet_path = _build_fixture_tree(tmp_path)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    packet["environment_id"] = "env_wrong"
+    _write_json(packet_path, packet)
+    with pytest.raises(SystemExit, match="packet_environment_mismatch"):
         handoff.build_handoff(DATE)

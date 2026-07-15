@@ -6,10 +6,10 @@ Canonical dry-run strategy prep for the Lena image autonomy path.
 Runs, in order:
 1. recipe catalog lock validation
 2. content packet batch dry run
-3. Kling payload dry runs for the selected recipes
-4. autonomous generation readiness audit
-5. next generation step recommendation
-6. autonomous generation queue dry run
+3. autonomous generation readiness audit
+4. next generation step recommendation
+5. autonomous generation queue dry run
+6. Claude/Higgsfield handoff packet build
 
 Safe: no API calls, no image generation, no video generation, no upload,
 no queue mutation, no publish, no schedule, no credential reads.
@@ -30,12 +30,9 @@ RECIPE_BANK = (
 )
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
 CONTENT_PACKETS = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
-KLING_PAYLOADS = ROOT / "pipeline" / "strategy" / "lena" / "kling_payloads"
 
 VALIDATE_LOCKS = ROOT / "tools" / "strategy" / "lena_validate_recipe_catalog_locks_v1.py"
 BUILD_BATCH = ROOT / "tools" / "strategy" / "lena_build_content_batch_dryrun_v1.py"
-BUILD_PAYLOAD = ROOT / "tools" / "strategy" / "lena_build_kling_payload_dryrun_v1.py"
-BUILD_VIDEO_PAYLOAD = ROOT / "tools" / "strategy" / "lena_build_kling_video_payload_dryrun_v1.py"
 AUDIT = ROOT / "tools" / "strategy" / "lena_audit_autonomous_generation_readiness_v1.py"
 RECOMMEND = ROOT / "tools" / "strategy" / "lena_recommend_next_generation_step_v1.py"
 WORLD_STATE = ROOT / "tools" / "strategy" / "lena_build_world_state_v1.py"
@@ -43,7 +40,6 @@ ENGAGEMENT_DEMAND = ROOT / "tools" / "strategy" / "lena_build_engagement_demand_
 POST_OUTCOME = ROOT / "tools" / "strategy" / "lena_build_post_outcome_learning_state_v1.py"
 BUILD_QUEUE = ROOT / "tools" / "strategy" / "lena_build_autonomous_generation_queue_dryrun_v1.py"
 BUILD_NEXT_LIVE_HANDOFF = ROOT / "tools" / "strategy" / "lena_build_next_live_image_handoff_v1.py"
-VIDEO_PAYLOADS = ROOT / "pipeline" / "strategy" / "lena" / "kling_video_payloads"
 
 
 def utc_date() -> str:
@@ -117,20 +113,6 @@ def manifest_path(date_str: str) -> Path:
     )
 
 
-def payload_path(date_str: str, recipe_id: str) -> Path:
-    return (
-        KLING_PAYLOADS / date_str
-        / f"kling_payload_dryrun_{date_str}_{recipe_id}.json"
-    )
-
-
-def video_payload_path(date_str: str, recipe_id: str) -> Path:
-    return (
-        VIDEO_PAYLOADS / date_str
-        / f"kling_video_payload_dryrun_{date_str}_{recipe_id}.json"
-    )
-
-
 def audit_path(date_str: str) -> Path:
     return (
         NEXT_ACTIONS / date_str
@@ -182,13 +164,6 @@ def packet_path(date_str: str, recipe_id: str) -> Path:
         CONTENT_PACKETS / date_str
         / f"lena_content_packet_dryrun_{date_str}_{recipe_id}.json"
     )
-
-
-def packet_supports_video(packet: dict) -> bool:
-    best = str(packet.get("best_content_type", "")).lower()
-    return "reel" in best or "video" in best
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the canonical Lena strategy autonomy prep dry-run stack."
@@ -262,55 +237,6 @@ def main() -> int:
         output_path = save_report(report, args.date)
         print(json.dumps({"ok": False, "failed_step": step["step"], "report_path": str(output_path)}, indent=2))
         return 1
-
-    payload_results = []
-    for recipe_id in recipe_ids:
-        payload_cmd = [
-            sys.executable,
-            str(BUILD_PAYLOAD),
-            "--recipe",
-            recipe_id,
-            "--date",
-            args.date,
-        ]
-        payload_step = run_step(f"build_kling_payload_dryrun:{recipe_id}", payload_cmd)
-        steps.append(payload_step)
-        payload_results.append(payload_step)
-        if not payload_step["ok"]:
-            report["status"] = "failed"
-            report["failed_step"] = payload_step["step"]
-            output_path = save_report(report, args.date)
-            print(json.dumps({"ok": False, "failed_step": payload_step["step"], "report_path": str(output_path)}, indent=2))
-            return 1
-
-    video_payload_results = []
-    video_candidate_recipe_ids = []
-    for recipe_id in recipe_ids:
-        current_packet_path = packet_path(args.date, recipe_id)
-        if not current_packet_path.is_file():
-            continue
-        current_packet = read_json(current_packet_path)
-        if not packet_supports_video(current_packet):
-            continue
-        video_candidate_recipe_ids.append(recipe_id)
-        video_payload_cmd = [
-            sys.executable,
-            str(BUILD_VIDEO_PAYLOAD),
-            "--packet",
-            str(current_packet_path),
-        ]
-        video_payload_step = run_step(
-            f"build_kling_video_payload_dryrun:{recipe_id}",
-            video_payload_cmd,
-        )
-        steps.append(video_payload_step)
-        video_payload_results.append(video_payload_step)
-        if not video_payload_step["ok"]:
-            report["status"] = "failed"
-            report["failed_step"] = video_payload_step["step"]
-            output_path = save_report(report, args.date)
-            print(json.dumps({"ok": False, "failed_step": video_payload_step["step"], "report_path": str(output_path)}, indent=2))
-            return 1
 
     audit_cmd = [sys.executable, str(AUDIT), "--date", args.date]
     if args.recipes:
@@ -392,25 +318,16 @@ def main() -> int:
         return 1
 
     audit_report = read_json(audit_path(args.date)) if audit_path(args.date).is_file() else {}
-    next_step_report = read_json(next_step_path(args.date)) if next_step_path(args.date).is_file() else {}
     world_state_report = read_json(world_state_path(args.date)) if world_state_path(args.date).is_file() else {}
     engagement_demand_report = read_json(engagement_demand_path(args.date)) if engagement_demand_path(args.date).is_file() else {}
     post_outcome_report = read_json(post_outcome_path(args.date)) if post_outcome_path(args.date).is_file() else {}
+    next_step_report = read_json(next_step_path(args.date)) if next_step_path(args.date).is_file() else {}
     queue_report = read_json(queue_path(args.date)) if queue_path(args.date).is_file() else {}
-    video_payload_reports = [
-        read_json(video_payload_path(args.date, recipe_id))
-        for recipe_id in video_candidate_recipe_ids
-        if video_payload_path(args.date, recipe_id).is_file()
-    ]
-
     report["status"] = "ok"
     report["artifacts"] = {
         "batch_manifest": str(manifest_path(args.date)),
-        "payloads": [str(payload_path(args.date, recipe_id)) for recipe_id in recipe_ids],
-        "video_payloads": [
-            str(video_payload_path(args.date, recipe_id))
-            for recipe_id in video_candidate_recipe_ids
-        ],
+        "payloads": [],
+        "video_payloads": [],
         "readiness_audit": str(audit_path(args.date)),
         "next_generation_step": str(next_step_path(args.date)),
         "world_state": str(world_state_path(args.date)),
@@ -431,18 +348,12 @@ def main() -> int:
             else ""
         ),
         "active_recipe_count": len(recipe_ids),
-        "payload_count": len(recipe_ids),
-        "video_candidate_recipe_ids": video_candidate_recipe_ids,
-        "video_payload_count": len(video_candidate_recipe_ids),
-        "video_seed_available_count": sum(
-            1 for item in video_payload_reports if item.get("seed_image_present") is True
-        ),
-        "video_transport_ready_count": sum(
-            1 for item in video_payload_reports if item.get("seed_image_transport_ready") is True
-        ),
-        "video_live_ready_count": sum(
-            1 for item in video_payload_reports if item.get("seed_image_live_ready") is True
-        ),
+        "payload_count": 0,
+        "video_candidate_recipe_ids": [],
+        "video_payload_count": 0,
+        "video_seed_available_count": 0,
+        "video_transport_ready_count": 0,
+        "video_live_ready_count": 0,
         "lane_status_counts": audit_report.get("lane_status_counts", {}),
         "broader_autonomous_generation_ready": broader_ready,
         "strategy_gate_blocked": audit_report.get("strategy_gate", {}).get(
@@ -477,9 +388,7 @@ def main() -> int:
         "learning_resolution_state_summary": next_step_report.get("recommendation", {}).get("learning_resolution_state_summary", {}),
         "learning_required_follow_up_action": next_step_report.get("recommendation", {}).get("learning_required_follow_up_action", ""),
         "recommended_video_recipe_id": (
-            next_step_report.get("recommendation", {}).get("recommended_recipe_id", "")
-            if next_step_report.get("recommendation", {}).get("recommended_recipe_id", "") in video_candidate_recipe_ids
-            else (video_candidate_recipe_ids[0] if video_candidate_recipe_ids else "")
+            ""
         ),
         "continuity_alert_count": len(world_state_report.get("continuity_alerts", [])),
         "preferred_rotation_recipe_ids": world_state_report.get("queue_rotation_controls", {}).get(
@@ -504,6 +413,8 @@ def main() -> int:
         "next_live_image_handoff_markdown_path": str(next_live_handoff_md_path(args.date)),
         "next_live_handoff_script_present": BUILD_NEXT_LIVE_HANDOFF.is_file(),
         "next_live_handoff_blocker": "" if BUILD_NEXT_LIVE_HANDOFF.is_file() else "missing_script",
+        "provider_routing_mode": "higgsfield_forward_no_live",
+        "obsolete_kling_payload_branch_required": False,
     }
 
     save_report(report, args.date)

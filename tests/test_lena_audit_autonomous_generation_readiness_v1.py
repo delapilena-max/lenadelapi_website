@@ -224,21 +224,22 @@ def test_build_report_marks_missing_artifacts_blocked_and_emits_safe_flags(
     _write_json(gate_policy, _gate_policy())
 
     packet_dir = tmp_path / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
-    payload_dir = tmp_path / "pipeline" / "strategy" / "lena" / "kling_payloads" / DATE
     _write_json(
         packet_dir / f"lena_content_packet_dryrun_{DATE}_hcr_001.json",
-        {"compact_kling_prompt_chars": 2400},
-    )
-    _write_json(
-        payload_dir / f"kling_payload_dryrun_{DATE}_hcr_001.json",
         {
-            "prompt_chars": 2440,
-            "scene_logic_contract_present": True,
-            "master_identity_body_present": True,
-            "blocked_terms_absent": True,
-            "wardrobe_style_used": {"source": "catalog", "style_lane": "public"},
-            "wardrobe_outfit_id_used": "wc_001",
-            "environment_id_used": "env_001",
+            "compact_kling_prompt_chars": 2400,
+            "provider_prompt_contract": {
+                "prompt_chars": 2440,
+                "prompt_headroom": 59,
+                "scene_logic_contract_present": True,
+                "master_identity_body_present": True,
+                "blocked_terms_absent": True,
+                "outfit_controlled": True,
+                "environment_controlled": True,
+            },
+            "wardrobe_outfit_id": "wc_001",
+            "environment_id": "env_001",
+            "content_pillar": "identity",
         },
     )
 
@@ -247,7 +248,6 @@ def test_build_report_marks_missing_artifacts_blocked_and_emits_safe_flags(
     monkeypatch.setattr(readiness, "MEMORY_POLICY", memory_policy)
     monkeypatch.setattr(readiness, "GATE_POLICY", gate_policy)
     monkeypatch.setattr(readiness, "PACKET_BASE", packet_dir.parent)
-    monkeypatch.setattr(readiness, "PAYLOAD_BASE", payload_dir.parent)
 
     report = readiness.build_report(DATE, ["hcr_001", "hcr_002"])
     assert report["lane_status_counts"] == {"ready_with_warnings": 1, "blocked": 1}
@@ -267,6 +267,9 @@ def test_build_report_marks_missing_artifacts_blocked_and_emits_safe_flags(
         "credentials_read": False,
     }
     assert report["strategy_gate"]["blocked"] is True
+    ready_lane = next(lane for lane in report["lanes"] if lane["recipe_id"] == "hcr_001")
+    assert ready_lane["payload_path"].endswith(f"lena_content_packet_dryrun_{DATE}_hcr_001.json")
+    assert ready_lane["provider_prompt_surface_status"] == ""
 
 
 def test_save_report_writes_date_scoped_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
