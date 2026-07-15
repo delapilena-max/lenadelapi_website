@@ -1,0 +1,262 @@
+{
+  "version": "1",
+  "source": "Read-only audit + read-only compaction simulation, 2026-07-08 (approved for implementation same day)",
+  "notes": "Controlled pose/body-language rotation so nearby renders do not repeat the same stance. Deliberately modeled on lena_expression_gaze_bank_v1.json's combo/compatibility_tags shape. Each entry is a short physical-stance modifier layered on top of (never overriding) the scene bank's own 'action' field. compatibility_tags intersect against LANE_POSE_TAG_ALLOWLIST in lena_prompt_brain.py (lane-level compatibility); reference_mode_tags intersect against the slot's chosen reference_mode. 'universal' entries are allowed on every lane. hand_risk flags entries that involve a hand action, for QA/reference and for lanes with an existing hand-risk sensitivity. attitude_level (2026-07-08, Visual Hook / Allure Gate follow-up) added to every combo (neutral/moderate/high), read by _pose_attitude_weight() in lena_prompt_brain.py as an additive selection-weight bonus -- never a hard filter. 6 new high-attitude combos (pose_p013-pose_p018) added: platform-safe confident-stance/hip-shift/wall-lean/three-quarter-angle/hair-touch/squared-posture directions, deliberately excluding over-the-shoulder and walking-stride attitude poses for this first pass (flagged as too unstable for a first attitude patch) and any heavy hand-object interaction.",
+  "combos": [
+    {
+      "pose_body_language_id": "pose_p001",
+      "label": "weight_shift_one_hip",
+      "text": "weight shifted onto one hip, stance easy and unforced",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "moderate"
+    },
+    {
+      "pose_body_language_id": "pose_p002",
+      "label": "knee_slightly_bent",
+      "text": "one knee slightly bent, standing loose rather than stiff",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p003",
+      "label": "shoulders_angled_face_back",
+      "text": "shoulders angled away, face turned back toward the camera",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "moderate"
+    },
+    {
+      "pose_body_language_id": "pose_p004",
+      "label": "relaxed_candid_stance",
+      "text": "relaxed candid stance, settled weight, not a stiff model pose",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body",
+        "face_detail",
+        "video_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p005",
+      "label": "leaning_counter_waist_visible",
+      "text": "leaning lightly against the counter, waist still visible",
+      "compatibility_tags": [
+        "leaning_ok"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p006",
+      "label": "leaning_railing_hips_visible",
+      "text": "leaning against the railing, hips and waist unobstructed",
+      "compatibility_tags": [
+        "leaning_ok"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "moderate"
+    },
+    {
+      "pose_body_language_id": "pose_p007",
+      "label": "hand_on_chair_back",
+      "text": "one hand resting lightly on the back of the chair",
+      "compatibility_tags": [
+        "seated"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": true,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p008",
+      "label": "brushing_hair_back",
+      "text": "brushing a loose strand of hair back with one hand",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body",
+        "face_detail"
+      ],
+      "hand_risk": true,
+      "attitude_level": "moderate"
+    },
+    {
+      "pose_body_language_id": "pose_p009",
+      "label": "reaching_phone_on_table",
+      "text": "reaching lightly for her phone resting on the table",
+      "compatibility_tags": [
+        "low_hand_risk"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": true,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p010",
+      "label": "adjusting_bag_strap",
+      "text": "casually adjusting the strap of her bag on one shoulder",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": true,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p011",
+      "label": "mid_step_walking",
+      "text": "caught mid-step, walking forward with natural rhythm",
+      "compatibility_tags": [
+        "in_motion"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "video_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p012",
+      "label": "seated_turned_sideways",
+      "text": "seated, turned slightly sideways rather than square-on",
+      "compatibility_tags": [
+        "seated"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "neutral"
+    },
+    {
+      "pose_body_language_id": "pose_p013",
+      "label": "hand_on_hip_confident_stance",
+      "text": "one hand resting on her hip, shoulders back, chin lifted with quiet confidence",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": true,
+      "attitude_level": "high"
+    },
+    {
+      "pose_body_language_id": "pose_p014",
+      "label": "hip_shift_chin_down_confident",
+      "text": "hip shifted to one side, one knee bent, chin tipped slightly down",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "high"
+    },
+    {
+      "pose_body_language_id": "pose_p015",
+      "label": "leaning_wall_hip_popped",
+      "text": "leaning against the wall, one hip popped out, casual confident attitude",
+      "compatibility_tags": [
+        "leaning_ok"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "high"
+    },
+    {
+      "pose_body_language_id": "pose_p016",
+      "label": "three_quarter_angle_curve_visible",
+      "text": "three-quarter body angle, waist and hip curve clearly on display",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "high"
+    },
+    {
+      "pose_body_language_id": "pose_p017",
+      "label": "hair_touch_confident_gaze",
+      "text": "touching her hair with one hand, direct confident gaze at the camera",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body",
+        "face_detail"
+      ],
+      "hand_risk": true,
+      "attitude_level": "high"
+    },
+    {
+      "pose_body_language_id": "pose_p018",
+      "label": "squared_confident_stance",
+      "text": "squared confident posture, slight body angle, weight settled and sure",
+      "compatibility_tags": [
+        "universal"
+      ],
+      "reference_mode_tags": [
+        "full_body",
+        "upper_body"
+      ],
+      "hand_risk": false,
+      "attitude_level": "high"
+    }
+  ]
+}
