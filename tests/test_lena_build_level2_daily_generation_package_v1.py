@@ -269,7 +269,7 @@ def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, mon
     assert report["autonomy_ladder_status"]["level_4_state"] == "future_only"
     assert report["autonomy_ladder_status"]["level_5_state"] == "future_only"
     assert report["final_operator_report"]["status"] == "ready_for_operator_review"
-    assert report["next_allowed_action"]["action"] == "await_operator_review_optional"
+    assert report["next_allowed_action"]["action"] == "await_human_review_within_level_2_contract"
     assert after - before == {Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_level2_daily_generation_package_{DATE}.json"}
 
     serialized = json.dumps(report, sort_keys=True)
@@ -341,7 +341,7 @@ def test_missing_approval_produces_approval_pending(tmp_path: Path, monkeypatch:
     assert report["approval_boundary_state"]["status"] == "approval_pending"
     assert report["approval_boundary_state"]["generation_approval"]["status"] == "missing"
     assert report["final_operator_report"]["status"] == "approval_pending"
-    assert report["next_allowed_action"]["action"] == "resolve_machine_eligibility_gate"
+    assert report["next_allowed_action"]["action"] == "obtain_explicit_generation_approval"
     assert report["approval_boundary_state"]["diagnostic"]["blocking"] is True
     assert report["approval_boundary_state"]["generation_approval"]["diagnostic"]["artifact_exists"] is False
     assert report["approval_boundary_state"]["claim"]["diagnostic"]["artifact_exists"] is True
@@ -357,7 +357,7 @@ def test_qa_failure_produces_qa_blocked(tmp_path: Path, monkeypatch: pytest.Monk
 
     assert report["qa_disposition_state"]["status"] == "qa_blocked"
     assert report["final_operator_report"]["status"] == "qa_blocked"
-    assert report["next_allowed_action"]["action"] == "review_machine_eligibility_results"
+    assert report["next_allowed_action"]["action"] == "review_qa_and_prepare_retry_recommendation_only"
     assert report["qa_disposition_state"]["diagnostic"]["artifact_exists"] is True
     assert report["qa_disposition_state"]["diagnostic"]["blocking"] is True
     assert "--expected-image-sha256" in report["qa_disposition_state"]["diagnostic"]["safe_next_step"]
