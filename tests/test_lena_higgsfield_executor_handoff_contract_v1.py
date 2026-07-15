@@ -817,7 +817,7 @@ def test_dry_run_reports_valid_approval_binding(
     assert "approval-handoff binding : confirmed exact match to supplied --handoff-artifact" in stdout
 
 
-def test_live_blocked_with_consumption_not_implemented_even_with_valid_approval(
+def test_dry_run_with_valid_approval_creates_no_claim_or_receipt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -825,20 +825,58 @@ def test_live_blocked_with_consumption_not_implemented_even_with_valid_approval(
     real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
     packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path)],
+    )
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
+    assert not approval_mod.claim_output_path(DATE, SLOT_ID).exists()
+    assert not approval_mod.receipt_output_path(DATE, SLOT_ID).exists()
+
+
+def test_raw_date_slot_live_is_blocked_before_provider_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
     monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
     monkeypatch.setattr(
         executor, "run_live",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live provider path must not be reached")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("raw live path must not be reached")),
     )
-    monkeypatch.setattr(
-        sys, "argv",
-        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
-    )
+    monkeypatch.setattr(sys, "argv", ["executor", "--date", DATE, "--slot-id", SLOT_ID, "--live"])
 
     assert executor.main() == 1
     stdout = capsys.readouterr().out
-    assert "approval_consumption_contract_not_implemented" in stdout
-    assert "=== Higgsfield generation approval -- validation (no consumption) ===" in stdout
+    assert "raw --date/--slot-id --live is forbidden" in stdout
+    assert "The only permitted live still-image command" in stdout
+
+
+def test_retry_decision_live_is_blocked_before_provider_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    fake_retry_artifact = tmp_path / "retry.json"
+    fake_retry_artifact.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        executor,
+        "_load_retry_decision_source",
+        lambda path: (DATE, SLOT_ID, copy.deepcopy(real_source), Path(path)),
+    )
+    monkeypatch.setattr(
+        executor, "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("retry live path must not be reached")),
+    )
+    monkeypatch.setattr(sys, "argv", ["executor", "--retry-decision-artifact", str(fake_retry_artifact), "--live"])
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "--retry-decision-artifact --live is forbidden" in stdout
 
 
 def test_invalid_approval_reported_and_blocks_dry_run(
@@ -888,6 +926,179 @@ def test_invalid_approval_also_blocks_live_without_generic_consumption_message(
     assert executor.main() == 1
     stdout = capsys.readouterr().out
     assert "approval_operator_mismatch" in stdout
+
+
+def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: {
+            "job_id": "job-123",
+            "status": "completed",
+            "result_urls": ["https://example.com/final.png"],
+            "saved_image_path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
+            "image_format_detected": ".png",
+            "subprocess_start_attempted": True,
+            "provider_submission_may_have_occurred": True,
+        },
+    )
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    claim_path = approval_mod.claim_output_path(DATE, SLOT_ID)
+    receipt_path = approval_mod.receipt_output_path(DATE, SLOT_ID)
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
+    assert claim_path.is_file()
+    assert receipt_path.is_file()
+    assert manifest_path.is_file()
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert claim["state"] == "claimed_pending_receipt"
+    assert claim["publish_authorized"] is False
+    assert receipt["outcome"] == "success"
+    assert receipt["failure_stage"] is None
+    assert receipt["publish_authorized"] is False
+    assert manifest["generation_claim_artifact_path"] == "pipeline/approvals/lena/generation/2026-07-13/lenagate2026071325ca9e1d-pack000-01-photo_higgsfield_generation_claim.json"
+    assert manifest["generation_execution_receipt_path"] == "pipeline/approvals/lena/generation/2026-07-13/lenagate2026071325ca9e1d-pack000-01-photo_higgsfield_generation_execution_receipt.json"
+    assert "claim written" in stdout
+    assert "receipt written" in stdout
+
+
+def test_existing_claim_blocks_reuse_without_provider_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    approval_result = approval_mod.validate_generation_approval_artifact(approval_path)
+    approval_mod.write_generation_claim_atomic(
+        approval_mod.claim_output_path(DATE, SLOT_ID),
+        approval_mod.build_generation_claim_record(approval_result),
+    )
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    monkeypatch.setattr(
+        executor, "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider path must not be reached after claim collision")),
+    )
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "claim creation failed: generation_claim_already_exists" in stdout
+    assert not approval_mod.receipt_output_path(DATE, SLOT_ID).exists()
+
+
+@pytest.mark.parametrize(
+    ("stage", "provider_submission_may_have_occurred"),
+    [
+        ("subprocess_start_failure", False),
+        ("provider_rejection", True),
+        ("provider_output_parse_failure", True),
+        ("provider_output_invalid", True),
+        ("download_failure", True),
+    ],
+)
+def test_live_failures_retain_claim_and_write_failure_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    stage: str,
+    provider_submission_may_have_occurred: bool,
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+
+    def _fail_live(*args, **kwargs):
+        raise executor.ProviderCallError(
+            f"synthetic {stage}",
+            stage=stage,
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=provider_submission_may_have_occurred,
+            provider_job_id="job-123" if provider_submission_may_have_occurred else None,
+            provider_status="processing" if provider_submission_may_have_occurred else None,
+        )
+
+    monkeypatch.setattr(executor, "run_live", _fail_live)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    claim_path = approval_mod.claim_output_path(DATE, SLOT_ID)
+    receipt_path = approval_mod.receipt_output_path(DATE, SLOT_ID)
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
+    assert claim_path.is_file()
+    assert receipt_path.is_file()
+    assert not manifest_path.exists()
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["outcome"] == "execution_failed"
+    assert receipt["failure_stage"] == stage
+    assert receipt["subprocess_start_attempted"] is True
+    assert receipt["provider_submission_may_have_occurred"] is provider_submission_may_have_occurred
+    assert receipt["publish_authorized"] is False
+    assert "Claim retained" in stdout
+
+
+def test_receipt_collision_after_success_keeps_claim_and_does_not_retry_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_source = executor.resolve_prompt_source(DATE, SLOT_ID)
+    packet_path = _build_packet_fixture(tmp_path, real_source, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    monkeypatch.setattr(executor, "resolve_prompt_source", lambda date, slot: copy.deepcopy(real_source))
+    calls = {"run_live": 0}
+
+    def _success_live(*args, **kwargs):
+        calls["run_live"] += 1
+        return {
+            "job_id": "job-123",
+            "status": "completed",
+            "result_urls": ["https://example.com/final.png"],
+            "saved_image_path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
+            "image_format_detected": ".png",
+            "subprocess_start_attempted": True,
+            "provider_submission_may_have_occurred": True,
+        }
+
+    monkeypatch.setattr(executor, "run_live", _success_live)
+    precreated_receipt = approval_mod.receipt_output_path(DATE, SLOT_ID)
+    precreated_receipt.parent.mkdir(parents=True, exist_ok=True)
+    precreated_receipt.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        sys, "argv",
+        ["executor", "--handoff-artifact", str(packet_path), "--approval-artifact", str(approval_path), "--live"],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert calls["run_live"] == 1
+    assert approval_mod.claim_output_path(DATE, SLOT_ID).is_file()
+    assert "execution receipt creation failed" in stdout
+    assert not (tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json").exists()
 
 
 def test_handoff_packet_paths_remain_repo_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

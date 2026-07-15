@@ -222,6 +222,16 @@ def test_recording_tool_never_imports_executor_or_provider_modules() -> None:
 
 def test_module_never_invokes_subprocess_or_network() -> None:
     source = Path(approval_mod.__file__).read_text(encoding="utf-8")
-    assert "subprocess" not in source
-    assert "urllib" not in source
-    assert "requests" not in source
+    lowered = source.lower()
+    for forbidden in (
+        "import subprocess",
+        "from subprocess",
+        "subprocess.",
+        "import urllib",
+        "from urllib",
+        "urllib.",
+        "import requests",
+        "from requests",
+        "requests.",
+    ):
+        assert forbidden not in lowered
