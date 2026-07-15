@@ -544,6 +544,7 @@ def print_approval_validation_report(approval_path: Path, approval_result: dict[
     print(f"publish_authorized       : {scope['publish_authorized']}")
     print(f"analytics_mutation_authorized: {scope['analytics_mutation_authorized']}")
     print("approval-handoff binding : confirmed exact match to supplied --handoff-artifact")
+<<<<<<< HEAD
     print("consumption_state        : validation_only (dry-run never consumes approval)")
 
 
@@ -731,6 +732,9 @@ def _write_retry_generation_execution_receipt(
         "receipt_repo_path": _repo_relative_path(path),
         "receipt_record": record,
     }
+=======
+    print("consumption_state        : not_implemented (validation-only; --live stays blocked)")
+>>>>>>> 542a05d9 (feat: add Higgsfield generation approval contract)
 
 
 # --- Handoff packet helpers -------------------------------------------------
@@ -1375,6 +1379,7 @@ def main() -> int:
         "--approval-artifact", type=Path, dest="approval_artifact", default=None,
         help="Optional, only valid together with --handoff-artifact. A recorded "
              "generation-approval artifact (tools/lena_record_higgsfield_generation_"
+<<<<<<< HEAD
              "approval_v1.py) to validate and, under --live, consume through an "
              "atomic single-use claim/receipt contract.",
     )
@@ -1386,6 +1391,11 @@ def main() -> int:
              "(tools/lena_record_higgsfield_retry_generation_approval_v1.py) to "
              "validate and, under --live, consume through an atomic single-use "
              "retry claim/receipt contract.",
+=======
+             "approval_v1.py) to validate and report against the handoff. Validation "
+             "only -- a valid approval does not unlock --live; atomic single-use "
+             "consumption is not implemented yet.",
+>>>>>>> 542a05d9 (feat: add Higgsfield generation approval contract)
     )
     parser.add_argument(
         "--custom-reference-id", dest="custom_reference_id",
@@ -1411,12 +1421,15 @@ def main() -> int:
     if args.approval_artifact is not None and args.handoff_artifact is None:
         print("[ABORT] --approval-artifact requires --handoff-artifact.")
         return 1
+<<<<<<< HEAD
     if args.retry_approval_artifact is not None and args.retry_decision_artifact is None:
         print("[ABORT] --retry-approval-artifact requires --retry-decision-artifact.")
         return 1
     if args.approval_artifact is not None and args.retry_approval_artifact is not None:
         print("[ABORT] --approval-artifact and --retry-approval-artifact are mutually exclusive.")
         return 1
+=======
+>>>>>>> 542a05d9 (feat: add Higgsfield generation approval contract)
 
     if args.handoff_artifact is not None:
         if args.retry_decision_artifact is not None or args.date or args.slot_id:
@@ -1449,6 +1462,20 @@ def main() -> int:
             return 0 if validation["ok"] else 1
 
         if approval_error is not None:
+<<<<<<< HEAD
+=======
+            return 1
+        if args.approval_artifact is not None:
+            print(
+                "[ABORT] approval_consumption_contract_not_implemented: a validated "
+                "generation approval was supplied, but atomic single-use consumption "
+                "(claim/receipt) is not implemented yet -- live execution remains "
+                "blocked regardless of approval validity."
+            )
+            return 1
+        if not report.get("live_execution_authorized"):
+            print("[ABORT] --live is not authorized by the handoff artifact.")
+>>>>>>> 542a05d9 (feat: add Higgsfield generation approval contract)
             return 1
         if args.approval_artifact is None:
             print(
