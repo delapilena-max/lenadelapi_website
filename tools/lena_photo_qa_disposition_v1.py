@@ -640,8 +640,13 @@ def _validate_manifest_bank_context(
         committed_prompt_brain = _git_show_bytes(authority_commit, PROMPT_BRAIN_PATH)
     except (UnicodeError, json.JSONDecodeError, BoundaryError) as exc:
         raise BoundaryError("provenance_mismatch", f"canonical generation context could not be loaded: {exc}") from exc
-    if PROMPT_BRAIN_PATH.read_bytes() != committed_prompt_brain:
-        raise BoundaryError("provenance_mismatch", "loaded expression fallback implementation differs from committed authority")
+    try:
+        _require_crlf_lf_equivalent(PROMPT_BRAIN_PATH, committed_prompt_brain)
+    except BoundaryError as exc:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "loaded expression fallback implementation differs from committed authority",
+        ) from exc
     pose_by_id = {
         item.get("pose_body_language_id"): item
         for item in pose_bank.get("combos", [])

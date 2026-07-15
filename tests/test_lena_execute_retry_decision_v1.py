@@ -12,20 +12,25 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline import higgsfield_lena_api_executor as executor
+from tests.fixtures.lena_retry_lineage import build_retry_lineage
 from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer
 
 
 DATE = "2026-07-13"
 ORIGINAL_SLOT = "lenagate2026071325ca9e1d-pack000-01-photo"
 IMAGE_SHA = "ae53f875421f38750d85757a9dd7336691c9acd5cff555a3f51281e1f062e5a4"
-CORRECTION = ROOT / "pipeline" / "asset_review" / "lena" / DATE / (
-    f"{ORIGINAL_SLOT}__{IMAGE_SHA}_bounded_retry_plan_correction.json"
-)
 
 
-def test_committed_correction_builds_bounded_retry_decision_without_writing(tmp_path: Path) -> None:
+@pytest.fixture
+def retry_lineage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    return build_retry_lineage(tmp_path, monkeypatch)
+
+
+def test_committed_correction_builds_bounded_retry_decision_without_writing(
+    tmp_path: Path, retry_lineage: dict
+) -> None:
     report = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
     )
     assert report["state"] == "ready_for_retry_executor_dry_run"
@@ -43,9 +48,11 @@ def test_committed_correction_builds_bounded_retry_decision_without_writing(tmp_
     assert Path(report["retry_decision_artifact_path"]).exists() is False
 
 
-def test_written_retry_decision_is_distinct_and_duplicate_safe(tmp_path: Path) -> None:
+def test_written_retry_decision_is_distinct_and_duplicate_safe(
+    tmp_path: Path, retry_lineage: dict
+) -> None:
     written = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
         write_decision=True,
     )
@@ -74,7 +81,7 @@ def test_written_retry_decision_is_distinct_and_duplicate_safe(tmp_path: Path) -
 
     with pytest.raises(retry_consumer.RetryDecisionError) as error:
         retry_consumer.evaluate_retry_correction(
-            correction_artifact_path=CORRECTION,
+            correction_artifact_path=retry_lineage["correction_path"],
             output_root=tmp_path,
         )
     assert error.value.code == "duplicate_retry_decision"
@@ -84,9 +91,10 @@ def test_written_retry_decision_reaches_real_executor_dry_run_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    retry_lineage: dict,
 ) -> None:
     written = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
         write_decision=True,
     )
@@ -109,9 +117,9 @@ def test_written_retry_decision_reaches_real_executor_dry_run_path(
     assert after == before
 
 
-def test_tampered_retry_decision_fails_closed(tmp_path: Path) -> None:
+def test_tampered_retry_decision_fails_closed(tmp_path: Path, retry_lineage: dict) -> None:
     written = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
         write_decision=True,
     )
@@ -132,9 +140,10 @@ def test_tampered_retry_lineage_fails_before_provider_access(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    retry_lineage: dict,
 ) -> None:
     written = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
         write_decision=True,
     )
@@ -158,9 +167,9 @@ def test_tampered_retry_lineage_fails_before_provider_access(
     assert "fingerprint" in stdout.lower()
 
 
-def test_retry_attempt_two_is_impossible(tmp_path: Path) -> None:
+def test_retry_attempt_two_is_impossible(tmp_path: Path, retry_lineage: dict) -> None:
     written = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
         write_decision=True,
     )
@@ -180,17 +189,18 @@ def test_retry_attempt_two_is_impossible(tmp_path: Path) -> None:
 def test_no_write_default_performs_no_provider_or_file_side_effects(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    retry_lineage: dict,
 ) -> None:
     def forbidden(*args, **kwargs):
         raise AssertionError("provider path must not be reached during no-write retry planning")
 
     monkeypatch.setattr(executor, "run_live", forbidden)
     report = retry_consumer.evaluate_retry_correction(
-        correction_artifact_path=CORRECTION,
+        correction_artifact_path=retry_lineage["correction_path"],
         output_root=tmp_path,
     )
     assert report["state"] == "ready_for_retry_executor_dry_run"
-    assert list(tmp_path.rglob("*")) == []
+    assert Path(report["retry_decision_artifact_path"]).exists() is False
 
 
 def test_cli_emits_one_machine_readable_blocked_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

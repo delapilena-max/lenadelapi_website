@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from tests.fixtures.lena_retry_lineage import build_retry_lineage
 from tools import lena_photo_qa_disposition_v1 as disposition
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff
 from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff
@@ -57,6 +58,84 @@ RETRY_IMAGE = ROOT / "pipeline" / "higgsfield_library" / "lena" / RETRY_DATE / f
 RETRY_IDENTITY = ROOT / "pipeline" / "higgsfield_debug" / RETRY_DATE / RETRY_SLOT / "identity_verification.json"
 REFERENCE_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
 MODEL_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_model_authority_v1.json"
+
+
+@pytest.fixture()
+def retry_lineage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    original_disposition_path = disposition.disposition_artifact_path
+    original_validate_decision = disposition._validate_decision
+    original_inspect_image = disposition._inspect_image
+    original_validate_manifest = disposition._validate_manifest
+    lineage = build_retry_lineage(tmp_path, monkeypatch)
+    monkeypatch.setattr(disposition, "disposition_artifact_path", original_disposition_path)
+    monkeypatch.setattr(disposition, "_validate_decision", original_validate_decision)
+    monkeypatch.setattr(disposition, "_inspect_image", original_inspect_image)
+    monkeypatch.setattr(disposition, "_validate_manifest", original_validate_manifest)
+    reference_path = lineage["reference_path"]
+    reference_set_sha = hashlib.sha256(
+        selector._canonical_bytes(
+            {
+                "authority_id": "synthetic_test_reference_authority",
+                "references": [{"path": str(reference_path.resolve()), "sha256": _sha(reference_path)}],
+            }
+        )
+    ).hexdigest()
+
+    def synthetic_reference_authority(specs, authority_path, authority_sha, authority_commit):
+        supplied = list(specs)
+        if authority_path != lineage["reference_authority_artifact"].resolve() or authority_sha != "1" * 64:
+            raise disposition.BoundaryError("identity_evidence_invalid", "synthetic authority evidence rejected")
+        if supplied != [(reference_path, _sha(reference_path))]:
+            raise disposition.BoundaryError("identity_evidence_invalid", "synthetic authority rejected reference set")
+        return (
+            [
+                {
+                    "path": str(reference_path.resolve()),
+                    "sha256": _sha(reference_path),
+                    "format": "PNG",
+                    "width": 64,
+                    "height": 64,
+                }
+            ],
+            reference_set_sha,
+            {
+                "authority_id": "synthetic_test_reference_authority",
+                "authority_artifact_path": str(lineage["reference_authority_artifact"]),
+                "authority_artifact_sha256": "1" * 64,
+                "authority_commit": "a" * 40,
+            },
+        )
+
+    monkeypatch.setattr(disposition, "_validate_references", synthetic_reference_authority)
+    monkeypatch.setattr(
+        identity,
+        "identity_verification_evidence_path",
+        lambda date, slot: lineage["identity_evidence_path"],
+    )
+    monkeypatch.setattr(
+        disposition,
+        "_validate_model_authority",
+        lambda *args: {
+            "path": str(lineage["model_authority_artifact"]),
+            "sha256": "2" * 64,
+            "provider": "anthropic",
+            "approved_model": "exact-test-model",
+        },
+    )
+    monkeypatch.setattr(
+        disposition,
+        "_load_canonical_rubric",
+        lambda commit: {
+            "authority_commit": commit,
+            "required_semantic_dimensions": {
+                "identity": ["face"],
+                "character_fit": ["confident"],
+            },
+        },
+    )
+    monkeypatch.setattr(disposition, "_validate_manifest_bank_context", lambda manifest, candidate, commit: None)
+    lineage["reference_set_sha"] = reference_set_sha
+    return lineage
 
 
 @pytest.fixture()
@@ -270,24 +349,24 @@ def test_accept_disposition_is_bound_and_not_publish_ready(harness) -> None:
     assert result["image_sha256"] == _sha(harness["image_path"])
 
 
-def test_retry_lineage_reaches_no_provider_qa_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_lineage_reaches_no_provider_qa_dry_run(
+    monkeypatch: pytest.MonkeyPatch,
+    retry_lineage: dict,
+) -> None:
     monkeypatch.setattr(
         disposition,
         "_validate_manifest_bank_context",
         lambda manifest, candidate, commit: None,
     )
     result = disposition.evaluate_photo_qa_disposition(
-        decision_path=RETRY_DECISION,
-        manifest_path=RETRY_MANIFEST,
-        image_path=RETRY_IMAGE,
-        expected_image_sha256=RETRY_IMAGE_SHA,
-        identity_evidence_path=RETRY_IDENTITY,
-        reference_specs=[(
-            ROOT / "pipeline" / "higgsfield_library" / "lena" / "2026-07-09" / "prompt_isolation_tests" / "readypack0709-pack004-08-wardrobe-test-c_seed.png",
-            "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb",
-        )],
-        reference_authority_artifact=REFERENCE_AUTHORITY,
-        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        decision_path=retry_lineage["retry_decision_path"],
+        manifest_path=retry_lineage["retry_manifest_path"],
+        image_path=retry_lineage["image_path"],
+        expected_image_sha256=retry_lineage["retry_image_sha"],
+        identity_evidence_path=retry_lineage["identity_evidence_path"],
+        reference_specs=[(retry_lineage["reference_path"], _sha(retry_lineage["reference_path"]))],
+        reference_authority_artifact=retry_lineage["reference_authority_artifact"],
+        reference_authority_sha256=retry_lineage["reference_authority_sha256"],
         failure_memory_loader=lambda: {
             "pattern_counts": {},
             "soft_flagged_patterns": [],
@@ -299,8 +378,8 @@ def test_retry_lineage_reaches_no_provider_qa_dry_run(monkeypatch: pytest.Monkey
     assert result["reason_codes"] == ["visual_review_unavailable"]
     assert result["provider_called"] is False
     assert result["qa_inputs"]["decision_kind"] == "retry_decision"
-    assert result["decision_fingerprint_sha256"] == "ad559b7b3eaa29ad4a70d991990c0bea6c8d0bf8eaff696d18cf4af85d9ce130"
-    assert result["generation_provenance"]["manifest_path"] == str(RETRY_MANIFEST.resolve())
+    assert result["decision_fingerprint_sha256"] == retry_lineage["retry_decision"]["retry_decision_fingerprint_sha256"]
+    assert result["generation_provenance"]["manifest_path"] == str(retry_lineage["retry_manifest_path"].resolve())
 
 
 def test_original_selected_candidate_no_provider_behavior_is_unchanged(harness) -> None:
@@ -1063,65 +1142,65 @@ def test_canonical_rubric_and_exact_bindings_reach_single_mocked_call(harness) -
     assert "second lena-like identity" in json.dumps(request["scene_context"]).lower()
 
 
-def test_tampered_retry_decision_fingerprint_fails_before_provider_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    tampered = tmp_path / RETRY_DECISION.name
-    artifact = json.loads(RETRY_DECISION.read_text(encoding="utf-8-sig"))
+def test_tampered_retry_decision_fingerprint_fails_before_provider_access(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    retry_lineage: dict,
+) -> None:
+    tampered = tmp_path / retry_lineage["retry_decision_path"].name
+    artifact = json.loads(retry_lineage["retry_decision_path"].read_text(encoding="utf-8-sig"))
     artifact["retry_decision_fingerprint_sha256"] = "0" * 64
     _write_json(tampered, artifact)
     calls: list[dict] = []
     monkeypatch.setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request) or _all_pass())
     result = disposition.evaluate_photo_qa_disposition(
         decision_path=tampered,
-        manifest_path=RETRY_MANIFEST,
-        image_path=RETRY_IMAGE,
-        expected_image_sha256=RETRY_IMAGE_SHA,
-        identity_evidence_path=RETRY_IDENTITY,
-        reference_specs=[],
-        reference_authority_artifact=REFERENCE_AUTHORITY,
-        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        manifest_path=retry_lineage["retry_manifest_path"],
+        image_path=retry_lineage["image_path"],
+        expected_image_sha256=retry_lineage["retry_image_sha"],
+        identity_evidence_path=retry_lineage["identity_evidence_path"],
+        reference_specs=[(retry_lineage["reference_path"], _sha(retry_lineage["reference_path"]))],
+        reference_authority_artifact=retry_lineage["reference_authority_artifact"],
+        reference_authority_sha256=retry_lineage["reference_authority_sha256"],
         live_visual_review=True,
         visual_provider="anthropic",
-        visual_model=disposition.APPROVED_VISUAL_MODEL,
-        visual_model_authority_artifact=MODEL_AUTHORITY,
-        visual_model_authority_sha256=_sha(MODEL_AUTHORITY),
+        visual_model="exact-test-model",
+        visual_model_authority_artifact=retry_lineage["model_authority_artifact"],
+        visual_model_authority_sha256=retry_lineage["model_authority_sha256"],
         expected_decision_fingerprint="0" * 64,
-        expected_reference_set_sha256="0" * 64,
+        expected_reference_set_sha256=retry_lineage["reference_set_sha"],
     )
     assert calls == []
     assert result["reason_codes"] == ["decision_binding_mismatch"]
 
 
-def test_tampered_retry_manifest_fails_before_provider_access(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(
-        disposition,
-        "_validate_manifest_bank_context",
-        lambda manifest, candidate, commit: None,
-    )
+def test_tampered_retry_manifest_fails_before_provider_access(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    retry_lineage: dict,
+) -> None:
     tampered = tmp_path / "result_manifest.json"
-    manifest = json.loads(RETRY_MANIFEST.read_text(encoding="utf-8-sig"))
+    manifest = json.loads(retry_lineage["retry_manifest_path"].read_text(encoding="utf-8-sig"))
     manifest["retry_execution_contract"]["retry_decision_fingerprint_sha256"] = "0" * 64
     _write_json(tampered, manifest)
     calls: list[dict] = []
     monkeypatch.setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request) or _all_pass())
     result = disposition.evaluate_photo_qa_disposition(
-        decision_path=RETRY_DECISION,
+        decision_path=retry_lineage["retry_decision_path"],
         manifest_path=tampered,
-        image_path=RETRY_IMAGE,
-        expected_image_sha256=RETRY_IMAGE_SHA,
-        identity_evidence_path=RETRY_IDENTITY,
-        reference_specs=[(
-            ROOT / "pipeline" / "higgsfield_library" / "lena" / "2026-07-09" / "prompt_isolation_tests" / "readypack0709-pack004-08-wardrobe-test-c_seed.png",
-            "7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb",
-        )],
-        reference_authority_artifact=REFERENCE_AUTHORITY,
-        reference_authority_sha256=_sha(REFERENCE_AUTHORITY),
+        image_path=retry_lineage["image_path"],
+        expected_image_sha256=retry_lineage["retry_image_sha"],
+        identity_evidence_path=retry_lineage["identity_evidence_path"],
+        reference_specs=[(retry_lineage["reference_path"], _sha(retry_lineage["reference_path"]))],
+        reference_authority_artifact=retry_lineage["reference_authority_artifact"],
+        reference_authority_sha256=retry_lineage["reference_authority_sha256"],
         live_visual_review=True,
         visual_provider="anthropic",
-        visual_model=disposition.APPROVED_VISUAL_MODEL,
-        visual_model_authority_artifact=MODEL_AUTHORITY,
-        visual_model_authority_sha256=_sha(MODEL_AUTHORITY),
-        expected_decision_fingerprint="ad559b7b3eaa29ad4a70d991990c0bea6c8d0bf8eaff696d18cf4af85d9ce130",
-        expected_reference_set_sha256="f75b124c7738ee858375bfd45bd46ad5427e29b0e10ac819f289af648627b3d8",
+        visual_model="exact-test-model",
+        visual_model_authority_artifact=retry_lineage["model_authority_artifact"],
+        visual_model_authority_sha256=retry_lineage["model_authority_sha256"],
+        expected_decision_fingerprint=retry_lineage["retry_decision"]["retry_decision_fingerprint_sha256"],
+        expected_reference_set_sha256=retry_lineage["reference_set_sha"],
     )
     assert calls == []
     assert result["reason_codes"] == ["provenance_mismatch"]

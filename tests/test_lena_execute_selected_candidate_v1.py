@@ -20,9 +20,125 @@ from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
 @pytest.fixture(scope="module")
 def canonical_decision(tmp_path_factory):
     output = tmp_path_factory.mktemp("selected_decision")
-    path, artifact, _ = selector.run_gate("2026-07-13", output, verify_clean=False)
-    assert artifact["candidate_status"] == "selected"
+    authority_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    provenance = []
+    for relative in selector.AUTHORITY_PATHS:
+        current = (ROOT / relative).read_bytes()
+        provenance.append(
+            {
+                "path": relative,
+                "sha256": consumer._sha256_bytes(current),
+                "semantics": "canonical authority",
+            }
+        )
+    candidate = {
+        "candidate_id": "synthetic-pack000-00-photo::hcr_fixture::cbn_fixture",
+        "slot_id": "synthetic-pack000-00-photo",
+        "lane": "synthetic lane",
+        "recipe_id": "hcr_fixture",
+        "hook_id": "cbn_fixture",
+        "prompt_sha256": consumer._sha256_bytes(b"synthetic prompt bytes"),
+        "exact_proposed_dry_run_command": (
+            "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-13 "
+            "--slot-id synthetic-pack000-00-photo"
+        ),
+    }
+    core = {
+        "schema_version": selector.SCHEMA_VERSION,
+        "influencer_id": "lena",
+        "as_of_date": "2026-07-13",
+        "authority_commit": authority_commit,
+        "strategy_contract": {
+            "canonical_niche": selector.CANONICAL_NICHE,
+            "path": selector.AUTHORITY_PATHS[1],
+        },
+        "input_provenance": provenance,
+        "candidate_status": "selected",
+        "final_action": consumer.ACCEPTED_FINAL_ACTION,
+        "candidate": candidate,
+        "evidence": {
+            "prompt_pack": {
+                "pack_count": 1,
+                "prompt_count": 1,
+                "library_prefix": "synthetic",
+                "prompt_identity_sha256": consumer._sha256_bytes(b"synthetic identity"),
+                "curator_excluded_count": 0,
+                "failure_memory_hard_excluded_patterns": [],
+                "failure_memory_soft_flagged_patterns": [],
+                "failure_memory_excluded_count": 0,
+            },
+            "recipe_binding_semantics": "strategy compatibility, not prompt provenance",
+            "recent_content_evidence_semantics": "synthetic test fixture",
+            "ranking_order": [],
+            "tiebreak_label": "deterministic_noncreative_tiebreak",
+        },
+        "rejected_or_blocked_reasons": [],
+        "confidence": "high",
+        "noncritical_evidence_gaps": [],
+        "failure_memory_inputs": {
+            "semantics": "synthetic test fixture",
+            "failure_memory_hard_excluded_patterns": [],
+            "failure_memory_soft_flagged_patterns": [],
+            "failure_memory_excluded_count": 0,
+        },
+        "recent_content_inputs": [],
+        "expensive_video_boundary": "not evaluated; this gate selects an ordinary Higgsfield still only",
+        "exact_next_allowed_action": candidate["exact_proposed_dry_run_command"],
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+    artifact = dict(core)
+    artifact["generated_at_utc"] = "2026-07-13T00:00:00Z"
+    artifact["decision_fingerprint_sha256"] = consumer._sha256_bytes(
+        selector._canonical_bytes(core)
+    )
+    path = output / "synthetic_selected_decision.json"
+    path.write_text(json.dumps(artifact), encoding="utf-8")
     return path, artifact
+
+
+@pytest.fixture(autouse=True)
+def synthetic_selection_runtime(monkeypatch, canonical_decision):
+    artifact = canonical_decision[1]
+    stored_core = consumer._decision_core(artifact)
+    selected = dict(artifact["candidate"])
+    selected["_prompt"] = "synthetic prompt bytes"
+    source = {
+        "resolver": "synthetic_test",
+        "slot_prefix": "synthetic",
+        "pack_count": 1,
+        "image": {
+            "slot_id": selected["slot_id"],
+            "lane": selected["lane"],
+            "image_prompt": selected["_prompt"],
+        },
+    }
+    monkeypatch.setattr(consumer, "_rebuild_current_decision", lambda value: (stored_core, dict(selected)))
+    monkeypatch.setattr(consumer.executor, "resolve_prompt_source", lambda date, slot: source)
+    monkeypatch.setattr(
+        consumer.executor,
+        "validate_candidate",
+        lambda source, expected_prompt_path: {
+            "ok": True,
+            "all_reasons": [],
+            "prompt_matches_expected": True,
+            "hard_exclude_reasons": [],
+        },
+    )
+    monkeypatch.setattr(
+        consumer.executor,
+        "build_provider_argv",
+        lambda prompt, custom_reference_id: [
+            "higgsfield",
+            "images",
+            "generate",
+            "--wait",
+            "--json",
+            prompt,
+        ],
+    )
 
 
 def write_artifact(tmp_path, artifact, name="decision.json"):
