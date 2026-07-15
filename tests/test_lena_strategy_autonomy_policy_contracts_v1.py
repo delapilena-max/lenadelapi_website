@@ -16,6 +16,7 @@ REALISM_POLICY = NODE / "life_engine_realism_memory_policy_v1.json"
 AUTONOMY_GATE_POLICY = NODE / "strategy_autonomy_gate_policy_v1.json"
 WORLD_CONTINUITY_POLICY = NODE / "world_continuity_policy_v1.json"
 ENGAGEMENT_SELECTION_POLICY = NODE / "engagement_selection_policy_v1.json"
+AUTONOMY_LADDER_CONTRACT = NODE / "autonomy_ladder_v1.json"
 DAILY_CADENCE = NODE / "daily_cadence.json"
 CONTENT_BUCKETS = NODE / "content_buckets.json"
 GENERATION_POLICY = ROOT / "pipeline" / "config" / "lena_generation_policy.json"
@@ -34,6 +35,7 @@ def test_policy_files_parse_as_static_json_source() -> None:
         AUTONOMY_GATE_POLICY,
         WORLD_CONTINUITY_POLICY,
         ENGAGEMENT_SELECTION_POLICY,
+        AUTONOMY_LADDER_CONTRACT,
         DAILY_CADENCE,
         CONTENT_BUCKETS,
         GENERATION_POLICY,
