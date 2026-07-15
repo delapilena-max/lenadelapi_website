@@ -1,0 +1,20 @@
+{
+  "version": "v1.6.1",
+  "weights": {
+    "shares": 4,
+    "saves": 3,
+    "comments": 2.5,
+    "follows": 5,
+    "profile_visits": 2,
+    "likes": 1,
+    "completion_rate": 25,
+    "replay_rate": 20
+  },
+  "classification": {
+    "winner": 75,
+    "strong": 50,
+    "neutral": 25,
+    "weak": 0
+  },
+  "notes": "Directional score for comparing Lena posts against Lena posts."
+}

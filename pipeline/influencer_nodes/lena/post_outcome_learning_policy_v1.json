@@ -1,0 +1,25 @@
+{
+  "version": "v1.0.0",
+  "name": "Lena Post Outcome Learning Policy",
+  "purpose": "Turn logged manual posts, post metrics, and publish state into a canonical post-outcome memory that can promote strong recipes and flag missing operational follow-through.",
+  "manual_post_log_path": "pipeline/analytics/lena_manual_post_log_v2_7.csv",
+  "post_metrics_path": "pipeline/analytics/lena_post_metrics_v1_6_1.csv",
+  "publish_state_path": "pipeline/state/lena_r2_publish_state.json",
+  "state_path": "pipeline/state/lena_post_outcome_learning_state_v1.json",
+  "report_dir": "pipeline/strategy/lena/next_actions",
+  "winner_classifications": ["winner", "strong"],
+  "pending_classifications": ["pending"],
+  "queue_scoring": {
+    "winner_boost": 22,
+    "strong_boost": 14,
+    "neutral_boost": 4,
+    "recent_followup_bonus": 6
+  },
+  "freshness_windows": {
+    "followup_days": 3,
+    "metrics_stale_days": 4
+  },
+  "operational_alerts": {
+    "stale_pending_metrics_threshold": 1
+  }
+}
