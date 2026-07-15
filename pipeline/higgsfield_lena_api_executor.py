@@ -621,6 +621,172 @@ def _write_generation_execution_receipt(
     }
 
 
+def execute_approved_handoff_live_generation(
+    context: dict[str, Any],
+    *,
+    custom_reference_id: str | None = None,
+    live_executor: Callable[[str, str, dict, str], dict] | None = None,
+) -> dict[str, Any]:
+    """Execute one approved live generation using a validated context.
+
+    The caller is responsible for validating the handoff and approval
+    artifacts and for providing the resolved execution context. This helper
+    keeps the claim/receipt/manifest lifecycle in one place so wrappers can
+    stay thin without duplicating execution semantics.
+    """
+    approval_result = context["approval_result"]
+    handoff_facts = approval_result["handoff_facts"]
+    date_str = str(context["date"])
+    slot_id = str(context["slot_id"])
+    source = context["source"]
+    resolved_custom_reference_id = custom_reference_id or str(context["custom_reference_id"])
+    manifest_repo_path = context["manifest_path"]
+
+    claim_info = _create_generation_claim(approval_result)
+    claim_path = Path(claim_info["claim_path"])
+
+    result: dict[str, Any] = {
+        "ok": False,
+        "date": date_str,
+        "slot_id": slot_id,
+        "recipe_id": str(context["recipe_id"]),
+        "selected_slot_id": slot_id,
+        "selected_recipe_id": str(context.get("recipe_id") or ""),
+        "claim_info": claim_info,
+        "claim_path": claim_path.resolve(),
+        "claim_repo_path": claim_info["claim_repo_path"],
+        "manifest_path": Path(manifest_repo_path).resolve(),
+        "manifest_repo_path": _repo_relative_path(Path(manifest_repo_path)),
+        "receipt_info": None,
+        "receipt_path": None,
+        "receipt_repo_path": None,
+        "live_result": None,
+        "provider_submission_may_have_occurred": False,
+        "subprocess_start_attempted": False,
+        "provider_call_performed": False,
+        "generation_performed": False,
+        "manifest_written": False,
+        "claim_written": True,
+        "receipt_written": False,
+        "failure_stage": None,
+        "failure_error_text": None,
+        "failure_provider_job_id": None,
+        "failure_provider_status": None,
+        "failure_output_path": None,
+        "failure_image_format_detected": None,
+        "publish_authorized": False,
+        "publish_performed": False,
+        "queue_mutated": False,
+        "qa_run": False,
+        "retry_executed": False,
+        "dirty_workspace_dependency": False,
+    }
+
+    live_executor = live_executor or run_live
+
+    try:
+        live_result = live_executor(date_str, slot_id, source, resolved_custom_reference_id)
+    except Exception as exc:
+        failure_stage = getattr(exc, "stage", "provider_failure")
+        subprocess_start_attempted = bool(getattr(exc, "subprocess_start_attempted", False))
+        provider_submission_may_have_occurred = bool(getattr(exc, "provider_submission_may_have_occurred", False))
+        provider_job_id = getattr(exc, "provider_job_id", None)
+        provider_status = getattr(exc, "provider_status", None)
+        output_path = getattr(exc, "output_path", None)
+        image_format_detected = getattr(exc, "image_format_detected", None)
+        result.update(
+            {
+                "provider_submission_may_have_occurred": provider_submission_may_have_occurred,
+                "subprocess_start_attempted": subprocess_start_attempted,
+                "provider_call_performed": provider_submission_may_have_occurred,
+                "failure_stage": failure_stage,
+                "failure_error_text": _sanitize_operational_error_text(exc),
+                "failure_provider_job_id": provider_job_id,
+                "failure_provider_status": provider_status,
+                "failure_output_path": output_path,
+                "failure_image_format_detected": image_format_detected,
+            }
+        )
+        try:
+            receipt_info = _write_generation_execution_receipt(
+                claim_path,
+                approval_result,
+                outcome="execution_failed",
+                failure_stage=failure_stage,
+                error_text=result["failure_error_text"],
+                subprocess_start_attempted=subprocess_start_attempted,
+                provider_submission_may_have_occurred=provider_submission_may_have_occurred,
+                provider_job_id=provider_job_id,
+                provider_status=provider_status,
+                output_path=output_path,
+                image_format_detected=image_format_detected,
+                actual_manifest_path=None,
+            )
+        except Exception as receipt_exc:
+            result["receipt_info"] = None
+            result["receipt_written"] = False
+            result["failure_error_text"] = (
+                f"{result['failure_error_text']} (receipt write failed: {_sanitize_operational_error_text(receipt_exc)})"
+            )
+            return result
+
+        result.update(
+            {
+                "receipt_info": receipt_info,
+                "receipt_path": receipt_info["receipt_path"],
+                "receipt_repo_path": receipt_info["receipt_repo_path"],
+                "receipt_written": True,
+            }
+        )
+        return result
+
+    result["live_result"] = live_result
+    result["provider_submission_may_have_occurred"] = bool(live_result.get("provider_submission_may_have_occurred"))
+    result["subprocess_start_attempted"] = bool(live_result.get("subprocess_start_attempted"))
+    result["provider_call_performed"] = bool(live_result.get("provider_submission_may_have_occurred"))
+    result["generation_performed"] = bool(live_result.get("saved_image_path"))
+
+    receipt_info = _write_generation_execution_receipt(
+        claim_path,
+        approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=result["subprocess_start_attempted"],
+        provider_submission_may_have_occurred=result["provider_submission_may_have_occurred"],
+        provider_job_id=live_result.get("job_id"),
+        provider_status=live_result.get("status"),
+        output_path=live_result.get("saved_image_path"),
+        image_format_detected=live_result.get("image_format_detected"),
+        actual_manifest_path=_repo_relative_path(Path(manifest_repo_path)),
+    )
+    manifest = build_manifest(
+        date_str,
+        slot_id,
+        source,
+        resolved_custom_reference_id,
+        live_result,
+        claim_repo_path=claim_info["claim_repo_path"],
+        receipt_repo_path=receipt_info["receipt_repo_path"],
+    )
+    manifest_path_obj = Path(manifest_repo_path)
+    manifest_path_obj.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path_obj.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    result.update(
+        {
+            "ok": True,
+            "receipt_info": receipt_info,
+            "receipt_path": receipt_info["receipt_path"],
+            "receipt_repo_path": receipt_info["receipt_repo_path"],
+            "receipt_written": True,
+            "manifest_record": manifest,
+            "manifest_written": True,
+        }
+    )
+    return result
+
+
 def _validate_retry_approval_artifact(retry_handoff_path: Path, approval_path: Path) -> dict[str, Any]:
     from tools.lena_higgsfield_retry_generation_approval_v1 import (  # noqa: E402
         HiggsfieldRetryGenerationApprovalError,
@@ -1476,90 +1642,53 @@ def main() -> int:
                 "rewritten into live authorization."
             )
             return 1
+        from tools.lena_higgsfield_generation_approval_v1 import claim_output_path, receipt_output_path  # noqa: E402
+
+        execution_context = {
+            "date": report["date"],
+            "slot_id": report["selected_slot_id"],
+            "recipe_id": report["selected_recipe_id"],
+            "handoff_report": report,
+            "source": source,
+            "packet_validation": packet_validation,
+            "validation": validation,
+            "approval_result": approval_result,
+            "claim_path": claim_output_path(report["date"], report["selected_slot_id"]),
+            "receipt_path": receipt_output_path(report["date"], report["selected_slot_id"]),
+            "manifest_path": manifest_path(report["date"], report["selected_slot_id"]),
+            "handoff_artifact": args.handoff_artifact,
+            "approval_artifact": args.approval_artifact,
+            "custom_reference_id": args.custom_reference_id,
+        }
         try:
-            claim_info = _create_generation_claim(approval_result)
+            execution_result = execute_approved_handoff_live_generation(
+                execution_context,
+                custom_reference_id=args.custom_reference_id,
+                live_executor=run_live,
+            )
         except Exception as exc:
             code = getattr(exc, "code", "generation_claim_creation_failed")
             print(f"[ABORT] claim creation failed: {code}: {exc}")
             return 1
-        claim_path = Path(claim_info["claim_path"])
-        manifest_repo_path = _repo_relative_path(manifest_path(report["date"], report["selected_slot_id"]))
-        try:
-            live_result = run_live(report["date"], report["selected_slot_id"], source, args.custom_reference_id)
-        except ProviderCallError as exc:
-            try:
-                receipt_info = _write_generation_execution_receipt(
-                    claim_path,
-                    approval_result,
-                    outcome="execution_failed",
-                    failure_stage=exc.stage,
-                    error_text=_sanitize_operational_error_text(exc),
-                    subprocess_start_attempted=exc.subprocess_start_attempted,
-                    provider_submission_may_have_occurred=exc.provider_submission_may_have_occurred,
-                    provider_job_id=exc.provider_job_id,
-                    provider_status=exc.provider_status,
-                    output_path=exc.output_path,
-                    image_format_detected=exc.image_format_detected,
-                    actual_manifest_path=None,
-                )
-            except Exception as receipt_exc:
-                print(f"[FAILED] {exc}")
-                print(
-                    "[FAILED] claim retained but execution receipt could not be "
-                    f"written: {getattr(receipt_exc, 'code', 'generation_execution_receipt_write_failed')}: {receipt_exc}"
-                )
-                print("[FAILED] Manual reconciliation required before any new approval is used.")
-                return 1
-            print(f"[FAILED] {exc}")
-            print(f"[FAILED] execution receipt written: {receipt_info['receipt_repo_path']}")
+        if not execution_result["ok"]:
+            print(f"[FAILED] {execution_result['failure_error_text']}")
+            if execution_result.get("receipt_written"):
+                receipt_info = execution_result["receipt_info"] or {}
+                receipt_repo_path = receipt_info.get("receipt_repo_path") or execution_result.get("receipt_repo_path")
+                print(f"[FAILED] execution receipt written: {receipt_repo_path}")
+            else:
+                print("[FAILED] claim retained but execution receipt could not be written.")
             print("[FAILED] Claim retained; manual reconciliation or a new approval is required.")
             return 1
-        try:
-            receipt_info = _write_generation_execution_receipt(
-                claim_path,
-                approval_result,
-                outcome="success",
-                failure_stage=None,
-                error_text=None,
-                subprocess_start_attempted=bool(live_result.get("subprocess_start_attempted")),
-                provider_submission_may_have_occurred=bool(live_result.get("provider_submission_may_have_occurred")),
-                provider_job_id=live_result.get("job_id"),
-                provider_status=live_result.get("status"),
-                output_path=live_result.get("saved_image_path"),
-                image_format_detected=live_result.get("image_format_detected"),
-                actual_manifest_path=manifest_repo_path,
-            )
-        except Exception as receipt_exc:
-            print(
-                "[FAILED] live generation succeeded, but execution receipt creation "
-                f"failed: {getattr(receipt_exc, 'code', 'generation_execution_receipt_write_failed')}: {receipt_exc}"
-            )
-            print("[FAILED] Claim retained; manual reconciliation required before any new approval is used.")
-            return 1
-        manifest = build_manifest(
-            report["date"],
-            report["selected_slot_id"],
-            source,
-            args.custom_reference_id,
-            live_result,
-            claim_repo_path=claim_info["claim_repo_path"],
-            receipt_repo_path=receipt_info["receipt_repo_path"],
-        )
-        mpath = manifest_path(report["date"], report["selected_slot_id"])
-        try:
-            mpath.parent.mkdir(parents=True, exist_ok=True)
-            mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-        except Exception as exc:
-            print(
-                "[FAILED] execution receipt written but manifest creation failed: "
-                f"{_sanitize_operational_error_text(exc)}"
-            )
-            print("[FAILED] Claim and receipt were retained. No provider retry was attempted.")
-            return 1
+
+        live_result = execution_result["live_result"] or {}
+        claim_info = execution_result["claim_info"] or {}
+        receipt_info = execution_result["receipt_info"] or {}
+        manifest_repo_path = execution_result["manifest_repo_path"]
         print(f"[LIVE] saved image     : {live_result['saved_image_path']}")
         print(f"[LIVE] claim written    : {claim_info['claim_repo_path']}")
         print(f"[LIVE] receipt written  : {receipt_info['receipt_repo_path']}")
-        print(f"[LIVE] manifest written: {mpath}")
+        print(f"[LIVE] manifest written: {manifest_repo_path}")
         return 0
 
     if args.retry_decision_artifact is not None:
