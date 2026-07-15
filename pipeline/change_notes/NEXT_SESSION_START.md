@@ -80,7 +80,53 @@ five conditions are met and he confirms it explicitly.
 >
 > This banner controls wherever older dated sections below conflict with the
 > current technical state. Older banners remain historical evidence and
-> should be retained, not rewritten. Current HEAD is `47469bc2`
+> should be retained, not rewritten.
+>
+> ## CURRENT CHECKPOINT: STRATEGY AUTHORITY RECONCILIATION BLOCKED BEFORE NO-LIVE HIGGSFIELD PROOF (2026-07-14)
+>
+> This newer 2026-07-14 banner controls wherever older dated sections below
+> conflict with the current technical state. Older banners remain historical
+> evidence and should be retained, not rewritten. Current HEAD is
+> `c4eb065d73d41578be0ba2387feccc2e59da3c82`.
+>
+> **Recent committed checkpoints:**
+> - `47469bc2` implemented atomic single-use Higgsfield approval claims and immutable execution receipts.
+> - `cba3fe9f` updated the Claude/Higgsfield execution-boundary continuity documentation.
+> - `c4eb065d` authority-tracked:
+>   - `tools/lena_strategy_autonomy_run_v1.py`
+>   - `tools/strategy/lena_build_autonomous_generation_queue_dryrun_v1.py`
+>   - four required Lena strategy/learning policy JSON files
+>   - focused controller, queue, and policy-contract tests
+>
+> **Maintained test baseline after that checkpoint:** `871 passed, 2 skipped`
+>
+> **Current truth:**
+> - The controller remains quarantined/non-production.
+> - No live generation, upload, queue promotion, or publishing occurred.
+> - The requested strategy-to-Higgsfield dry-run was not executed because it would consume dirty or untracked authoritative inputs.
+> - Do not claim the end-to-end no-live proof has passed.
+>
+> **Runtime/local-state truth:**
+> - Runtime state files remain intentionally untracked and must be treated as hash-recorded local inputs.
+> - `pipeline/state/lena_meta_feedback_ingestion_state_v1.json`
+> - `pipeline/state/lena_world_state_v1.json`
+>
+> **Current blockers before the no-live proof:**
+> - Prompt authority remains blocked by modified `pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json`.
+> - Prompt authority remains blocked by modified `tools/strategy/lena_build_content_packet_dryrun_v1.py`.
+> - Provider routing remains blocked by stale hardcoded Kling payload requirements.
+> - The deleted/missing Kling builders must not be restored merely to make the Higgsfield path run.
+> - Full status also revealed three additional untracked direct strategy dependencies requiring authority audit:
+>   - `tools/strategy/lena_audit_autonomous_generation_readiness_v1.py`
+>   - `tools/strategy/lena_build_engagement_demand_state_v1.py`
+>   - `tools/strategy/lena_build_world_state_v1.py`
+> - A recursive read-only authority audit is the next technical task.
+> - Commercialization remains parked until the engine works correctly.
+>
+> ## HISTORICAL CHECKPOINT: HIGGSFIELD STILL-IMAGE EXECUTION CHAIN IS DETERMINISTIC THROUGH APPROVAL, ATOMIC CONSUMPTION, AND RECEIPT (2026-07-14)
+>
+> This older 2026-07-14 banner remains historical evidence. At the time of
+> that checkpoint, HEAD was `47469bc2`
 > (`feat: consume Higgsfield generation approvals atomically`).
 >
 > **Committed technical chain in order:**
