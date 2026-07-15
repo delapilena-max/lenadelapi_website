@@ -387,6 +387,7 @@ def canonical_state_payload(
     state_path: Path,
 ) -> dict:
     controls = report.get("queue_rotation_controls", {})
+    state_path_value = state_path.relative_to(ROOT).as_posix() if state_path.is_absolute() else state_path.as_posix()
     return {
         "version": "v1",
         "updated_at": report.get("generated_at", ""),
@@ -400,7 +401,7 @@ def canonical_state_payload(
         "deprioritized_recipe_ids": controls.get("deprioritized_recipe_ids", []),
         "preferred_rotation_recipe_ids": controls.get("prefer_recipe_ids", []),
         "recent_counts": report.get("continuity_snapshot", {}).get("recent_counts", {}),
-        "state_path": str(state_path),
+        "state_path": state_path_value,
     }
 
 
