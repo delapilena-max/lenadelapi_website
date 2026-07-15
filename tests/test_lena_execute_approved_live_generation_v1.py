@@ -375,6 +375,70 @@ def test_failure_after_provider_submission_is_accounted(
     assert wrapper.report_path(DATE, SLOT_ID).is_file()
 
 
+def test_failure_when_receipt_write_itself_fails_is_accounted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    handoff_path = _touch(tmp_path / "handoff.json")
+    approval_path = _touch(tmp_path / "approval.json")
+
+    claim_path = approval.claim_output_path(DATE, SLOT_ID)
+
+    def fake_context_loader(*_args: object) -> dict[str, object]:
+        ctx = _context_loader(tmp_path)
+        ctx["claim_path"] = claim_path
+        ctx["approval_artifact"] = approval_path
+        ctx["handoff_artifact"] = handoff_path
+        return ctx
+
+    def fake_run_live(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise executor.ProviderCallError(
+            "provider may have received the request",
+            stage="post_submission",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id="job-789",
+            provider_status="running",
+            output_path=str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
+            image_format_detected=".png",
+        )
+
+    def failing_receipt_writer(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("receipt disk write failed")
+
+    monkeypatch.setattr(executor, "_write_generation_execution_receipt", failing_receipt_writer)
+
+    report = wrapper.execute_approved_live_generation(
+        handoff_path,
+        approval_path,
+        live=True,
+        live_executor=fake_run_live,
+        context_loader=fake_context_loader,
+    )
+
+    assert report["live_generation_accounting_status"] == "live_generation_failed_accounted"
+    assert report["failure_stage"] == "post_submission"
+    assert report["provider_submission_may_have_occurred"] is True
+    assert report["claim_written"] is True
+    assert report["receipt_written"] is False
+    assert report["publish_authorized"] is False
+    assert report["publish_performed"] is False
+    assert report["queue_mutated"] is False
+    assert report["qa_disposition_required"] is True
+    assert report["next_allowed_action"] == "review_live_generation_failure"
+    assert "receipt write failed" in report["failure_error_text"]
+    assert report["side_effect_flags"]["provider_call_performed"] is True
+    assert report["side_effect_flags"]["claims_written"] is True
+    assert report["side_effect_flags"]["receipts_written"] is False
+    assert report["side_effect_flags"]["publish_performed"] is False
+    assert report["side_effect_flags"]["queue_mutated"] is False
+    assert report["side_effect_flags"]["qa_run"] is False
+    assert report["side_effect_flags"]["retry_executed"] is False
+    assert claim_path.is_file()
+    assert not approval.receipt_output_path(DATE, SLOT_ID).is_file()
+    assert wrapper.report_path(DATE, SLOT_ID).is_file()
+
+
 def test_wrapper_source_does_not_import_publish_queue_qa_or_retry_helpers() -> None:
     source = Path(wrapper.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
