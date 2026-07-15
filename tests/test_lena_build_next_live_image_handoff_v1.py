@@ -13,8 +13,12 @@ DATE = "2026-07-13"
 SLOT_ID = "lenagate2026071325ca9e1d-pack000-01-photo"
 RECIPE_ID = "hcr_006"
 EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
-DRY_RUN_COMMAND = f"python {EXECUTOR_PATH} --date {DATE} --slot-id {SLOT_ID}"
-LIVE_COMMAND = f"{DRY_RUN_COMMAND} --live"
+HANDOFF_PATH = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
+HANDOFF_MD_PATH = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.md"
+LEGACY_DRY_RUN_COMMAND = f"python {EXECUTOR_PATH} --date {DATE} --slot-id {SLOT_ID}"
+HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact {HANDOFF_PATH}"
+LIVE_COMMAND = f"{HANDOFF_COMMAND} --live"
+PROMPT_INPUT_PATH = f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_25ca9e1d_128799286987.json"
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -113,7 +117,7 @@ def _queue_payload(recipe_id: str = RECIPE_ID) -> dict:
     }
 
 
-def _candidate_payload(command: str = DRY_RUN_COMMAND) -> dict:
+def _candidate_payload(command: str = LEGACY_DRY_RUN_COMMAND) -> dict:
     candidate = {
         "activity": "stepping out near the entrance of a low-lit lounge.",
         "candidate_id": f"{SLOT_ID}::hcr_006::cbn_004",
@@ -171,7 +175,7 @@ def _candidate_payload(command: str = DRY_RUN_COMMAND) -> dict:
     }
 
 
-def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, command: str = DRY_RUN_COMMAND) -> tuple[Path, Path, Path, Path]:
+def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, command: str = LEGACY_DRY_RUN_COMMAND) -> tuple[Path, Path, Path, Path]:
     next_actions = tmp_root / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
     prompt_dir = tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
     recommendation_path = next_actions / f"lena_next_generation_step_{DATE}.json"
@@ -213,24 +217,32 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["media_content_type"] == "image"
     assert report["slot_media_type"] == "photo"
     assert report["selected_hook_text"] == "Tried To Dress Down. Failed."
-    assert report["source_recommendation_artifact_path"].endswith(f"lena_next_generation_step_{DATE}.json")
-    assert report["source_learning_artifact_path"].endswith(f"lena_post_outcome_learning_state_{DATE}.json")
-    assert report["source_queue_dry_run_artifact_path"].endswith(f"lena_autonomous_generation_queue_dryrun_{DATE}.json")
-    assert report["selected_prompt_input_artifact_path"] == str(prompt_path)
+    assert report["expected_handoff_artifact_path"] == HANDOFF_PATH
+    assert report["expected_handoff_markdown_path"] == HANDOFF_MD_PATH
+    assert report["source_recommendation_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_generation_step_{DATE}.json"
+    assert report["source_learning_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_post_outcome_learning_state_{DATE}.json"
+    assert report["source_queue_dry_run_artifact_path"] == f"pipeline/strategy/lena/next_actions/{DATE}/lena_autonomous_generation_queue_dryrun_{DATE}.json"
+    assert report["selected_prompt_input_artifact_path"] == PROMPT_INPUT_PATH
+    assert report["selected_prompt_input"]["artifact_path"] == PROMPT_INPUT_PATH
     assert report["selected_prompt_input"]["artifact_sha256"] == hashlib.sha256(prompt_path.read_bytes()).hexdigest()
     assert report["selected_prompt_input"]["prompt_sha256"] == "48260be45ea28a236dabae2c34876e45aa21fef55e98bf2f63a22ac890b2ce2d"
+    assert report["selected_prompt_input"]["exact_proposed_dry_run_command"] == LEGACY_DRY_RUN_COMMAND
     assert report["selected_prompt_input"]["prompt_text"] is None
     assert report["selected_prompt_input"]["prompt_text_available"] is False
     assert report["selected_prompt_input"]["prompt_text_status"] == "not_persisted_in_authoritative_artifact"
-    assert report["structured_executor_inputs"]["dry_run_command"] == DRY_RUN_COMMAND
+    assert report["structured_executor_inputs"]["dry_run_command"] == HANDOFF_COMMAND
     assert report["structured_executor_inputs"]["live_command"] == LIVE_COMMAND
-    assert report["structured_executor_inputs"]["dry_run_argv"] == ["python", EXECUTOR_PATH, "--date", DATE, "--slot-id", SLOT_ID]
-    assert report["structured_executor_inputs"]["live_argv"] == ["python", EXECUTOR_PATH, "--date", DATE, "--slot-id", SLOT_ID, "--live"]
+    assert report["structured_executor_inputs"]["dry_run_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH]
+    assert report["structured_executor_inputs"]["live_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH, "--live"]
     assert report["structured_executor_inputs"]["model"] == "text2image_soul_v2"
     assert report["structured_executor_inputs"]["aspect_ratio"] == "9:16"
     assert report["structured_executor_inputs"]["negative_prompt_enabled"] is False
     assert report["structured_executor_inputs"]["soul_metadata"]["name"] == "Lena"
-    assert report["structured_executor_inputs"]["soul_metadata"]["type"] == "soul_2"
+    assert report["structured_executor_inputs"]["soul_metadata"]["type"] == "Soul 2.0"
+    assert report["structured_executor_inputs"]["handoff_artifact_path"] == HANDOFF_PATH
+    assert report["structured_executor_inputs"]["handoff_markdown_path"] == HANDOFF_MD_PATH
+    assert report["structured_executor_inputs"]["expected_image_path"] == f"pipeline/higgsfield_library/lena/{DATE}/{SLOT_ID}_seed.png"
+    assert report["structured_executor_inputs"]["expected_manifest_path"] == f"pipeline/higgsfield_debug/{DATE}/{SLOT_ID}/result_manifest.json"
     assert report["packet_state"] == "packet_valid_for_claude_review"
     assert report["dry_run_executor_contract_state"] == "ready"
     assert report["live_execution_state"] == "blocked"
@@ -252,7 +264,7 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert json.loads(json_path.read_text(encoding="utf-8")) == report
     markdown = md_path.read_text(encoding="utf-8")
     for expected in [
-        DRY_RUN_COMMAND,
+        HANDOFF_COMMAND,
         LIVE_COMMAND,
         SLOT_ID,
         "packet_valid_for_claude_review",

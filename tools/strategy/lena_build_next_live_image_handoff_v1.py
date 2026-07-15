@@ -21,7 +21,7 @@ ASPECT_RATIO = "9:16"
 NEGATIVE_PROMPT_ENABLED = False
 DEFAULT_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 SOUL_NAME = "Lena"
-SOUL_TYPE = "soul_2"
+SOUL_TYPE = "Soul 2.0"
 
 
 class HandoffBuildError(SystemExit):
@@ -60,6 +60,14 @@ def queue_dry_run_path(date_str: str) -> Path:
     return dated_path(NEXT_ACTIONS, date_str, f"lena_autonomous_generation_queue_dryrun_{date_str}.json")
 
 
+def handoff_json_path(date_str: str) -> Path:
+    return dated_path(NEXT_ACTIONS, date_str, f"lena_next_live_image_handoff_{date_str}.json")
+
+
+def handoff_markdown_path(date_str: str) -> Path:
+    return dated_path(NEXT_ACTIONS, date_str, f"lena_next_live_image_handoff_{date_str}.md")
+
+
 def learning_path_from_recommendation(recommendation: dict) -> Path:
     return Path(str(recommendation.get("learning_artifact_path", "")).strip())
 
@@ -69,6 +77,14 @@ def selected_candidate_paths(date_str: str) -> list[Path]:
     if not directory.is_dir():
         return []
     return sorted(directory.glob("lena_pre_generation_candidate_*.json"))
+
+
+def repo_relative_path(path: Path) -> str:
+    resolved = Path(path).resolve()
+    try:
+        return resolved.relative_to(ROOT).as_posix()
+    except ValueError:
+        return resolved.as_posix()
 
 
 def repo_executor_command(date_str: str, slot_id: str, *, live: bool = False) -> str:
@@ -93,6 +109,30 @@ def repo_executor_argv(date_str: str, slot_id: str, *, live: bool = False) -> li
         date_str,
         "--slot-id",
         slot_id,
+    ]
+    if live:
+        argv.append("--live")
+    return argv
+
+
+def handoff_executor_command(handoff_artifact_path: str, *, live: bool = False) -> str:
+    parts = [
+        "python",
+        REPO_EXECUTOR_PATH,
+        "--handoff-artifact",
+        handoff_artifact_path,
+    ]
+    if live:
+        parts.append("--live")
+    return " ".join(parts)
+
+
+def handoff_executor_argv(handoff_artifact_path: str, *, live: bool = False) -> list[str]:
+    argv = [
+        "python",
+        REPO_EXECUTOR_PATH,
+        "--handoff-artifact",
+        handoff_artifact_path,
     ]
     if live:
         argv.append("--live")
@@ -312,9 +352,10 @@ def build_handoff(date_str: str) -> dict:
     selected_prompt_text = selected_candidate_report.get("_prompt")
     prompt_text_available = isinstance(selected_prompt_text, str) and bool(selected_prompt_text.strip())
 
-    dry_run_command = expected_command
-    live_command = repo_executor_command(date_str, slot_id, live=True)
-
+    handoff_json_rel_path = repo_relative_path(handoff_json_path(date_str))
+    handoff_md_rel_path = repo_relative_path(handoff_markdown_path(date_str))
+    dry_run_command = handoff_executor_command(handoff_json_rel_path)
+    live_command = handoff_executor_command(handoff_json_rel_path, live=True)
     report = {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -326,22 +367,24 @@ def build_handoff(date_str: str) -> dict:
         "repo_executor_path": REPO_EXECUTOR_PATH,
         "media_content_type": MEDIA_CONTENT_TYPE,
         "slot_media_type": SLOT_MEDIA_TYPE,
+        "expected_handoff_artifact_path": handoff_json_rel_path,
+        "expected_handoff_markdown_path": handoff_md_rel_path,
         "selected_slot_id": slot_id,
         "selected_recipe_id": candidate.get("recipe_id", ""),
         "selected_lane": candidate.get("lane", ""),
         "selected_hook_id": candidate.get("hook_id", ""),
         "selected_hook_text": candidate.get("hook_text", ""),
         "selected_caption_seed": candidate.get("caption_seed", ""),
-        "source_recommendation_artifact_path": str(recommendation_path),
+        "source_recommendation_artifact_path": repo_relative_path(recommendation_path),
         "source_recommendation_artifact_sha256": sha256_file(recommendation_path),
-        "source_learning_artifact_path": str(learning_path),
+        "source_learning_artifact_path": repo_relative_path(learning_path),
         "source_learning_artifact_sha256": sha256_file(learning_path),
-        "source_queue_dry_run_artifact_path": str(queue_path),
+        "source_queue_dry_run_artifact_path": repo_relative_path(queue_path),
         "source_queue_dry_run_artifact_sha256": sha256_file(queue_path),
-        "selected_prompt_input_artifact_path": str(candidate_path),
+        "selected_prompt_input_artifact_path": repo_relative_path(candidate_path),
         "selected_prompt_input_artifact_sha256": sha256_file(candidate_path),
         "selected_prompt_input": {
-            "artifact_path": str(candidate_path),
+            "artifact_path": repo_relative_path(candidate_path),
             "artifact_sha256": sha256_file(candidate_path),
             "candidate_id": candidate.get("candidate_id", ""),
             "decision_fingerprint_sha256": selected_candidate_report.get("decision_fingerprint_sha256", ""),
@@ -376,7 +419,7 @@ def build_handoff(date_str: str) -> dict:
                 "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
                 "identity_is_prompt_instruction": False,
             },
-            "selected_prompt_input_artifact_path": str(candidate_path),
+            "selected_prompt_input_artifact_path": repo_relative_path(candidate_path),
             "selected_prompt_input_artifact_sha256": sha256_file(candidate_path),
             "selected_prompt_sha256": candidate.get("prompt_sha256", ""),
             "selected_prompt_text": selected_prompt_text if prompt_text_available else None,
@@ -384,7 +427,9 @@ def build_handoff(date_str: str) -> dict:
                 "available" if prompt_text_available else "not_persisted_in_authoritative_artifact"
             ),
             "selected_prompt_text_available": prompt_text_available,
-            "expected_image_path": str(
+            "handoff_artifact_path": handoff_json_rel_path,
+            "handoff_markdown_path": handoff_md_rel_path,
+            "expected_image_path": repo_relative_path(
                 ROOT
                 / "pipeline"
                 / "higgsfield_library"
@@ -392,7 +437,7 @@ def build_handoff(date_str: str) -> dict:
                 / date_str
                 / f"{slot_id}_seed.png"
             ),
-            "expected_manifest_path": str(
+            "expected_manifest_path": repo_relative_path(
                 ROOT
                 / "pipeline"
                 / "higgsfield_debug"
@@ -401,11 +446,18 @@ def build_handoff(date_str: str) -> dict:
                 / "result_manifest.json"
             ),
             "dry_run_command": dry_run_command,
-            "dry_run_argv": repo_executor_argv(date_str, slot_id),
+            "dry_run_argv": handoff_executor_argv(handoff_json_rel_path),
             "live_command": live_command,
-            "live_argv": repo_executor_argv(date_str, slot_id, live=True),
+            "live_argv": handoff_executor_argv(handoff_json_rel_path, live=True),
             "executor_byte_match_required_for_live": True,
             "executor_byte_match_proven": False,
+            "live_execution_authorized": False,
+            "generation_approval_required": True,
+            "manual_operator_approval_required": True,
+            "provider_call_performed": False,
+            "generation_performed": False,
+            "publish_authorized": False,
+            "manual_publish_review_required": True,
         },
         "source_recommendation": {
             "action_type": recommendation_body.get("action_type", ""),
@@ -472,6 +524,8 @@ def build_handoff(date_str: str) -> dict:
             "candidate_command_matches_repo_executor": True,
             "prompt_text_available": prompt_text_available,
             "live_prompt_byte_check_required": True,
+            "handoff_artifact_path": handoff_json_rel_path,
+            "handoff_markdown_path": handoff_md_rel_path,
             "live_execution_authorized": False,
             "dry_run_executor_contract_state": "ready",
             "live_execution_state": "blocked",
@@ -515,6 +569,8 @@ def write_markdown(path: Path, report: dict) -> None:
         f"- learning: `{report['source_learning_artifact_path']}`",
         f"- queue dry run: `{report['source_queue_dry_run_artifact_path']}`",
         f"- selected prompt input: `{report['selected_prompt_input_artifact_path']}`",
+        f"- expected handoff artifact: `{report['expected_handoff_artifact_path']}`",
+        f"- expected handoff markdown: `{report['expected_handoff_markdown_path']}`",
         "",
         "## Readiness",
         "",
@@ -566,6 +622,8 @@ def write_markdown(path: Path, report: dict) -> None:
         f"- negative_prompt_enabled: `{structured['negative_prompt_enabled']}`",
         f"- expected image path: `{structured['expected_image_path']}`",
         f"- expected manifest path: `{structured['expected_manifest_path']}`",
+        f"- handoff artifact path: `{structured['handoff_artifact_path']}`",
+        f"- handoff markdown path: `{structured['handoff_markdown_path']}`",
         "",
         "## Live Boundary",
         "",
@@ -579,8 +637,8 @@ def write_markdown(path: Path, report: dict) -> None:
 def save_handoff(report: dict, date_str: str) -> tuple[Path, Path]:
     out_dir = NEXT_ACTIONS / date_str
     out_dir.mkdir(parents=True, exist_ok=True)
-    json_path = out_dir / f"lena_next_live_image_handoff_{date_str}.json"
-    md_path = out_dir / f"lena_next_live_image_handoff_{date_str}.md"
+    json_path = handoff_json_path(date_str)
+    md_path = handoff_markdown_path(date_str)
     json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_markdown(md_path, report)
     return json_path, md_path
