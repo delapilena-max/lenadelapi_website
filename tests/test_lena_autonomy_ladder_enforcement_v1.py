@@ -85,6 +85,9 @@ def test_contract_loads_from_committed_json_and_exposes_authority() -> None:
     assert "C:\\projects\\ai\\content_bot" not in serialized
     assert "content_bot_pr_clean" not in serialized
 
+    with pytest.raises(TypeError):
+        autonomy_ladder.load_contract(Path("override.json"))  # type: ignore[call-arg]
+
 
 @pytest.mark.parametrize(
     ("payload", "expected_code"),
@@ -115,6 +118,14 @@ def test_level_three_is_real_but_blocked_by_publish_freeze() -> None:
     assert error.value.code == "publish_freeze_active"
     assert error.value.report["contract"]["publish_freeze_active"] is True
     assert error.value.report["contract"]["level_3_disabled_by_publish_freeze"] is True
+
+    with pytest.raises(TypeError):
+        autonomy_ladder.assert_allowed(
+            "publish_queue",
+            level=3,
+            action="human-approved posting preparation",
+            allow_when_publish_freeze_active=True,  # type: ignore[call-arg]
+        )
 
 
 def test_level_two_approval_records_do_not_grant_posting_authority() -> None:
