@@ -74,6 +74,7 @@ from __future__ import annotations
 #   python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09 --slot-id readypack0709-pack000-05-photo --live
 
 import argparse
+import copy
 import contextlib
 import hashlib
 import io
@@ -894,6 +895,45 @@ def build_manifest(
 
 
 def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str, dict, Path]:
+    payload = json.loads(retry_decision_artifact.read_text(encoding="utf-8-sig"))
+    schema_version = payload.get("schema_version")
+
+    if schema_version == "lena_higgsfield_retry_handoff_v1":
+        from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff  # noqa: E402
+
+        artifact = retry_handoff.load_retry_execution_source(retry_decision_artifact)
+        handoff_path = _resolve_repo_path(str(artifact["source_handoff_artifact_path"]))
+        _, source, _, _ = _validate_handoff_packet(handoff_path)
+        retry_source = copy.deepcopy(source)
+        retry_source["resolver"] = "retry_handoff"
+        retry_source["slot_prefix"] = str(artifact["original_slot_id"])
+        retry_source["pack_count"] = 1
+        retry_source["image"]["slot_id"] = artifact["retry_slot_id"]
+        retry_source["image"]["image_prompt"] = artifact["retry_prompt_text"]
+        retry_source["image"]["prompt_sha256"] = artifact["retry_prompt_sha256"]
+        retry_source["image"]["retry_execution_contract"] = {
+            "schema_version": schema_version,
+            "retry_handoff_fingerprint_sha256": artifact["retry_handoff_fingerprint_sha256"],
+            "retry_attempt": artifact["retry_attempt"],
+            "retry_cap": artifact["retry_cap"],
+            "retry_purpose": artifact["retry_purpose"],
+            "original_slot_id": artifact["original_slot_id"],
+            "retry_slot_id": artifact["retry_slot_id"],
+            "source_handoff_artifact_path": artifact["source_handoff_artifact_path"],
+            "source_handoff_artifact_sha256": artifact["source_handoff_artifact_sha256"],
+            "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
+            "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
+            "source_execution_receipt_path": artifact["source_execution_receipt_path"],
+            "source_execution_receipt_sha256": artifact["source_execution_receipt_sha256"],
+            "source_manifest_path": artifact["source_manifest_path"],
+            "source_manifest_sha256": artifact["source_manifest_sha256"],
+            "source_output_image_path": artifact["source_output_image_path"],
+            "source_output_image_sha256": artifact["source_output_image_sha256"],
+            "source_original_prompt_sha256": artifact["source_original_prompt_sha256"],
+            "retry_constraints": artifact["retry_constraints"],
+        }
+        return str(artifact["date"]), str(artifact["retry_slot_id"]), retry_source, retry_decision_artifact.resolve()
+
     from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer  # noqa: E402
 
     artifact, source = retry_consumer.load_retry_execution_source(retry_decision_artifact)
