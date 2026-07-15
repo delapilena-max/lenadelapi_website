@@ -99,6 +99,7 @@ def build_boosts(policy: dict, world_state: dict, rows: list[dict]) -> tuple[dic
 
 def canonical_state(report: dict, state_path: Path) -> dict:
     queue = report.get("queue_boosts", {})
+    state_path_value = state_path.relative_to(ROOT).as_posix() if state_path.is_absolute() else state_path.as_posix()
     return {
         "version": "v1",
         "updated_at": report.get("generated_at", ""),
@@ -107,7 +108,7 @@ def canonical_state(report: dict, state_path: Path) -> dict:
         "active_signal_classes": report.get("active_signal_classes", []),
         "boost_by_recipe_id": queue.get("boost_by_recipe_id", {}),
         "preferred_recipe_ids": queue.get("preferred_recipe_ids", []),
-        "state_path": str(state_path),
+        "state_path": state_path_value,
     }
 
 

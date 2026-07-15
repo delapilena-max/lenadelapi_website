@@ -13,14 +13,31 @@ POST_OUTCOME_POLICY = NODE / "post_outcome_learning_policy_v1.json"
 FOLLOWUP_POLICY = NODE / "followup_post_decision_policy_v1_7.json"
 SCORING_MODEL = NODE / "post_metric_scoring_model_v1_6_1.json"
 REALISM_POLICY = NODE / "life_engine_realism_memory_policy_v1.json"
+AUTONOMY_GATE_POLICY = NODE / "strategy_autonomy_gate_policy_v1.json"
+WORLD_CONTINUITY_POLICY = NODE / "world_continuity_policy_v1.json"
+ENGAGEMENT_SELECTION_POLICY = NODE / "engagement_selection_policy_v1.json"
+DAILY_CADENCE = NODE / "daily_cadence.json"
+CONTENT_BUCKETS = NODE / "content_buckets.json"
+GENERATION_POLICY = ROOT / "pipeline" / "config" / "lena_generation_policy.json"
 
 
 def _read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def test_policy_files_parse_as_static_json_source() -> None:
-    for path in (POST_OUTCOME_POLICY, FOLLOWUP_POLICY, SCORING_MODEL, REALISM_POLICY):
+    for path in (
+        POST_OUTCOME_POLICY,
+        FOLLOWUP_POLICY,
+        SCORING_MODEL,
+        REALISM_POLICY,
+        AUTONOMY_GATE_POLICY,
+        WORLD_CONTINUITY_POLICY,
+        ENGAGEMENT_SELECTION_POLICY,
+        DAILY_CADENCE,
+        CONTENT_BUCKETS,
+        GENERATION_POLICY,
+    ):
         payload = _read_json(path)
         assert isinstance(payload, dict)
         assert "generated_at" not in payload
@@ -117,3 +134,82 @@ def test_realism_policy_fields_match_current_consumers_and_contain_no_secrets() 
     assert "api_key" not in serialized.lower()
     assert "token" not in serialized.lower()
     assert "secret" not in serialized.lower()
+
+
+def test_strategy_gate_policy_matches_current_readiness_consumers() -> None:
+    policy = _read_json(AUTONOMY_GATE_POLICY)
+
+    assert policy["version"] == "v1.0.0"
+    assert policy["require_all_priority_lanes_ready"] is True
+    assert set(policy["critical_blocker_reasons"]) == {
+        "recipe_missing",
+        "recipe_scene_contract_missing",
+        "packet_missing",
+        "payload_missing",
+        "payload_scene_contract_missing",
+        "master_identity_missing",
+        "blocked_terms_present",
+        "payload_headroom_too_low",
+    }
+    assert set(policy["critical_warning_reasons"]) == {
+        "style_bank_randomized_wardrobe",
+        "environment_not_recipe_locked",
+    }
+    assert policy["soft_warning_reasons"] == ["payload_headroom_narrow"]
+
+
+def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_policy_are_static_and_complete() -> None:
+    continuity = _read_json(WORLD_CONTINUITY_POLICY)
+    cadence = _read_json(DAILY_CADENCE)
+    buckets = _read_json(CONTENT_BUCKETS)
+    generation = _read_json(GENERATION_POLICY)
+
+    assert continuity["version"] == "v1.0.0"
+    assert continuity["state_path"] == "pipeline/state/lena_world_state_v1.json"
+    assert continuity["recent_memory_window"] >= continuity["balance_window"] >= 1
+    assert continuity["rotation_preview_limit"] >= 1
+    assert continuity["queue_rotation_policy"]["prefer_top_n"] >= 1
+    assert continuity["queue_rotation_policy"]["deprioritize_if_score_below"] > 0
+    soft_caps = continuity["anti_repetition"]["soft_caps"]
+    assert soft_caps["mirror_lane_in_balance_window"] >= 1
+    assert soft_caps["proof_mode_in_balance_window"] >= 1
+    assert continuity["context_mix_targets"]["max_home_share_in_balance_window"] < 1
+    assert continuity["context_mix_targets"]["min_public_or_fitness_share_in_balance_window"] > 0
+
+    assert cadence["version"] == "v1.3.1"
+    assert cadence["daily_posts"] == 5
+    assert set(cadence["slot_strategy"]) == {"01", "02", "03", "04", "05"}
+    assert cadence["slot_strategy"]["03"]["media_type"] == "video"
+    assert cadence["slot_strategy"]["03"]["music_required"] is True
+
+    assert buckets["version"] == "v1.3.1"
+    assert set(buckets["buckets"]) == {"reach", "trust", "engagement", "identity"}
+    assert all(buckets["buckets"][name]["rules"] for name in buckets["buckets"])
+
+    assert generation["generation"]["image_engine"] == "kling_image_3.0"
+    assert generation["generation"]["video_engine"] == "kling_video_3.0"
+    assert generation["safety"]["dry_run_until_preflight_passes"] is True
+
+
+def test_engagement_selection_policy_ranges_and_paths_are_valid() -> None:
+    policy = _read_json(ENGAGEMENT_SELECTION_POLICY)
+
+    assert policy["version"] == "v1.0.0"
+    assert policy["signals_path"] == "pipeline/analytics/lena_engagement_signals_v1_6.csv"
+    assert policy["state_path"] == "pipeline/state/lena_engagement_demand_state_v1.json"
+    assert policy["report_dir"] == "pipeline/strategy/lena/next_actions"
+    assert policy["minimum_signal_count_to_activate"] >= 1
+    assert policy["max_signal_count_per_class_for_scoring"] >= policy["minimum_signal_count_to_activate"]
+    assert policy["default_primary_boost"] > policy["default_secondary_boost"] > 0
+    assert {
+        "outfit_request",
+        "routine_request",
+        "food_question",
+        "flirty",
+        "audio_question",
+        "compliment",
+    } == set(policy["signal_class_map"])
+    for config in policy["signal_class_map"].values():
+        assert isinstance(config["preferred_recipe_ids"], list)
+        assert isinstance(config["secondary_recipe_ids"], list)
+        assert isinstance(config["notes"], str) and config["notes"].strip()
