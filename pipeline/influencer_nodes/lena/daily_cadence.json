@@ -1,0 +1,97 @@
+{
+  "version": "v1.3.1",
+  "daily_posts": 5,
+  "slot_strategy": {
+    "01": {
+      "time_block": "morning",
+      "media_type": "photo",
+      "growth_bucket": "trust",
+      "role": "casual wellness/photo",
+      "preferred_lanes": [
+        "morning stretch",
+        "smoothie prep",
+        "apartment reset",
+        "soft skincare morning"
+      ],
+      "metric_focus": [
+        "saves",
+        "profile_visits"
+      ]
+    },
+    "02": {
+      "time_block": "midday",
+      "media_type": "photo",
+      "growth_bucket": "identity",
+      "role": "outfit/body-confidence/lifestyle photo",
+      "preferred_lanes": [
+        "outfit check",
+        "balcony pose",
+        "poolside lifestyle",
+        "city errands"
+      ],
+      "metric_focus": [
+        "follows",
+        "profile_visits",
+        "saves"
+      ]
+    },
+    "03": {
+      "time_block": "afternoon",
+      "media_type": "video",
+      "growth_bucket": "reach",
+      "role": "movement/fitness Reel",
+      "preferred_lanes": [
+        "dance clip",
+        "stretch flow",
+        "light workout",
+        "wellness movement"
+      ],
+      "metric_focus": [
+        "reach",
+        "shares",
+        "watch_time_seconds",
+        "completion_rate",
+        "follows"
+      ],
+      "music_required": true
+    },
+    "04": {
+      "time_block": "evening",
+      "media_type": "photo_or_video",
+      "growth_bucket": "engagement",
+      "role": "humor/POV relatable post",
+      "preferred_lanes": [
+        "pov wellness joke",
+        "kitchen moment",
+        "gym recovery",
+        "coffee walk"
+      ],
+      "metric_focus": [
+        "comments",
+        "shares",
+        "saves"
+      ]
+    },
+    "05": {
+      "time_block": "night",
+      "media_type": "photo",
+      "growth_bucket": "trust",
+      "role": "wind-down/stretch/skincare/home photo",
+      "preferred_lanes": [
+        "evening skincare",
+        "simple dinner",
+        "sauna/recovery",
+        "wind-down stretch"
+      ],
+      "metric_focus": [
+        "saves",
+        "profile_visits"
+      ]
+    }
+  },
+  "anti_repetition_rules": [
+    "No same lane twice in one day.",
+    "Do not repeat weak formats after 14-day review.",
+    "Balance reach, trust, engagement, and identity every day."
+  ]
+}

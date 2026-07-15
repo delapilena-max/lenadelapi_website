@@ -12,6 +12,7 @@ No recipe bank modified. No hook bank modified.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -116,21 +117,16 @@ SKIN_REALISM_COMPACT = (
     "Unretouched phone-camera skin: visible pores on cheeks, nose, and forehead, "
     "fine facial texture, faint under-eye/lower-lid lines, slight redness, tiny tone unevenness, "
     "tiny forehead texture, soft natural under-eye darkness, small natural nose shine, "
-    "real skin oil balance, normal asymmetry, and one or two tiny natural blemish-scale imperfections. "
+    "real skin oil balance, normal asymmetry, and clear natural complexion. "
     "No skin blur, no denoised skin, no softened pore detail. Micro details: peach-fuzz edge light, "
     "individual brow hairs, real lashes with tiny shadows, imperfect lip texture, "
     "a slight crease at mouth corners, faint smile-line softness, normal eyelid fold depth, "
     "subtle tear-trough transition, natural philtrum and lip-edge definition, "
     "stray hair strands, uneven catchlights, room-shadow falloff on skin. "
-    "Preserve reference beauty marks only, in the same fixed positions, same side of the face, "
-    "and roughly the same size and count as the reference. "
-    "Treat those marks as exact identity anchors tied to the same relative locations around the "
-    "eyes, nose, mouth, cheeks, and lower face as in the reference. "
-    "If her reference beauty marks are subtle, keep them subtle and sparse. "
-    "Do not move them, mirror them, multiply them, or enlarge them. "
-    "If facial marks appear, they should stay faithful to the reference image rather than being restyled. "
-    "No new non-reference freckle clusters, no decorative freckle mask, "
-    "no beauty-filter speckling, no new moles, no beauty filter, no CGI face, "
+    "Face detail comes from the Lena character element; keep the facial surface faithful to the approved references. "
+    "No fake freckles, no new non-reference freckle clusters, no moved or multiplied beauty marks. "
+    "No decorative beauty-filter surface pattern, "
+    "no beauty-filter speckling, no beauty filter, no CGI face, "
     "not airbrushed, not poreless, not plastic or glossy. "
     "No polished beauty-campaign finish, no commercial skin retouch look, no foundation-ad finish. "
     "No baby-face stylization, no oversized irises, no porcelain doll facial finish, "
@@ -157,20 +153,20 @@ STRUCTURED_TECHNICAL_REALISM = (
     "Photorealistic high-resolution image with visible pores, fine facial texture, "
     "natural under-eye retention, imperfect lip texture, tiny tone variation, "
     "stray hair strands, realistic catchlights, and scene-true shadow falloff. "
-    "Preserve only Lena's exact subtle reference beauty marks in the same locations. "
+    "Face detail comes from the Lena character element; keep the facial surface faithful to the approved references. "
     "Hands remain anatomically correct with five fingers, believable knuckles, "
     "clean thumb placement, and relaxed wrists. Avoid plastic skin, beauty-filter "
-    "speckling, poreless retouching, deformed hands, identity drift, body-slimming drift, "
+    "poreless retouching, deformed hands, identity drift, body-slimming drift, "
     "or environment/wardrobe contradictions."
 )
 
 STRUCTURED_SECTION_MAX = {
-    "[Subject]": 430,
-    "[Action]": 250,
-    "[Environment]": 260,
-    "[Cinematography]": 170,
-    "[Lighting/Style]": 210,
-    "[Technical]": 210,
+    "[Subject]": 540,
+    "[Action]": 330,
+    "[Environment]": 360,
+    "[Cinematography]": 230,
+    "[Lighting/Style]": 300,
+    "[Technical]": 500,
 }
 
 AI_TERMS = re.compile(
@@ -183,10 +179,13 @@ NSFW_TERMS = re.compile(
     r"sex worker)\b",
     re.I
 )
+HASHTAG_TERMS = re.compile(r"#[A-Za-z0-9_]+")
 VALID_PLATFORMS = {
     "Facebook Feed", "Facebook Reels",
     "Instagram Feed", "Instagram Reels"
 }
+REPORT_TYPE = "lena_content_packet_dryrun"
+SCHEMA_VERSION = "v1"
 PUBLIC_FIELDS = [
     "hook_text",
     "caption_draft",
@@ -194,6 +193,24 @@ PUBLIC_FIELDS = [
     "optional_reels_opening_line",
     "suggested_comment_reply_angle",
 ]
+PACKET_BLOCKED_TERMS = (
+    "goodtest1",
+    "element_list",
+    "/v1/images/generations",
+    ".env.txt",
+)
+MASTER_IDENTITY_CHECKS = (
+    "identity is fixed",
+    "do not slim",
+    "petite",
+    "hourglass",
+    "do not reinterpret",
+    "full natural lifted bust",
+    "slim-thick",
+    "narrow-hipped",
+    "defined waist",
+    "wide hips",
+)
 
 
 def load_json(path):
@@ -226,6 +243,45 @@ def fit_prompt_sentences(parts, max_chars):
     return current
 
 
+def fit_prompt_units(text, max_chars):
+    text = clean_fragment(text)
+    if not text:
+        return ""
+
+    current = ""
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        if sentence.strip()
+    ]
+    for sentence in sentences:
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            break
+
+        clause_current = ""
+        clauses = [
+            clause.strip()
+            for clause in re.split(r"(?<=,)\s+|(?<=;)\s+", sentence)
+            if clause.strip()
+        ]
+        for clause in clauses:
+            clause_candidate = (
+                f"{clause_current} {clause}".strip()
+                if clause_current else clause
+            )
+            if len(clause_candidate) <= max_chars:
+                clause_current = clause_candidate
+                continue
+            break
+        current = clause_current
+        break
+    return current
+
+
 def clean_fragment(text):
     return re.sub(r"\s+", " ", (text or "")).strip()
 
@@ -236,6 +292,16 @@ def trim_fragment_to_chars(text, max_chars):
         return text
     clipped = text[:max_chars].rsplit(" ", 1)[0].rstrip(",;: ")
     return clipped or text[:max_chars].rstrip(",;: ")
+
+
+def check_master_identity(prompt: str) -> bool:
+    prompt_lower = (prompt or "").lower()
+    return all(marker in prompt_lower for marker in MASTER_IDENTITY_CHECKS)
+
+
+def check_packet_blocked_terms(prompt: str) -> list[str]:
+    prompt_lower = (prompt or "").lower()
+    return [term for term in PACKET_BLOCKED_TERMS if term in prompt_lower]
 
 
 def build_structured_prompt_sections(recipe):
@@ -282,7 +348,7 @@ def build_structured_kling_prompt(recipe, max_chars=2499):
         if remaining <= 0:
             break
         section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
-        trimmed = fit_prompt_sentences([body], min(remaining, section_cap))
+        trimmed = fit_prompt_units(body, min(remaining, section_cap))
         if not trimmed:
             trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
         if not trimmed:
@@ -301,31 +367,11 @@ def compute_proof_prompt_budget(
     env_entry=None,
     max_chars=2499,
 ):
-    reserved = 0
-    appended_parts = 0
-
-    if wardrobe_entry:
-        reserved += len(
-            format_catalog_wardrobe_override(wardrobe_entry).strip()
-        )
-        appended_parts += 1
-    if env_entry:
-        reserved += len(
-            f"Environment: {env_entry['prompt_fragment']}".strip()
-        )
-        appended_parts += 1
-
-    if appended_parts:
-        reserved += appended_parts
-
-    budget = max_chars - reserved - 70
-    if budget < 1200:
-        raise SystemExit(
-            "[ABORT] proof-mode locked wardrobe/environment text leaves "
-            f"too little room for the base Kling prompt ({budget} chars). "
-            "Shorten the overlay text before live use."
-        )
-    return budget
+    # The current dry-run packet builder tracks locked wardrobe/environment
+    # bindings as deterministic inputs, but does not append the old provider-
+    # specific overlay strings into the prompt preview itself.
+    _ = wardrobe_entry, env_entry
+    return max_chars
 
 
 def compute_style_bank_prompt_budget(max_chars=2499):
@@ -699,6 +745,23 @@ def build_packet(
     kling_prompt = build_compact_kling_prompt(
         recipe, max_chars=prompt_budget
     )
+    provider_prompt_blocked_terms = check_packet_blocked_terms(kling_prompt)
+    provider_prompt_contract = {
+        "surface_status": "quarantined_provider_neutral_dry_run_packet",
+        "provider_route": "higgsfield_forward_no_live",
+        "live_authority": False,
+        "prompt_chars": len(kling_prompt),
+        "prompt_headroom": 2499 - len(kling_prompt),
+        "scene_logic_contract_present": bool(recipe.get("scene_logic_contract", {})),
+        "master_identity_body_present": check_master_identity(kling_prompt),
+        "blocked_terms_absent": len(provider_prompt_blocked_terms) == 0,
+        "blocked_terms_found": provider_prompt_blocked_terms,
+        "outfit_controlled": bool(outfit_id),
+        "environment_controlled": bool(environment_id),
+    }
+    provider_prompt_sha256 = hashlib.sha256(
+        kling_prompt.encode("utf-8")
+    ).hexdigest()
 
     locked_scene_context = recipe.get("scene_type", "scene_context")
     realism_iteration_plan = {
@@ -750,6 +813,8 @@ def build_packet(
     }
 
     return {
+        "report_type": REPORT_TYPE,
+        "schema_version": SCHEMA_VERSION,
         "packet_id": packet_id,
         "generated_date": run_date,
         "generator": "lena_build_content_packet_dryrun_v1",
@@ -779,6 +844,10 @@ def build_packet(
         "compact_kling_prompt_preview": kling_prompt,
         "compact_kling_prompt_chars": len(kling_prompt),
         "compact_kling_prompt_budget": prompt_budget,
+        "compact_provider_prompt_preview": kling_prompt,
+        "compact_provider_prompt_chars": len(kling_prompt),
+        "compact_provider_prompt_budget": prompt_budget,
+        "compact_provider_prompt_sha256": provider_prompt_sha256,
         "strong_hook_id": hook["id"],
         "strong_hook_category": hook["category"],
         "hook_text": hook.get("hook_text", ""),
@@ -801,8 +870,75 @@ def build_packet(
         "proof_control_role": recipe.get("proof_control_role", ""),
         "safe_expansion_lanes": expansion_matrix or [],
         "realism_iteration_plan": realism_iteration_plan,
+        "provider_prompt_contract": provider_prompt_contract,
         "safety_flags": {},
     }
+
+
+def rebuild_packet_from_authoritative_sources(packet):
+    recipe_bank = load_json(RECIPE_BANK)
+    hook_bank = load_json(HOOK_BANK)
+    wardrobe_catalog = load_json(WARDROBE_CATALOG)
+    env_catalog = load_json(ENV_CATALOG)
+
+    recipe = dict(select_recipe(recipe_bank, packet["recipe_id"]))
+    wf_entry = None
+    env_entry = None
+
+    chosen_outfit_id = packet.get("wardrobe_outfit_id") or recipe.get("wardrobe_outfit_id")
+    if chosen_outfit_id:
+        wf_entry = select_wardrobe_entry(
+            wardrobe_catalog,
+            chosen_outfit_id,
+            recipe.get("wardrobe_allow_high_risk", False),
+            blocked_terms=recipe.get("wardrobe_blocked_terms", []),
+        )
+        recipe["wardrobe_outfit_id"] = chosen_outfit_id
+
+    chosen_env_id = packet.get("environment_id") or recipe.get("environment_id")
+    if chosen_env_id:
+        env_entry = select_environment_entry_for_recipe(
+            env_catalog, chosen_env_id, recipe
+        )
+        recipe["environment_id"] = chosen_env_id
+        if packet.get("environment_context"):
+            recipe["environment_context"] = packet["environment_context"]
+        elif not recipe.get("environment_context"):
+            recipe["environment_context"] = (
+                f"Environment: {env_entry['prompt_fragment']} "
+            )
+
+    prompt_budget_override = None
+    if wf_entry:
+        prompt_budget_override = compute_proof_prompt_budget(
+            wardrobe_entry=wf_entry,
+            env_entry=env_entry,
+        )
+
+    expansion_matrix = build_safe_expansion_matrix(
+        recipe,
+        recipe_bank,
+        wardrobe_catalog,
+        env_catalog,
+    )
+
+    hook = next(
+        (item for item in hook_bank["hooks"] if item.get("id") == packet["strong_hook_id"]),
+        None,
+    )
+    if hook is None:
+        raise SystemExit(
+            f"[ABORT] Hook '{packet['strong_hook_id']}' not found."
+        )
+
+    return build_packet(
+        recipe,
+        hook,
+        packet.get("hook_selection_reason", "authoritative source rebuild"),
+        packet["generated_date"],
+        prompt_budget=prompt_budget_override,
+        expansion_matrix=expansion_matrix,
+    )
 
 
 def validate_packet(packet, output_path):
@@ -820,6 +956,8 @@ def validate_packet(packet, output_path):
         errors.append("provider_call_enabled must be false")
 
     flags["recipe_exists"] = bool(packet.get("recipe_id"))
+    if not flags["recipe_exists"]:
+        errors.append("recipe_id is required")
 
     flags["hook_category_linked"] = True  # enforced at selection
 
@@ -846,6 +984,33 @@ def validate_packet(packet, output_path):
     flags["no_nsfw_in_public"] = len(nsfw_hits) == 0
     if nsfw_hits:
         errors.append(f"nsfw terms in public fields: {nsfw_hits}")
+
+    hashtag_hits = [
+        f for f in PUBLIC_FIELDS
+        if packet.get(f) and HASHTAG_TERMS.search(str(packet[f]))
+    ]
+    flags["no_hashtags_in_public"] = len(hashtag_hits) == 0
+    if hashtag_hits:
+        errors.append(f"hashtags not allowed in public fields: {hashtag_hits}")
+
+    provider_prompt_contract = packet.get("provider_prompt_contract", {})
+    flags["provider_prompt_contract_present"] = isinstance(provider_prompt_contract, dict) and bool(provider_prompt_contract)
+    if not flags["provider_prompt_contract_present"]:
+        errors.append("provider_prompt_contract is required")
+
+    flags["scene_logic_contract_present"] = bool(provider_prompt_contract.get("scene_logic_contract_present"))
+    if not flags["scene_logic_contract_present"]:
+        errors.append("scene_logic_contract must be present")
+
+    flags["master_identity_body_present"] = bool(provider_prompt_contract.get("master_identity_body_present"))
+    if not flags["master_identity_body_present"]:
+        errors.append("master identity markers must remain present")
+
+    flags["packet_blocked_terms_absent"] = bool(provider_prompt_contract.get("blocked_terms_absent"))
+    if not flags["packet_blocked_terms_absent"]:
+        errors.append(
+            f"blocked packet terms present: {provider_prompt_contract.get('blocked_terms_found', [])}"
+        )
 
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
     flags["kling_prompt_under_2500"] = kling_len < 2500

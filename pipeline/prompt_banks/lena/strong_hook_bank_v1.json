@@ -15,7 +15,16 @@
     "gym_confidence",
     "coffee_daylife",
     "should_i_post_this",
-    "playful_confession"
+    "playful_confession",
+    "curiosity_open_loop",
+    "consequence",
+    "meaningful_choice",
+    "payoff",
+    "adventure_escape",
+    "situational_humor",
+    "quiet_personal",
+    "world_expansion",
+    "callback"
   ],
   "hooks": [
     {
@@ -1942,7 +1951,7 @@
         "Instagram Reels"
       ],
       "best_content_type": "photo+reel",
-      "visual_pairing": "Lena confident, direct expression, result energy \u2014 look clearly post-decision",
+      "visual_pairing": "Lena confident, direct expression, result energy — look clearly post-decision",
       "caption_followup": "It always is.",
       "optional_reels_opening_line": "I asked myself if I should post this. The answer was yes.",
       "suggested_comment_reply_angle": "The answer is always yes. That is just how it goes.",
@@ -2535,6 +2544,708 @@
         "total_score": 47
       },
       "risk_notes": "none"
+    },
+    {
+      "id": "co_001",
+      "category": "curiosity_open_loop",
+      "hook_text": "I Almost Changed My Mind",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena paused at a doorway before leaving",
+      "caption_followup": "There was one detail I had not considered.",
+      "optional_reels_opening_line": "This was the moment the plan changed.",
+      "suggested_comment_reply_angle": "I will show you what won.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Open loop must receive a later payoff."
+    },
+    {
+      "id": "co_002",
+      "category": "curiosity_open_loop",
+      "hook_text": "The Better Idea Came Later",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "Lena in transit or looking toward an unexplained destination",
+      "caption_followup": "I should have expected that.",
+      "optional_reels_opening_line": "The first plan did not survive the night.",
+      "suggested_comment_reply_angle": "The second idea was better.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Do not imply an emergency."
+    },
+    {
+      "id": "co_003",
+      "category": "curiosity_open_loop",
+      "hook_text": "This Was Before The Decision",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "composed portrait with a visible choice cue",
+      "caption_followup": "I look calmer than I felt.",
+      "optional_reels_opening_line": "I had two options and one minute.",
+      "suggested_comment_reply_angle": "You will understand in the next post.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Use only when a real follow-up is planned."
+    },
+    {
+      "id": "cn_001",
+      "category": "consequence",
+      "hook_text": "I Knew Better And Went Anyway",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "arrival, night-out, or adventure aftermath",
+      "caption_followup": "The warning was accurate. I was not interested.",
+      "optional_reels_opening_line": "Here is what the choice looked like later.",
+      "suggested_comment_reply_angle": "Worth it is still under review.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Keep consequences plausible and non-dangerous."
+    },
+    {
+      "id": "cn_002",
+      "category": "consequence",
+      "hook_text": "This Is What That Choice Cost",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "quiet aftermath with wardrobe or travel continuity",
+      "caption_followup": "Mostly sleep. A little dignity.",
+      "optional_reels_opening_line": "You picked it. I lived with it.",
+      "suggested_comment_reply_angle": "I accept partial responsibility.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Never fabricate financial or serious personal harm."
+    },
+    {
+      "id": "cn_003",
+      "category": "consequence",
+      "hook_text": "The Plan Had Other Ideas",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "weather, transit, or social-plan complication",
+      "caption_followup": "Nothing dramatic. Just very on brand.",
+      "optional_reels_opening_line": "The plan changed before I did.",
+      "suggested_comment_reply_angle": "I should stop trusting perfect plans.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Avoid fake crisis framing."
+    },
+    {
+      "id": "mc_001",
+      "category": "meaningful_choice",
+      "hook_text": "Elegant Or A Little Dangerous",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "two credible outfit or destination alternatives",
+      "caption_followup": "Both work. They tell different stories.",
+      "optional_reels_opening_line": "Choose the energy, not my identity.",
+      "suggested_comment_reply_angle": "I already know which one scares me more.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Ask only when the answer can change a later post."
+    },
+    {
+      "id": "mc_002",
+      "category": "meaningful_choice",
+      "hook_text": "Stay Longer Or Leave Early",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "venue, sunset, or travel transition",
+      "caption_followup": "There is a good reason for both.",
+      "optional_reels_opening_line": "You choose the next scene.",
+      "suggested_comment_reply_angle": "I reserve the right to reinterpret the vote.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Choice must be operationally payable."
+    },
+    {
+      "id": "mc_003",
+      "category": "meaningful_choice",
+      "hook_text": "The Dress Or The Motorcycle",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "credible fashion-versus-adventure fork",
+      "caption_followup": "One is sensible. That is not helping.",
+      "optional_reels_opening_line": "Pick what you want to see next.",
+      "suggested_comment_reply_angle": "I know which answer this crowd will choose.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Motorcycle option must remain adventure-led, not automatic pinup."
+    },
+    {
+      "id": "po_001",
+      "category": "payoff",
+      "hook_text": "You Chose This One",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "visible fulfillment of a prior outfit or location vote",
+      "caption_followup": "So I followed the idea through.",
+      "optional_reels_opening_line": "The earlier choice became this.",
+      "suggested_comment_reply_angle": "You were more convincing than expected.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Name or visually establish the real prior choice."
+    },
+    {
+      "id": "po_002",
+      "category": "payoff",
+      "hook_text": "This Is Where I Ended Up",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "destination or consequence clearly linked to prior setup",
+      "caption_followup": "The route was less direct than planned.",
+      "optional_reels_opening_line": "The answer became a place.",
+      "suggested_comment_reply_angle": "I would probably choose it again.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Do not claim travel continuity that did not occur in the content arc."
+    },
+    {
+      "id": "po_003",
+      "category": "payoff",
+      "hook_text": "Fine You Were Right",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "confident result frame after audience input",
+      "caption_followup": "I tested the popular opinion.",
+      "optional_reels_opening_line": "Consider this the evidence.",
+      "suggested_comment_reply_angle": "Enjoy this rare admission.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Use only after a genuine audience choice."
+    },
+    {
+      "id": "ae_001",
+      "category": "adventure_escape",
+      "hook_text": "I Needed A Different Horizon",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "credible travel, road, or outdoor departure",
+      "caption_followup": "No dramatic reason. I just listened to the impulse.",
+      "optional_reels_opening_line": "The city was starting to feel too small.",
+      "suggested_comment_reply_angle": "I packed light and chose badly.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Avoid invented major-life claims."
+    },
+    {
+      "id": "ae_002",
+      "category": "adventure_escape",
+      "hook_text": "The Scenic Route Won Again",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "roadside, motorcycle, or landscape-led scene",
+      "caption_followup": "It was not the efficient option.",
+      "optional_reels_opening_line": "Efficiency was never the point.",
+      "suggested_comment_reply_angle": "The long way had better light.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Adventure must be visible and contextually credible."
+    },
+    {
+      "id": "ae_003",
+      "category": "adventure_escape",
+      "hook_text": "I Left Before I Overthought It",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "airport, road, or departure threshold",
+      "caption_followup": "A small escape, not a disappearance.",
+      "optional_reels_opening_line": "Sometimes the plan needs less discussion.",
+      "suggested_comment_reply_angle": "I did remember the important bag.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Do not imply abandonment or emergency."
+    },
+    {
+      "id": "sh_001",
+      "category": "situational_humor",
+      "hook_text": "I Was Productive For Eleven Minutes",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "coffee, desk, errands, or domestic candid",
+      "caption_followup": "Please respect this personal record.",
+      "optional_reels_opening_line": "Then the day developed opinions.",
+      "suggested_comment_reply_angle": "I will accept polite applause.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Keep humor self-aware, not self-degrading."
+    },
+    {
+      "id": "sh_002",
+      "category": "situational_humor",
+      "hook_text": "One Errand Became A Personality Test",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "grocery, coffee, flower, or street scene",
+      "caption_followup": "I passed the outfit portion.",
+      "optional_reels_opening_line": "The list and I are no longer speaking.",
+      "suggested_comment_reply_angle": "The flowers were essential eventually.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "No fake stakes."
+    },
+    {
+      "id": "sh_003",
+      "category": "situational_humor",
+      "hook_text": "This Look Required No Practical Decisions",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "fashion-forward everyday context",
+      "caption_followup": "That was the appeal.",
+      "optional_reels_opening_line": "Beautiful? Yes. Efficient? Irrelevant.",
+      "suggested_comment_reply_angle": "I stand by the priorities.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Keep it playful rather than validation-seeking."
+    },
+    {
+      "id": "qp_001",
+      "category": "quiet_personal",
+      "hook_text": "Today Needed Less Noise",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "morning, home, bench, or recovery scene",
+      "caption_followup": "So I gave it some room.",
+      "optional_reels_opening_line": "Not every day needs a plot twist.",
+      "suggested_comment_reply_angle": "Quiet looks good from here.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "No CTA required."
+    },
+    {
+      "id": "qp_002",
+      "category": "quiet_personal",
+      "hook_text": "Keeping This Part For Myself",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "intimate but non-sexual candid moment",
+      "caption_followup": "You can still have the picture.",
+      "optional_reels_opening_line": "Some details are better without explanation.",
+      "suggested_comment_reply_angle": "Mystery is not an emergency.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Protect boundaries; do not imply concealed crisis."
+    },
+    {
+      "id": "qp_003",
+      "category": "quiet_personal",
+      "hook_text": "A Soft Day Was The Right Choice",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "low-temperature daily-life scene",
+      "caption_followup": "Nothing to prove. Nothing to chase.",
+      "optional_reels_opening_line": "I almost forgot how good ordinary can feel.",
+      "suggested_comment_reply_angle": "We can be interesting tomorrow.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "No forced engagement prompt."
+    },
+    {
+      "id": "we_001",
+      "category": "world_expansion",
+      "hook_text": "You Have Not Seen This Side Yet",
+      "word_count": 7,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "new credible place, hobby, or social context",
+      "caption_followup": "It has been here the whole time.",
+      "optional_reels_opening_line": "Consider this a new corner of the map.",
+      "suggested_comment_reply_angle": "There is more to this place later.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Do not invent unsupported biography."
+    },
+    {
+      "id": "we_002",
+      "category": "world_expansion",
+      "hook_text": "This Place Changes My Energy",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "distinctive city, cultural, or travel environment",
+      "caption_followup": "I noticed it before I noticed the camera.",
+      "optional_reels_opening_line": "New setting, same standards.",
+      "suggested_comment_reply_angle": "I am adding this one to the rotation.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Environment must be visibly specific."
+    },
+    {
+      "id": "we_003",
+      "category": "world_expansion",
+      "hook_text": "A Better View Of My World",
+      "word_count": 6,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "scene revealing routine, destination, or interest",
+      "caption_followup": "The background matters this time.",
+      "optional_reels_opening_line": "This is where the next story can start.",
+      "suggested_comment_reply_angle": "You were looking at the outfit, were you not?",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "World detail must be real within the content system."
+    },
+    {
+      "id": "cb_001",
+      "category": "callback",
+      "hook_text": "Remember The Other Option",
+      "word_count": 4,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "visual callback to an earlier fork",
+      "caption_followup": "I did not forget it.",
+      "optional_reels_opening_line": "The choice you did not pick still had a story.",
+      "suggested_comment_reply_angle": "Consider this the alternate ending.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Reference a traceable earlier post."
+    },
+    {
+      "id": "cb_002",
+      "category": "callback",
+      "hook_text": "This Was Always Coming Back",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "repeated location, wardrobe motif, or unfinished plan",
+      "caption_followup": "Some ideas wait for better timing.",
+      "optional_reels_opening_line": "We left this one unfinished.",
+      "suggested_comment_reply_angle": "The timing finally behaved.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Callback must match real continuity."
+    },
+    {
+      "id": "cb_003",
+      "category": "callback",
+      "hook_text": "You Asked What Happened Next",
+      "word_count": 5,
+      "best_platforms": [
+        "Facebook Feed",
+        "Facebook Reels",
+        "Instagram Feed",
+        "Instagram Reels"
+      ],
+      "best_content_type": "photo+reel",
+      "visual_pairing": "clear aftermath or result frame",
+      "caption_followup": "Here is the part I owed you.",
+      "optional_reels_opening_line": "The short answer is this picture.",
+      "suggested_comment_reply_angle": "The long answer may need another post.",
+      "scores": {
+        "visual_pairing_score": 9,
+        "curiosity_score": 9,
+        "comment_potential_score": 8,
+        "platform_safety_score": 10,
+        "lena_voice_score": 10,
+        "total_score": 46
+      },
+      "risk_notes": "Do not reopen a loop unless another payoff is feasible."
     }
   ]
 }

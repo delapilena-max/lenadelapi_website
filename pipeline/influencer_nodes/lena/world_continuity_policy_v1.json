@@ -1,0 +1,59 @@
+{
+  "version": "v1.0.0",
+  "name": "Lena World Continuity Policy",
+  "purpose": "Turn Lena's approved recipes, outfits, environments, cadence, and realism memory into a believable rolling life-state so autonomy chooses plausible next moments instead of disconnected repeats.",
+  "state_path": "pipeline/state/lena_world_state_v1.json",
+  "report_dir": "pipeline/strategy/lena/next_actions",
+  "recent_memory_window": 10,
+  "balance_window": 8,
+  "rotation_preview_limit": 6,
+  "continuity_principles": [
+    "Lena should feel like one woman moving through a believable week, not a pile of unrelated glamour renders.",
+    "Home-coded lanes are important for trust, but they must not dominate the account feed.",
+    "Public-world, fitness, and outside-life lanes must recur often enough to prove a broad human life.",
+    "Proof lanes may repeat briefly for debugging, but they should not define the broader wardrobe or environment rotation.",
+    "Wardrobe, setting, and activity changes should look intentional and socially plausible for the context."
+  ],
+  "anti_repetition": {
+    "avoid_back_to_back_same_recipe": true,
+    "avoid_back_to_back_same_scene_type": true,
+    "avoid_back_to_back_same_environment_id": true,
+    "avoid_back_to_back_same_outfit_id": true,
+    "soft_caps": {
+      "same_recipe_in_recent_window": 1,
+      "same_scene_type_in_recent_window": 2,
+      "same_environment_id_in_recent_window": 1,
+      "same_outfit_id_in_recent_window": 1,
+      "same_environment_lane_in_recent_window": 2,
+      "same_style_lane_in_recent_window": 2,
+      "same_content_pillar_in_recent_window": 3,
+      "mirror_lane_in_balance_window": 2,
+      "proof_mode_in_balance_window": 2
+    }
+  },
+  "context_mix_targets": {
+    "max_home_share_in_balance_window": 0.5,
+    "min_public_or_fitness_share_in_balance_window": 0.375
+  },
+  "candidate_scoring": {
+    "public_balance_bonus": 18,
+    "fresh_content_pillar_bonus": 8,
+    "fresh_style_lane_bonus": 6,
+    "non_proof_rotation_bonus": 10,
+    "proof_priority_bonus_ceiling": 8,
+    "home_overuse_penalty": 18,
+    "proof_mode_overuse_penalty": 22,
+    "same_recipe_penalty": 30,
+    "same_scene_type_penalty": 24,
+    "same_environment_penalty": 20,
+    "same_outfit_penalty": 18,
+    "same_environment_lane_penalty": 14,
+    "same_style_lane_penalty": 10,
+    "same_content_pillar_penalty": 8,
+    "mirror_lane_penalty": 22
+  },
+  "queue_rotation_policy": {
+    "deprioritize_if_score_below": 86,
+    "prefer_top_n": 4
+  }
+}
