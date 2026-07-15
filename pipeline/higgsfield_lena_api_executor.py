@@ -70,8 +70,8 @@ from __future__ import annotations
 # Run (dry-run, default, no provider/network call):
 #   python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09 --slot-id readypack0709-pack000-05-photo
 #
-# Run (live, exactly one real provider call -- needs --live explicitly):
-#   python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09 --slot-id readypack0709-pack000-05-photo --live
+# Run (live, exact approved path only):
+#   python pipeline/higgsfield_lena_api_executor.py --handoff-artifact <packet> --approval-artifact <approval> --live
 
 import argparse
 import copy
@@ -168,6 +168,27 @@ class ProviderCallError(Exception):
     """Raised for any provider subprocess/parse/download failure. Always
     fails closed -- never leaves a failed job looking like a successful
     artifact."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        stage: str = "provider_failure",
+        subprocess_start_attempted: bool = False,
+        provider_submission_may_have_occurred: bool = False,
+        provider_job_id: str | None = None,
+        provider_status: str | None = None,
+        output_path: str | None = None,
+        image_format_detected: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.subprocess_start_attempted = subprocess_start_attempted
+        self.provider_submission_may_have_occurred = provider_submission_may_have_occurred
+        self.provider_job_id = provider_job_id
+        self.provider_status = provider_status
+        self.output_path = output_path
+        self.image_format_detected = image_format_detected
 
 
 class HandoffArtifactError(Exception):
@@ -473,8 +494,6 @@ def print_handoff_dry_run_report(
     print_dry_run_report(report["date"], report["selected_slot_id"], source, custom_reference_id, validation)
 
 
-<<<<<<< HEAD
-=======
 # --- Generation-approval binding (validation only; no consumption) ---------
 #
 # Reuses tools/lena_higgsfield_generation_approval_v1.py (Nicolas-only,
@@ -714,7 +733,6 @@ def _write_retry_generation_execution_receipt(
     }
 
 
->>>>>>> 770bfffa (feat: add one-shot Higgsfield retry authorization)
 # --- Handoff packet helpers -------------------------------------------------
 
 def _require_handoff(condition: bool, code: str, detail: str) -> None:
@@ -1060,6 +1078,9 @@ def build_manifest(
     source: dict,
     custom_reference_id: str,
     live_result: Optional[dict],
+    *,
+    claim_repo_path: str | None = None,
+    receipt_repo_path: str | None = None,
 ) -> dict:
     image = source["image"]
     prompt = image["image_prompt"]
@@ -1128,6 +1149,10 @@ def build_manifest(
                 "image_format_detected": live_result.get("image_format_detected"),
             }
         )
+        if claim_repo_path:
+            manifest["generation_claim_artifact_path"] = claim_repo_path
+        if receipt_repo_path:
+            manifest["generation_execution_receipt_path"] = receipt_repo_path
 
     retry_contract = image.get("retry_execution_contract")
     if isinstance(retry_contract, dict):
@@ -1200,7 +1225,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     if not resolved_binary:
         raise ProviderCallError(
             f"Could not resolve {HIGGSFIELD_CLI_BINARY!r} via shutil.which() -- "
-            "the Higgsfield CLI does not appear to be on PATH."
+            "the Higgsfield CLI does not appear to be on PATH.",
+            stage="subprocess_start_failure",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
         )
     resolved_argv = [resolved_binary, *argv[1:]]
 
@@ -1214,6 +1242,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         # controlled error path, not surface as an uncaught traceback.
         raise ProviderCallError(
             f"Failed to spawn the Higgsfield CLI process ({resolved_binary!r}): {exc}"
+            ,
+            stage="subprocess_start_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=False,
         ) from exc
 
     if result.returncode != 0:
@@ -1221,6 +1253,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         raise ProviderCallError(
             f"higgsfield generate create exited {result.returncode}. "
             f"stderr (tail): {stderr_tail}"
+            ,
+            stage="provider_rejection",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
         )
 
     stdout = result.stdout or ""
@@ -1230,6 +1266,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         raise ProviderCallError(
             f"Failed to parse --json output as JSON: {exc}. "
             f"stdout length was {len(stdout)} chars."
+            ,
+            stage="provider_output_parse_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
         ) from exc
 
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
@@ -1242,6 +1282,12 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             "refusing to proceed. Only the top-level 'result_url' field is "
             "treated as a generation output; no other field (including "
             "'min_result_url' or anything nested) is considered."
+            ,
+            stage="provider_output_invalid",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_status=status,
         )
     if len(result_urls) > 1:
         raise ProviderCallError(
@@ -1249,13 +1295,26 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             "top-level result_url values where exactly one job (and "
             "therefore exactly one result_url) was expected. This executor "
             "refuses to silently pick one. Manual review required."
+            ,
+            stage="provider_output_invalid",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_status=status,
         )
 
     result_url = result_urls[0]
     try:
         image_bytes = _download(result_url, ROOT / "pipeline" / "higgsfield_library" / "lena" / date_str / f"{slot_id}_seed.tmp")
     except Exception as exc:
-        raise ProviderCallError(f"Download of result image failed: {exc}") from exc
+        raise ProviderCallError(
+            f"Download of result image failed: {exc}",
+            stage="download_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_status=status,
+        ) from exc
 
     extension = _detect_image_extension(image_bytes)
     final_path = library_path(date_str, slot_id, extension)
@@ -1269,6 +1328,8 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         "result_urls": result_urls,
         "saved_image_path": str(final_path),
         "image_format_detected": extension,
+        "subprocess_start_attempted": True,
+        "provider_submission_may_have_occurred": True,
     }
 
 
@@ -1311,8 +1372,6 @@ def main() -> int:
     parser.add_argument("--retry-decision-artifact", type=Path)
     parser.add_argument("--handoff-artifact", type=Path)
     parser.add_argument(
-<<<<<<< HEAD
-=======
         "--approval-artifact", type=Path, dest="approval_artifact", default=None,
         help="Optional, only valid together with --handoff-artifact. A recorded "
              "generation-approval artifact (tools/lena_record_higgsfield_generation_"
@@ -1329,7 +1388,6 @@ def main() -> int:
              "retry claim/receipt contract.",
     )
     parser.add_argument(
->>>>>>> 770bfffa (feat: add one-shot Higgsfield retry authorization)
         "--custom-reference-id", dest="custom_reference_id",
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         help="Higgsfield Soul custom_reference_id (default: Lena's confirmed Soul ID)",
@@ -1350,8 +1408,6 @@ def main() -> int:
 
     expected_prompt_path = Path(args.expected_prompt_file) if args.expected_prompt_file else None
 
-<<<<<<< HEAD
-=======
     if args.approval_artifact is not None and args.handoff_artifact is None:
         print("[ABORT] --approval-artifact requires --handoff-artifact.")
         return 1
@@ -1362,7 +1418,6 @@ def main() -> int:
         print("[ABORT] --approval-artifact and --retry-approval-artifact are mutually exclusive.")
         return 1
 
->>>>>>> 770bfffa (feat: add one-shot Higgsfield retry authorization)
     if args.handoff_artifact is not None:
         if args.retry_decision_artifact is not None or args.date or args.slot_id:
             print("[ABORT] --handoff-artifact is mutually exclusive with --retry-decision-artifact and --date/--slot-id.")
@@ -1375,24 +1430,116 @@ def main() -> int:
         except HandoffArtifactError as exc:
             print(f"[ABORT] {exc.code}: {exc.detail}")
             return 1
-        if not live:
-            print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
-            return 0 if validation["ok"] else 1
+
         print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
-        if not report.get("live_execution_authorized"):
-            print("[ABORT] --live is not authorized by the handoff artifact.")
+
+        approval_result = None
+        approval_error: Optional[HandoffArtifactError] = None
+        if args.approval_artifact is not None:
+            try:
+                approval_result = _validate_approval_artifact(args.handoff_artifact, args.approval_artifact)
+                print_approval_validation_report(args.approval_artifact, approval_result)
+            except HandoffArtifactError as exc:
+                approval_error = exc
+                print(f"[ABORT] approval validation failed: {exc.code}: {exc.detail}")
+
+        if not live:
+            if approval_error is not None:
+                return 1
+            return 0 if validation["ok"] else 1
+
+        if approval_error is not None:
             return 1
+        if args.approval_artifact is None:
+            print(
+                "[ABORT] --live with --handoff-artifact requires a valid "
+                "--approval-artifact. The handoff remains review-only and is never "
+                "rewritten into live authorization."
+            )
+            return 1
+        try:
+            claim_info = _create_generation_claim(approval_result)
+        except Exception as exc:
+            code = getattr(exc, "code", "generation_claim_creation_failed")
+            print(f"[ABORT] claim creation failed: {code}: {exc}")
+            return 1
+        claim_path = Path(claim_info["claim_path"])
+        manifest_repo_path = _repo_relative_path(manifest_path(report["date"], report["selected_slot_id"]))
         try:
             live_result = run_live(report["date"], report["selected_slot_id"], source, args.custom_reference_id)
         except ProviderCallError as exc:
+            try:
+                receipt_info = _write_generation_execution_receipt(
+                    claim_path,
+                    approval_result,
+                    outcome="execution_failed",
+                    failure_stage=exc.stage,
+                    error_text=_sanitize_operational_error_text(exc),
+                    subprocess_start_attempted=exc.subprocess_start_attempted,
+                    provider_submission_may_have_occurred=exc.provider_submission_may_have_occurred,
+                    provider_job_id=exc.provider_job_id,
+                    provider_status=exc.provider_status,
+                    output_path=exc.output_path,
+                    image_format_detected=exc.image_format_detected,
+                    actual_manifest_path=None,
+                )
+            except Exception as receipt_exc:
+                print(f"[FAILED] {exc}")
+                print(
+                    "[FAILED] claim retained but execution receipt could not be "
+                    f"written: {getattr(receipt_exc, 'code', 'generation_execution_receipt_write_failed')}: {receipt_exc}"
+                )
+                print("[FAILED] Manual reconciliation required before any new approval is used.")
+                return 1
             print(f"[FAILED] {exc}")
-            print("[FAILED] No manifest written, no artifact saved as successful.")
+            print(f"[FAILED] execution receipt written: {receipt_info['receipt_repo_path']}")
+            print("[FAILED] Claim retained; manual reconciliation or a new approval is required.")
             return 1
-        manifest = build_manifest(report["date"], report["selected_slot_id"], source, args.custom_reference_id, live_result)
+        try:
+            receipt_info = _write_generation_execution_receipt(
+                claim_path,
+                approval_result,
+                outcome="success",
+                failure_stage=None,
+                error_text=None,
+                subprocess_start_attempted=bool(live_result.get("subprocess_start_attempted")),
+                provider_submission_may_have_occurred=bool(live_result.get("provider_submission_may_have_occurred")),
+                provider_job_id=live_result.get("job_id"),
+                provider_status=live_result.get("status"),
+                output_path=live_result.get("saved_image_path"),
+                image_format_detected=live_result.get("image_format_detected"),
+                actual_manifest_path=manifest_repo_path,
+            )
+        except Exception as receipt_exc:
+            print(
+                "[FAILED] live generation succeeded, but execution receipt creation "
+                f"failed: {getattr(receipt_exc, 'code', 'generation_execution_receipt_write_failed')}: {receipt_exc}"
+            )
+            print("[FAILED] Claim retained; manual reconciliation required before any new approval is used.")
+            return 1
+        manifest = build_manifest(
+            report["date"],
+            report["selected_slot_id"],
+            source,
+            args.custom_reference_id,
+            live_result,
+            claim_repo_path=claim_info["claim_repo_path"],
+            receipt_repo_path=receipt_info["receipt_repo_path"],
+        )
         mpath = manifest_path(report["date"], report["selected_slot_id"])
-        mpath.parent.mkdir(parents=True, exist_ok=True)
-        mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        try:
+            mpath.parent.mkdir(parents=True, exist_ok=True)
+            mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:
+            print(
+                "[FAILED] execution receipt written but manifest creation failed: "
+                f"{_sanitize_operational_error_text(exc)}"
+            )
+            print("[FAILED] Claim and receipt were retained. No provider retry was attempted.")
+            return 1
         print(f"[LIVE] saved image     : {live_result['saved_image_path']}")
+        print(f"[LIVE] claim written    : {claim_info['claim_repo_path']}")
+        print(f"[LIVE] receipt written  : {receipt_info['receipt_repo_path']}")
         print(f"[LIVE] manifest written: {mpath}")
         return 0
 
@@ -1438,13 +1585,6 @@ def main() -> int:
             return 1
         return 0 if validation["ok"] else 1
 
-<<<<<<< HEAD
-    # --live: run every dry-run validation first.
-    print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
-    if not validation["ok"]:
-        print("[ABORT] Validation failed -- refusing to make a provider call.")
-        return 1
-=======
     if args.retry_decision_artifact is not None:
         print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
         retry_approval_result = None
@@ -1552,23 +1692,14 @@ def main() -> int:
         print(f"[LIVE] retry receipt written : {receipt_info['receipt_repo_path']}")
         print(f"[LIVE] manifest written: {mpath}")
         return 0
->>>>>>> 770bfffa (feat: add one-shot Higgsfield retry authorization)
 
-    try:
-        live_result = run_live(date_str, slot_id, source, args.custom_reference_id)
-    except ProviderCallError as exc:
-        print(f"[FAILED] {exc}")
-        print("[FAILED] No manifest written, no artifact saved as successful.")
-        return 1
-
-    manifest = build_manifest(date_str, slot_id, source, args.custom_reference_id, live_result)
-    mpath = manifest_path(date_str, slot_id)
-    mpath.parent.mkdir(parents=True, exist_ok=True)
-    mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    print(f"[LIVE] saved image     : {live_result['saved_image_path']}")
-    print(f"[LIVE] manifest written: {mpath}")
-    return 0
+    print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
+    print(
+        "[ABORT] raw --date/--slot-id --live is forbidden. The only permitted live "
+        "still-image command is: python pipeline/higgsfield_lena_api_executor.py "
+        "--handoff-artifact <packet> --approval-artifact <approval> --live"
+    )
+    return 1
 
 
 if __name__ == "__main__":
