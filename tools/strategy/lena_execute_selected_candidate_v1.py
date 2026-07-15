@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline import higgsfield_lena_api_executor as executor  # noqa: E402
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector  # noqa: E402
 
@@ -338,6 +339,15 @@ def evaluate_decision(
     live_requested: bool = False,
     dry_run_delegate: Callable[[str, str], dict[str, Any]] = _delegate_executor_dry_run,
 ) -> dict[str, Any]:
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_execute_selected_candidate_v1",
+            level=1,
+            action="candidate generation only",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        raise ConsumerError(exc.code, exc.detail) from exc
+
     artifact = _read_artifact(artifact_path)
     candidate = _validate_shape(artifact)
     stored_core, recomputed = _validate_fingerprint(artifact)

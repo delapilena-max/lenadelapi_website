@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline.identity import lena_higgsfield_identity as identity  # noqa: E402
 from pipeline.prompting import lena_prompt_brain  # noqa: E402
 from pipeline.qa import lena_higgsfield_failure_memory as failure_memory  # noqa: E402
@@ -1095,6 +1096,11 @@ def evaluate_photo_qa_disposition(
 ) -> dict[str, Any]:
     provider_called = False
     try:
+        autonomy_ladder.assert_allowed(
+            "lena_photo_qa_disposition_v1",
+            level=2,
+            action="QA disposition",
+        )
         if not isinstance(reference_authority_artifact, Path) or not SHA256_RE.fullmatch(str(reference_authority_sha256)):
             raise BoundaryError("identity_evidence_invalid", "committed identity-reference authority path and SHA-256 are required")
         decision, candidate, decision_kind = _validate_decision(decision_path.resolve())
@@ -1262,6 +1268,8 @@ def evaluate_photo_qa_disposition(
             "side_effects_performed": [],
             "exact_next_allowed_action": next_action,
         }
+    except autonomy_ladder.AutonomyLadderError as exc:
+        return _blocked_artifact(exc.code, exc.detail, provider_called=provider_called)
     except BoundaryError as exc:
         return _blocked_artifact(exc.code, exc.detail, provider_called=provider_called)
 

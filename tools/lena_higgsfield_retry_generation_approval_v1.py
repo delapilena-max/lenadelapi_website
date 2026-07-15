@@ -8,6 +8,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+if str(Path(__file__).resolve().parents[1]) not in os.sys.path:
+    os.sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from tools import lena_higgsfield_generation_approval_v1 as canonical_approval
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 
@@ -121,6 +125,15 @@ def build_retry_generation_approval_record(
     confirmation: str,
     approved_at: datetime | None = None,
 ) -> dict[str, Any]:
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_higgsfield_retry_generation_approval_v1",
+            level=2,
+            action="explicit per-slot human approval consumption",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        raise HiggsfieldRetryGenerationApprovalError(exc.code, exc.detail) from exc
+
     _require(
         operator_id == canonical_approval.CANONICAL_OPERATOR_ID,
         "approval_operator_mismatch",
@@ -182,6 +195,15 @@ def validate_retry_generation_approval_artifact(
     now: datetime | None = None,
     require_not_expired: bool = True,
 ) -> dict[str, Any]:
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_higgsfield_retry_generation_approval_v1",
+            level=2,
+            action="explicit per-slot human approval consumption",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        raise HiggsfieldRetryGenerationApprovalError(exc.code, exc.detail) from exc
+
     approval_path = approval_path.resolve()
     try:
         approval = canonical_approval.read_json_object(

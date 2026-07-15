@@ -3,10 +3,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from pipeline.influencer_nodes.lena import autonomy_ladder
+
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
 CONTENT_PACKETS = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
 
@@ -217,6 +223,15 @@ def load_queue_report(date_str: str) -> tuple[Path, dict]:
 
 
 def build_handoff(date_str: str) -> dict:
+    try:
+        autonomy_ladder.assert_allowed(
+            "lena_build_next_live_image_handoff_v1",
+            level=0,
+            action="dry-run handoff construction",
+        )
+    except autonomy_ladder.AutonomyLadderError as exc:
+        raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
+
     recommendation_path = next_step_path(date_str)
     recommendation = load_report(
         recommendation_path,
@@ -610,7 +625,14 @@ def main() -> int:
     parser.add_argument("--date", default=utc_date(), help="UTC date for output folder")
     args = parser.parse_args()
 
-    report = build_handoff(args.date)
+    try:
+        report = build_handoff(args.date)
+    except HandoffBuildError as exc:
+        print(str(exc))
+        return 1
+    except autonomy_ladder.AutonomyLadderError as exc:
+        print(f"[ABORT] {exc.code}: {exc.detail}")
+        return 1
     json_path, md_path = save_handoff(report, args.date)
     print(
         json.dumps(
