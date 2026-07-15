@@ -21,6 +21,7 @@ SCHEMA_VERSION = "v1"
 STRATEGY_PREP_REPORT_TYPE = "lena_strategy_autonomy_prep"
 NEXT_STEP_REPORT_TYPE = "lena_next_generation_step"
 HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
+SHADOW_ELIGIBILITY_REPORT_TYPE = "lena_autonomous_generation_eligibility_shadow"
 GENERATION_APPROVAL_SCHEMA_VERSION = "v1"
 RETRY_DECISION_SCHEMA_VERSION = "lena_retry_decision_v1"
 RETRY_HANDOFF_SCHEMA_VERSION = "lena_higgsfield_retry_handoff_v1"
@@ -72,6 +73,10 @@ def next_step_path(date_str: str) -> Path:
 
 def handoff_path(date_str: str) -> Path:
     return dated_path(NEXT_ACTIONS, date_str, f"lena_next_live_image_handoff_{date_str}.json")
+
+
+def shadow_eligibility_path(date_str: str) -> Path:
+    return dated_path(NEXT_ACTIONS, date_str, f"lena_autonomous_generation_eligibility_shadow_{date_str}.json")
 
 
 def retry_decision_paths(date_str: str) -> list[Path]:
@@ -337,6 +342,64 @@ def build_live_generation_handoff_state(date_str: str, candidate_selection: dict
         },
         slot_id,
     )
+
+
+def build_autonomous_eligibility_shadow_state(date_str: str) -> dict[str, Any]:
+    path = shadow_eligibility_path(date_str)
+    report = load_report(path, report_type=SHADOW_ELIGIBILITY_REPORT_TYPE)
+    expected_artifact = str(path.relative_to(ROOT).as_posix())
+    safe_next_step = f"python -m tools.strategy.lena_build_autonomous_generation_eligibility_shadow_v1 --date {date_str}"
+    if report is None:
+        return {
+            **_artifact_diagnostic(
+                path,
+                None,
+                expected_artifact=expected_artifact,
+                blocking=False,
+                diagnostic="the shadow eligibility report is missing, so the package can only note that the read-only summary is unavailable.",
+                safe_next_step=safe_next_step,
+            ),
+            "status": "autonomous_eligibility_shadow_missing",
+            "summary": {},
+        }
+
+    source_artifacts = report.get("source_artifacts", {})
+    if not isinstance(source_artifacts, dict):
+        source_artifacts = {}
+    authority_state = report.get("authority_state", {})
+    if not isinstance(authority_state, dict):
+        authority_state = {}
+    next_allowed_action = report.get("next_allowed_action", {})
+    if not isinstance(next_allowed_action, dict):
+        next_allowed_action = {}
+
+    coverage: dict[str, Any] = {}
+    for key, artifact in source_artifacts.items():
+        if isinstance(artifact, dict):
+            coverage[key] = {
+                "source_artifact_path": artifact.get("source_artifact_path", ""),
+                "source_artifact_present": artifact.get("source_artifact_present", False),
+                "source_artifact_sha256": artifact.get("source_artifact_sha256"),
+            }
+
+    return {
+        **_artifact_diagnostic(
+            path,
+            report,
+            expected_artifact=expected_artifact,
+            blocking=False,
+            diagnostic="the shadow eligibility report is present and ready for package summary.",
+            safe_next_step=safe_next_step,
+        ),
+        "status": "autonomous_eligibility_shadow_ready",
+        "summary": {
+            "eligibility_status": report.get("eligibility_status", ""),
+            "blocking_reasons": report.get("blocking_reasons", []),
+            "authority_state": authority_state,
+            "next_allowed_action": next_allowed_action,
+            "source_artifacts": coverage,
+        },
+    }
 
 
 def build_approval_boundary_state(date_str: str, slot_id: str) -> dict[str, Any]:
@@ -916,6 +979,7 @@ def build_level2_daily_generation_package(date_str: str) -> dict[str, Any]:
     strategy_plan_state = build_strategy_plan_state(date_str)
     candidate_selection_state = build_candidate_selection_state(date_str)
     handoff_state, slot_id = build_live_generation_handoff_state(date_str, candidate_selection_state)
+    autonomous_eligibility_shadow_state = build_autonomous_eligibility_shadow_state(date_str)
     approval_boundary_state = build_approval_boundary_state(date_str, slot_id)
     qa_disposition_state = build_qa_disposition_state(date_str, slot_id)
     retry_recommendation_state = build_retry_recommendation_state(date_str, qa_disposition_state, slot_id)
@@ -936,6 +1000,7 @@ def build_level2_daily_generation_package(date_str: str) -> dict[str, Any]:
             ("strategy_plan_state", strategy_plan_state),
             ("candidate_selection_state", candidate_selection_state),
             ("live_generation_handoff_state", handoff_state),
+            ("autonomous_eligibility_shadow_state", autonomous_eligibility_shadow_state),
             ("approval_boundary_state", approval_boundary_state),
             ("qa_disposition_state", qa_disposition_state),
             ("retry_recommendation_state", retry_recommendation_state),
@@ -960,6 +1025,7 @@ def build_level2_daily_generation_package(date_str: str) -> dict[str, Any]:
         "strategy_plan_state": strategy_plan_state,
         "candidate_selection_state": candidate_selection_state,
         "live_generation_handoff_state": handoff_state,
+        "autonomous_eligibility_shadow_state": autonomous_eligibility_shadow_state,
         "approval_boundary_state": approval_boundary_state,
         "qa_disposition_state": qa_disposition_state,
         "retry_recommendation_state": retry_recommendation_state,

@@ -95,6 +95,104 @@ def _handoff_payload() -> dict:
     }
 
 
+def _shadow_eligibility_payload(*, eligibility_status: str = "autonomous_eligibility_passed") -> dict:
+    return {
+        "report_type": "lena_autonomous_generation_eligibility_shadow",
+        "schema_version": "v1",
+        "date": DATE,
+        "generated_at": "2026-07-15T12:00:00+00:00",
+        "eligibility_status": eligibility_status,
+        "checks": [
+            {
+                "check_id": "canonical_brain_manifest_ready",
+                "passed": True,
+                "blocking": False,
+                "reason": "canonical Lena brain manifest is ready",
+                "evidence": {
+                    "canonical_brain_assets_status": "ready",
+                    "missing_required_assets": [],
+                    "dirty_workspace_dependency": False,
+                },
+            }
+        ],
+        "blocking_reasons": [],
+        "source_artifacts": {
+            "canonical_brain_assets": {
+                "source_artifact_path": "pipeline/influencer_nodes/lena/canonical_brain_assets.py",
+                "source_artifact_present": True,
+                "source_artifact_sha256": "1" * 64,
+                "canonical_brain_assets_status": "ready",
+                "missing_required_assets": [],
+                "dirty_workspace_dependency": False,
+                "assets": [
+                    {
+                        "asset_id": "prompt_brain",
+                        "path": "pipeline/prompting/lena_prompt_brain.py",
+                        "exists": True,
+                        "required": True,
+                        "sha256": "2" * 64,
+                        "category": "prompt_brain",
+                        "kind": "file",
+                    }
+                ],
+            },
+            "strategy_prep": {
+                "source_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_strategy_autonomy_prep_{DATE}.json",
+                "source_artifact_present": True,
+                "source_artifact_sha256": "3" * 64,
+            },
+            "next_generation_step": {
+                "source_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_generation_step_{DATE}.json",
+                "source_artifact_present": True,
+                "source_artifact_sha256": "4" * 64,
+            },
+            "live_image_handoff": {
+                "source_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json",
+                "source_artifact_present": True,
+                "source_artifact_sha256": "5" * 64,
+            },
+            "autonomy_ladder": {
+                "source_artifact_path": "pipeline/influencer_nodes/lena/autonomy_ladder_v1.json",
+                "source_artifact_present": True,
+                "source_artifact_sha256": "6" * 64,
+            },
+        },
+        "authority_state": {
+            "manual_approval_pending": True,
+            "manual_approval_scaffold_active": True,
+            "autonomous_eligibility_pending": eligibility_status != "autonomous_eligibility_passed",
+            "autonomous_eligibility_passed": eligibility_status == "autonomous_eligibility_passed",
+            "provider_execution_frozen": True,
+            "publish_frozen": True,
+            "publish_freeze_active": True,
+            "auto_approval_forbidden": True,
+            "implicit_escalation_forbidden": True,
+            "generation_approval_does_not_imply_posting_approval": True,
+            "dirty_workspace_dependency": False,
+            "live_execution_authorized": False,
+            "generation_approval_required": True,
+            "manual_operator_approval_required": True,
+            "provider_call_performed": False,
+            "generation_performed": False,
+            "publish_authorized": False,
+            "manual_publish_review_required": True,
+        },
+        "next_allowed_action": {
+            "status": eligibility_status,
+            "action": "await_explicit_provider_authorization",
+            "reason": "shadow checks passed, but live provider execution remains disabled",
+        },
+        "dirty_workspace_dependency": False,
+        "shadow_mode_only": True,
+        "provider_call_performed": False,
+        "approval_consumed": False,
+        "claims_written": False,
+        "receipts_written": False,
+        "queue_mutated": False,
+        "publish_performed": False,
+    }
+
+
 def _approval_payload() -> dict:
     return {
         "report_type": "lena_higgsfield_generation_approval",
@@ -190,6 +288,7 @@ def _build_fixture_tree(
     include_strategy_prep: bool = True,
     include_next_step: bool = True,
     include_handoff: bool = True,
+    include_shadow_eligibility: bool = True,
     include_approval: bool = True,
     include_claim: bool = True,
     include_receipt: bool = True,
@@ -211,6 +310,11 @@ def _build_fixture_tree(
         _write_json(next_actions / f"lena_next_generation_step_{DATE}.json", _next_step_payload())
     if include_handoff:
         _write_json(next_actions / f"lena_next_live_image_handoff_{DATE}.json", _handoff_payload())
+    if include_shadow_eligibility:
+        _write_json(
+            next_actions / f"lena_autonomous_generation_eligibility_shadow_{DATE}.json",
+            _shadow_eligibility_payload(),
+        )
     if include_approval:
         _write_json(approvals / f"{SLOT_ID}_higgsfield_generation_approval.json", _approval_payload())
     if include_claim:
@@ -260,6 +364,12 @@ def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, mon
     assert report["strategy_plan_state"]["status"] == "ready"
     assert report["candidate_selection_state"]["status"] == "ready"
     assert report["live_generation_handoff_state"]["status"] == "ready"
+    assert report["autonomous_eligibility_shadow_state"]["status"] == "autonomous_eligibility_shadow_ready"
+    assert report["autonomous_eligibility_shadow_state"]["summary"]["eligibility_status"] == "autonomous_eligibility_passed"
+    assert report["autonomous_eligibility_shadow_state"]["summary"]["authority_state"]["provider_execution_frozen"] is True
+    assert report["autonomous_eligibility_shadow_state"]["summary"]["authority_state"]["provider_call_performed"] is False
+    assert report["autonomous_eligibility_shadow_state"]["summary"]["next_allowed_action"]["action"] == "await_explicit_provider_authorization"
+    assert report["autonomous_eligibility_shadow_state"]["summary"]["source_artifacts"]["canonical_brain_assets"]["source_artifact_present"] is True
     assert report["approval_boundary_state"]["status"] == "approved"
     assert report["qa_disposition_state"]["status"] == "ready"
     assert report["retry_recommendation_state"]["status"] == "not_needed"
@@ -270,6 +380,7 @@ def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, mon
     assert report["autonomy_ladder_status"]["level_5_state"] == "future_only"
     assert report["final_operator_report"]["status"] == "ready_for_operator_review"
     assert report["next_allowed_action"]["action"] == "await_human_review_within_level_2_contract"
+    assert "autonomous_eligibility_shadow_state" not in report["final_operator_report"]["blocking_sections"]
     assert after - before == {Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_level2_daily_generation_package_{DATE}.json"}
 
     serialized = json.dumps(report, sort_keys=True)
@@ -330,6 +441,20 @@ def test_missing_upstream_input_produces_blocked_missing_input(tmp_path: Path, m
     assert "lena_recommend_next_generation_step_v1" in report["candidate_selection_state"]["diagnostic"]["safe_next_step"]
     assert report["live_generation_handoff_state"]["diagnostic"]["artifact_exists"] is True
     assert report["strategy_plan_state"]["diagnostic"]["artifact_exists"] is True
+
+
+def test_missing_shadow_eligibility_is_non_blocking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _build_fixture_tree(tmp_path, include_shadow_eligibility=False)
+
+    report = package_builder.build_level2_daily_generation_package(DATE)
+
+    assert report["autonomous_eligibility_shadow_state"]["status"] == "autonomous_eligibility_shadow_missing"
+    assert report["autonomous_eligibility_shadow_state"]["diagnostic"]["artifact_exists"] is False
+    assert report["autonomous_eligibility_shadow_state"]["diagnostic"]["blocking"] is False
+    assert report["final_operator_report"]["status"] == "ready_for_operator_review"
+    assert report["next_allowed_action"]["action"] == "await_human_review_within_level_2_contract"
+    assert "autonomous_eligibility_shadow_state" not in report["final_operator_report"]["blocking_sections"]
 
 
 def test_missing_approval_produces_approval_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
