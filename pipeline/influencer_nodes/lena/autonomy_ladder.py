@@ -48,8 +48,8 @@ class AutonomyLadderBlocked(AutonomyLadderError):
         }
 
 
-def _read_contract(path: Path | None = None) -> dict[str, Any]:
-    path = path or CONTRACT_PATH
+def _read_contract() -> dict[str, Any]:
+    path = CONTRACT_PATH
     if not path.is_file():
         raise AutonomyLadderError("contract_missing", f"autonomy ladder contract is missing: {path}")
     try:
@@ -133,8 +133,8 @@ def _validate_contract(payload: dict[str, Any]) -> None:
         _require(level.get("status") == "future_only", "contract_invalid", f"level {number} must remain future-only")
 
 
-def load_contract(path: Path | None = None) -> dict[str, Any]:
-    payload = _read_contract(path)
+def load_contract() -> dict[str, Any]:
+    payload = _read_contract()
     _validate_contract(payload)
     return payload
 
@@ -175,7 +175,6 @@ def assert_allowed(
     *,
     level: int,
     action: str,
-    allow_when_publish_freeze_active: bool = False,
 ) -> dict[str, Any]:
     contract = load_contract()
     level_data = get_level(contract, level)
@@ -190,7 +189,7 @@ def assert_allowed(
         )
     if level == 3:
         publish_freeze = contract.get("publish_freeze", {})
-        if publish_freeze.get("active") is True and not allow_when_publish_freeze_active:
+        if publish_freeze.get("active") is True:
             raise AutonomyLadderBlocked(
                 "publish_freeze_active",
                 "publish freeze is active, so level 3 posting remains blocked",
