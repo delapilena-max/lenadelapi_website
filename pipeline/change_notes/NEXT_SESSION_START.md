@@ -76,6 +76,55 @@ Do not interpret a successful test, a passing dry-run, or a code review as
 lifting this freeze on its own -- it lifts only when Nicolas is told all
 five conditions are met and he confirms it explicitly.
 
+> ## CURRENT CHECKPOINT: HIGGSFIELD STILL-IMAGE EXECUTION CHAIN IS DETERMINISTIC THROUGH APPROVAL, ATOMIC CONSUMPTION, AND RECEIPT (2026-07-14)
+>
+> This banner controls wherever older dated sections below conflict with the
+> current technical state. Older banners remain historical evidence and
+> should be retained, not rewritten. Current HEAD is `47469bc2`
+> (`feat: consume Higgsfield generation approvals atomically`).
+>
+> **Committed technical chain in order:**
+> - `079ca54a` -- explicit unresolved-metrics classification
+> - `03ce32ad` -- outcome learning routed into strategy recommendation
+> - `df71d214` -- deterministic Claude/Higgsfield handoff packet builder
+> - `ee422c6c` -- executor verifies handoff prompt identity by independent regeneration and exact SHA
+> - `542a05d9` -- separate immutable Higgsfield generation-approval contract
+> - `47469bc2` -- atomic single-use approval claim and execution receipt
+>
+> **Current architecture:**
+> `published outcomes`
+> `-> explicit metrics-resolution state`
+> `-> outcome learning`
+> `-> learning-aware recommendation`
+> `-> Claude/Higgsfield handoff packet`
+> `-> executor dry-run verification`
+> `-> Nicolas generation approval`
+> `-> atomic single-use claim`
+> `-> Claude runs the repo Higgsfield executor`
+> `-> immutable execution receipt`
+> `-> result manifest`
+>
+> **Only permitted live still-image command:** `python pipeline/higgsfield_lena_api_executor.py --handoff-artifact <packet.json> --approval-artifact <approval.json> --live`
+>
+> **Current operating boundaries:**
+> - Claude is the operational reviewer/executor.
+> - Higgsfield CLI is the forward still-image provider path.
+> - Codex implements and tests deterministic controller code.
+> - Strategy preparation never directly calls Higgsfield.
+> - Soul identity is structured provider metadata, not prompt text.
+> - Negative prompts remain disabled for Higgsfield.
+> - Raw date/slot live execution is blocked.
+> - Retry live execution is blocked pending a separately bound retry approval.
+> - Approval authorizes one provider-submission attempt only.
+> - Approval never authorizes upload, R2, queue promotion, publishing, or analytics mutation.
+> - Dry-run creates no approval claim or execution receipt.
+> - Claim collision blocks before provider execution.
+> - Orphan claims and receipt-write failures require manual reconciliation.
+> - Receipt failure never rearms the consumed approval.
+> - No live generation occurred during this implementation chain.
+> - Standing upload/queue/publish freezes remain unchanged.
+> - Commercialization remains parked until the engine works correctly.
+>
 > ## CURRENT CHECKPOINT: KLING I2V COMMISSIONING RUNNER COMMITTED; FOUR ISOLATED EVIDENCE RUNS COMPLETE; NO PRODUCTION-PATH DECISION (2026-07-13)
 >
 > This checkpoint supersedes the current-state claims in older dated
