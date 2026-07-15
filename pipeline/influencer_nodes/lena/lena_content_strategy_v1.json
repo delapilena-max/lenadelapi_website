@@ -1,0 +1,138 @@
+{
+  "version": "v1.0.0",
+  "status": "canonical",
+  "effective_date": "2026-07-13",
+  "canonical_niche": "Glamour, Choices, And Beautiful Trouble",
+  "persona_path": "pipeline/influencer_nodes/lena/persona.json",
+  "pillar_ids": [
+    "everyday_lena",
+    "style_and_getting_ready",
+    "beautiful_trouble",
+    "city_and_social_life",
+    "adventure_and_escape",
+    "audience_choice_and_payoff",
+    "high_heat_glamour"
+  ],
+  "creative_temperatures": [
+    "quiet",
+    "warm",
+    "glamorous",
+    "high_heat"
+  ],
+  "narrative_roles": [
+    "setup",
+    "choice",
+    "anticipation",
+    "experience",
+    "consequence",
+    "payoff",
+    "aftermath",
+    "quiet_reset",
+    "world_expansion"
+  ],
+  "audience_choice_contract": {
+    "followers_may_influence": true,
+    "followers_control_lena": false,
+    "material_future_effect_required": true,
+    "maximum_unresolved_choices": 2,
+    "lena_may_reinterpret_or_reject_in_character": true,
+    "protected_poll_topics": [
+      "identity",
+      "safety",
+      "body_shape",
+      "intimate_behavior",
+      "major_life_claims"
+    ]
+  },
+  "open_loop_contract": {
+    "open_only_with_feasible_payoff": true,
+    "fake_emergencies_forbidden": true,
+    "invented_major_life_claims_forbidden": true,
+    "generic_engagement_bait_forbidden": true,
+    "trackable_choice_required_for_choice_hooks": true
+  },
+  "payoff_contract": {
+    "normal_payoff_window_posts": {
+      "minimum": 1,
+      "maximum": 3
+    },
+    "unresolved_choice_ceiling_posts": 5,
+    "longer_arc_requires_explicit_designation": true,
+    "payoff_must_reference_real_prior_setup": true
+  },
+  "balance_rules": {
+    "mode": "sequencing_not_percentage_quota",
+    "no_consecutive_high_heat_posts": true,
+    "normal_lower_temperature_or_story_forward_spacing_posts": 2,
+    "quiet_and_warm_may_have_no_cta": true,
+    "high_heat_cannot_substitute_for_narrative_relevance": true,
+    "do_not_maximize_every_sexual_signal_by_default": true,
+    "exceptions_require_explicit_creative_reason": true,
+    "automated_enforcement_status": "not_implemented",
+    "publishing_quotas_added": false
+  },
+  "high_heat_rules": {
+    "is_one_pillar_not_whole_account": true,
+    "platform_safe_only": true,
+    "swimwear_requires_context": [
+      "beach",
+      "pool",
+      "resort",
+      "boat",
+      "spa",
+      "equivalent_plausible_context"
+    ],
+    "sexual_solicitation_forbidden": true,
+    "pornographic_presentation_forbidden": true
+  },
+  "motorcycle_role": {
+    "classification": "adventure_and_world_content",
+    "automatic_pinup_framing": false,
+    "existing_production_blocks_remain_authoritative": true
+  },
+  "anti_gimmick_rules": [
+    "Do not ask a choice that cannot materially affect a future post.",
+    "Do not let every post become a poll or call to action.",
+    "Do not promise a payoff the system cannot deliver.",
+    "Do not use fake emergencies, needy validation, or deceptive real-world claims.",
+    "Do not let audience interaction replace Lena's agency or personality."
+  ],
+  "historical_asset_policy": {
+    "existing_assets_remain_valid": true,
+    "historical_assets_are_immutable": true,
+    "strategy_change_is_prospective_only": true
+  },
+  "authority_precedence": {
+    "persona_json": "Owns Lena's public identity, personality, and pillar definitions.",
+    "lena_content_strategy_v1_json": "Owns creative temperature, narrative role, audience choice, payoff, and balance doctrine.",
+    "scene_and_recipe_banks": "Own per-item strategy classification only.",
+    "strong_hook_bank_v1_json": "Owns reusable hook patterns and their scoring metadata.",
+    "dormant_untracked_policies": "Reference material only; they gain no authority through this strategy patch.",
+    "dormant_reference_paths": [
+      "pipeline/influencer_nodes/lena/world_continuity_policy_v1.json",
+      "pipeline/influencer_nodes/lena/series_library_v1_7.json",
+      "pipeline/influencer_nodes/lena/followup_post_decision_policy_v1_7.json",
+      "pipeline/influencer_nodes/lena/engagement_content_loops.json"
+    ]
+  },
+  "current_catalog_gaps": {
+    "adventure_recipe_ids": [],
+    "high_heat_recipe_ids": [],
+    "statement": "The current recipe catalog contains no genuine adventure or high-heat recipes; this contract does not fabricate them."
+  },
+  "future_world_state_bridge": {
+    "status": "reserved_not_wired",
+    "reserved_fields": [
+      "story_arc_id",
+      "narrative_role",
+      "open_choice_id",
+      "choice_options",
+      "choice_status",
+      "opened_at_post_id",
+      "selected_option",
+      "payoff_due_after_posts",
+      "payoff_post_id",
+      "operator_override_reason"
+    ]
+  }
+}
