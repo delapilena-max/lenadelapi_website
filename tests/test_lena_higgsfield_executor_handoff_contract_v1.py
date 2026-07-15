@@ -4,13 +4,16 @@ import copy
 import hashlib
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
 import pipeline.higgsfield_lena_api_executor as executor
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
+import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
+import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
 
 
 DATE = "2026-07-13"
@@ -35,6 +38,18 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(approval_mod, "ROOT", tmp_root)
     monkeypatch.setattr(
         approval_mod,
+        "DEFAULT_APPROVAL_ROOT",
+        tmp_root / "pipeline" / "approvals" / "lena" / "generation",
+    )
+    monkeypatch.setattr(retry_handoff_mod, "ROOT", tmp_root)
+    monkeypatch.setattr(
+        retry_handoff_mod,
+        "DEFAULT_OUTPUT_ROOT",
+        tmp_root / "pipeline" / "strategy" / "lena" / "retry_handoffs",
+    )
+    monkeypatch.setattr(retry_approval_mod, "ROOT", tmp_root)
+    monkeypatch.setattr(
+        retry_approval_mod,
         "DEFAULT_APPROVAL_ROOT",
         tmp_root / "pipeline" / "approvals" / "lena" / "generation",
     )
@@ -365,6 +380,209 @@ def _build_approval_fixture(handoff_path: Path, *, slot_id: str = SLOT_ID, date_
     return out_path
 
 
+def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    _patch_roots(tmp_root, monkeypatch)
+    retry_date = "2026-07-14"
+    original_slot = "higgsfield-20260714-hcr_011-photo"
+    custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
+    original_prompt = (
+        "[Subject]: Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult slim-thick hourglass body and face. "
+        "Do not reinterpret her as a different person. Do not slim her into petite, narrow-hipped proportions. Keep full natural "
+        "lifted bust, defined waist, and wide hips. Hair stays reference-true warm medium-brown with visible honey/caramel highlights "
+        "and lighter face-framing pieces. Wardrobe and accessories: Cherry red fitted square-neck mini dress visible from neckline "
+        "through upper torso only. Gold hoop earrings. [Action]: Waist-up or chest-up only. Lena stands near the mirror at a 20-30 "
+        "degree angle toward the mirror or window. Mirror-selfie phone visibility is acceptable if the phone sits low enough to keep "
+        "her face readable. [Environment]: Home getting-ready corner or bedroom vanity area. Mirror edge visible, not full mirror "
+        "dominance. Dresser or small vanity surface, a few products, clothes draped on a chair, shoes near the mirror, warm apartment "
+        "light, and ordinary home clutter kept tasteful. Lived-in and elevated, never hotel-like. [Cinematography]: 85mm portrait "
+        "compression or 50mm close lifestyle portrait, waist-up framing, real phone-camera skin detail, shallow depth of field, "
+        "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio. [Lighting/Style]: Face-first available "
+        "light only. Cool blue-hour window light shapes one side of the face while an ordinary warm bedside lamp lifts the shadow side "
+        "just enough to keep pores, under-eye texture, and lip texture alive. No beauty-dish polish, no ring light, no glam campaign "
+        "finish. [Technical]: Photorealistic high-resolution image with visible pores, fine facial texture, natural under-eye retention, "
+        "imperfect lip texture, tiny tone variation, stray hair strands, realistic catchlights, and scene-true shadow falloff. Face "
+        "detail comes from the Lena character element; keep the facial surface faithful to the approved references. Hands remain "
+        "anatomically correct with five fingers, believable knuckles, clean thumb placement, and relaxed wrists."
+    )
+    original_prompt_sha = hashlib.sha256(original_prompt.encode("utf-8")).hexdigest()
+    handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_next_live_image_handoff_{retry_date}.json"
+    packet_repo_path = Path("pipeline/strategy/lena/content_packets") / retry_date / f"lena_content_packet_dryrun_{retry_date}_hcr_011.json"
+    handoff_path = tmp_root / handoff_repo_path
+    packet_path = tmp_root / packet_repo_path
+    _write_json(
+        packet_path,
+        {
+            "report_type": "lena_content_packet_dryrun",
+            "generated_date": retry_date,
+            "recipe_id": "hcr_011",
+            "compact_provider_prompt_preview": original_prompt,
+            "compact_provider_prompt_sha256": original_prompt_sha,
+            "compact_provider_prompt_budget": 2499,
+            "provider_prompt_contract": {"provider_route": "higgsfield_forward_no_live", "live_authority": False},
+        },
+    )
+    packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    _write_json(
+        handoff_path,
+        {
+            "report_type": "lena_next_live_image_handoff",
+            "schema_version": "v1",
+            "created_at": "2026-07-15T05:00:00+00:00",
+            "execution_owner": "claude",
+            "provider": "higgsfield",
+            "executor_type": "higgsfield_cli",
+            "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+            "packet_state": "packet_valid_for_claude_review",
+            "dry_run_executor_contract_state": "ready",
+            "live_execution_state": "blocked",
+            "live_execution_authorized": False,
+            "generation_approval_required": True,
+            "manual_operator_approval_required": True,
+            "provider_call_performed": False,
+            "generation_performed": False,
+            "publish_authorized": False,
+            "manual_publish_review_required": True,
+            "date": retry_date,
+            "selected_slot_id": original_slot,
+            "expected_handoff_artifact_path": handoff_repo_path.as_posix(),
+            "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
+            "selected_prompt_input_artifact_sha256": packet_sha,
+            "selected_prompt_input": {"prompt_sha256": original_prompt_sha, "prompt_text": original_prompt},
+            "structured_executor_inputs": {
+                "provider": "higgsfield",
+                "executor_type": "higgsfield_cli",
+                "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+                "model": "text2image_soul_v2",
+                "aspect_ratio": "9:16",
+                "negative_prompt_enabled": False,
+                "live_execution_authorized": False,
+                "date": retry_date,
+                "slot_id": original_slot,
+                "handoff_artifact_path": handoff_repo_path.as_posix(),
+                "soul_metadata": {
+                    "name": "Lena",
+                    "type": "Soul 2.0",
+                    "custom_reference_id": custom_reference_id,
+                    "identity_is_prompt_instruction": False,
+                },
+                "selected_prompt_sha256": original_prompt_sha,
+                "selected_prompt_text": original_prompt,
+            },
+        },
+    )
+    handoff_sha = hashlib.sha256(handoff_path.read_bytes()).hexdigest()
+    image_path = tmp_root / "pipeline" / "higgsfield_library" / "lena" / retry_date / f"{original_slot}_seed.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"\x89PNG\r\n\x1a\nretry-proof-image")
+    manifest_repo_path = Path("pipeline/higgsfield_debug") / retry_date / original_slot / "result_manifest.json"
+    _write_json(
+        tmp_root / manifest_repo_path,
+        {
+            "provider": "higgsfield",
+            "slot_id": original_slot,
+            "prompt_sha256": original_prompt_sha,
+            "saved_image_path": str(image_path),
+            "provider_job_id": "job-123",
+            "provider_status": "completed",
+        },
+    )
+    receipt_repo_path = Path("pipeline/approvals/lena/generation") / retry_date / f"{original_slot}_higgsfield_generation_execution_receipt.json"
+    receipt_path = tmp_root / receipt_repo_path
+    _write_json(
+        receipt_path,
+        {
+            "report_type": "lena_higgsfield_generation_execution_receipt",
+            "schema_version": "v1",
+            "receipt_type": "higgsfield_single_generation_execution_receipt",
+            "handoff_artifact_path": handoff_repo_path.as_posix(),
+            "handoff_artifact_sha256": handoff_sha,
+            "date": retry_date,
+            "slot_id": original_slot,
+            "prompt_sha256": original_prompt_sha,
+            "outcome": "success",
+            "provider_job_id": "job-123",
+            "provider_status": "completed",
+            "provider_submission_may_have_occurred": True,
+            "subprocess_start_attempted": True,
+            "output_path": str(image_path),
+            "actual_manifest_path": manifest_repo_path.as_posix(),
+            "provider": "Higgsfield",
+            "executor": "Higgsfield CLI repo adapter",
+            "model": "text2image_soul_v2",
+            "aspect_ratio": "9:16",
+            "custom_reference_id": custom_reference_id,
+        },
+    )
+    retry_report = retry_handoff_mod.evaluate_retry_handoff(
+        handoff_artifact=handoff_path,
+        execution_receipt=receipt_path,
+        output_root=retry_handoff_mod.DEFAULT_OUTPUT_ROOT,
+        write_artifact=True,
+    )
+    retry_handoff_path = Path(retry_report["retry_handoff_artifact_path"])
+    retry_facts = retry_approval_mod.inspect_retry_handoff_artifact(retry_handoff_path)
+    approval_record = retry_approval_mod.build_retry_generation_approval_record(
+        retry_facts,
+        operator_id=approval_mod.CANONICAL_OPERATOR_ID,
+        confirmation=retry_approval_mod.confirmation_phrase(retry_facts["slot_id"]),
+    )
+    approval_path = retry_approval_mod.approval_output_path(retry_facts["date"], retry_facts["slot_id"])
+    retry_approval_mod.write_retry_generation_approval_record_atomic(approval_path, approval_record)
+
+    def fake_validate_handoff_packet(path: Path):
+        report = json.loads(handoff_path.read_text(encoding="utf-8"))
+        source = {
+            "resolver": "content_packet_dryrun",
+            "slot_prefix": "hcr_011",
+            "pack_count": 1,
+            "pack_variety_warnings": [],
+            "image": {
+                "slot_id": original_slot,
+                "lane": "fit_check_mirror_getting_ready",
+                "wardrobe_outfit_id": "wc_p020",
+                "environment_id": "env_v008",
+                "pose_body_language_id": None,
+                "pose_body_language_label": "getting ready at the mirror",
+                "effective_wardrobe_silhouette_class": "beautiful_trouble",
+                "soul_name": "Lena",
+                "soul_version": "Soul 2.0",
+                "soul_selection_mode": "provider_config_not_prompt_text",
+                "camera_text": "85mm portrait compression",
+                "lighting_text": "blue-hour ambient mixed with warm lamp fill",
+                "negative_prompt_enabled": False,
+                "image_prompt": original_prompt,
+                "validation": {
+                    "framing_present": True,
+                    "wardrobe_casual_free": True,
+                    "wardrobe_casual_terms_found": [],
+                    "scene_action_conflict_free": True,
+                    "scene_action_conflict_terms_found": [],
+                    "soul_anchor_absent": True,
+                    "negative_prompt_disabled": True,
+                    "heavy_overcorrection_free": True,
+                    "heavy_overcorrection_terms_found": [],
+                    "pose_scene_match_pass": True,
+                    "pose_scene_mismatch_terms_found": [],
+                    "low_hook_terms_found": [],
+                    "final_expression_text": "",
+                    "expression_safe_fallback_used": False,
+                    "expression_safe_fallback_reason": "",
+                    "expression_scene_gaze_conflict_terms_found": [],
+                },
+            },
+        }
+        packet_validation = {
+            "ok": True,
+            "prompt_matches_expected": None,
+            "hard_exclude_reasons": [],
+            "all_reasons": [],
+        }
+        return report, source, packet_validation, packet_validation
+
+    monkeypatch.setattr(executor, "_validate_handoff_packet", fake_validate_handoff_packet)
+    return retry_handoff_path, approval_path
+
+
 def test_approval_artifact_requires_handoff_artifact(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -556,3 +774,320 @@ def test_handoff_packet_paths_remain_repo_relative(tmp_path: Path, monkeypatch: 
         assert not Path(str(packet[key])).is_absolute()
     assert packet["structured_executor_inputs"]["handoff_artifact_path"] == packet["expected_handoff_artifact_path"]
     assert packet["structured_executor_inputs"]["handoff_markdown_path"] == packet["expected_handoff_markdown_path"]
+
+
+def test_retry_dry_run_remains_no_live_without_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, _ = _build_retry_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(sys, "argv", ["executor", "--retry-decision-artifact", str(retry_handoff_path)])
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    assert "DRY RUN" in stdout
+    assert "no subprocess call, no network call, no file written" in stdout
+    assert not retry_approval_mod.claim_output_path("2026-07-14", "higgsfield-20260714-hcr_011-retry01-photo").exists()
+    assert not retry_approval_mod.receipt_output_path("2026-07-14", "higgsfield-20260714-hcr_011-retry01-photo").exists()
+
+
+def test_retry_live_requires_separate_retry_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, _ = _build_retry_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(sys, "argv", ["executor", "--retry-decision-artifact", str(retry_handoff_path), "--live"])
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "--retry-approval-artifact" in stdout
+
+
+def test_retry_dry_run_reports_valid_retry_approval_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+        ],
+    )
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    assert "=== Higgsfield retry generation approval -- validation (no consumption) ===" in stdout
+    assert "approval-retry binding   : confirmed exact match to supplied --retry-decision-artifact" in stdout
+
+
+def test_retry_live_rejects_wrong_slot_or_prompt_or_retry_handoff_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    approval = json.loads(retry_approval_path.read_text(encoding="utf-8"))
+    approval["slot_id"] = "wrong-slot"
+    approval["confirmation_statement"] = retry_approval_mod.confirmation_phrase("wrong-slot")
+    retry_approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "approval_slot_binding_mismatch" in capsys.readouterr().out
+
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path / "prompt", monkeypatch)
+    approval = json.loads(retry_approval_path.read_text(encoding="utf-8"))
+    approval["prompt_sha256"] = hashlib.sha256(b"wrong").hexdigest()
+    retry_approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "approval_prompt_sha_mismatch" in capsys.readouterr().out
+
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path / "binding", monkeypatch)
+    approval = json.loads(retry_approval_path.read_text(encoding="utf-8"))
+    approval["retry_handoff_artifact_path"] = "pipeline/strategy/lena/retry_handoffs/2026-07-14/wrong.json"
+    retry_approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "wrong.json" in capsys.readouterr().out
+
+
+def test_retry_live_rejects_expired_or_broken_lineage_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    approval = json.loads(retry_approval_path.read_text(encoding="utf-8"))
+    approved_at = datetime.now(timezone.utc) - timedelta(minutes=retry_approval_mod.APPROVAL_TTL_MINUTES + 1)
+    approval["approved_at_utc"] = approved_at.replace(microsecond=0).isoformat()
+    approval["expires_at_utc"] = (approved_at + timedelta(minutes=retry_approval_mod.APPROVAL_TTL_MINUTES)).replace(microsecond=0).isoformat()
+    retry_approval_path.write_text(json.dumps(approval, indent=2) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "approval_expired" in capsys.readouterr().out
+
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path / "lineage", monkeypatch)
+    source_receipt = tmp_path / "lineage" / "pipeline" / "approvals" / "lena" / "generation" / "2026-07-14" / "higgsfield-20260714-hcr_011-photo_higgsfield_generation_execution_receipt.json"
+    receipt = json.loads(source_receipt.read_text(encoding="utf-8"))
+    receipt["provider_status"] = "tampered"
+    source_receipt.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "source_execution_receipt_sha256 does not match the current receipt bytes" in capsys.readouterr().out
+
+
+def test_retry_live_success_creates_retry_claim_receipt_and_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    retry_slot = "higgsfield-20260714-hcr_011-retry01-photo"
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: {
+            "job_id": "job-123",
+            "status": "completed",
+            "result_urls": ["https://example.com/final.png"],
+            "saved_image_path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / "2026-07-14" / f"{retry_slot}_seed.png"),
+            "image_format_detected": ".png",
+            "subprocess_start_attempted": True,
+            "provider_submission_may_have_occurred": True,
+        },
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+
+    assert executor.main() == 0
+    stdout = capsys.readouterr().out
+    assert retry_approval_mod.claim_output_path("2026-07-14", retry_slot).is_file()
+    assert retry_approval_mod.receipt_output_path("2026-07-14", retry_slot).is_file()
+    assert (tmp_path / "pipeline" / "higgsfield_debug" / "2026-07-14" / retry_slot / "result_manifest.json").is_file()
+    assert "retry claim written" in stdout
+    assert "retry receipt written" in stdout
+
+
+def test_retry_live_rejects_reused_approval_and_consumes_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    retry_slot = "higgsfield-20260714-hcr_011-retry01-photo"
+    approval_result = retry_approval_mod.validate_retry_generation_approval_artifact(retry_approval_path)
+    retry_approval_mod.write_retry_generation_claim_atomic(
+        retry_approval_mod.claim_output_path("2026-07-14", retry_slot),
+        retry_approval_mod.build_retry_generation_claim_record(approval_result),
+    )
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider path must not be reached after retry claim collision")),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    assert "retry_generation_claim_already_exists" in capsys.readouterr().out
+
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path / "failure", monkeypatch)
+    def _fail_live(*args, **kwargs):
+        raise executor.ProviderCallError(
+            "synthetic provider rejection",
+            stage="provider_rejection",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id="job-123",
+            provider_status="processing",
+        )
+
+    monkeypatch.setattr(executor, "run_live", _fail_live)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert retry_approval_mod.claim_output_path("2026-07-14", retry_slot).is_file()
+    assert retry_approval_mod.receipt_output_path("2026-07-14", retry_slot).is_file()
+    assert "Retry claim retained" in stdout
+
+
+def test_retry_receipt_prevents_second_attempt_even_without_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(tmp_path, monkeypatch)
+    retry_slot = "higgsfield-20260714-hcr_011-retry01-photo"
+    approval_result = retry_approval_mod.validate_retry_generation_approval_artifact(retry_approval_path)
+    claim_path = retry_approval_mod.claim_output_path("2026-07-14", retry_slot)
+    retry_approval_mod.write_retry_generation_claim_atomic(
+        claim_path,
+        retry_approval_mod.build_retry_generation_claim_record(approval_result),
+    )
+    retry_approval_mod.write_retry_generation_execution_receipt_atomic(
+        retry_approval_mod.receipt_output_path("2026-07-14", retry_slot),
+        retry_approval_mod.build_retry_generation_execution_receipt_record(
+            claim_path,
+            approval_result,
+            outcome="execution_failed",
+            failure_stage="provider_rejection",
+            error_text="already consumed",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id="job-123",
+            provider_status="failed",
+            output_path=None,
+            image_format_detected=None,
+            actual_manifest_path=None,
+        ),
+    )
+    claim_path.unlink()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+
+    assert executor.main() == 1
+    assert "retry_generation_already_consumed" in capsys.readouterr().out

@@ -619,6 +619,120 @@ def _write_generation_execution_receipt(
     }
 
 
+def _validate_retry_approval_artifact(retry_handoff_path: Path, approval_path: Path) -> dict[str, Any]:
+    from tools.lena_higgsfield_retry_generation_approval_v1 import (  # noqa: E402
+        HiggsfieldRetryGenerationApprovalError,
+        validate_retry_generation_approval_artifact,
+    )
+
+    try:
+        result = validate_retry_generation_approval_artifact(approval_path)
+    except HiggsfieldRetryGenerationApprovalError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+
+    bound_retry_path = result["retry_facts"]["retry_handoff_path"]
+    if bound_retry_path.resolve() != retry_handoff_path.resolve():
+        raise HandoffArtifactError(
+            "approval_retry_handoff_binding_mismatch",
+            f"retry approval artifact {approval_path} is bound to a different retry "
+            f"handoff artifact ({bound_retry_path}) than the one supplied via "
+            f"--retry-decision-artifact ({retry_handoff_path})",
+        )
+    return result
+
+
+def print_retry_approval_validation_report(approval_path: Path, approval_result: dict[str, Any]) -> None:
+    approval = approval_result["approval"]
+    scope = approval_result["scope_summary"]
+    print()
+    print("=== Higgsfield retry generation approval -- validation (no consumption) ===")
+    print(f"approval artifact path  : {approval_result['approval_repo_path']}")
+    print(f"approval artifact sha256: {approval_result['approval_sha256']}")
+    print(f"operator_id              : {approval.get('operator_id')}")
+    print(f"approved_at_utc          : {approval_result['approved_at_utc']}")
+    print(f"expires_at_utc           : {approval_result['expires_at_utc']}")
+    print(f"is_expired               : {approval_result['is_expired']}")
+    print(f"authorized_attempts      : {scope['authorized_attempts']}")
+    print(f"upload_authorized        : {scope['upload_authorized']}")
+    print(f"queue_promotion_authorized: {scope['queue_promotion_authorized']}")
+    print(f"publish_authorized       : {scope['publish_authorized']}")
+    print(f"scheduling_authorized    : {scope['scheduling_authorized']}")
+    print(f"analytics_mutation_authorized: {scope['analytics_mutation_authorized']}")
+    print("approval-retry binding   : confirmed exact match to supplied --retry-decision-artifact")
+    print("consumption_state        : validation_only (dry-run never consumes approval)")
+
+
+def _create_retry_generation_claim(approval_result: dict[str, Any]) -> dict[str, Any]:
+    from tools.lena_higgsfield_retry_generation_approval_v1 import (  # noqa: E402
+        HiggsfieldRetryGenerationApprovalError,
+        build_retry_generation_claim_record,
+        claim_output_path,
+        receipt_output_path,
+        write_retry_generation_claim_atomic,
+    )
+
+    retry_facts = approval_result["retry_facts"]
+    claim_path = claim_output_path(retry_facts["date"], retry_facts["slot_id"])
+    receipt_path = receipt_output_path(retry_facts["date"], retry_facts["slot_id"])
+    if receipt_path.exists():
+        raise HiggsfieldRetryGenerationApprovalError(
+            "retry_generation_already_consumed",
+            f"retry approval is already consumed because an execution receipt already exists: {receipt_path}",
+        )
+    record = build_retry_generation_claim_record(approval_result)
+    write_retry_generation_claim_atomic(claim_path, record)
+    return {
+        "claim_path": claim_path.resolve(),
+        "claim_repo_path": _repo_relative_path(claim_path),
+        "claim_record": record,
+    }
+
+
+def _write_retry_generation_execution_receipt(
+    claim_path: Path,
+    approval_result: dict[str, Any],
+    *,
+    outcome: str,
+    failure_stage: str | None,
+    error_text: str | None,
+    subprocess_start_attempted: bool,
+    provider_submission_may_have_occurred: bool,
+    provider_job_id: str | None,
+    provider_status: str | None,
+    output_path: str | None,
+    image_format_detected: str | None,
+    actual_manifest_path: str | None,
+) -> dict[str, Any]:
+    from tools.lena_higgsfield_retry_generation_approval_v1 import (  # noqa: E402
+        build_retry_generation_execution_receipt_record,
+        receipt_output_path,
+        write_retry_generation_execution_receipt_atomic,
+    )
+
+    retry_facts = approval_result["retry_facts"]
+    path = receipt_output_path(retry_facts["date"], retry_facts["slot_id"])
+    record = build_retry_generation_execution_receipt_record(
+        claim_path,
+        approval_result,
+        outcome=outcome,
+        failure_stage=failure_stage,
+        error_text=error_text,
+        subprocess_start_attempted=subprocess_start_attempted,
+        provider_submission_may_have_occurred=provider_submission_may_have_occurred,
+        provider_job_id=provider_job_id,
+        provider_status=provider_status,
+        output_path=output_path,
+        image_format_detected=image_format_detected,
+        actual_manifest_path=actual_manifest_path,
+    )
+    write_retry_generation_execution_receipt_atomic(path, record)
+    return {
+        "receipt_path": path.resolve(),
+        "receipt_repo_path": _repo_relative_path(path),
+        "receipt_record": record,
+    }
+
+
 # --- Handoff packet helpers -------------------------------------------------
 
 def _require_handoff(condition: bool, code: str, detail: str) -> None:
@@ -1265,6 +1379,15 @@ def main() -> int:
              "atomic single-use claim/receipt contract.",
     )
     parser.add_argument(
+        "--retry-approval-artifact", type=Path, dest="retry_approval_artifact", default=None,
+        help="Optional, only valid together with --retry-decision-artifact when the "
+             "artifact is a lena_higgsfield_retry_handoff_v1 retry handoff. A "
+             "recorded retry-generation approval artifact "
+             "(tools/lena_record_higgsfield_retry_generation_approval_v1.py) to "
+             "validate and, under --live, consume through an atomic single-use "
+             "retry claim/receipt contract.",
+    )
+    parser.add_argument(
         "--custom-reference-id", dest="custom_reference_id",
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         help="Higgsfield Soul custom_reference_id (default: Lena's confirmed Soul ID)",
@@ -1287,6 +1410,12 @@ def main() -> int:
 
     if args.approval_artifact is not None and args.handoff_artifact is None:
         print("[ABORT] --approval-artifact requires --handoff-artifact.")
+        return 1
+    if args.retry_approval_artifact is not None and args.retry_decision_artifact is None:
+        print("[ABORT] --retry-approval-artifact requires --retry-decision-artifact.")
+        return 1
+    if args.approval_artifact is not None and args.retry_approval_artifact is not None:
+        print("[ABORT] --approval-artifact and --retry-approval-artifact are mutually exclusive.")
         return 1
 
     if args.handoff_artifact is not None:
@@ -1442,15 +1571,127 @@ def main() -> int:
 
     if not live:
         print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
+        retry_approval_error: Optional[HandoffArtifactError] = None
+        if args.retry_decision_artifact is not None and args.retry_approval_artifact is not None:
+            try:
+                retry_approval_result = _validate_retry_approval_artifact(
+                    args.retry_decision_artifact, args.retry_approval_artifact
+                )
+                print_retry_approval_validation_report(args.retry_approval_artifact, retry_approval_result)
+            except HandoffArtifactError as exc:
+                retry_approval_error = exc
+                print(f"[ABORT] retry approval validation failed: {exc.code}: {exc.detail}")
+        if retry_approval_error is not None:
+            return 1
         return 0 if validation["ok"] else 1
 
     if args.retry_decision_artifact is not None:
         print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
-        print(
-            "[ABORT] --retry-decision-artifact --live is forbidden until a separately "
-            "bound retry approval contract exists."
+        retry_approval_result = None
+        retry_approval_error: Optional[HandoffArtifactError] = None
+        if args.retry_approval_artifact is not None:
+            try:
+                retry_approval_result = _validate_retry_approval_artifact(
+                    args.retry_decision_artifact, args.retry_approval_artifact
+                )
+                print_retry_approval_validation_report(args.retry_approval_artifact, retry_approval_result)
+            except HandoffArtifactError as exc:
+                retry_approval_error = exc
+                print(f"[ABORT] retry approval validation failed: {exc.code}: {exc.detail}")
+        if retry_approval_error is not None:
+            return 1
+        if args.retry_approval_artifact is None:
+            print(
+                "[ABORT] --live with --retry-decision-artifact requires a valid "
+                "--retry-approval-artifact. The retry handoff remains review-only "
+                "and is never rewritten into live authorization."
+            )
+            return 1
+        try:
+            claim_info = _create_retry_generation_claim(retry_approval_result)
+        except Exception as exc:
+            code = getattr(exc, "code", "retry_generation_claim_creation_failed")
+            print(f"[ABORT] retry claim creation failed: {code}: {exc}")
+            return 1
+        claim_path = Path(claim_info["claim_path"])
+        manifest_repo_path = _repo_relative_path(manifest_path(date_str, slot_id))
+        try:
+            live_result = run_live(date_str, slot_id, source, args.custom_reference_id)
+        except ProviderCallError as exc:
+            try:
+                receipt_info = _write_retry_generation_execution_receipt(
+                    claim_path,
+                    retry_approval_result,
+                    outcome="execution_failed",
+                    failure_stage=exc.stage,
+                    error_text=_sanitize_operational_error_text(exc),
+                    subprocess_start_attempted=exc.subprocess_start_attempted,
+                    provider_submission_may_have_occurred=exc.provider_submission_may_have_occurred,
+                    provider_job_id=exc.provider_job_id,
+                    provider_status=exc.provider_status,
+                    output_path=exc.output_path,
+                    image_format_detected=exc.image_format_detected,
+                    actual_manifest_path=None,
+                )
+            except Exception as receipt_exc:
+                print(f"[FAILED] {exc}")
+                print(
+                    "[FAILED] retry claim retained but execution receipt could not be "
+                    f"written: {getattr(receipt_exc, 'code', 'retry_generation_execution_receipt_write_failed')}: {receipt_exc}"
+                )
+                print("[FAILED] Manual reconciliation required before any new retry approval is used.")
+                return 1
+            print(f"[FAILED] {exc}")
+            print(f"[FAILED] retry execution receipt written: {receipt_info['receipt_repo_path']}")
+            print("[FAILED] Retry claim retained; manual reconciliation or a new retry approval is required.")
+            return 1
+        try:
+            receipt_info = _write_retry_generation_execution_receipt(
+                claim_path,
+                retry_approval_result,
+                outcome="success",
+                failure_stage=None,
+                error_text=None,
+                subprocess_start_attempted=bool(live_result.get("subprocess_start_attempted")),
+                provider_submission_may_have_occurred=bool(live_result.get("provider_submission_may_have_occurred")),
+                provider_job_id=live_result.get("job_id"),
+                provider_status=live_result.get("status"),
+                output_path=live_result.get("saved_image_path"),
+                image_format_detected=live_result.get("image_format_detected"),
+                actual_manifest_path=manifest_repo_path,
+            )
+        except Exception as receipt_exc:
+            print(
+                "[FAILED] live retry generation succeeded, but retry execution receipt creation "
+                f"failed: {getattr(receipt_exc, 'code', 'retry_generation_execution_receipt_write_failed')}: {receipt_exc}"
+            )
+            print("[FAILED] Retry claim retained; manual reconciliation required before any new retry approval is used.")
+            return 1
+        manifest = build_manifest(
+            date_str,
+            slot_id,
+            source,
+            args.custom_reference_id,
+            live_result,
+            claim_repo_path=claim_info["claim_repo_path"],
+            receipt_repo_path=receipt_info["receipt_repo_path"],
         )
-        return 1
+        mpath = manifest_path(date_str, slot_id)
+        try:
+            mpath.parent.mkdir(parents=True, exist_ok=True)
+            mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception as exc:
+            print(
+                "[FAILED] retry execution receipt written but manifest creation failed: "
+                f"{_sanitize_operational_error_text(exc)}"
+            )
+            print("[FAILED] Retry claim and receipt were retained. No provider retry was attempted.")
+            return 1
+        print(f"[LIVE] saved image     : {live_result['saved_image_path']}")
+        print(f"[LIVE] retry claim written   : {claim_info['claim_repo_path']}")
+        print(f"[LIVE] retry receipt written : {receipt_info['receipt_repo_path']}")
+        print(f"[LIVE] manifest written: {mpath}")
+        return 0
 
     print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
     print(
