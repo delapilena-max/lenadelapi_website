@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
@@ -114,3 +115,16 @@ def test_rebuild_packet_from_authoritative_sources_reproduces_prompt_preview(mon
 
     assert rebuilt["compact_provider_prompt_preview"] == packet["compact_provider_prompt_preview"]
     assert rebuilt["compact_provider_prompt_sha256"] == packet["compact_provider_prompt_sha256"]
+
+
+def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() -> None:
+    recipe_bank = json.loads(Path(packet_builder.RECIPE_BANK).read_text(encoding="utf-8-sig"))
+    recipe = next(item for item in recipe_bank["recipes"] if item["id"] == "hcr_011")
+
+    prompt = packet_builder.build_structured_kling_prompt(recipe, max_chars=2499)
+
+    assert "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio." in prompt
+    assert "blue-hour ambient mixed with warm [Lighting/Style]:" not in prompt
+    assert "non-studio. [Lighting/Style]:" in prompt
+    assert "[Lighting/Style]: Face-first available light only." in prompt
+    assert len(prompt) <= 2499

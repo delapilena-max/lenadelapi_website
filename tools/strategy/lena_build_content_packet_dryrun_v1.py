@@ -161,12 +161,12 @@ STRUCTURED_TECHNICAL_REALISM = (
 )
 
 STRUCTURED_SECTION_MAX = {
-    "[Subject]": 430,
-    "[Action]": 250,
-    "[Environment]": 260,
-    "[Cinematography]": 170,
-    "[Lighting/Style]": 210,
-    "[Technical]": 210,
+    "[Subject]": 540,
+    "[Action]": 330,
+    "[Environment]": 360,
+    "[Cinematography]": 230,
+    "[Lighting/Style]": 300,
+    "[Technical]": 500,
 }
 
 AI_TERMS = re.compile(
@@ -243,6 +243,45 @@ def fit_prompt_sentences(parts, max_chars):
     return current
 
 
+def fit_prompt_units(text, max_chars):
+    text = clean_fragment(text)
+    if not text:
+        return ""
+
+    current = ""
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        if sentence.strip()
+    ]
+    for sentence in sentences:
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            break
+
+        clause_current = ""
+        clauses = [
+            clause.strip()
+            for clause in re.split(r"(?<=,)\s+|(?<=;)\s+", sentence)
+            if clause.strip()
+        ]
+        for clause in clauses:
+            clause_candidate = (
+                f"{clause_current} {clause}".strip()
+                if clause_current else clause
+            )
+            if len(clause_candidate) <= max_chars:
+                clause_current = clause_candidate
+                continue
+            break
+        current = clause_current
+        break
+    return current
+
+
 def clean_fragment(text):
     return re.sub(r"\s+", " ", (text or "")).strip()
 
@@ -309,7 +348,7 @@ def build_structured_kling_prompt(recipe, max_chars=2499):
         if remaining <= 0:
             break
         section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
-        trimmed = fit_prompt_sentences([body], min(remaining, section_cap))
+        trimmed = fit_prompt_units(body, min(remaining, section_cap))
         if not trimmed:
             trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
         if not trimmed:
