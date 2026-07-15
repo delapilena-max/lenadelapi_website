@@ -26,8 +26,13 @@ from __future__ import annotations
 #             image_references (array, max 1), quality (enum "1.5k"/"2k").
 #   No Prompt Enhancer parameter exists in this schema -- see doctrine note
 #   below. No negative-prompt parameter exists either.
-#   Lena's confirmed Soul: name="Lena", type="soul_2",
-#   id=1f1200e4-1cc9-4504-ac1c-3304b687e3c1 (`soul-id list --json`).
+#   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
+#   id=90a293d7-f3af-4377-8751-3304a27b6f31 (`soul-id list --json`,
+#   re-confirmed 2026-07-12 -- the provider account's live Soul ID rotated
+#   at some point after the original 2026-07-09/10 confirmation; the prior
+#   id, 1f1200e4-1cc9-4504-ac1c-3304b687e3c1, is no longer present on the
+#   account and is preserved only as historical fact in already-recorded
+#   manifests/evidence -- never used as a default for new live submissions).
 #
 # PROMPT ENHANCER DOCTRINE: the authenticated schema for text2image_soul_v2
 # exposes no enhancer-shaped parameter at all (searched for enhance/
@@ -69,9 +74,12 @@ from __future__ import annotations
 #   python pipeline/higgsfield_lena_api_executor.py --date 2026-07-09 --slot-id readypack0709-pack000-05-photo --live
 
 import argparse
+import contextlib
 import hashlib
+import io
 import json
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -104,6 +112,10 @@ from lena_higgsfield_prompt_library_dryrun import _hard_exclude_reasons  # noqa:
 HIGGSFIELD_CLI_BINARY = "higgsfield"
 HIGGSFIELD_IMAGE_JOB_TYPE = "text2image_soul_v2"
 HIGGSFIELD_ASPECT_RATIO = "9:16"
+HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
+HANDOFF_SCHEMA_VERSION = "v1"
+HANDOFF_EXECUTION_OWNER = "claude"
+HANDOFF_EXECUTOR_TYPE = "higgsfield_cli"
 
 # Confirmed once during the authenticated contract-inspection session
 # (2026-07-09/10 later session). Not re-verified per invocation -- calling
@@ -112,17 +124,26 @@ HIGGSFIELD_ASPECT_RATIO = "9:16"
 HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.10"
 
 # Lena's confirmed Soul (`higgsfield soul-id list --json`, authenticated,
-# 2026-07-09/10 later session). Non-secret identity/config metadata, not
-# read from or written to .env (see SOUL ID DOCTRINE above).
-DEFAULT_LENA_CUSTOM_REFERENCE_ID = "1f1200e4-1cc9-4504-ac1c-3304b687e3c1"
+# re-confirmed 2026-07-12 -- the account's live Soul ID rotated since the
+# original 2026-07-09/10 confirmation; the prior id
+# 1f1200e4-1cc9-4504-ac1c-3304b687e3c1 is no longer present on the
+# provider account). Non-secret identity/config metadata, not read from or
+# written to .env (see SOUL ID DOCTRINE above). This is the single, current
+# default used for every NEW live submission -- it is never chosen from a
+# set, and historical evidence recorded under the prior id remains valid
+# historical fact (see pipeline/identity/lena_higgsfield_identity.py's
+# APPROVED_CUSTOM_REFERENCE_IDS for the separate, read-only evidence-side
+# policy that accepts either id).
+DEFAULT_LENA_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 CONFIRMED_LENA_SOUL_NAME = "Lena"
-CONFIRMED_LENA_SOUL_TYPE = "soul_2"
+CONFIRMED_LENA_SOUL_TYPE = "Soul 2.0"
 
 # Exact count_per_pack used to generate the accepted 2026-07-09 readiness
 # pack (library_prefix="readypack0709", packs=12, count_per_pack=10). This
 # is not a general-purpose default -- it is the one confirmed value needed
 # to deterministically reproduce those exact slots. See resolve_prompt_source.
 KNOWN_PHOTO_DUMP_PACK_COUNT = 10
+POSE_BANK_PATH = ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_pose_body_language_bank_v1.json"
 
 _PACK_SLOT_ID_PATTERN = re.compile(
     r"^(?P<library_prefix>[A-Za-z0-9]+)-pack(?P<pack_index>\d{3})-"
@@ -146,6 +167,15 @@ class ProviderCallError(Exception):
     """Raised for any provider subprocess/parse/download failure. Always
     fails closed -- never leaves a failed job looking like a successful
     artifact."""
+
+
+class HandoffArtifactError(Exception):
+    """Raised when a Claude/Higgsfield handoff artifact fails validation."""
+
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 # --- Prompt-source resolution ----------------------------------------------
@@ -197,6 +227,22 @@ def _extract_pose_text(prompt: str) -> str:
     return match.group(1) if match else ""
 
 
+def _canonical_pose_text(image: dict[str, Any]) -> str:
+    pose_id = str(image.get("pose_body_language_id") or "").strip()
+    if not pose_id:
+        return ""
+    try:
+        bank = json.loads(POSE_BANK_PATH.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return ""
+    for item in bank.get("combos", []):
+        if not isinstance(item, dict) or item.get("pose_body_language_id") != pose_id:
+            continue
+        text = item.get("text")
+        return text.strip() if isinstance(text, str) else ""
+    return ""
+
+
 # --- Safety-gate validation (dry-run and pre-live) --------------------------
 
 def validate_candidate(source: dict, expected_prompt_path: Optional[Path]) -> dict:
@@ -236,6 +282,347 @@ def validate_candidate(source: dict, expected_prompt_path: Optional[Path]) -> di
         "prompt_matches_expected": prompt_matches_expected,
         "all_reasons": reasons,
     }
+
+
+def render_dry_run_contract(
+    date_str: str,
+    slot_id: str,
+    source: dict,
+    custom_reference_id: str,
+    expected_prompt_path: Optional[Path] = None,
+) -> dict[str, Any]:
+    validation = validate_candidate(source, expected_prompt_path)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        print_dry_run_report(date_str, slot_id, source, custom_reference_id, validation)
+    return {
+        "stdout": output.getvalue(),
+        "validation": validation,
+        "ok": validation["ok"],
+        "date": date_str,
+        "slot_id": slot_id,
+    }
+
+
+def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    report = _load_handoff_report(handoff_path)
+    date_str = str(report["date"]).strip()
+    slot_id = str(report["selected_slot_id"]).strip()
+    structured = report.get("structured_executor_inputs", {})
+    _require_handoff(isinstance(structured, dict), "handoff_missing_executor_inputs", f"{handoff_path} has no structured_executor_inputs object")
+
+    _require_handoff(structured.get("model") == HIGGSFIELD_IMAGE_JOB_TYPE, "handoff_model_mismatch", f"{handoff_path} model must be {HIGGSFIELD_IMAGE_JOB_TYPE!r}")
+    _require_handoff(structured.get("aspect_ratio") == HIGGSFIELD_ASPECT_RATIO, "handoff_aspect_mismatch", f"{handoff_path} aspect_ratio must be {HIGGSFIELD_ASPECT_RATIO!r}")
+    _require_handoff(structured.get("provider") == HIGGSFIELD_CLI_BINARY, "handoff_provider_mismatch", f"{handoff_path} provider must be {HIGGSFIELD_CLI_BINARY!r}")
+    _require_handoff(structured.get("executor_type") == HANDOFF_EXECUTOR_TYPE, "handoff_executor_type_mismatch", f"{handoff_path} executor_type must be {HANDOFF_EXECUTOR_TYPE!r}")
+    _require_handoff(structured.get("repo_executor_path") == "pipeline/higgsfield_lena_api_executor.py", "handoff_repo_executor_path_mismatch", f"{handoff_path} repo_executor_path must be pipeline/higgsfield_lena_api_executor.py")
+    _require_handoff(structured.get("negative_prompt_enabled") is False, "handoff_negative_prompt_enabled", f"{handoff_path} must keep negative_prompt_enabled false")
+    _require_handoff(structured.get("live_execution_authorized") is False, "handoff_live_not_authorized", f"{handoff_path} must keep live_execution_authorized false")
+    _require_handoff(report.get("live_execution_authorized") is False, "handoff_live_not_authorized", f"{handoff_path} must keep live_execution_authorized false")
+    _require_handoff(report.get("generation_approval_required") is True, "handoff_generation_approval_required", f"{handoff_path} must require generation approval")
+    _require_handoff(report.get("manual_operator_approval_required") is True, "handoff_manual_operator_approval_required", f"{handoff_path} must require manual operator approval")
+    _require_handoff(report.get("provider_call_performed") is False, "handoff_provider_call_performed", f"{handoff_path} must not claim provider call performed")
+    _require_handoff(report.get("generation_performed") is False, "handoff_generation_performed", f"{handoff_path} must not claim generation performed")
+    _require_handoff(report.get("publish_authorized") is False, "handoff_publish_authorized", f"{handoff_path} must not claim publish authorization")
+    _require_handoff(report.get("manual_publish_review_required") is True, "handoff_manual_publish_review_required", f"{handoff_path} must keep manual publish review required")
+    _require_handoff(report.get("packet_state") == "packet_valid_for_claude_review", "handoff_packet_state_invalid", f"{handoff_path} packet_state must remain review-only")
+    _require_handoff(report.get("dry_run_executor_contract_state") == "ready", "handoff_contract_state_invalid", f"{handoff_path} dry_run_executor_contract_state must be ready")
+    _require_handoff(report.get("live_execution_state") == "blocked", "handoff_live_state_invalid", f"{handoff_path} live_execution_state must remain blocked")
+
+    soul = structured.get("soul_metadata", {})
+    _require_handoff(isinstance(soul, dict), "handoff_missing_soul_metadata", f"{handoff_path} has no soul_metadata object")
+    _require_handoff(soul.get("name") == CONFIRMED_LENA_SOUL_NAME, "handoff_soul_name_mismatch", f"{handoff_path} soul name mismatch")
+    _require_handoff(soul.get("type") == CONFIRMED_LENA_SOUL_TYPE, "handoff_soul_type_mismatch", f"{handoff_path} soul type mismatch")
+    _require_handoff(soul.get("custom_reference_id") == DEFAULT_LENA_CUSTOM_REFERENCE_ID, "handoff_soul_reference_mismatch", f"{handoff_path} custom_reference_id mismatch")
+    _require_handoff(soul.get("identity_is_prompt_instruction") is False, "handoff_soul_prompt_instruction_invalid", f"{handoff_path} soul identity must remain metadata")
+
+    handoff_rel = _repo_relative_path(handoff_path)
+    expected_dry = f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_rel}"
+    expected_live = f"{expected_dry} --live"
+    _require_handoff(structured.get("dry_run_command") == expected_dry, "handoff_dry_run_command_mismatch", f"{handoff_path} dry_run_command must be {expected_dry!r}")
+    _require_handoff(structured.get("live_command") == expected_live, "handoff_live_command_mismatch", f"{handoff_path} live_command must be {expected_live!r}")
+    _require_handoff(structured.get("dry_run_argv") == ["python", "pipeline/higgsfield_lena_api_executor.py", "--handoff-artifact", handoff_rel], "handoff_dry_run_argv_mismatch", f"{handoff_path} dry_run_argv must match the repo-adapter handoff command")
+    _require_handoff(structured.get("live_argv") == ["python", "pipeline/higgsfield_lena_api_executor.py", "--handoff-artifact", handoff_rel, "--live"], "handoff_live_argv_mismatch", f"{handoff_path} live_argv must match the blocked live command")
+
+    recommendation_path = _resolve_repo_path(report.get("source_recommendation_artifact_path", ""))
+    learning_path = _resolve_repo_path(report.get("source_learning_artifact_path", ""))
+    queue_path = _resolve_repo_path(report.get("source_queue_dry_run_artifact_path", ""))
+    candidate_path = _resolve_repo_path(report.get("selected_prompt_input_artifact_path", ""))
+    for label, path_value in (
+        ("recommendation", recommendation_path),
+        ("learning", learning_path),
+        ("queue", queue_path),
+        ("selected candidate", candidate_path),
+    ):
+        _require_handoff(path_value.is_file(), "handoff_missing_source_artifact", f"{handoff_path} missing required {label} artifact: {path_value}")
+
+    _require_handoff(report.get("source_recommendation_artifact_sha256") == _sha256_file(recommendation_path), "handoff_recommendation_sha_mismatch", f"{handoff_path} recommendation sha mismatch")
+    _require_handoff(report.get("source_learning_artifact_sha256") == _sha256_file(learning_path), "handoff_learning_sha_mismatch", f"{handoff_path} learning sha mismatch")
+    _require_handoff(report.get("source_queue_dry_run_artifact_sha256") == _sha256_file(queue_path), "handoff_queue_sha_mismatch", f"{handoff_path} queue sha mismatch")
+    _require_handoff(report.get("selected_prompt_input_artifact_sha256") == _sha256_file(candidate_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected candidate artifact sha mismatch")
+
+    recommendation = load_report(recommendation_path, expected_report_type="lena_next_generation_step", expected_date=date_str)
+    learning_path_loaded, learning = load_learning_report(recommendation, date_str)
+    queue_loaded_path, queue_report = load_queue_report(date_str)
+    candidate_report = load_candidate_report(candidate_path, date_str)
+    candidate = candidate_report.get("candidate", {})
+
+    _require_handoff(learning_path_loaded == learning_path, "handoff_learning_path_mismatch", f"{handoff_path} learning artifact path mismatch")
+    _require_handoff(queue_loaded_path == queue_path, "handoff_queue_path_mismatch", f"{handoff_path} queue artifact path mismatch")
+    _require_handoff(recommendation.get("learning_status") == learning.get("metrics_resolution_summary", {}).get("learning_status"), "handoff_learning_status_mismatch", f"{handoff_path} learning status mismatch")
+    _require_handoff(int(recommendation.get("learning_published_post_count", -1)) == int(learning.get("published_post_count", -1)), "handoff_learning_published_count_mismatch", f"{handoff_path} learning published count mismatch")
+    _require_handoff(int(recommendation.get("learning_pending_metrics_count", -1)) == len(learning.get("pending_metrics_posts", [])), "handoff_learning_pending_count_mismatch", f"{handoff_path} learning pending count mismatch")
+    _require_handoff(int(recommendation.get("learning_stale_pending_metrics_count", -1)) == len(learning.get("stale_pending_metrics_posts", [])), "handoff_learning_stale_count_mismatch", f"{handoff_path} learning stale count mismatch")
+    _require_handoff(recommendation.get("learning_resolution_state_summary", {}) == learning.get("metrics_resolution_summary", {}), "handoff_learning_summary_mismatch", f"{handoff_path} learning resolution summary mismatch")
+    _require_handoff(report.get("source_recommendation", {}).get("recommended_recipe_id") == recommendation.get("recommendation", {}).get("recommended_recipe_id"), "handoff_recommendation_recipe_mismatch", f"{handoff_path} recommendation recipe mismatch")
+
+    queue_head = queue_report.get("queue_slots", [])[0]
+    _require_handoff(queue_head.get("recipe_id") == recommendation.get("recommendation", {}).get("recommended_recipe_id"), "handoff_queue_head_mismatch", f"{handoff_path} queue head mismatch")
+    _require_handoff(candidate.get("recipe_id") == queue_head.get("recipe_id"), "handoff_candidate_recipe_mismatch", f"{handoff_path} selected candidate recipe mismatch")
+    _require_handoff(candidate.get("candidate_id") == report.get("selected_prompt_input", {}).get("candidate_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected candidate id mismatch")
+    _require_handoff(candidate.get("prompt_sha256") == report.get("selected_prompt_input", {}).get("prompt_sha256"), "handoff_expected_prompt_sha_missing_or_mismatch", f"{handoff_path} expected prompt sha mismatch")
+    _require_handoff(candidate_report.get("decision_fingerprint_sha256") == report.get("selected_prompt_input", {}).get("decision_fingerprint_sha256"), "handoff_decision_fingerprint_mismatch", f"{handoff_path} decision fingerprint mismatch")
+    _require_handoff(candidate.get("exact_proposed_dry_run_command") == report.get("selected_prompt_input", {}).get("exact_proposed_dry_run_command"), "handoff_candidate_command_mismatch", f"{handoff_path} candidate dry-run command mismatch")
+
+    source = resolve_prompt_source(date_str, slot_id)
+    image = source.get("image", {})
+    prompt = image.get("image_prompt")
+    _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
+    regenerated_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    expected_sha = str(report.get("selected_prompt_input", {}).get("prompt_sha256", ""))
+    _require_handoff(expected_sha and regenerated_sha == expected_sha, "handoff_prompt_sha_mismatch", f"{handoff_path} regenerated prompt SHA does not match packet expectation")
+    _require_handoff(candidate.get("prompt_sha256") == regenerated_sha, "handoff_prompt_candidate_sha_mismatch", f"{handoff_path} candidate prompt sha mismatch")
+    _require_handoff(image.get("slot_id") == slot_id, "handoff_slot_mismatch", f"{handoff_path} regenerated slot mismatch")
+    _require_handoff(image.get("lane") == candidate.get("lane"), "handoff_lane_mismatch", f"{handoff_path} regenerated lane mismatch")
+    _require_handoff(image.get("soul_name") == CONFIRMED_LENA_SOUL_NAME, "handoff_soul_name_mismatch", f"{handoff_path} regenerated soul name mismatch")
+    _require_handoff(image.get("soul_version") == CONFIRMED_LENA_SOUL_TYPE, "handoff_soul_version_mismatch", f"{handoff_path} regenerated soul version mismatch")
+    _require_handoff(image.get("soul_selection_mode") == "provider_config_not_prompt_text", "handoff_soul_selection_mode_mismatch", f"{handoff_path} regenerated soul selection mode mismatch")
+    _require_handoff(image.get("negative_prompt_enabled") is False, "handoff_negative_prompt_enabled", f"{handoff_path} regenerated prompt must keep negative_prompt disabled")
+    _require_handoff(report.get("selected_prompt_input", {}).get("artifact_sha256") == _sha256_file(candidate_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected candidate artifact sha mismatch")
+    validation = validate_candidate(source, None)
+    _require_handoff(validation["ok"], "handoff_prompt_validation_failed", f"{handoff_path} regenerated prompt does not satisfy the existing dry-run validation gates")
+    _require_handoff(report.get("selected_prompt_input_artifact_path") == report.get("selected_prompt_input", {}).get("artifact_path"), "handoff_candidate_path_mismatch", f"{handoff_path} selected candidate path mismatch")
+    _require_handoff(report.get("selected_prompt_input_artifact_path") == _repo_relative_path(candidate_path), "handoff_candidate_path_mismatch", f"{handoff_path} selected candidate path mismatch")
+    _require_handoff(report.get("expected_handoff_artifact_path") == _repo_relative_path(handoff_path), "handoff_artifact_path_mismatch", f"{handoff_path} packet path mismatch")
+    _require_handoff(report.get("expected_handoff_markdown_path") == _repo_relative_path(_handoff_markdown_path(date_str)), "handoff_markdown_path_mismatch", f"{handoff_path} markdown path mismatch")
+    _require_handoff(structured.get("date") == date_str, "handoff_date_mismatch", f"{handoff_path} structured date mismatch")
+    _require_handoff(structured.get("handoff_artifact_path") == _repo_relative_path(handoff_path), "handoff_artifact_path_mismatch", f"{handoff_path} structured packet path mismatch")
+    _require_handoff(structured.get("handoff_markdown_path") == _repo_relative_path(_handoff_markdown_path(date_str)), "handoff_markdown_path_mismatch", f"{handoff_path} structured markdown path mismatch")
+    _require_handoff(structured.get("expected_image_path") == _repo_relative_path(
+        ROOT
+        / "pipeline"
+        / "higgsfield_library"
+        / "lena"
+        / date_str
+        / f"{slot_id}_seed.png"
+    ), "handoff_expected_image_path_mismatch", f"{handoff_path} expected image path mismatch")
+    _require_handoff(structured.get("expected_manifest_path") == _repo_relative_path(
+        ROOT
+        / "pipeline"
+        / "higgsfield_debug"
+        / date_str
+        / slot_id
+        / "result_manifest.json"
+    ), "handoff_expected_manifest_path_mismatch", f"{handoff_path} expected manifest path mismatch")
+
+    packet_validation = {
+        "handoff_artifact_path": _repo_relative_path(handoff_path),
+        "handoff_validation_passed": True,
+        "date": date_str,
+        "slot_id": slot_id,
+        "selected_prompt_sha256": expected_sha,
+        "regenerated_prompt_sha256": regenerated_sha,
+        "prompt_sha_match": True,
+        "provider_model_aspect_soul_agreement": True,
+        "provider_call_performed": False,
+        "generation_performed": False,
+        "live_execution_authorized": False,
+        "hand_off_state": report.get("live_execution_state"),
+    }
+    return report, source, packet_validation, validation
+
+
+def print_handoff_dry_run_report(
+    handoff_path: Path,
+    report: dict,
+    source: dict,
+    custom_reference_id: str,
+    packet_validation: dict,
+    validation: dict,
+) -> None:
+    image = source["image"]
+    prompt = image["image_prompt"]
+    argv = build_provider_argv(prompt, custom_reference_id)
+
+    print("=== Higgsfield Lena executor -- HANDOFF DRY RUN (no provider/network call) ===\n")
+    print(f"handoff artifact path  : {packet_validation['handoff_artifact_path']}")
+    print(f"handoff validation     : {packet_validation['handoff_validation_passed']}")
+    print(f"date                    : {report['date']}")
+    print(f"slot_id                 : {report['selected_slot_id']}")
+    print(f"expected prompt sha256  : {packet_validation['selected_prompt_sha256']}")
+    print(f"regenerated prompt sha256: {packet_validation['regenerated_prompt_sha256']}")
+    print(f"prompt sha match        : {packet_validation['prompt_sha_match']}")
+    print(f"provider/model/aspect/soul agreement : {packet_validation['provider_model_aspect_soul_agreement']}")
+    print(f"provider_call_performed : {packet_validation['provider_call_performed']}")
+    print(f"generation_performed    : {packet_validation['generation_performed']}")
+    print(f"live_execution_authorized: {packet_validation['live_execution_authorized']}")
+    print()
+    print_dry_run_report(report["date"], report["selected_slot_id"], source, custom_reference_id, validation)
+
+
+# --- Handoff packet helpers -------------------------------------------------
+
+def _require_handoff(condition: bool, code: str, detail: str) -> None:
+    if not condition:
+        raise HandoffArtifactError(code, detail)
+
+
+def _repo_relative_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(ROOT).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def _resolve_repo_path(path_value: str) -> Path:
+    raw = str(path_value or "").strip()
+    _require_handoff(bool(raw), "handoff_path_missing", "required repository path is missing")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def _handoff_json_path(date_str: str) -> Path:
+    return ROOT / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_next_live_image_handoff_{date_str}.json"
+
+
+def _handoff_markdown_path(date_str: str) -> Path:
+    return ROOT / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_next_live_image_handoff_{date_str}.md"
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_report(
+    path: Path,
+    *,
+    expected_report_type: str,
+    expected_date: str,
+    require_date: bool = True,
+) -> dict[str, Any]:
+    _require_handoff(path.is_file(), "handoff_missing_artifact", f"missing required artifact: {path}")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - defensive fail closed
+        raise HandoffArtifactError("handoff_unreadable_artifact", f"{path}: {exc}") from exc
+    _require_handoff(isinstance(report, dict), "handoff_malformed_artifact", f"{path} must contain a JSON object")
+    _require_handoff(
+        report.get("report_type") == expected_report_type,
+        "handoff_wrong_report_type",
+        f"{path} has report_type {report.get('report_type')!r}, expected {expected_report_type!r}",
+    )
+    report_date = str(report.get("date", "")).strip()
+    if require_date or report_date:
+        _require_handoff(
+            report_date == expected_date,
+            "handoff_date_mismatch",
+            f"{path} has date {report_date!r}, expected {expected_date!r}",
+        )
+    return report
+
+
+def load_learning_report(recommendation: dict[str, Any], expected_date: str) -> tuple[Path, dict[str, Any]]:
+    learning_path = _resolve_repo_path(str(recommendation.get("learning_artifact_path", "")))
+    _require_handoff(
+        learning_path.is_file(),
+        "handoff_missing_learning_artifact",
+        f"recommendation references a missing learning artifact: {learning_path}",
+    )
+    learning = load_report(
+        learning_path,
+        expected_report_type="lena_post_outcome_learning_state",
+        expected_date=expected_date,
+    )
+    return learning_path, learning
+
+
+def load_queue_report(expected_date: str) -> tuple[Path, dict[str, Any]]:
+    path = ROOT / "pipeline" / "strategy" / "lena" / "next_actions" / expected_date / f"lena_autonomous_generation_queue_dryrun_{expected_date}.json"
+    queue_report = load_report(
+        path,
+        expected_report_type="lena_autonomous_generation_queue_dryrun",
+        expected_date=expected_date,
+        require_date=False,
+    )
+    queue_slots = queue_report.get("queue_slots", [])
+    _require_handoff(
+        isinstance(queue_slots, list) and bool(queue_slots),
+        "handoff_empty_queue_report",
+        f"{path} has no queue_slots",
+    )
+    head = queue_slots[0]
+    _require_handoff(
+        isinstance(head, dict),
+        "handoff_queue_head_invalid",
+        f"{path} queue head is not a JSON object",
+    )
+    return path.resolve(), queue_report
+
+
+def load_candidate_report(path: Path, expected_date: str) -> dict[str, Any]:
+    _require_handoff(path.is_file(), "handoff_missing_artifact", f"missing required artifact: {path}")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - defensive fail closed
+        raise HandoffArtifactError("handoff_unreadable_artifact", f"{path}: {exc}") from exc
+    _require_handoff(isinstance(report, dict), "handoff_malformed_artifact", f"{path} must contain a JSON object")
+    _require_handoff(
+        report.get("schema_version") == "lena_pre_generation_candidate_gate_v1",
+        "handoff_wrong_report_type",
+        f"{path} has schema_version {report.get('schema_version')!r}, expected 'lena_pre_generation_candidate_gate_v1'",
+    )
+    _require_handoff(
+        str(report.get("as_of_date", "")).strip() == expected_date,
+        "handoff_date_mismatch",
+        f"{path} has as_of_date {report.get('as_of_date')!r}, expected {expected_date!r}",
+    )
+    _require_handoff(
+        report.get("candidate_status") == "selected",
+        "handoff_candidate_not_selected",
+        f"{path} is not a selected candidate artifact",
+    )
+    candidate = report.get("candidate")
+    _require_handoff(
+        isinstance(candidate, dict),
+        "handoff_missing_selected_candidate",
+        f"{path} does not contain a selected candidate object",
+    )
+    _require_handoff(
+        candidate.get("candidate_id") and candidate.get("slot_id"),
+        "handoff_candidate_identity_missing",
+        f"{path} is missing candidate_id or slot_id",
+    )
+    return report
+
+
+def _load_handoff_report(handoff_path: Path) -> dict[str, Any]:
+    _require_handoff(handoff_path.is_file(), "handoff_missing_artifact", f"missing required handoff artifact: {handoff_path}")
+    try:
+        report = json.loads(handoff_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - defensive fail closed
+        raise HandoffArtifactError("handoff_unreadable_artifact", f"{handoff_path}: {exc}") from exc
+    _require_handoff(isinstance(report, dict), "handoff_malformed_artifact", f"{handoff_path} must contain a JSON object")
+    _require_handoff(report.get("report_type") == HANDOFF_REPORT_TYPE, "handoff_wrong_report_type", f"{handoff_path} has report_type {report.get('report_type')!r}, expected {HANDOFF_REPORT_TYPE!r}")
+    _require_handoff(report.get("schema_version") == HANDOFF_SCHEMA_VERSION, "handoff_wrong_schema_version", f"{handoff_path} has schema_version {report.get('schema_version')!r}, expected {HANDOFF_SCHEMA_VERSION!r}")
+    _require_handoff(report.get("execution_owner") == HANDOFF_EXECUTION_OWNER, "handoff_execution_owner_mismatch", f"{handoff_path} execution_owner must be {HANDOFF_EXECUTION_OWNER!r}")
+    _require_handoff(report.get("provider") == HIGGSFIELD_CLI_BINARY, "handoff_provider_mismatch", f"{handoff_path} provider must be {HIGGSFIELD_CLI_BINARY!r}")
+    _require_handoff(report.get("executor_type") == HANDOFF_EXECUTOR_TYPE, "handoff_executor_type_mismatch", f"{handoff_path} executor_type must be {HANDOFF_EXECUTOR_TYPE!r}")
+    _require_handoff(report.get("date"), "handoff_date_missing", f"{handoff_path} must include a date")
+    _require_handoff(report.get("selected_slot_id"), "handoff_slot_missing", f"{handoff_path} must include a selected_slot_id")
+    return report
 
 
 # --- Provider argv construction ---------------------------------------------
@@ -279,25 +666,41 @@ def _sanitize_url(url: str) -> str:
     return f"{p.scheme}://{p.netloc}{p.path[:24]}...<redacted len={len(url)}>"
 
 
-def _collect_result_urls(obj: Any) -> list[str]:
-    """Generic walk collecting http(s) URL-shaped strings from the parsed
-    --json response, independent of exact key names -- the real response
-    schema for `generate create ... --wait --json` was not confirmed during
-    the read-only contract inspection (only `generate cost` was safely
-    exercised), so this does not assume a specific field name."""
-    urls: list[str] = []
+def _canonical_result_urls(obj: Any) -> list[str]:
+    """Extracts only the canonical top-level 'result_url' field(s) from a
+    completed Higgsfield job response -- never recurses into nested
+    structures. Evidence (2026-07-10, real completed text2image_soul_v2 job,
+    via the safe read-only `generate list --image --json` lookup): a job
+    object has exactly one real generation output, 'result_url' (the
+    full-res image), alongside 'min_result_url' (a thumbnail -- not treated
+    as a result) and an unrelated 'params.style.url' (the style preset's own
+    CDN thumbnail, not a generation output at all). The prior implementation
+    walked the entire JSON tree for any http(s)-looking string and counted
+    all three, incorrectly triggering the ">1 result URL" fail-closed path
+    on every successful job. This function reads only the top-level
+    'result_url' key -- 'min_result_url' and anything nested (params, style,
+    or otherwise) is never inspected, so it can never be mistaken for a
+    result.
 
-    def walk(value: Any) -> None:
-        if isinstance(value, dict):
-            for v in value.values():
-                walk(v)
-        elif isinstance(value, list):
-            for v in value:
-                walk(v)
-        elif isinstance(value, str) and value.startswith(("http://", "https://")):
+    The raw shape of `generate create ... --wait --json` itself was not
+    captured this session (the live run's stdout was not persisted before
+    the prior version aborted), so this defensively accepts either a single
+    job object or a list containing job objects (matching `generate list`'s
+    shape) -- but in both cases only ever reads 'result_url' at the top
+    level of each candidate object."""
+    if isinstance(obj, dict):
+        candidates = [obj]
+    elif isinstance(obj, list):
+        candidates = [item for item in obj if isinstance(item, dict)]
+    else:
+        candidates = []
+
+    urls: list[str] = []
+    for candidate in candidates:
+        value = candidate.get("result_url")
+        if isinstance(value, str) and value.startswith(("http://", "https://")):
             urls.append(value)
 
-    walk(obj)
     seen: set[str] = set()
     deduped: list[str] = []
     for u in urls:
@@ -400,7 +803,16 @@ def build_manifest(
         "text_surface_risk_terms_found": image.get("text_surface_risk_terms_found", []),
         "pose_body_language_id": image.get("pose_body_language_id"),
         "pose_body_language_label": image.get("pose_body_language_label"),
-        "pose_text": _extract_pose_text(prompt),
+        "pose_text": _canonical_pose_text(image),
+        # Persisted (2026-07-10) so a real, non-fabricated visual_style
+        # (f"{camera_text}; {lighting_text}", matching the Kling package
+        # builder's own convention) can be built later without re-parsing
+        # the "Camera: .../Lighting: ..." sentences out of image_prompt.
+        # None (not a fabricated default) if the source package predates
+        # this field -- same optional-field convention as pose_body_
+        # language_id/expression_gaze_id above.
+        "camera_text": image.get("camera_text"),
+        "lighting_text": image.get("lighting_text"),
         "expression_gaze_id": image.get("expression_gaze_id"),
         "expression_gaze_label": image.get("expression_gaze_label"),
         "expression_text": image["validation"]["final_expression_text"],
@@ -427,7 +839,18 @@ def build_manifest(
             }
         )
 
+    retry_contract = image.get("retry_execution_contract")
+    if isinstance(retry_contract, dict):
+        manifest["retry_execution_contract"] = retry_contract
+
     return manifest
+
+
+def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str, dict, Path]:
+    from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer  # noqa: E402
+
+    artifact, source = retry_consumer.load_retry_execution_source(retry_decision_artifact)
+    return str(artifact["as_of_date"]), str(artifact["retry_slot_id"]), source, retry_decision_artifact.resolve()
 
 
 # --- Live execution ----------------------------------------------------------
@@ -437,8 +860,32 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     prompt = image["image_prompt"]
     argv = build_provider_argv(prompt, custom_reference_id)
 
-    print(f"[LIVE] invoking: {_redacted_argv_for_display(argv, prompt)}")
-    result = subprocess.run(argv, capture_output=True, text=True, shell=False, check=False)
+    # Windows fix (2026-07-10): subprocess.run([...], shell=False) calls
+    # CreateProcess directly, which does not perform PATHEXT resolution the
+    # way a shell or shutil.which() does -- a bare "higgsfield" fails with
+    # FileNotFoundError ([WinError 2]) when the real executable on PATH is
+    # higgsfield.CMD. Resolve the actual executable path once, here, right
+    # at the subprocess boundary, and swap only argv[0] -- the logical
+    # provider command contract (build_provider_argv()) is unchanged.
+    resolved_binary = shutil.which(HIGGSFIELD_CLI_BINARY)
+    if not resolved_binary:
+        raise ProviderCallError(
+            f"Could not resolve {HIGGSFIELD_CLI_BINARY!r} via shutil.which() -- "
+            "the Higgsfield CLI does not appear to be on PATH."
+        )
+    resolved_argv = [resolved_binary, *argv[1:]]
+
+    print(f"[LIVE] resolved executable: {resolved_binary}")
+    print(f"[LIVE] invoking: {_redacted_argv_for_display(resolved_argv, prompt)}")
+    try:
+        result = subprocess.run(resolved_argv, capture_output=True, text=True, shell=False, check=False)
+    except OSError as exc:
+        # Narrow catch: only the process-spawn boundary itself, not the
+        # whole function. A spawn failure must fail through the executor's
+        # controlled error path, not surface as an uncaught traceback.
+        raise ProviderCallError(
+            f"Failed to spawn the Higgsfield CLI process ({resolved_binary!r}): {exc}"
+        ) from exc
 
     if result.returncode != 0:
         stderr_tail = (result.stderr or "").strip()[-2000:]
@@ -458,20 +905,21 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
 
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
     status = _find_first_str_field(parsed, ("status",))
-    result_urls = _collect_result_urls(parsed)
+    result_urls = _canonical_result_urls(parsed)
 
     if not result_urls:
         raise ProviderCallError(
-            "No result URL found in provider response -- refusing to "
-            "proceed. Provider response contained no http(s) URL anywhere "
-            "in its JSON structure."
+            "No canonical result_url found in provider response -- "
+            "refusing to proceed. Only the top-level 'result_url' field is "
+            "treated as a generation output; no other field (including "
+            "'min_result_url' or anything nested) is considered."
         )
     if len(result_urls) > 1:
         raise ProviderCallError(
-            f"Provider response contained {len(result_urls)} result URLs; "
-            "the contract for which one is primary was not confirmed "
-            "during the read-only inspection, so this executor refuses to "
-            "silently pick one. Manual review required."
+            f"Provider response contained {len(result_urls)} distinct "
+            "top-level result_url values where exactly one job (and "
+            "therefore exactly one result_url) was expected. This executor "
+            "refuses to silently pick one. Manual review required."
         )
 
     result_url = result_urls[0]
@@ -529,8 +977,10 @@ def print_dry_run_report(date_str: str, slot_id: str, source: dict, custom_refer
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--date", required=True, help="e.g. 2026-07-09")
-    parser.add_argument("--slot-id", required=True, dest="slot_id")
+    parser.add_argument("--date", help="e.g. 2026-07-09")
+    parser.add_argument("--slot-id", dest="slot_id")
+    parser.add_argument("--retry-decision-artifact", type=Path)
+    parser.add_argument("--handoff-artifact", type=Path)
     parser.add_argument(
         "--custom-reference-id", dest="custom_reference_id",
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
@@ -552,33 +1002,84 @@ def main() -> int:
 
     expected_prompt_path = Path(args.expected_prompt_file) if args.expected_prompt_file else None
 
-    try:
-        source = resolve_prompt_source(args.date, args.slot_id)
-    except PromptSourceError as exc:
-        print(f"[ABORT] {exc}")
-        return 1
+    if args.handoff_artifact is not None:
+        if args.retry_decision_artifact is not None or args.date or args.slot_id:
+            print("[ABORT] --handoff-artifact is mutually exclusive with --retry-decision-artifact and --date/--slot-id.")
+            return 1
+        if expected_prompt_path is not None:
+            print("[ABORT] --expected-prompt-file is not supported with --handoff-artifact.")
+            return 1
+        try:
+            report, source, packet_validation, validation = _validate_handoff_packet(args.handoff_artifact)
+        except HandoffArtifactError as exc:
+            print(f"[ABORT] {exc.code}: {exc.detail}")
+            return 1
+        if not live:
+            print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
+            return 0 if validation["ok"] else 1
+        print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
+        if not report.get("live_execution_authorized"):
+            print("[ABORT] --live is not authorized by the handoff artifact.")
+            return 1
+        try:
+            live_result = run_live(report["date"], report["selected_slot_id"], source, args.custom_reference_id)
+        except ProviderCallError as exc:
+            print(f"[FAILED] {exc}")
+            print("[FAILED] No manifest written, no artifact saved as successful.")
+            return 1
+        manifest = build_manifest(report["date"], report["selected_slot_id"], source, args.custom_reference_id, live_result)
+        mpath = manifest_path(report["date"], report["selected_slot_id"])
+        mpath.parent.mkdir(parents=True, exist_ok=True)
+        mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"[LIVE] saved image     : {live_result['saved_image_path']}")
+        print(f"[LIVE] manifest written: {mpath}")
+        return 0
+
+    if args.retry_decision_artifact is not None:
+        if args.date or args.slot_id:
+            print("[ABORT] --retry-decision-artifact is mutually exclusive with --date/--slot-id.")
+            return 1
+        if expected_prompt_path is not None:
+            print("[ABORT] --expected-prompt-file is not supported with --retry-decision-artifact.")
+            return 1
+        try:
+            date_str, slot_id, source, _ = _load_retry_decision_source(args.retry_decision_artifact)
+        except Exception as exc:
+            print(f"[ABORT] {exc}")
+            return 1
+    else:
+        if not args.date or not args.slot_id:
+            print("[ABORT] either --retry-decision-artifact or both --date and --slot-id are required.")
+            return 1
+        date_str = args.date
+        slot_id = args.slot_id
+        try:
+            source = resolve_prompt_source(date_str, slot_id)
+        except PromptSourceError as exc:
+            print(f"[ABORT] {exc}")
+            return 1
 
     validation = validate_candidate(source, expected_prompt_path)
 
     if not live:
-        print_dry_run_report(args.date, args.slot_id, source, args.custom_reference_id, validation)
+        print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
         return 0 if validation["ok"] else 1
 
     # --live: run every dry-run validation first.
-    print_dry_run_report(args.date, args.slot_id, source, args.custom_reference_id, validation)
+    print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
     if not validation["ok"]:
         print("[ABORT] Validation failed -- refusing to make a provider call.")
         return 1
 
     try:
-        live_result = run_live(args.date, args.slot_id, source, args.custom_reference_id)
+        live_result = run_live(date_str, slot_id, source, args.custom_reference_id)
     except ProviderCallError as exc:
         print(f"[FAILED] {exc}")
         print("[FAILED] No manifest written, no artifact saved as successful.")
         return 1
 
-    manifest = build_manifest(args.date, args.slot_id, source, args.custom_reference_id, live_result)
-    mpath = manifest_path(args.date, args.slot_id)
+    manifest = build_manifest(date_str, slot_id, source, args.custom_reference_id, live_result)
+    mpath = manifest_path(date_str, slot_id)
     mpath.parent.mkdir(parents=True, exist_ok=True)
     mpath.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
