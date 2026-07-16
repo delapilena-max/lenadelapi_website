@@ -28,6 +28,8 @@ RECEIPT_SCHEMA_VERSION = "v1"
 RECEIPT_TYPE = "higgsfield_single_generation_execution_receipt"
 HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
 HANDOFF_SCHEMA_VERSION = "v1"
+SELECTED_CANDIDATE_REPORT_TYPE = "lena_pre_generation_candidate_gate_v1"
+SELECTED_CANDIDATE_SCHEMA_VERSION = "lena_pre_generation_candidate_gate_v1"
 HANDOFF_EXECUTION_OWNER = "claude"
 HANDOFF_PROVIDER = "higgsfield"
 HANDOFF_EXECUTOR_TYPE = "higgsfield_cli"
@@ -246,6 +248,11 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     )
     parse_iso8601_utc(report.get("created_at"), code="handoff_created_at_invalid", label="handoff created_at")
 
+    selected_candidate_binding = validate_selected_candidate_binding(report)
+    selected_candidate_path = selected_candidate_binding["selected_candidate_path"]
+    selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
+    selected_candidate = selected_candidate_binding["selected_candidate"]
+
     structured = report.get("structured_executor_inputs")
     require(
         isinstance(structured, dict),
@@ -368,6 +375,166 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "custom_reference_id": custom_reference_id,
         "soul_name": soul.get("name"),
         "soul_type": soul.get("type"),
+        "selected_candidate_path": selected_candidate_path,
+        "selected_candidate_repo_path": repo_relative_path(selected_candidate_path) if selected_candidate_path else "",
+        "selected_candidate_sha256": selected_candidate_sha_value,
+        "selected_candidate": selected_candidate,
+        "selected_candidate_id": selected_candidate_binding["selected_candidate_id"],
+        "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
+        "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
+        "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
+    }
+
+
+def validate_selected_candidate_binding(report: dict[str, Any]) -> dict[str, Any]:
+    selected_recipe_id = str(report.get("selected_recipe_id") or "").strip()
+    require(
+        selected_recipe_id,
+        "handoff_selected_candidate_provenance_missing",
+        "handoff selected_recipe_id is missing",
+    )
+
+    selected_candidate_binding = report.get("selected_candidate")
+    require(
+        isinstance(selected_candidate_binding, dict),
+        "handoff_selected_candidate_provenance_missing",
+        "handoff selected_candidate must be a JSON object",
+    )
+
+    selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
+    selected_candidate_sha_value = str(report.get("source_selected_candidate_artifact_sha256") or "").strip()
+    require(
+        selected_candidate_path_value,
+        "handoff_selected_candidate_path_missing",
+        "handoff source_selected_candidate_artifact_path is missing",
+    )
+    require(
+        selected_candidate_sha_value,
+        "handoff_selected_candidate_sha_missing",
+        "handoff source_selected_candidate_artifact_sha256 is missing",
+    )
+    require(
+        str(selected_candidate_binding.get("artifact_path", "")).strip() == selected_candidate_path_value,
+        "handoff_selected_candidate_binding_mismatch",
+        "handoff selected_candidate.artifact_path must match source_selected_candidate_artifact_path",
+    )
+    require(
+        str(selected_candidate_binding.get("artifact_sha256", "")).strip() == selected_candidate_sha_value,
+        "handoff_selected_candidate_sha_binding_mismatch",
+        "handoff selected_candidate.artifact_sha256 must match source_selected_candidate_artifact_sha256",
+    )
+
+    selected_candidate_path = resolve_repo_path(
+        selected_candidate_path_value,
+        code="handoff_selected_candidate_path_invalid",
+        label="handoff source_selected_candidate_artifact_path",
+    )
+    selected_candidate = read_json_object(
+        selected_candidate_path,
+        code="handoff_selected_candidate_missing_or_invalid",
+        label="selected candidate artifact",
+    )
+    require_sha256(
+        selected_candidate_sha_value,
+        code="handoff_selected_candidate_sha_invalid",
+        label="handoff source_selected_candidate_artifact_sha256",
+    )
+    require(
+        sha256_file(selected_candidate_path) == selected_candidate_sha_value,
+        "handoff_selected_candidate_sha_mismatch",
+        "handoff selected candidate artifact sha256 does not match current bytes",
+    )
+    require(
+        selected_candidate.get("schema_version") == SELECTED_CANDIDATE_SCHEMA_VERSION,
+        "handoff_selected_candidate_schema_mismatch",
+        f"selected candidate schema_version must be {SELECTED_CANDIDATE_SCHEMA_VERSION!r}",
+    )
+    require(
+        selected_candidate.get("candidate_status") == "selected",
+        "handoff_selected_candidate_status_invalid",
+        "selected candidate artifact must remain selected",
+    )
+    selected_candidate_body = selected_candidate.get("candidate")
+    require(
+        isinstance(selected_candidate_body, dict),
+        "handoff_selected_candidate_body_missing",
+        "selected candidate artifact must contain a candidate object",
+    )
+    require(
+        str(selected_candidate_body.get("candidate_id", "")).strip()
+        == str(selected_candidate_binding.get("candidate_id", "")).strip(),
+        "handoff_selected_candidate_id_mismatch",
+        "selected candidate candidate_id does not match the handoff snapshot",
+    )
+    require(
+        str(selected_candidate_body.get("slot_id", "")).strip()
+        == str(selected_candidate_binding.get("slot_id", "")).strip(),
+        "handoff_selected_candidate_slot_mismatch",
+        "selected candidate slot_id does not match the handoff snapshot",
+    )
+    require(
+        str(selected_candidate_body.get("recipe_id", "")).strip() == selected_recipe_id,
+        "handoff_selected_candidate_recipe_mismatch",
+        "selected candidate recipe_id does not match the handoff recipe_id",
+    )
+    require(
+        str(selected_candidate_body.get("prompt_sha256", "")).strip()
+        == str(selected_candidate_binding.get("prompt_sha256", "")).strip(),
+        "handoff_selected_candidate_prompt_sha_mismatch",
+        "selected candidate prompt_sha256 does not match the handoff snapshot",
+    )
+    require(
+        str(selected_candidate_binding.get("schema_version", "")).strip() == SELECTED_CANDIDATE_SCHEMA_VERSION,
+        "handoff_selected_candidate_snapshot_schema_mismatch",
+        f"handoff selected_candidate.schema_version must be {SELECTED_CANDIDATE_SCHEMA_VERSION!r}",
+    )
+    require(
+        str(selected_candidate_binding.get("candidate_status", "")).strip() == "selected",
+        "handoff_selected_candidate_snapshot_status_invalid",
+        "handoff selected_candidate.candidate_status must remain selected",
+    )
+
+    selected_prompt_input = report.get("selected_prompt_input")
+    require(
+        isinstance(selected_prompt_input, dict),
+        "handoff_selected_prompt_input_missing",
+        "handoff selected_prompt_input must be a JSON object",
+    )
+    structured_preview = report.get("structured_executor_inputs")
+    require(
+        isinstance(structured_preview, dict),
+        "handoff_executor_inputs_missing",
+        "handoff structured_executor_inputs must be a JSON object",
+    )
+    require(
+        str(selected_prompt_input.get("selected_candidate_artifact_path", "")).strip() == selected_candidate_path_value,
+        "handoff_selected_candidate_binding_mismatch",
+        "handoff selected_prompt_input.selected_candidate_artifact_path must match the selected candidate artifact",
+    )
+    require(
+        str(selected_prompt_input.get("selected_candidate_artifact_sha256", "")).strip() == selected_candidate_sha_value,
+        "handoff_selected_candidate_sha_binding_mismatch",
+        "handoff selected_prompt_input.selected_candidate_artifact_sha256 must match the selected candidate artifact sha256",
+    )
+    require(
+        str(structured_preview.get("selected_candidate_artifact_path", "")).strip() == selected_candidate_path_value,
+        "handoff_structured_selected_candidate_binding_mismatch",
+        "handoff structured_executor_inputs.selected_candidate_artifact_path must match the selected candidate artifact",
+    )
+    require(
+        str(structured_preview.get("selected_candidate_artifact_sha256", "")).strip() == selected_candidate_sha_value,
+        "handoff_structured_selected_candidate_sha_mismatch",
+        "handoff structured_executor_inputs.selected_candidate_artifact_sha256 must match the selected candidate artifact sha256",
+    )
+
+    return {
+        "selected_candidate_path": selected_candidate_path,
+        "selected_candidate_sha256": selected_candidate_sha_value,
+        "selected_candidate": selected_candidate,
+        "selected_candidate_id": str(selected_candidate_body.get("candidate_id", "")).strip(),
+        "selected_candidate_slot_id": str(selected_candidate_body.get("slot_id", "")).strip(),
+        "selected_candidate_recipe_id": str(selected_candidate_body.get("recipe_id", "")).strip(),
+        "selected_candidate_prompt_sha256": str(selected_candidate_body.get("prompt_sha256", "")).strip(),
     }
 
 

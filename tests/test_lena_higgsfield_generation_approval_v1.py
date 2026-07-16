@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -45,8 +46,44 @@ def _handoff_repo_path() -> str:
     return f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
 
 
+def _selected_candidate_repo_path() -> str:
+    return f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
+
+
+def _selected_candidate_payload() -> dict:
+    return {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": DATE,
+        "authority_commit": "b" * 40,
+        "candidate_status": "selected",
+        "candidate": {
+            "candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
+            "slot_id": SLOT_ID,
+            "lane": "readypack lane",
+            "recipe_id": "hcr_011",
+            "hook_id": "cbn_004",
+            "prompt_sha256": PROMPT_SHA,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
+        },
+        "decision_fingerprint_sha256": "c" * 64,
+        "generated_at_utc": "2026-07-14T12:00:00Z",
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+
+
+def _selected_candidate_sha() -> str:
+    return hashlib.sha256(
+        json.dumps(_selected_candidate_payload(), indent=2).replace("\n", os.linesep).encode("utf-8")
+    ).hexdigest()
+
+
 def _valid_handoff_report() -> dict:
     handoff_repo_path = _handoff_repo_path()
+    selected_candidate_repo_path = _selected_candidate_repo_path()
+    selected_candidate_sha = _selected_candidate_sha()
+    selected_candidate_payload = _selected_candidate_payload()
     return {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -67,9 +104,24 @@ def _valid_handoff_report() -> dict:
         "manual_publish_review_required": True,
         "date": DATE,
         "selected_slot_id": SLOT_ID,
+        "selected_recipe_id": "hcr_011",
         "expected_handoff_artifact_path": handoff_repo_path,
+        "source_selected_candidate_artifact_path": selected_candidate_repo_path,
+        "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+        "selected_candidate": {
+            "artifact_path": selected_candidate_repo_path,
+            "artifact_sha256": selected_candidate_sha,
+            "candidate_id": selected_candidate_payload["candidate"]["candidate_id"],
+            "slot_id": selected_candidate_payload["candidate"]["slot_id"],
+            "recipe_id": selected_candidate_payload["candidate"]["recipe_id"],
+            "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
+            "schema_version": selected_candidate_payload["schema_version"],
+            "candidate_status": selected_candidate_payload["candidate_status"],
+        },
         "selected_prompt_input": {
             "prompt_sha256": PROMPT_SHA,
+            "selected_candidate_artifact_path": selected_candidate_repo_path,
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
         },
         "selected_prompt_input_artifact_sha256": CANDIDATE_ARTIFACT_SHA,
         "structured_executor_inputs": {
@@ -83,6 +135,8 @@ def _valid_handoff_report() -> dict:
             "date": DATE,
             "slot_id": SLOT_ID,
             "handoff_artifact_path": handoff_repo_path,
+            "selected_candidate_artifact_path": selected_candidate_repo_path,
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
             "soul_metadata": {
                 "name": "Lena",
                 "type": "Soul 2.0",
@@ -98,6 +152,9 @@ def _write_handoff(tmp_path: Path, report: dict | None = None) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
     handoff_path.write_text(json.dumps(report or _valid_handoff_report(), indent=2), encoding="utf-8")
+    selected_candidate_path = tmp_path / _selected_candidate_repo_path()
+    selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
+    selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2), encoding="utf-8")
     return handoff_path
 
 
@@ -130,6 +187,11 @@ def test_inspect_handoff_artifact_extracts_expected_facts(tmp_path: Path, monkey
     assert facts["prompt_sha256"] == PROMPT_SHA
     assert facts["custom_reference_id"] == CUSTOM_REFERENCE_ID
     assert facts["handoff_repo_path"] == _handoff_repo_path()
+    assert facts["selected_candidate_repo_path"] == _selected_candidate_repo_path()
+    assert facts["selected_candidate_id"] == f"{SLOT_ID}::hcr_011::cbn_004"
+    assert facts["selected_candidate_slot_id"] == SLOT_ID
+    assert facts["selected_candidate_recipe_id"] == "hcr_011"
+    assert facts["selected_candidate_prompt_sha256"] == PROMPT_SHA
 
 
 # --- build + validate round trip ---------------------------------------------
@@ -354,6 +416,69 @@ def test_validate_rejects_stale_handoff_sha_after_handoff_mutation(
     with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
         validate_generation_approval_artifact(approval_path)
     assert excinfo.value.code == "approval_handoff_sha_mismatch"
+
+
+@pytest.mark.parametrize(
+    ("mutator", "expected_code"),
+    [
+        (lambda report: report.pop("selected_candidate"), "handoff_selected_candidate_provenance_missing"),
+        (lambda report: report["selected_candidate"].pop("candidate_id"), "handoff_selected_candidate_id_mismatch"),
+        (lambda report: report["selected_candidate"].pop("slot_id"), "handoff_selected_candidate_slot_mismatch"),
+        (lambda report: report["selected_candidate"].__setitem__("candidate_status", "abstain"), "handoff_selected_candidate_snapshot_status_invalid"),
+        (lambda report: report["selected_candidate"].__setitem__("prompt_sha256", hashlib.sha256(b"other-prompt").hexdigest()), "handoff_selected_candidate_prompt_sha_mismatch"),
+    ],
+)
+def test_validate_rejects_selected_candidate_snapshot_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutator, expected_code: str
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    report = json.loads(handoff_path.read_text(encoding="utf-8"))
+    mutator(report)
+    handoff_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code == expected_code
+
+
+@pytest.mark.parametrize(
+    ("mutator", "expected_code"),
+    [
+        (lambda payload: payload.__setitem__("candidate_status", "abstain"), "handoff_selected_candidate_sha_mismatch"),
+        (lambda payload: payload["candidate"].__setitem__("slot_id", "wrong-slot"), "handoff_selected_candidate_sha_mismatch"),
+        (lambda payload: payload["candidate"].__setitem__("recipe_id", "hcr_008"), "handoff_selected_candidate_sha_mismatch"),
+    ],
+)
+def test_validate_rejects_selected_candidate_file_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutator, expected_code: str
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    candidate_path = tmp_path / _selected_candidate_repo_path()
+    payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+    mutator(payload)
+    candidate_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code == expected_code
+
+
+def test_validate_rejects_malformed_selected_candidate_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    candidate_path = tmp_path / _selected_candidate_repo_path()
+    candidate_path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code == "handoff_selected_candidate_missing_or_invalid"
 
 
 def test_validate_rejects_wrong_slot_binding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -619,6 +744,7 @@ def test_write_generation_execution_receipt_atomic_refuses_overwrite(
         (lambda report: report.__setitem__("generation_performed", True), "handoff_generation_performed_invalid"),
         (lambda report: report["structured_executor_inputs"].__setitem__("negative_prompt_enabled", True), "handoff_negative_prompt_invalid"),
         (lambda report: report["structured_executor_inputs"]["soul_metadata"].__setitem__("identity_is_prompt_instruction", True), "handoff_soul_identity_mode_invalid"),
+        (lambda report: report.pop("source_selected_candidate_artifact_path"), "handoff_selected_candidate_path_missing"),
     ],
 )
 def test_inspect_handoff_artifact_fails_closed_on_unsafe_handoff(

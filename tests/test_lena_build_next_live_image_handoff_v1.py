@@ -18,6 +18,7 @@ HANDOFF_MD_PATH = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_im
 HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact {HANDOFF_PATH}"
 LIVE_COMMAND = f"{HANDOFF_COMMAND} --live"
 PROMPT_INPUT_PATH = f"pipeline/strategy/lena/content_packets/{DATE}/lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+SELECTED_CANDIDATE_PATH = f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
 PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
 
 
@@ -165,31 +166,60 @@ def _packet_payload(prompt_text: str = PROMPT_TEXT) -> dict:
     }
 
 
-def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, prompt_text: str = PROMPT_TEXT) -> tuple[Path, Path, Path, Path]:
+def _selected_candidate_payload(recipe_id: str = RECIPE_ID, slot_id: str = SLOT_ID, *, generated_at_utc: str = "2026-07-14T12:34:57Z") -> dict:
+    prompt_sha = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
+    candidate_id = f"{slot_id}::{recipe_id}::cbn_004"
+    return {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": DATE,
+        "authority_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "candidate_status": "selected",
+        "candidate": {
+            "candidate_id": candidate_id,
+            "slot_id": slot_id,
+            "lane": "parking_garage_flash",
+            "recipe_id": recipe_id,
+            "hook_id": "cbn_004",
+            "prompt_sha256": prompt_sha,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
+        },
+        "decision_fingerprint_sha256": "5" * 64,
+        "generated_at_utc": generated_at_utc,
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+
+
+def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", recipe_id: str = RECIPE_ID, prompt_text: str = PROMPT_TEXT, selected_recipe_id: str | None = None) -> tuple[Path, Path, Path, Path, Path]:
     next_actions = tmp_root / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
     packets = tmp_root / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
+    pre_generation = tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
     recommendation_path = next_actions / f"lena_next_generation_step_{DATE}.json"
     learning_path = next_actions / f"lena_post_outcome_learning_state_{DATE}.json"
     queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
     packet_path = packets / f"lena_content_packet_dryrun_{DATE}_{recipe_id}.json"
+    selected_path = pre_generation / "lena_pre_generation_candidate_selected.json"
 
     learning, _follow_up = _learning_payload(learning_status)
     _write_json(learning_path, learning)
     _write_json(recommendation_path, _recommendation_payload(learning_path, learning_status))
     _write_json(queue_path, _queue_payload(recipe_id))
     _write_json(packet_path, _packet_payload(prompt_text))
-    return recommendation_path, learning_path, queue_path, packet_path
+    _write_json(selected_path, _selected_candidate_payload(selected_recipe_id or recipe_id))
+    return recommendation_path, learning_path, queue_path, packet_path, selected_path
 
 
 def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(handoff, "ROOT", tmp_path)
     monkeypatch.setattr(handoff, "NEXT_ACTIONS", tmp_path / "pipeline" / "strategy" / "lena" / "next_actions")
     monkeypatch.setattr(handoff, "CONTENT_PACKETS", tmp_path / "pipeline" / "strategy" / "lena" / "content_packets")
+    monkeypatch.setattr(handoff, "PRE_GENERATION_CANDIDATES", tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates")
 
 
 def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _, _, _, packet_path = _build_fixture_tree(tmp_path)
+    _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
     monkeypatch.setattr(handoff, "iso_now", lambda: "2026-07-14T12:34:56+00:00")
 
     report = handoff.build_handoff(DATE)
@@ -215,6 +245,16 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["selected_prompt_input"]["prompt_text_status"] == "available"
     assert report["selected_prompt_input"]["packet_id"] == f"cpkt_20260713_{RECIPE_ID}"
     assert report["selected_prompt_input"]["exact_proposed_dry_run_command"] == HANDOFF_COMMAND
+    assert report["source_selected_candidate_artifact_path"] == SELECTED_CANDIDATE_PATH
+    assert report["selected_candidate"]["artifact_path"] == SELECTED_CANDIDATE_PATH
+    assert report["selected_candidate"]["artifact_sha256"] == hashlib.sha256(
+        (tmp_path / SELECTED_CANDIDATE_PATH).read_bytes()
+    ).hexdigest()
+    assert report["selected_candidate"]["candidate_id"] == f"{SLOT_ID}::{RECIPE_ID}::cbn_004"
+    assert report["selected_candidate"]["slot_id"] == SLOT_ID
+    assert report["selected_candidate"]["recipe_id"] == RECIPE_ID
+    assert report["selected_candidate"]["prompt_sha256"] == hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
+    assert report["selected_prompt_input"]["selected_candidate_artifact_path"] == SELECTED_CANDIDATE_PATH
     assert report["structured_executor_inputs"]["dry_run_command"] == HANDOFF_COMMAND
     assert report["structured_executor_inputs"]["live_command"] == LIVE_COMMAND
     assert report["structured_executor_inputs"]["dry_run_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH]
@@ -231,10 +271,11 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["generation_performed"] is False
     assert report["learning_status"] == "current"
     assert report["queue_head"]["recipe_id"] == RECIPE_ID
+    assert report["validation"]["selected_candidate_valid"] is True
     assert report["validation"]["selected_prompt_input_valid"] is True
     assert json.loads(json_path.read_text(encoding="utf-8")) == report
     markdown = md_path.read_text(encoding="utf-8")
-    for expected in [HANDOFF_COMMAND, LIVE_COMMAND, SLOT_ID, report["selected_prompt_input"]["prompt_sha256"], "packet_valid_for_claude_review"]:
+    for expected in [HANDOFF_COMMAND, LIVE_COMMAND, SLOT_ID, report["selected_prompt_input"]["prompt_sha256"], report["selected_candidate"]["candidate_id"], str(SELECTED_CANDIDATE_PATH), "packet_valid_for_claude_review"]:
         assert expected in markdown
 
 
@@ -259,7 +300,7 @@ def test_learning_status_is_carried_truthfully(tmp_path: Path, monkeypatch: pyte
 
 def test_queue_or_recommendation_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _, _, queue_path, _ = _build_fixture_tree(tmp_path)
+    _, _, queue_path, _, _ = _build_fixture_tree(tmp_path)
     queue = json.loads(queue_path.read_text(encoding="utf-8"))
     queue["queue_slots"][0]["recipe_id"] = "hcr_999"
     _write_json(queue_path, queue)
@@ -267,9 +308,56 @@ def test_queue_or_recommendation_mismatch_fails_closed(tmp_path: Path, monkeypat
         handoff.build_handoff(DATE)
 
 
+def test_selected_candidate_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _build_fixture_tree(tmp_path, selected_recipe_id="hcr_008")
+    with pytest.raises(SystemExit, match="selected_candidate_recommendation_mismatch"):
+        handoff.build_handoff(DATE)
+
+
+def test_missing_selected_candidate_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _, _, _, _, selected_path = _build_fixture_tree(tmp_path)
+    selected_path.unlink()
+    with pytest.raises(SystemExit, match="missing_selected_candidate"):
+        handoff.build_handoff(DATE)
+
+
+def test_multiple_selected_candidates_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _build_fixture_tree(tmp_path)
+    extra_selected = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE / "lena_pre_generation_candidate_extra.json"
+    _write_json(extra_selected, _selected_candidate_payload(generated_at_utc="2026-07-14T13:00:00Z"))
+    with pytest.raises(SystemExit, match="ambiguous_selected_candidate"):
+        handoff.build_handoff(DATE)
+
+
+def test_malformed_and_non_selected_candidate_artifacts_are_ignored_when_one_selected_remains(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _, _, _, _, selected_path = _build_fixture_tree(tmp_path)
+    candidate_dir = selected_path.parent
+    (candidate_dir / "lena_pre_generation_candidate_malformed.json").write_text("{not-json", encoding="utf-8")
+    _write_json(candidate_dir / "lena_pre_generation_candidate_abstain.json", {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": DATE,
+        "authority_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "candidate_status": "abstain",
+        "candidate": None,
+        "decision_fingerprint_sha256": "6" * 64,
+        "generated_at_utc": "2026-07-14T14:00:00Z",
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    })
+    report = handoff.build_handoff(DATE)
+    assert report["source_selected_candidate_artifact_path"] == SELECTED_CANDIDATE_PATH
+
+
 def test_missing_learning_artifact_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    recommendation_path, learning_path, _, _ = _build_fixture_tree(tmp_path)
+    recommendation_path, learning_path, _, _, _ = _build_fixture_tree(tmp_path)
     learning_path.unlink()
     assert recommendation_path.is_file()
     with pytest.raises(SystemExit, match="missing_learning_artifact"):
@@ -287,7 +375,7 @@ def test_missing_content_packet_fails_closed(tmp_path: Path, monkeypatch: pytest
 
 def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    _, _, _, packet_path = _build_fixture_tree(tmp_path)
+    _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     packet["environment_id"] = "env_wrong"
     _write_json(packet_path, packet)

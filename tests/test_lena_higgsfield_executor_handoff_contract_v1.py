@@ -35,6 +35,11 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(handoff_builder, "ROOT", tmp_root)
     monkeypatch.setattr(handoff_builder, "NEXT_ACTIONS", tmp_root / "pipeline" / "strategy" / "lena" / "next_actions")
     monkeypatch.setattr(handoff_builder, "CONTENT_PACKETS", tmp_root / "pipeline" / "strategy" / "lena" / "content_packets")
+    monkeypatch.setattr(
+        handoff_builder,
+        "PRE_GENERATION_CANDIDATES",
+        tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+    )
     monkeypatch.setattr(approval_mod, "ROOT", tmp_root)
     monkeypatch.setattr(
         approval_mod,
@@ -180,6 +185,31 @@ def _content_packet_payload(prompt_text: str = PROMPT_TEXT) -> dict:
     }
 
 
+def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc: str = "2026-07-13T12:34:57Z") -> dict:
+    prompt_sha = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
+    slot_id = f"higgsfield-20260713-{recipe_id}-photo"
+    return {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": DATE,
+        "authority_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "candidate_status": "selected",
+        "candidate": {
+            "candidate_id": f"{slot_id}::{recipe_id}::cbn_004",
+            "slot_id": slot_id,
+            "lane": "parking_garage_flash",
+            "recipe_id": recipe_id,
+            "hook_id": "cbn_004",
+            "prompt_sha256": prompt_sha,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
+        },
+        "decision_fingerprint_sha256": "5" * 64,
+        "generated_at_utc": generated_at_utc,
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+
+
 def _source_from_prompt(prompt_text: str = PROMPT_TEXT) -> dict:
     return {
         "resolver": "content_packet_dryrun",
@@ -227,16 +257,19 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
     _patch_roots(tmp_root, monkeypatch)
     next_actions = tmp_root / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
     packets = tmp_root / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
+    candidates = tmp_root / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
     learning_path = next_actions / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_path = next_actions / f"lena_next_generation_step_{DATE}.json"
     queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
     content_packet_path = packets / f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+    selected_candidate_path = candidates / "lena_pre_generation_candidate_selected.json"
     packet_report = _content_packet_payload(prompt_text)
 
     _write_json(learning_path, _learning_payload())
     _write_json(recommendation_path, _recommendation_payload(learning_path))
     _write_json(queue_path, _queue_payload())
     _write_json(content_packet_path, packet_report)
+    _write_json(selected_candidate_path, _selected_candidate_payload())
 
     monkeypatch.setattr(
         executor,
@@ -409,6 +442,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / retry_date / f"lena_content_packet_dryrun_{retry_date}_hcr_011.json"
     handoff_path = tmp_root / handoff_repo_path
     packet_path = tmp_root / packet_repo_path
+    selected_candidate_repo_path = Path("pipeline/strategy/lena/pre_generation_candidates") / retry_date / "lena_pre_generation_candidate_selected.json"
     _write_json(
         packet_path,
         {
@@ -422,6 +456,29 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
         },
     )
     packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    selected_candidate_payload = {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": retry_date,
+        "authority_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "candidate_status": "selected",
+        "candidate": {
+            "candidate_id": f"{original_slot}::hcr_011::cbn_004",
+            "slot_id": original_slot,
+            "lane": "fit_check_mirror_getting_ready",
+            "recipe_id": "hcr_011",
+            "hook_id": "cbn_004",
+            "prompt_sha256": original_prompt_sha,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {retry_date} --slot-id {original_slot}",
+        },
+        "decision_fingerprint_sha256": "7" * 64,
+        "generated_at_utc": "2026-07-14T12:34:57Z",
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+    selected_candidate_path = tmp_root / selected_candidate_repo_path
+    _write_json(selected_candidate_path, selected_candidate_payload)
+    selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     _write_json(
         handoff_path,
         {
@@ -444,10 +501,28 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
             "manual_publish_review_required": True,
             "date": retry_date,
             "selected_slot_id": original_slot,
+            "selected_recipe_id": "hcr_011",
             "expected_handoff_artifact_path": handoff_repo_path.as_posix(),
+            "source_selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+            "selected_candidate": {
+                "artifact_path": selected_candidate_repo_path.as_posix(),
+                "artifact_sha256": selected_candidate_sha,
+                "candidate_id": selected_candidate_payload["candidate"]["candidate_id"],
+                "slot_id": selected_candidate_payload["candidate"]["slot_id"],
+                "recipe_id": selected_candidate_payload["candidate"]["recipe_id"],
+                "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
+                "schema_version": selected_candidate_payload["schema_version"],
+                "candidate_status": selected_candidate_payload["candidate_status"],
+            },
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": packet_sha,
-            "selected_prompt_input": {"prompt_sha256": original_prompt_sha, "prompt_text": original_prompt},
+            "selected_prompt_input": {
+                "prompt_sha256": original_prompt_sha,
+                "prompt_text": original_prompt,
+                "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+                "selected_candidate_artifact_sha256": selected_candidate_sha,
+            },
             "structured_executor_inputs": {
                 "provider": "higgsfield",
                 "executor_type": "higgsfield_cli",
@@ -459,6 +534,8 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "date": retry_date,
                 "slot_id": original_slot,
                 "handoff_artifact_path": handoff_repo_path.as_posix(),
+                "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+                "selected_candidate_artifact_sha256": selected_candidate_sha,
                 "soul_metadata": {
                     "name": "Lena",
                     "type": "Soul 2.0",
