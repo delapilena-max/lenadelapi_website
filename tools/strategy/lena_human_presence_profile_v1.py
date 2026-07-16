@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from pipeline.identity import lena_character_doctrine_validate_v1 as doctrine
@@ -102,7 +103,7 @@ LENA_DEFAULT_PRESENCE_TEMPLATE: dict[str, Any] = {
 
 
 def _deep_merge(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
+    merged = deepcopy(base)
     for key, value in overrides.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = _deep_merge(merged[key], value)

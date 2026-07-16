@@ -50,6 +50,7 @@ from pipeline.prompting.lena_prompt_brain import (
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
     HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS,
 )
+from tools.strategy.lena_human_presence_profile_v1 import build_lena_presence_contract
 
 # A photo-dump pack should show real pose variety, not one clone repeated
 # across every image.
@@ -145,12 +146,19 @@ def _validate_image(package: dict) -> dict:
     }
 
 
-def build_report(date_str: str, slot_prefix: str, count: int, required_recipe_id: str = "") -> dict:
+def build_report(
+    date_str: str,
+    slot_prefix: str,
+    count: int,
+    required_recipe_id: str = "",
+    presence_contract: dict | None = None,
+) -> dict:
     pack = generate_higgsfield_photo_dump_pack(
         date_str,
         slot_prefix,
         count=count,
         required_recipe_id=required_recipe_id,
+        presence_contract=presence_contract,
     )
 
     per_image = []
@@ -176,6 +184,7 @@ def build_report(date_str: str, slot_prefix: str, count: int, required_recipe_id
                 "soul_name": package["soul_name"],
                 "soul_version": package["soul_version"],
                 "soul_selection_mode": package["soul_selection_mode"],
+                "human_presence": package.get("human_presence"),
                 "validation": validation,
                 "image_prompt": package["image_prompt"],
             }
@@ -228,6 +237,7 @@ def build_report(date_str: str, slot_prefix: str, count: int, required_recipe_id
             "pose_scene_match_pass": (_count("pose_scene_match_pass"), n),
         },
         "images": per_image,
+        "human_presence": next((item["human_presence"] for item in per_image if item["human_presence"]), None),
     }
 
 
@@ -259,6 +269,14 @@ def print_report(report: dict, show_prompts: bool) -> None:
             print(f"  - {warning}")
     else:
         print("variety warnings            : none")
+    if report.get("human_presence"):
+        hp = report["human_presence"]
+        print()
+        print("human presence:")
+        print(f"  schema_version            : {hp['schema_version']}")
+        print(f"  medium_interpretation     : {hp['medium_interpretation']}")
+        print(f"  selector weights changed   : {hp['selector_weight_adjustments_changed']}")
+        print(f"  prompt text                : {hp['prompt_text']}")
     print()
     print(f"prompt length min/avg/max   : {report['prompt_length_min']} / "
           f"{report['prompt_length_avg']} / {report['prompt_length_max']} chars")
@@ -348,9 +366,30 @@ def main() -> int:
         "--show-prompts", action="store_true",
         help="also print full numbered prompt text for each image (still stdout-only, no writes)",
     )
+    parser.add_argument(
+        "--presence-profile",
+        choices=("none", "lena_default"),
+        default="none",
+        help="optionally compile and apply the generic Human Presence Engine profile",
+    )
+    parser.add_argument(
+        "--required-recipe-id",
+        default="",
+        help="optional controlled recipe id to thread into the prompt builder",
+    )
     args = parser.parse_args()
 
-    report = build_report(args.date, args.slot_prefix, args.count)
+    presence_contract = None
+    if args.presence_profile == "lena_default":
+        presence_contract = build_lena_presence_contract()
+
+    report = build_report(
+        args.date,
+        args.slot_prefix,
+        args.count,
+        required_recipe_id=args.required_recipe_id,
+        presence_contract=presence_contract,
+    )
     print_report(report, show_prompts=args.show_prompts)
     return 0
 

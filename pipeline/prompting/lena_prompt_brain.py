@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict
 
+from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
+
 BANNED_PUBLIC_TERMS = [
     "AI",
     "artificial intelligence",
@@ -1300,19 +1302,60 @@ SOCIAL_PRIORITY_LANES = {
 }
 
 
-def choose_scene_production(scene_pool: list[dict], rng: random.Random) -> dict:
+def choose_scene_production(
+    scene_pool: list[dict],
+    rng: random.Random,
+    presence_plan: dict[str, Any] | None = None,
+) -> dict:
     bank = load_photo_scene_bank()
     priority_lanes = {
         str(item).strip().lower()
         for item in bank.get("social_priority_lanes", [])
         if str(item).strip()
     } or SOCIAL_PRIORITY_LANES
+    presence_terms = _presence_terms_for(presence_plan, "scene")
     weighted: list[dict] = []
     for scene in scene_pool:
         lane = str(scene.get("lane") or "").strip().lower()
         weight = 4 if lane in priority_lanes else 1
+        weight += _presence_bonus_weight(_presence_scene_text(scene), presence_terms)
+        weight = max(1, weight)
         weighted.extend([scene] * weight)
     return rng.choice(weighted or scene_pool)
+
+
+def _presence_terms_for(plan: dict[str, Any] | None, selector_name: str) -> tuple[str, ...]:
+    if not plan:
+        return ()
+    values = plan.get("selector_bias_terms", {}).get(selector_name, [])
+    terms: list[str] = []
+    for value in values or []:
+        term = str(value or "").strip().lower()
+        if term and term not in terms:
+            terms.append(term)
+    return tuple(terms)
+
+
+def _presence_bonus_weight(text: str, terms: tuple[str, ...], max_bonus: int = 2) -> int:
+    if not terms:
+        return 0
+    lower = str(text or "").lower()
+    hits = sum(1 for term in terms if term in lower)
+    return min(max_bonus, hits)
+
+
+def _presence_scene_text(scene: dict) -> str:
+    return " ".join(
+        [
+            str(scene.get("lane") or ""),
+            str(scene.get("action") or ""),
+            str(scene.get("caption") or ""),
+            str(scene.get("details") or ""),
+            str(scene.get("environment") or ""),
+            str(scene.get("camera") or ""),
+            str(scene.get("lighting") or ""),
+        ]
+    )
 
 
 def public_capture_lock(lane: str) -> str:
@@ -1598,7 +1641,12 @@ def _outfit_matches_lane_context(entry: dict, lane: str) -> bool:
     return True
 
 
-def pick_catalog_outfit_production(lane: str, reference_mode: str = "upper_body", rng=None) -> dict:
+def pick_catalog_outfit_production(
+    lane: str,
+    reference_mode: str = "upper_body",
+    rng=None,
+    presence_plan: dict[str, Any] | None = None,
+) -> dict:
     _rng = rng if rng is not None else random.Random()
     catalog = load_wardrobe_catalog()
     allowed_style_lanes = LANE_STYLE_LANE_ALLOWLIST.get(
@@ -1631,6 +1679,7 @@ def pick_catalog_outfit_production(lane: str, reference_mode: str = "upper_body"
 
     candidate_source = preferred_candidates if preferred_candidates else safe_candidates
     safe_pool = []
+    presence_terms = _presence_terms_for(presence_plan, "wardrobe")
     for entry in candidate_source:
         weight = 1
         if lane in PUBLIC_SOCIAL_LANES:
@@ -1640,6 +1689,18 @@ def pick_catalog_outfit_production(lane: str, reference_mode: str = "upper_body"
         # Visual Hook / Allure Gate (2026-07-08): additive, applies to every
         # lane, never zeroes out a candidate -- floored at 1 below.
         weight += _body_visibility_hook_weight(entry)
+        entry_text = " ".join(
+            [
+                str(entry.get("name") or ""),
+                str(entry.get("prompt") or ""),
+                str(entry.get("style_lane") or ""),
+                str(entry.get("body_visibility") or ""),
+                str(entry.get("coverage_level") or ""),
+                " ".join(str(item) for item in entry.get("scene_fit") or []),
+                str(entry.get("occasion") or ""),
+            ]
+        )
+        weight += _presence_bonus_weight(entry_text, presence_terms)
         weight = max(1, weight)
         safe_pool.extend([entry] * weight)
 
@@ -2020,6 +2081,7 @@ def choose_expression_gaze_production(
     rng: random.Random,
     lane: str | None = None,
     recent_used: set[str] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> dict:
     """Selects one expression/gaze/head-pose combo. Filters by lane-compatibility
     tag (so it never contradicts the scene's own action) and, when possible,
@@ -2043,9 +2105,20 @@ def choose_expression_gaze_production(
     non_recent = [c for c in tag_filtered if c.get("expression_gaze_id") not in recent_used]
 
     pool = non_recent or tag_filtered
+    presence_terms = _presence_terms_for(presence_plan, "expression_gaze")
     weighted = []
     for entry in pool:
-        weighted.extend([entry] * _expression_attitude_weight(entry))
+        weight = _expression_attitude_weight(entry)
+        entry_text = " ".join(
+            [
+                str(entry.get("text") or ""),
+                str(entry.get("label") or ""),
+                " ".join(str(tag) for tag in entry.get("compatibility_tags") or []),
+            ]
+        )
+        weight += _presence_bonus_weight(entry_text, presence_terms)
+        weight = max(1, weight)
+        weighted.extend([entry] * weight)
     return rng.choice(weighted or pool)
 
 
@@ -2405,6 +2478,7 @@ def choose_pose_body_language_production(
     reference_mode: str | None = None,
     recent_used: set[str] | None = None,
     exclude_tags: set[str] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> dict:
     """Selects one pose/body-language combo. Filters by lane-compatibility tag
     (never contradicts the scene's own action -- e.g. never picks a seated pose
@@ -2460,9 +2534,21 @@ def choose_pose_body_language_production(
     non_recent = [c for c in mode_filtered if c.get("pose_body_language_id") not in recent_used]
 
     pool = non_recent or mode_filtered
+    presence_terms = _presence_terms_for(presence_plan, "pose_body_language")
     weighted = []
     for entry in pool:
-        weighted.extend([entry] * _pose_attitude_weight(entry))
+        weight = _pose_attitude_weight(entry)
+        entry_text = " ".join(
+            [
+                str(entry.get("text") or ""),
+                str(entry.get("label") or ""),
+                " ".join(str(tag) for tag in entry.get("compatibility_tags") or []),
+                str(entry.get("hand_risk") or ""),
+            ]
+        )
+        weight += _presence_bonus_weight(entry_text, presence_terms)
+        weight = max(1, weight)
+        weighted.extend([entry] * weight)
     return rng.choice(weighted or pool)
 
 
@@ -3425,7 +3511,11 @@ REFERENCE_PRIORITY = {
 }
 
 
-def choose_reference_mode(media_type: str, scene: dict) -> str:
+def choose_reference_mode(
+    media_type: str,
+    scene: dict,
+    presence_plan: dict[str, Any] | None = None,
+) -> str:
     text = " ".join([
         str(media_type or ""),
         str(scene.get("lane") or ""),
@@ -3435,9 +3525,6 @@ def choose_reference_mode(media_type: str, scene: dict) -> str:
         str(scene.get("camera") or ""),
         str(scene.get("lighting") or ""),
     ]).lower()
-
-    if media_type == "video":
-        return "video_body"
 
     face_terms = [
         "close-up", "close up", "beauty portrait", "skincare",
@@ -3458,16 +3545,40 @@ def choose_reference_mode(media_type: str, scene: dict) -> str:
         "waist-up", "medium shot", "hands", "jewelry",
     ]
 
-    if any(term in text for term in face_terms) and not any(term in text for term in full_body_terms):
-        return "face_detail"
+    base_mode = "upper_body"
+    if media_type == "video":
+        base_mode = "video_body"
+    elif any(term in text for term in face_terms) and not any(term in text for term in full_body_terms):
+        base_mode = "face_detail"
+    elif any(term in text for term in full_body_terms):
+        base_mode = "full_body"
+    elif any(term in text for term in upper_body_terms):
+        base_mode = "upper_body"
 
-    if any(term in text for term in full_body_terms):
-        return "full_body"
+    if not presence_plan:
+        return base_mode
 
-    if any(term in text for term in upper_body_terms):
-        return "upper_body"
+    framing_intent = (
+        presence_plan.get("body_presentation", {})
+        .get("contract", {})
+        .get("framing_intent")
+    )
+    if media_type == "video":
+        return "video_body"
+    if framing_intent == "face_priority":
+        if base_mode != "full_body" and any(term in text for term in face_terms):
+            return "face_detail"
+    elif framing_intent == "upper_body_intimate":
+        if base_mode == "face_detail":
+            return "upper_body"
+    elif framing_intent == "full_body_presence":
+        if base_mode != "face_detail" and any(term in text for term in full_body_terms):
+            return "full_body"
+    elif framing_intent == "dynamic_motion_framing":
+        if base_mode != "face_detail" and any(term in text for term in full_body_terms):
+            return "full_body"
 
-    return "upper_body"
+    return base_mode
 
 
 def reference_policy_for_mode(mode: str) -> str:
@@ -4801,6 +4912,7 @@ def generate_higgsfield_prompt_package(
     media_type: str,
     sequence_index: int | None = None,
     required_recipe_id: str = "",
+    presence_contract: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Forward Higgsfield-native prompt builder. Short prompt, no negative
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
@@ -4823,6 +4935,12 @@ def generate_higgsfield_prompt_package(
     )
 
     validate_saved_prompt_sources()
+    presence_plan = None
+    if presence_contract is not None:
+        presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
+            presence_contract,
+            medium="motion" if media_type == "video" else "still_image",
+        )
     production_scene_pool, scene_bank = get_production_scene_pool(required_recipe_id=required_recipe_id)
     if not production_scene_pool:
         raise SystemExit("[ABORT] No production-safe saved photo scenes remain.")
@@ -4834,12 +4952,12 @@ def generate_higgsfield_prompt_package(
         environment_entry = dict(controlled_authority["environment"])
         wardrobe_entry = dict(controlled_authority["wardrobe"])
     else:
-        scene = choose_scene_production(production_scene_pool, rng)
+        scene = choose_scene_production(production_scene_pool, rng, presence_plan=presence_plan)
         environment_entry = choose_environment_production(scene, rng)
         wardrobe_entry = None
     environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
     environment_text = _higgsfield_safe_environment_text(environment_text)
-    reference_mode = choose_reference_mode(media_type, scene)
+    reference_mode = choose_reference_mode(media_type, scene, presence_plan=presence_plan)
 
     scene_lane_lower = str(scene.get("lane") or "").strip().lower()
     is_moto_lane = scene_lane_lower in HIGGSFIELD_MOTO_LANES
@@ -4866,7 +4984,12 @@ def generate_higgsfield_prompt_package(
         wardrobe_text = f"{moto_variant['prompt']}.{HIGGSFIELD_MOTO_SAFETY_LOCK}"
     else:
         if wardrobe_entry is None:
-            wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+            wardrobe_entry = pick_catalog_outfit_production(
+                scene["lane"],
+                reference_mode,
+                rng,
+                presence_plan=presence_plan,
+            )
         wardrobe_outfit_id = wardrobe_entry.get("outfit_id")
         wardrobe_outfit_name = wardrobe_entry.get("name")
         wardrobe_silhouette_class = catalog_outfit_silhouette_class(wardrobe_entry)
@@ -4879,7 +5002,11 @@ def generate_higgsfield_prompt_package(
         phrase for phrase in HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS if phrase in environment_text
     ]
 
-    expression_gaze_entry = choose_expression_gaze_production(rng, lane=scene["lane"])
+    expression_gaze_entry = choose_expression_gaze_production(
+        rng,
+        lane=scene["lane"],
+        presence_plan=presence_plan,
+    )
 
     required_pose_entry = None if is_moto_lane else _higgsfield_required_pose_entry(scene_lane_lower)
     if required_pose_entry is not None:
@@ -4890,6 +5017,7 @@ def generate_higgsfield_prompt_package(
             lane=scene["lane"],
             reference_mode=reference_mode,
             exclude_tags=None if is_moto_lane else HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS,
+            presence_plan=presence_plan,
         )
 
     # Pose-diversity Phase 1 (2026-07-09): moto lanes keep the fixed
@@ -4912,6 +5040,7 @@ def generate_higgsfield_prompt_package(
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
+    presence_text = f" {presence_plan['prompt_text']}" if presence_plan else ""
 
     image_prompt = _clean_public_text(
         f"{HIGGSFIELD_FRAMING_LINE} "
@@ -4924,12 +5053,13 @@ def generate_higgsfield_prompt_package(
         f"{HIGGSFIELD_FRAMING_REINFORCEMENT} "
         f"Lighting: {lighting_text}. "
         f"Mood: {HIGGSFIELD_MOOD_HOOK}."
+        f"{presence_text}"
     )
 
     caption = _clean_public_text(scene["caption"])
     caption = f"{caption}\n\n{_hashtags(rng, scene['lane'], 3)}"
 
-    return {
+    package = {
         "slot_id": slot_id,
         "media_type": media_type,
         "provider": "higgsfield",
@@ -4990,6 +5120,9 @@ def generate_higgsfield_prompt_package(
         },
         "prompt_brain_version": HIGGSFIELD_PROMPT_BRAIN_VERSION,
     }
+    if presence_plan is not None:
+        package["human_presence"] = presence_plan
+    return package
 
 
 # Photo-dump pack builder (2026-07-08). Additive only -- does not change
@@ -5249,6 +5382,7 @@ def generate_higgsfield_photo_dump_pack(
     slot_prefix: str,
     count: int = HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
     required_recipe_id: str = "",
+    presence_contract: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Build a cohesive multi-image Higgsfield-native photo-dump pack.
 
@@ -5301,6 +5435,7 @@ def generate_higgsfield_photo_dump_pack(
                 "photo",
                 sequence_index=candidate_seq,
                 required_recipe_id=required_recipe_id if i == 0 else "",
+                presence_contract=presence_contract,
             )
             lane = package["lane"]
             silhouette = package["wardrobe_silhouette_class"]
@@ -5522,6 +5657,8 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["body_visibility_rule"] = package.get("body_visibility_rule")
     meta["scene_coherence_note"] = package.get("scene_coherence_note")
     meta["frame_logic_text"] = package.get("frame_logic_text")
+    if package.get("human_presence") is not None:
+        meta["human_presence"] = package.get("human_presence")
     meta["image_prompt"] = package["image_prompt"]
     meta["negative_prompt"] = package["negative_prompt"]
     meta["caption"] = package["caption"]
