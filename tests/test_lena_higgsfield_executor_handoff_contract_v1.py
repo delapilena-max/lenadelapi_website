@@ -348,6 +348,311 @@ def test_handoff_drift_rejects_before_provider_access(
     assert expected_code in stdout
 
 
+def test_validate_handoff_packet_rejects_selected_candidate_recommendation_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("live execution must not be reached")),
+    )
+    monkeypatch.setattr(
+        executor.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider subprocess must not be reached")),
+    )
+
+    date = "2026-07-15"
+    slot_id = "higgsfield-20260715-hcr_008-photo"
+    recommendation_recipe_id = "hcr_011"
+    selected_recipe_id = "hcr_008"
+    custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
+    prompt_text = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+    prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+
+    next_actions_repo = Path("pipeline") / "strategy" / "lena" / "next_actions" / date
+    packets_repo = Path("pipeline") / "strategy" / "lena" / "content_packets" / date
+    candidates_repo = Path("pipeline") / "strategy" / "lena" / "pre_generation_candidates" / date
+    learning_repo_path = next_actions_repo / f"lena_post_outcome_learning_state_{date}.json"
+    recommendation_repo_path = next_actions_repo / f"lena_next_generation_step_{date}.json"
+    queue_repo_path = next_actions_repo / f"lena_autonomous_generation_queue_dryrun_{date}.json"
+    packet_repo_path = packets_repo / f"lena_content_packet_dryrun_{date}_{recommendation_recipe_id}.json"
+    selected_candidate_repo_path = candidates_repo / "lena_pre_generation_candidate_selected.json"
+    handoff_repo_path = next_actions_repo / f"lena_next_live_image_handoff_{date}.json"
+
+    learning_path = tmp_path / learning_repo_path
+    recommendation_path = tmp_path / recommendation_repo_path
+    queue_path = tmp_path / queue_repo_path
+    packet_path = tmp_path / packet_repo_path
+    selected_candidate_path = tmp_path / selected_candidate_repo_path
+    handoff_path = tmp_path / handoff_repo_path
+
+    learning_report = {
+        "report_type": "lena_post_outcome_learning_state",
+        "version": "v1",
+        "date": date,
+        "published_post_count": 3,
+        "pending_metrics_posts": [{}],
+        "stale_pending_metrics_posts": [{}],
+        "winner_posts": [{"recipe_id": recommendation_recipe_id}],
+        "queue_boosts": {"preferred_recipe_ids": [recommendation_recipe_id]},
+        "metrics_resolution_summary": {
+            "learning_status": "current",
+            "current_count": 2,
+            "usable_but_incomplete_count": 0,
+            "stale_unresolved_count": 0,
+            "manual_or_future_capability_required_count": 0,
+        },
+    }
+    recommendation_report = {
+        "report_type": "lena_next_generation_step",
+        "version": "v1",
+        "date": date,
+        "learning_artifact_path": learning_path.as_posix(),
+        "learning_status": learning_report["metrics_resolution_summary"]["learning_status"],
+        "learning_status_label": "learning_current",
+        "learning_validation_state": "valid",
+        "learning_validation_error": "",
+        "learning_availability": "available",
+        "learning_published_post_count": learning_report["published_post_count"],
+        "learning_pending_metrics_count": len(learning_report["pending_metrics_posts"]),
+        "learning_stale_pending_metrics_count": len(learning_report["stale_pending_metrics_posts"]),
+        "learning_resolution_state_summary": learning_report["metrics_resolution_summary"],
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "learning_winner_post_count": len(learning_report["winner_posts"]),
+        "recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": recommendation_recipe_id,
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids", "winner_posts"],
+            "next_live_gate": "review",
+        },
+    }
+    queue_report = {
+        "report_type": "lena_autonomous_generation_queue_dryrun",
+        "version": "v1",
+        "date": date,
+        "dry_run": True,
+        "queue_slots": [
+            {
+                "recipe_id": recommendation_recipe_id,
+                "title": "Parking Garage Flash",
+                "scene_type": "parking_garage_flash",
+                "autonomy_grade": "ready",
+                "payload_headroom": 261,
+                "outfit_used": "wc_p059",
+                "environment_used": "env_p001",
+                "proof_priority": 9,
+                "production_proof_mode": False,
+                "priority_score": 125,
+                "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
+            }
+        ],
+    }
+    packet_report = {
+        "report_type": "lena_content_packet_dryrun",
+        "generated_date": date,
+        "recipe_id": recommendation_recipe_id,
+        "packet_id": f"cpkt_{date.replace('-', '')}_{recommendation_recipe_id}",
+        "strong_hook_id": "cbn_004",
+        "hook_text": "Tried To Dress Down. Failed.",
+        "caption_draft": "caught me on the way in",
+        "compact_provider_prompt_preview": prompt_text,
+        "compact_provider_prompt_sha256": prompt_sha,
+        "compact_provider_prompt_budget": 2499,
+        "provider_prompt_contract": {
+            "provider_route": "higgsfield_forward_no_live",
+            "live_authority": False,
+        },
+    }
+    selected_candidate_payload = {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "influencer_id": "lena",
+        "as_of_date": date,
+        "authority_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "candidate_status": "selected",
+        "candidate": {
+            "candidate_id": f"{slot_id}::{selected_recipe_id}::cbn_004",
+            "slot_id": slot_id,
+            "lane": "parking_garage_flash",
+            "recipe_id": selected_recipe_id,
+            "hook_id": "cbn_004",
+            "prompt_sha256": prompt_sha,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date} --slot-id {slot_id}",
+        },
+        "decision_fingerprint_sha256": "5" * 64,
+        "generated_at_utc": "2026-07-15T12:34:57Z",
+        "provider_authorized": False,
+        "side_effects_performed": [],
+    }
+    _write_json(learning_path, learning_report)
+    _write_json(recommendation_path, recommendation_report)
+    _write_json(queue_path, queue_report)
+    _write_json(packet_path, packet_report)
+    _write_json(selected_candidate_path, selected_candidate_payload)
+
+    selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+    packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    handoff_report = {
+        "report_type": "lena_next_live_image_handoff",
+        "schema_version": "v1",
+        "created_at": "2026-07-15T12:00:00+00:00",
+        "execution_owner": "claude",
+        "provider": "higgsfield",
+        "executor_type": "higgsfield_cli",
+        "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+        "packet_state": "packet_valid_for_claude_review",
+        "dry_run_executor_contract_state": "ready",
+        "live_execution_state": "blocked",
+        "live_execution_authorized": False,
+        "generation_approval_required": True,
+        "manual_operator_approval_required": True,
+        "provider_call_performed": False,
+        "generation_performed": False,
+        "publish_authorized": False,
+        "manual_publish_review_required": True,
+        "date": date,
+        "selected_slot_id": slot_id,
+        "selected_recipe_id": selected_recipe_id,
+        "expected_handoff_artifact_path": handoff_repo_path.as_posix(),
+        "source_recommendation_artifact_path": recommendation_repo_path.as_posix(),
+        "source_recommendation_artifact_sha256": hashlib.sha256(recommendation_path.read_bytes()).hexdigest(),
+        "source_learning_artifact_path": learning_repo_path.as_posix(),
+        "source_learning_artifact_sha256": hashlib.sha256(learning_path.read_bytes()).hexdigest(),
+        "source_queue_dry_run_artifact_path": queue_repo_path.as_posix(),
+        "source_queue_dry_run_artifact_sha256": hashlib.sha256(queue_path.read_bytes()).hexdigest(),
+        "source_selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+        "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+        "source_recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": recommendation_recipe_id,
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids", "winner_posts"],
+            "next_live_gate": "review",
+        },
+        "selected_candidate": {
+            "artifact_path": selected_candidate_repo_path.as_posix(),
+            "artifact_sha256": selected_candidate_sha,
+            "candidate_id": selected_candidate_payload["candidate"]["candidate_id"],
+            "slot_id": selected_candidate_payload["candidate"]["slot_id"],
+            "recipe_id": selected_candidate_payload["candidate"]["recipe_id"],
+            "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
+            "schema_version": selected_candidate_payload["schema_version"],
+            "candidate_status": selected_candidate_payload["candidate_status"],
+        },
+        "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
+        "selected_prompt_input_artifact_sha256": packet_sha,
+        "selected_prompt_input": {
+            "packet_id": packet_report["packet_id"],
+            "hook_id": packet_report["strong_hook_id"],
+            "hook_text": packet_report["hook_text"],
+            "caption_seed": packet_report["caption_draft"],
+            "prompt_sha256": prompt_sha,
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date} --slot-id {slot_id}",
+        },
+        "structured_executor_inputs": {
+            "provider": "higgsfield",
+            "executor_type": "higgsfield_cli",
+            "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+            "model": "text2image_soul_v2",
+            "aspect_ratio": "9:16",
+            "negative_prompt_enabled": False,
+            "live_execution_authorized": False,
+            "date": date,
+            "slot_id": slot_id,
+            "handoff_artifact_path": handoff_repo_path.as_posix(),
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "soul_metadata": {
+                "name": "Lena",
+                "type": "Soul 2.0",
+                "custom_reference_id": custom_reference_id,
+                "identity_is_prompt_instruction": False,
+            },
+            "selected_prompt_sha256": prompt_sha,
+            "selected_prompt_text": prompt_text,
+            "dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
+            "live_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()} --live",
+            "dry_run_argv": [
+                "python",
+                "pipeline/higgsfield_lena_api_executor.py",
+                "--handoff-artifact",
+                handoff_repo_path.as_posix(),
+            ],
+            "live_argv": [
+                "python",
+                "pipeline/higgsfield_lena_api_executor.py",
+                "--handoff-artifact",
+                handoff_repo_path.as_posix(),
+                "--live",
+            ],
+        },
+    }
+    _write_json(handoff_path, handoff_report)
+
+    source = {
+        "resolver": "content_packet_dryrun",
+        "slot_prefix": recommendation_recipe_id,
+        "pack_count": 1,
+        "pack_variety_warnings": [],
+        "image": {
+            "slot_id": slot_id,
+            "lane": "parking_garage_flash",
+            "wardrobe_outfit_id": "wc_p059",
+            "environment_id": "env_p001",
+            "pose_body_language_id": None,
+            "pose_body_language_label": "leaning against the elevator wall before heading up",
+            "effective_wardrobe_silhouette_class": "beautiful_trouble",
+            "soul_name": "Lena",
+            "soul_version": "Soul 2.0",
+            "soul_selection_mode": "provider_config_not_prompt_text",
+            "camera_text": "35mm lens, natural grain",
+            "lighting_text": "warm lobby spill and realistic night shadow falloff",
+            "negative_prompt_enabled": False,
+            "image_prompt": prompt_text,
+            "validation": {
+                "framing_present": True,
+                "wardrobe_casual_free": True,
+                "wardrobe_casual_terms_found": [],
+                "scene_action_conflict_free": True,
+                "scene_action_conflict_terms_found": [],
+                "soul_anchor_absent": True,
+                "negative_prompt_disabled": True,
+                "heavy_overcorrection_free": True,
+                "heavy_overcorrection_terms_found": [],
+                "pose_scene_match_pass": True,
+                "pose_scene_mismatch_terms_found": [],
+                "low_hook_terms_found": [],
+                "final_expression_text": "",
+                "expression_safe_fallback_used": False,
+                "expression_safe_fallback_reason": "",
+                "expression_scene_gaze_conflict_terms_found": [],
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        executor,
+        "_rebuild_packet_prompt_source",
+        lambda _path: (copy.deepcopy(packet_report), copy.deepcopy(source)),
+    )
+
+    with pytest.raises(executor.HandoffArtifactError) as excinfo:
+        executor._validate_handoff_packet(handoff_path)
+
+    assert excinfo.value.code == "selected_candidate_recommendation_mismatch"
+    assert not approval_mod.claim_output_path(date, slot_id).exists()
+    assert not approval_mod.receipt_output_path(date, slot_id).exists()
+    assert not executor.manifest_path(date, slot_id).exists()
+
+
 def test_prompt_drift_rejects_before_provider_access(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
