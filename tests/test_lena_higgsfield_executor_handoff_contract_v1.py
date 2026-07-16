@@ -809,6 +809,36 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     assert not executor.manifest_path(date, slot_id).exists()
 
 
+def test_legacy_handoff_missing_reconciliation_provenance_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch, prompt_text=PROMPT_TEXT)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    for key in (
+        "source_reconciliation_artifact_path",
+        "source_reconciliation_artifact_sha256",
+        "source_reconciliation_decision_artifact_path",
+        "source_reconciliation_decision_artifact_sha256",
+        "source_reconciliation_decision_id",
+        "source_reconciliation_decision_operator_id",
+        "source_reconciliation_decision_expires_at_utc",
+        "source_reconciliation_decision_authority_scope",
+        "source_reconciliation_decision_live_generation_authorized",
+        "source_reconciliation_decision_publishing_authorized",
+        "source_reconciliation_decision_next_allowed_action",
+    ):
+        packet.pop(key, None)
+    packet_path.write_text(json.dumps(packet, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    with pytest.raises(reconciliation_contract.ReconciliationContractError) as excinfo:
+        executor._validate_handoff_packet(packet_path)
+    assert excinfo.value.code == "missing_reconciliation_artifact"
+    assert not approval_mod.claim_output_path(DATE, SLOT_ID).exists()
+    assert not approval_mod.receipt_output_path(DATE, SLOT_ID).exists()
+    assert not executor.manifest_path(DATE, SLOT_ID).exists()
+
+
 def test_prompt_drift_rejects_before_provider_access(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

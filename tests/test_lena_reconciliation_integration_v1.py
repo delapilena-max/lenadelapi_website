@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -306,6 +307,31 @@ def _reconciliation_payload(tmp_root: Path) -> tuple[dict, dict[str, Path]]:
     }
 
 
+def _write_decision_with_timestamps(
+    *,
+    reconciliation: dict,
+    reconciliation_repo_path: str,
+    generated_at_utc: str,
+    expires_at_utc: str,
+) -> Path:
+    confirmation = decision_mod.expected_confirmation_phrase(reconciliation)
+    decision_report = decision_mod.build_generation_reconciliation_decision(
+        reconciliation_repo_path,
+        "nicolas",
+        SELECTED_CANDIDATE_ID,
+        SELECTED_RECIPE_ID,
+        SLOT_ID,
+        confirmation,
+    )
+    decision_path, _, _ = decision_mod.write_report(decision_report, DATE)
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision["generated_at_utc"] = generated_at_utc
+    decision["expires_at_utc"] = expires_at_utc
+    decision["decision_expires_at_utc"] = expires_at_utc
+    _write_json(decision_path, decision)
+    return decision_path
+
+
 @pytest.fixture(autouse=True)
 def _forbid_live_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(executor.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider subprocess must not run")))
@@ -430,3 +456,169 @@ def test_report_only_reconciliation_flow_binds_handoff_and_blocks_live_without_a
     assert approval_mod.claim_output_path(DATE, SLOT_ID).exists() is False
     assert approval_mod.receipt_output_path(DATE, SLOT_ID).exists() is False
     assert executor.manifest_path(DATE, SLOT_ID).exists() is False
+
+
+@pytest.mark.parametrize(
+    ("generated_at_utc", "expires_at_utc", "now_utc", "expected_code"),
+    [
+        (
+            "2026-07-15T12:00:00+00:00",
+            "2026-07-15T12:30:00+00:00",
+            datetime(2026, 7, 15, 12, 29, 59, tzinfo=timezone.utc),
+            None,
+        ),
+        (
+            "2026-07-15T12:00:00+00:00",
+            "2026-07-15T12:30:00+00:00",
+            datetime(2026, 7, 15, 12, 30, tzinfo=timezone.utc),
+            "reconciliation_decision_expired",
+        ),
+        (
+            "2026-07-15T12:00:00+00:00",
+            "2026-07-15T12:30:00+00:00",
+            datetime(2026, 7, 15, 12, 30, 1, tzinfo=timezone.utc),
+            "reconciliation_decision_expired",
+        ),
+        (
+            "2020-01-01T00:00:00+00:00",
+            "2020-01-01T00:30:00+00:00",
+            datetime(2026, 7, 16, 0, 0, tzinfo=timezone.utc),
+            "reconciliation_decision_expired",
+        ),
+    ],
+)
+def test_reconciliation_decision_wall_clock_expiry_is_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    generated_at_utc: str,
+    expires_at_utc: str,
+    now_utc: datetime,
+    expected_code: str | None,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    reconciliation, paths = _reconciliation_payload(tmp_path)
+    reconciliation_repo_path = paths["reconciliation_path"].relative_to(tmp_path).as_posix()
+    decision_path = _write_decision_with_timestamps(
+        reconciliation=reconciliation,
+        reconciliation_repo_path=reconciliation_repo_path,
+        generated_at_utc=generated_at_utc,
+        expires_at_utc=expires_at_utc,
+    )
+
+    if expected_code is None:
+        loaded_path, loaded_report, loaded_sha256 = reconciliation_contract.load_reconciliation_decision(
+            decision_path.relative_to(tmp_path).as_posix(),
+            date_str=DATE,
+            reconciliation_path=paths["reconciliation_path"],
+            reconciliation_report=reconciliation,
+            reconciliation_sha256=reconciliation_contract.sha256_file(paths["reconciliation_path"]),
+            now_utc=now_utc,
+        )
+        assert loaded_path == decision_path
+        assert loaded_report["decision_expires_at_utc"] == expires_at_utc
+        assert loaded_sha256 == reconciliation_contract.sha256_file(decision_path)
+    else:
+        with pytest.raises(reconciliation_contract.ReconciliationContractError) as excinfo:
+            reconciliation_contract.load_reconciliation_decision(
+                decision_path.relative_to(tmp_path).as_posix(),
+                date_str=DATE,
+                reconciliation_path=paths["reconciliation_path"],
+                reconciliation_report=reconciliation,
+                reconciliation_sha256=reconciliation_contract.sha256_file(paths["reconciliation_path"]),
+                now_utc=now_utc,
+            )
+        assert excinfo.value.code == expected_code
+
+
+def test_aligned_reconciliation_rejects_supplied_decision_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    reconciliation, paths = _reconciliation_payload(tmp_path)
+    reconciliation_repo_path = paths["reconciliation_path"].relative_to(tmp_path).as_posix()
+    selected_candidate = json.loads(paths["selected_candidate_path"].read_text(encoding="utf-8"))["candidate"]
+    recommendation = json.loads(paths["recommendation_path"].read_text(encoding="utf-8"))
+    recommendation["recommendation"]["recommended_recipe_id"] = SELECTED_RECIPE_ID
+    _write_json(paths["recommendation_path"], recommendation)
+    queue = json.loads(paths["queue_path"].read_text(encoding="utf-8"))
+    queue["proof_lane_lock"]["recipe_id"] = SELECTED_RECIPE_ID
+    queue["queue_slots"][0]["recipe_id"] = SELECTED_RECIPE_ID
+    _write_json(paths["queue_path"], queue)
+    aligned_reconciliation = copy.deepcopy(reconciliation)
+    aligned_reconciliation["recommendation_recipe_id"] = SELECTED_RECIPE_ID
+    aligned_reconciliation["divergence_status"] = "aligned"
+    aligned_reconciliation["resolution_policy"] = "selected_candidate_authoritative"
+    aligned_reconciliation["reconciliation_status"] = "reconciled"
+    aligned_reconciliation["operator_review_required"] = False
+    aligned_reconciliation["final_reconciled_candidate_id"] = SELECTED_CANDIDATE_ID
+    aligned_reconciliation["final_reconciled_candidate_recipe_id"] = SELECTED_RECIPE_ID
+    aligned_reconciliation["final_reconciled_candidate_slot_id"] = SLOT_ID
+    aligned_reconciliation["final_reconciled_candidate_hook_id"] = selected_candidate["hook_id"]
+    aligned_reconciliation["final_reconciled_candidate_prompt_sha256"] = selected_candidate["prompt_sha256"]
+    aligned_reconciliation["final_reconciled_candidate_artifact_path"] = paths["selected_candidate_path"].relative_to(tmp_path).as_posix()
+    aligned_reconciliation["final_reconciled_candidate_artifact_sha256"] = reconciliation_contract.sha256_file(paths["selected_candidate_path"])
+    aligned_reconciliation["exact_next_allowed_action"] = "build_next_live_image_handoff"
+    aligned_reconciliation["next_allowed_action"] = {
+        "status": "reconciled",
+        "action": "build_next_live_image_handoff",
+        "reason": "recommendation and selected candidate are aligned and may be handed off",
+    }
+    aligned_reconciliation["blocking_reasons"] = []
+    aligned_reconciliation["source_artifacts"]["recommendation"]["source_artifact_sha256"] = reconciliation_contract.sha256_file(paths["recommendation_path"])
+    _write_json(paths["reconciliation_path"], aligned_reconciliation)
+    handoff_report = handoff_builder.build_handoff(DATE, reconciliation_repo_path)
+    handoff_path, _ = handoff_builder.save_handoff(handoff_report, DATE)
+    mutated_handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    mutated_handoff["source_reconciliation_decision_artifact_path"] = "pipeline/strategy/lena/reconciliation_decisions/2026-07-15/lena_generation_reconciliation_decision_dummy.json"
+    mutated_handoff["source_reconciliation_decision_artifact_sha256"] = "1" * 64
+    mutated_handoff["source_reconciliation_decision_id"] = "decision-id"
+    mutated_handoff["source_reconciliation_decision_operator_id"] = "nicolas"
+    mutated_handoff["source_reconciliation_decision_expires_at_utc"] = "2026-07-15T12:30:00+00:00"
+    mutated_handoff["source_reconciliation_decision_authority_scope"] = "handoff_preparation_only"
+    mutated_handoff["source_reconciliation_decision_live_generation_authorized"] = False
+    mutated_handoff["source_reconciliation_decision_publishing_authorized"] = False
+    mutated_handoff["source_reconciliation_decision_next_allowed_action"] = "build_next_live_image_handoff"
+    _write_json(handoff_path, mutated_handoff)
+
+    selected_candidate_binding = approval_mod.validate_selected_candidate_binding(mutated_handoff)
+    with pytest.raises(reconciliation_contract.ReconciliationContractError) as excinfo:
+        reconciliation_contract.validate_handoff_reconciliation_provenance(mutated_handoff, selected_candidate_binding)
+    assert excinfo.value.code == "unexpected_reconciliation_decision"
+
+
+def test_cli_aborts_cleanly_on_expired_reconciliation_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    reconciliation, paths = _reconciliation_payload(tmp_path)
+    reconciliation_repo_path = paths["reconciliation_path"].relative_to(tmp_path).as_posix()
+    decision_path = _write_decision_with_timestamps(
+        reconciliation=reconciliation,
+        reconciliation_repo_path=reconciliation_repo_path,
+        generated_at_utc="2020-01-01T00:00:00+00:00",
+        expires_at_utc="2020-01-01T00:30:00+00:00",
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "handoff",
+            "--date",
+            DATE,
+            "--reconciliation-artifact",
+            reconciliation_repo_path,
+            "--reconciliation-decision-artifact",
+            decision_path.relative_to(tmp_path).as_posix(),
+        ],
+    )
+
+    assert handoff_builder.main() == 1
+    captured = capsys.readouterr()
+    assert "[ABORT] reconciliation_decision_expired:" in captured.out
+    assert "Traceback" not in captured.err
+    assert handoff_builder.handoff_json_path(DATE).exists() is False
+    assert handoff_builder.handoff_markdown_path(DATE).exists() is False

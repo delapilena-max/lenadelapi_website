@@ -11,6 +11,7 @@ over-scoped reconciliation artifacts.
 import hashlib
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,6 @@ RECONCILIATION_POLICY_OPERATOR_REVIEW_REQUIRED = "explicit_operator_reconciliati
 RECONCILIATION_NEXT_ACTION_BUILD = "build_next_live_image_handoff"
 RECONCILIATION_NEXT_ACTION_DECISION = "create_operator_reconciliation_decision"
 RECONCILIATION_AUTHORITY_SCOPE = "handoff_preparation_only"
-RECONCILIATION_DECISION_TTL_MINUTES = 30
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -113,6 +113,25 @@ def _load_artifact(path_value: str, *, expected_report_type: str, expected_schem
     _require(report.get("schema_version") == expected_schema_version, invalid_code, f"{path} has schema_version {report.get('schema_version')!r}, expected {expected_schema_version!r}")
     _require(str(report.get("date", "")).strip() == date_str, invalid_code, f"{path} has date {report.get('date')!r}, expected {date_str!r}")
     return path, report, sha256
+
+
+def _parse_utc_timestamp(raw: Any, *, code: str, label: str) -> datetime:
+    text = str(raw or "").strip()
+    _require(bool(text), code, f"{label} is missing")
+    normalized = text.replace("Z", "+00:00")
+    try:
+        value = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ReconciliationContractError(code, f"{label} is not a valid ISO-8601 UTC timestamp: {text!r}") from exc
+    _require(value.tzinfo is not None, code, f"{label} must include a UTC offset: {text!r}")
+    return value.astimezone(timezone.utc).replace(microsecond=0)
+
+
+def _coerce_now_utc(now_utc: datetime | None) -> datetime:
+    if now_utc is None:
+        return datetime.now(timezone.utc).replace(microsecond=0)
+    _require(now_utc.tzinfo is not None, "invalid_reconciliation_decision", "now_utc must include a UTC offset")
+    return now_utc.astimezone(timezone.utc).replace(microsecond=0)
 
 
 def _validate_source_artifact_entry(
@@ -284,6 +303,7 @@ def load_reconciliation_decision(
     reconciliation_path: Path,
     reconciliation_report: dict[str, Any],
     reconciliation_sha256: str,
+    now_utc: datetime | None = None,
 ) -> tuple[Path, dict[str, Any], str]:
     path, report, sha256 = _load_artifact(
         path_value,
@@ -397,12 +417,26 @@ def load_reconciliation_decision(
         "reconciliation_decision_binding_mismatch",
         "decision selected_candidate_prompt_sha256 must match the reconciliation source",
     )
-    if str(report.get("expires_at_utc", "")).strip():
-        from datetime import datetime, timezone
-
-        expires = datetime.fromisoformat(str(report["expires_at_utc"]).replace("Z", "+00:00")).astimezone(timezone.utc)
-        generated = datetime.fromisoformat(str(report["generated_at_utc"]).replace("Z", "+00:00")).astimezone(timezone.utc)
-        _require(expires > generated, "reconciliation_decision_expired", "decision expires_at_utc must be later than generated_at_utc")
+    generated = _parse_utc_timestamp(generated_at, code="invalid_reconciliation_decision", label="generated_at_utc")
+    decision_expires = _parse_utc_timestamp(expires_at, code="invalid_reconciliation_decision", label="decision_expires_at_utc")
+    legacy_expires = str(report.get("expires_at_utc", "")).strip()
+    if legacy_expires:
+        _require(
+            _parse_utc_timestamp(legacy_expires, code="invalid_reconciliation_decision", label="expires_at_utc") == decision_expires,
+            "invalid_reconciliation_decision",
+            "expires_at_utc must match decision_expires_at_utc",
+        )
+    _require(
+        decision_expires > generated,
+        "reconciliation_decision_expired",
+        "decision decision_expires_at_utc must be later than generated_at_utc",
+    )
+    current_utc = _coerce_now_utc(now_utc)
+    _require(
+        current_utc < decision_expires,
+        "reconciliation_decision_expired",
+        "decision has expired at decision_expires_at_utc",
+    )
     return path, report, sha256
 
 
