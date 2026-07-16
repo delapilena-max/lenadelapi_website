@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import hashlib
 import json
 import re
@@ -23,6 +24,7 @@ from lena_higgsfield_prompt_library_dryrun import (  # noqa: E402
     build_library_report,
     curate_top_prompts,
 )
+from pipeline.prompting.lena_prompt_brain import ControlledProofLaneError  # noqa: E402
 from pipeline.qa.lena_higgsfield_failure_memory import (  # noqa: E402
     compute_higgsfield_failure_memory,
 )
@@ -227,9 +229,19 @@ def _exact_rotation_fields(value: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def build_prompt_candidates(as_of_date: str, head8: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def build_prompt_candidates(
+    as_of_date: str,
+    head8: str,
+    required_recipe_id: str = "",
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     prefix = f"lenagate{as_of_date.replace('-', '')}{head8}"
-    library = build_library_report(as_of_date, prefix, 1, 10)
+    library = build_library_report(
+        as_of_date,
+        prefix,
+        1,
+        10,
+        required_recipe_id=required_recipe_id,
+    )
     images = [image for pack in library["pack_reports"] for image in pack["images"]]
     identities = [(image.get("slot_id"), image.get("image_prompt")) for image in images]
     if len(images) != 10 or len({slot for slot, _ in identities}) != 10 or any(not slot or not prompt for slot, prompt in identities):
@@ -670,14 +682,30 @@ def run_gate(
     verify_clean: bool = True,
     authority_loader: Callable[[], dict[str, Any]] | None = None,
     recent_loader: Callable[[], dict[str, Any]] | None = None,
-    prompt_builder: Callable[[str, str], tuple[list[dict[str, Any]], dict[str, Any]]] = build_prompt_candidates,
+    prompt_builder: Callable[..., tuple[list[dict[str, Any]], dict[str, Any]]] = build_prompt_candidates,
 ) -> tuple[Path, dict[str, Any], bool]:
     authority_commit = _git("rev-parse", "HEAD")
     if verify_clean:
         verify_authority_inputs_clean()
     authorities = authority_loader() if authority_loader else load_authorities()
     recent = recent_loader() if recent_loader else load_recent_content()
-    candidates, prompt_meta = prompt_builder(as_of_date, authority_commit[:8])
+    call_kwargs = {}
+    if required_recipe_id:
+        try:
+            prompt_builder_signature = inspect.signature(prompt_builder)
+        except (TypeError, ValueError):
+            prompt_builder_signature = None
+        if prompt_builder_signature is not None:
+            accepts_required_recipe = any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "required_recipe_id"
+                for name, parameter in prompt_builder_signature.parameters.items()
+            )
+            if accepts_required_recipe:
+                call_kwargs["required_recipe_id"] = required_recipe_id
+    try:
+        candidates, prompt_meta = prompt_builder(as_of_date, authority_commit[:8], **call_kwargs)
+    except ControlledProofLaneError as exc:
+        raise GateError(exc.code, exc.detail) from exc
     candidate, rejected, saw_required_recipe = select_candidate(
         authorities,
         candidates,

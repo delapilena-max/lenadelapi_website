@@ -1672,6 +1672,9 @@ ENVIRONMENT_CATALOG_PATH = (
 PHOTO_SCENE_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_photo_scene_bank_v1.json"
 )
+RECIPE_BANK_PATH = (
+    ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_high_caliber_prompt_recipe_bank_v1.json"
+)
 EXPRESSION_GAZE_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_expression_gaze_bank_v1.json"
 )
@@ -1684,8 +1687,16 @@ POSE_BODY_LANGUAGE_BANK_PATH = (
 KLING_WORKORDERS_ROOT = ROOT / "pipeline" / "kling_workorders"
 
 _PHOTO_SCENE_BANK_CACHE: dict | None = None
+_RECIPE_BANK_CACHE: dict | None = None
 _ENVIRONMENT_CATALOG_CACHE: dict | None = None
 _PROMPT_SOURCE_VALIDATED = False
+
+
+class ControlledProofLaneError(RuntimeError):
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 def load_photo_scene_bank() -> dict:
@@ -1701,7 +1712,169 @@ def load_photo_scene_bank() -> dict:
     return _PHOTO_SCENE_BANK_CACHE
 
 
-def get_production_scene_pool() -> tuple[list[dict], dict]:
+def load_high_caliber_prompt_recipe_bank() -> dict:
+    global _RECIPE_BANK_CACHE
+    if _RECIPE_BANK_CACHE is None:
+        if not RECIPE_BANK_PATH.exists():
+            raise SystemExit(
+                f"[ABORT] Saved high-caliber recipe bank missing: {RECIPE_BANK_PATH}"
+            )
+        _RECIPE_BANK_CACHE = json.loads(
+            RECIPE_BANK_PATH.read_text(encoding="utf-8")
+        )
+    return _RECIPE_BANK_CACHE
+
+
+def _controlled_proof_lane_recipe_and_scene(required_recipe_id: str) -> tuple[dict, dict]:
+    recipe_id = str(required_recipe_id or "").strip()
+    if not recipe_id:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_required_recipe_missing",
+            "required controlled proof-lane recipe id is missing",
+        )
+
+    recipe_bank = load_high_caliber_prompt_recipe_bank()
+    recipes = recipe_bank.get("recipes", [])
+    recipe = next((dict(item) for item in recipes if item.get("id") == recipe_id), None)
+    if recipe is None:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_recipe_unknown",
+            f"unknown controlled proof-lane recipe {recipe_id!r}",
+        )
+    if not recipe.get("controlled_proof_lane", False):
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_recipe_not_controlled",
+            f"recipe {recipe_id!r} is not marked controlled_proof_lane",
+        )
+
+    required_fields = ("strategy_pillars", "creative_temperature", "narrative_roles")
+    if not all(recipe.get(field) for field in required_fields):
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_authority_contradiction",
+            f"controlled recipe {recipe_id!r} is missing required scene metadata",
+        )
+
+    scene_bank = load_photo_scene_bank()
+    blocked = {
+        str(item).strip().lower()
+        for item in scene_bank.get("production_blocked_lanes", [])
+        if str(item).strip()
+    }
+    matches: list[dict] = []
+    for scene in scene_bank.get("scenes", []):
+        lane = str(scene.get("lane") or "").strip().lower()
+        if lane not in blocked:
+            continue
+        if tuple(scene.get("strategy_pillars", [])) != tuple(recipe.get("strategy_pillars", [])):
+            continue
+        if scene.get("creative_temperature") != recipe.get("creative_temperature"):
+            continue
+        if bool(scene.get("choice_eligible")) != bool(recipe.get("choice_eligible")):
+            continue
+        if bool(scene.get("payoff_eligible")) != bool(recipe.get("payoff_eligible")):
+            continue
+        if not set(recipe.get("narrative_roles", [])) <= set(scene.get("narrative_roles", [])):
+            continue
+        matches.append(dict(scene))
+
+    if not matches:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_scene_unresolved",
+            f"unable to resolve a blocked scene for controlled recipe {recipe_id!r}",
+        )
+    if len(matches) > 1:
+        lanes = ", ".join(sorted(str(scene.get("lane", "")) for scene in matches))
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_scene_ambiguous",
+            f"controlled recipe {recipe_id!r} resolved to multiple blocked scenes: {lanes}",
+        )
+
+    return recipe, matches[0]
+
+
+def _controlled_environment_entry_for_recipe(recipe: dict) -> dict:
+    required_environment_id = str(recipe.get("environment_id") or "").strip()
+    if not required_environment_id:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_authority_contradiction",
+            f"controlled recipe {recipe.get('id')!r} is missing environment_id",
+        )
+    catalog = load_environment_catalog()
+    entry = next(
+        (
+            dict(item)
+            for item in catalog.get("environments", [])
+            if str(item.get("environment_id") or "").strip() == required_environment_id
+        ),
+        None,
+    )
+    if entry is None:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_environment_unresolved",
+            f"unable to resolve controlled environment {required_environment_id!r}",
+        )
+    allowed_recipe_types = {str(item).strip() for item in entry.get("allowed_recipe_types", []) if str(item).strip()}
+    if recipe.get("scene_type") not in allowed_recipe_types:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_environment_incompatible",
+            f"controlled environment {required_environment_id!r} is not allowed for scene_type {recipe.get('scene_type')!r}",
+        )
+    return entry
+
+
+def _controlled_wardrobe_entry_for_recipe(recipe: dict, lane: str) -> dict:
+    required_outfit_id = str(recipe.get("wardrobe_outfit_id") or "").strip()
+    if not required_outfit_id:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_authority_contradiction",
+            f"controlled recipe {recipe.get('id')!r} is missing wardrobe_outfit_id",
+        )
+    catalog = load_wardrobe_catalog()
+    entry = next(
+        (
+            dict(item)
+            for item in catalog.get("outfits", [])
+            if str(item.get("outfit_id") or "").strip() == required_outfit_id
+        ),
+        None,
+    )
+    if entry is None:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_wardrobe_unresolved",
+            f"unable to resolve controlled wardrobe outfit {required_outfit_id!r}",
+        )
+    if entry.get("status") in {"rejected", "high_risk"}:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_wardrobe_incompatible",
+            f"controlled wardrobe outfit {required_outfit_id!r} is not safe",
+        )
+    allowed_style_lanes = LANE_STYLE_LANE_ALLOWLIST.get(lane, {"going_out", "elevated_casual", "street"})
+    if entry.get("style_lane") not in allowed_style_lanes:
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_wardrobe_incompatible",
+            f"controlled wardrobe outfit {required_outfit_id!r} is not allowed for lane {lane!r}",
+        )
+    if not _outfit_matches_lane_context(entry, lane):
+        raise ControlledProofLaneError(
+            "controlled_proof_lane_wardrobe_incompatible",
+            f"controlled wardrobe outfit {required_outfit_id!r} is not compatible with lane {lane!r}",
+        )
+    return entry
+
+
+def resolve_controlled_proof_lane_authority(required_recipe_id: str) -> dict[str, dict]:
+    recipe, scene = _controlled_proof_lane_recipe_and_scene(required_recipe_id)
+    environment = _controlled_environment_entry_for_recipe(recipe)
+    wardrobe = _controlled_wardrobe_entry_for_recipe(recipe, str(scene.get("lane") or "").strip().lower())
+    return {
+        "recipe": recipe,
+        "scene": scene,
+        "environment": environment,
+        "wardrobe": wardrobe,
+    }
+
+
+def get_production_scene_pool(required_recipe_id: str = "") -> tuple[list[dict], dict]:
     bank = load_photo_scene_bank()
     blocked = {
         str(item).strip().lower()
@@ -1713,6 +1886,11 @@ def get_production_scene_pool() -> tuple[list[dict], dict]:
         for scene in bank.get("scenes", [])
         if str(scene.get("lane") or "").strip().lower() not in blocked
     ]
+    if required_recipe_id:
+        controlled = resolve_controlled_proof_lane_authority(required_recipe_id)["scene"]
+        controlled_lane = str(controlled.get("lane") or "").strip().lower()
+        if controlled_lane not in {str(scene.get("lane") or "").strip().lower() for scene in scenes}:
+            scenes.append(dict(controlled))
     return scenes, bank
 
 
@@ -4618,7 +4796,11 @@ HIGGSFIELD_PROMPT_BRAIN_VERSION = "lena_prompt_brain_higgsfield_native_v1"
 
 
 def generate_higgsfield_prompt_package(
-    date_str: str, slot_id: str, media_type: str, sequence_index: int | None = None
+    date_str: str,
+    slot_id: str,
+    media_type: str,
+    sequence_index: int | None = None,
+    required_recipe_id: str = "",
 ) -> Dict[str, Any]:
     """Forward Higgsfield-native prompt builder. Short prompt, no negative
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
@@ -4641,12 +4823,20 @@ def generate_higgsfield_prompt_package(
     )
 
     validate_saved_prompt_sources()
-    production_scene_pool, scene_bank = get_production_scene_pool()
+    production_scene_pool, scene_bank = get_production_scene_pool(required_recipe_id=required_recipe_id)
     if not production_scene_pool:
         raise SystemExit("[ABORT] No production-safe saved photo scenes remain.")
 
-    scene = choose_scene_production(production_scene_pool, rng)
-    environment_entry = choose_environment_production(scene, rng)
+    controlled_authority = None
+    if required_recipe_id:
+        controlled_authority = resolve_controlled_proof_lane_authority(required_recipe_id)
+        scene = dict(controlled_authority["scene"])
+        environment_entry = dict(controlled_authority["environment"])
+        wardrobe_entry = dict(controlled_authority["wardrobe"])
+    else:
+        scene = choose_scene_production(production_scene_pool, rng)
+        environment_entry = choose_environment_production(scene, rng)
+        wardrobe_entry = None
     environment_text, detail_text = build_environment_prompt_parts(scene, environment_entry)
     environment_text = _higgsfield_safe_environment_text(environment_text)
     reference_mode = choose_reference_mode(media_type, scene)
@@ -4675,7 +4865,8 @@ def generate_higgsfield_prompt_package(
         wardrobe_silhouette_class = moto_variant["silhouette_class"]
         wardrobe_text = f"{moto_variant['prompt']}.{HIGGSFIELD_MOTO_SAFETY_LOCK}"
     else:
-        wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
+        if wardrobe_entry is None:
+            wardrobe_entry = pick_catalog_outfit_production(scene["lane"], reference_mode, rng)
         wardrobe_outfit_id = wardrobe_entry.get("outfit_id")
         wardrobe_outfit_name = wardrobe_entry.get("name")
         wardrobe_silhouette_class = catalog_outfit_silhouette_class(wardrobe_entry)
@@ -5054,7 +5245,10 @@ def _higgsfield_photo_dump_pose_for_scene(scene_action: str, index: int) -> str:
 
 
 def generate_higgsfield_photo_dump_pack(
-    date_str: str, slot_prefix: str, count: int = HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT
+    date_str: str,
+    slot_prefix: str,
+    count: int = HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
+    required_recipe_id: str = "",
 ) -> Dict[str, Any]:
     """Build a cohesive multi-image Higgsfield-native photo-dump pack.
 
@@ -5102,7 +5296,11 @@ def generate_higgsfield_photo_dump_pack(
         for attempt in range(HIGGSFIELD_PHOTO_DUMP_MAX_RETRIES_PER_IMAGE + 1):
             candidate_seq = i if attempt == 0 else i + count * attempt
             package = generate_higgsfield_prompt_package(
-                date_str, slot_id, "photo", sequence_index=candidate_seq
+                date_str,
+                slot_id,
+                "photo",
+                sequence_index=candidate_seq,
+                required_recipe_id=required_recipe_id if i == 0 else "",
             )
             lane = package["lane"]
             silhouette = package["wardrobe_silhouette_class"]

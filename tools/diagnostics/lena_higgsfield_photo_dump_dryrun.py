@@ -145,8 +145,13 @@ def _validate_image(package: dict) -> dict:
     }
 
 
-def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
-    pack = generate_higgsfield_photo_dump_pack(date_str, slot_prefix, count=count)
+def build_report(date_str: str, slot_prefix: str, count: int, required_recipe_id: str = "") -> dict:
+    pack = generate_higgsfield_photo_dump_pack(
+        date_str,
+        slot_prefix,
+        count=count,
+        required_recipe_id=required_recipe_id,
+    )
 
     per_image = []
     for idx, package in enumerate(pack["images"]):
@@ -159,6 +164,8 @@ def build_report(date_str: str, slot_prefix: str, count: int) -> dict:
                 "wardrobe_outfit_id": package.get("wardrobe_outfit_id"),
                 "wardrobe_outfit_name": package.get("wardrobe_outfit_name"),
                 "wardrobe_silhouette_class": package.get("wardrobe_silhouette_class"),
+                "environment_id": package.get("environment_id"),
+                "environment_name": package.get("environment_name"),
                 "pose_body_language_id": package.get("pose_body_language_id"),
                 "pose_body_language_label": package.get("pose_body_language_label"),
                 "photo_dump_pose_variant": package.get("photo_dump_pose_variant"),

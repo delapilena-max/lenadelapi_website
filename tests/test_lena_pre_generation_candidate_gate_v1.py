@@ -578,6 +578,22 @@ def test_required_recipe_unknown_raises_even_when_other_candidates_exist(tmp_pat
     assert error.value.code == "required_recipe_candidate_missing"
 
 
+def test_controlled_required_recipe_run_gate_surfaces_the_mirror_lane(tmp_path) -> None:
+    path, decision, reused = gate.run_gate(
+        "2026-07-15",
+        tmp_path,
+        required_recipe_id="hcr_012",
+        verify_clean=False,
+    )
+
+    assert reused is False
+    assert path.is_file()
+    assert decision["candidate_status"] == "selected"
+    assert decision["candidate"]["recipe_id"] == "hcr_012"
+    assert decision["candidate"]["lane"] == "mirror outfit check"
+    assert decision["candidate"]["environment_id"] == "env_v008"
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

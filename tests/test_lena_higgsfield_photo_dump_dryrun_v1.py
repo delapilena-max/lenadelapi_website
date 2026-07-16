@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from pipeline.prompting import lena_prompt_brain as prompt_brain
 from pipeline.prompting.lena_prompt_brain import (
     HIGGSFIELD_BODY_SILHOUETTE_ANCHOR,
     HIGGSFIELD_FRAMING_LINE,
+    ControlledProofLaneError,
 )
 from tools.diagnostics import lena_higgsfield_photo_dump_dryrun as photo_dump
 from tools.diagnostics import lena_higgsfield_prompt_library_dryrun as prompt_library
@@ -88,3 +90,60 @@ def test_curator_can_select_a_valid_prompt_and_keep_laundromat_skipped(
     assert len(curation["selected"]) == 1
     assert curation["selected"][0]["image"]["slot_id"].startswith("lenagate20260715085620d1-pack000")
     assert curation["candidate_count"] > 0
+
+
+def test_ordinary_photo_dump_pack_output_remains_unchanged_from_main() -> None:
+    pack = photo_dump.build_report(DATE, "lenagate20260715085620d1-pack000", 10)
+
+    assert [image["lane"] for image in pack["images"]] == [
+        "wine bar patio",
+        "wine bar patio",
+        "wine bar patio",
+        "brunch patio",
+        "rooftop sunset",
+        "laundry day",
+        "morning apartment",
+        "brunch patio",
+        "lobby cocktail bar",
+        "sidewalk dinner",
+    ]
+
+
+def test_controlled_recipe_request_admits_the_mirror_lane_with_authoritative_metadata() -> None:
+    pack = prompt_brain.generate_higgsfield_photo_dump_pack(
+        DATE,
+        "lenagate20260715085620d1-pack000",
+        10,
+        required_recipe_id="hcr_012",
+    )
+
+    first_image = pack["images"][0]
+    assert first_image["lane"] == "mirror outfit check"
+    assert first_image["environment_id"] == "env_v008"
+    assert first_image["wardrobe_outfit_id"] == "wc_p050"
+    assert any(
+        image["lane"] == "mirror outfit check"
+        and image["environment_id"] == "env_v008"
+        and image["wardrobe_outfit_id"] == "wc_p050"
+        for image in pack["images"]
+    )
+
+
+def test_unknown_or_non_controlled_required_recipe_fails_closed() -> None:
+    with pytest.raises(ControlledProofLaneError) as unknown:
+        photo_dump.build_report(
+            DATE,
+            "lenagate20260715085620d1-pack000",
+            10,
+            required_recipe_id="hcr_unknown",
+        )
+    assert unknown.value.code == "controlled_proof_lane_recipe_unknown"
+
+    with pytest.raises(ControlledProofLaneError) as not_controlled:
+        photo_dump.build_report(
+            DATE,
+            "lenagate20260715085620d1-pack000",
+            10,
+            required_recipe_id="hcr_011",
+        )
+    assert not_controlled.value.code == "controlled_proof_lane_recipe_not_controlled"
