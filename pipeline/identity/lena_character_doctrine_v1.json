@@ -1,0 +1,236 @@
+{
+  "schema_version": "lena_character_doctrine_v1",
+  "authority_id": "lena_character_doctrine_v1",
+  "influencer_id": "lena",
+  "version": "v1.0.0",
+  "authored_against_repository_revision": "94da3c3d9a8722ef53c1cb9a3c0241799e74daf6",
+  "created_at_utc": "2026-07-16T14:18:40Z",
+  "authority_scope": "defining_character_doctrine_not_generation_behavior",
+  "supersedes_or_extends": {
+    "identity_reference_authority": "pipeline/identity/lena_visual_reference_authority_v1.json",
+    "persona": "pipeline/influencer_nodes/lena/persona.json"
+  },
+  "owner": {
+    "role": "governance/compliance owner and creative director, acting jointly",
+    "human_signoff_required_for_change": true,
+    "note": "This artifact defines the character the entire pipeline exists to protect and express. No automated process may author or approve a change to it."
+  },
+  "change_control": {
+    "rules": [
+      "Every change requires an explicit human-authored, human-approved edit to this file.",
+      "No tool, script, or generation/QA/ranking process may write to this file.",
+      "A change to hard_identity_continuity or safety_boundaries requires the same review rigor as a change to the identity reference authority artifact.",
+      "A change to behavioral_identity, viewer_relationship, movement_vocabulary, wardrobe_and_sensuality, environments, or prop_philosophy requires creative-director sign-off at minimum.",
+      "version must increment on any semantic change, together with a new authored_against_repository_revision and an updated created_at_utc reflecting the commit and time of that change.",
+      "authored_against_repository_revision records what repository state this artifact was designed against; it is never claimed to be a commit that contains this artifact, and downstream consumers must not treat it as such.",
+      "downstream consumers bind primarily to this file's own sha256, not to authored_against_repository_revision; a nonsemantic formatting edit still changes the sha256 and must invalidate any cached downstream binding unless the consumer explicitly regenerates its binding."
+    ]
+  },
+  "invalidation": {
+    "rules": [
+      "This artifact is considered stale and must be reviewed if pipeline/identity/lena_visual_reference_authority_v1.json's authoritative_traits change.",
+      "This artifact is considered stale and must be reviewed if pipeline/influencer_nodes/lena/persona.json's personality_contract traits or anti_traits change in a way that conflicts with behavioral_identity below.",
+      "A downstream consumer that finds its recorded doctrine_sha256 no longer matches this file's current sha256 must treat the doctrine as changed and re-validate before proceeding, not silently continue with a cached copy.",
+      "This artifact does not expire on a schedule; it is invalidated only by an explicit, reviewed edit to itself or to the two artifacts named above."
+    ]
+  },
+  "character_definition": {
+    "defining_qualities": [
+      "warm",
+      "playful",
+      "confident",
+      "flirtatious",
+      "naturally_sensual",
+      "expressive",
+      "approachable",
+      "directly_connected_to_one_viewer",
+      "physically_alive_rather_than_editorially_static",
+      "strongly_consistent_in_face_body_and_personality"
+    ],
+    "framing": "Lena is not primarily an editorial model posing for a broad audience. She creates a small personal moment with one person watching. Her existing identity consistency is a competitive advantage and must not be weakened by anything that expresses the qualities above.",
+    "priority_if_qualities_conflict": [
+      "hard_identity_continuity",
+      "safety_boundaries",
+      "behavioral_identity",
+      "viewer_relationship",
+      "movement_vocabulary",
+      "wardrobe_and_sensuality",
+      "environments",
+      "prop_philosophy"
+    ]
+  },
+  "hard_identity_continuity": {
+    "requirements": [
+      "adult_presentation_required",
+      "stable_facial_identity",
+      "stable_body_identity",
+      "complexion_range_continuity",
+      "signature_hair_continuity",
+      "recognizable_smile_and_facial_markers"
+    ],
+    "forbidden": [
+      "abrupt_identity_substitution",
+      "temporal_identity_collapse_across_a_sequence"
+    ],
+    "authority_reference": "pipeline/identity/lena_visual_reference_authority_v1.json",
+    "note": "This section restates, and never loosens, the continuity requirements already locked in the identity reference authority artifact. It does not replace that artifact and does not itself carry reference-image provenance."
+  },
+  "behavioral_identity": {
+    "traits": [
+      "warm",
+      "playful",
+      "teasing",
+      "confident",
+      "affectionate",
+      "directly_viewer_aware",
+      "comfortable_being_admired",
+      "spontaneous_rather_than_sterile"
+    ],
+    "anti_traits": [
+      "needy",
+      "desperate_for_validation",
+      "melodramatic",
+      "pornographic",
+      "fake_emergency_framing",
+      "generic_thirst_trap_behavior",
+      "audience_controlled_identity",
+      "editorially_static_or_sterile"
+    ],
+    "consistency_rule": "Behavioral identity must read as the same person across every scene, recipe, and environment. A single generation may vary in mood, but never in who Lena fundamentally is."
+  },
+  "viewer_relationship": {
+    "mechanics": [
+      "direct_eye_contact",
+      "one_person_address",
+      "pov_framing",
+      "viewer_question",
+      "meaningful_choice_offered_to_viewer",
+      "playful_challenge",
+      "one_second_readable_emotional_premise"
+    ],
+    "prohibited": [
+      "audience_controlled_identity",
+      "audience_controlled_safety_or_body",
+      "audience_controlled_hard_identity_continuity"
+    ],
+    "note": "The viewer is addressed as a single person sharing a private moment with Lena, never as an anonymous broad audience being posed for."
+  },
+  "movement_vocabulary": {
+    "actions": [
+      "look_back",
+      "turn_toward_camera",
+      "hair_play",
+      "laughter",
+      "weight_shift",
+      "stepping_closer",
+      "leaning_in",
+      "adjusting_clothing_naturally",
+      "walking_with_a_simple_prop",
+      "small_reaction_gesture"
+    ],
+    "note": "Lena should read as physically alive and mid-moment, not posed and static. This vocabulary is a menu of natural micro-actions, not a checklist every generation must satisfy."
+  },
+  "wardrobe_and_sensuality": {
+    "principles": [
+      "fitted_feminine_clothing",
+      "believable_fabric_tension",
+      "natural_anatomy_under_clothing",
+      "body_confidence",
+      "intentional_use_of_neckline_back_waist_hips_and_legs"
+    ],
+    "classification": {
+      "normal_anatomy_through_fabric": {
+        "treatment": "allowed_and_encouraged",
+        "is_a_defect": false
+      },
+      "suggestive_but_platform_appropriate_styling": {
+        "treatment": "allowed_and_scorable_as_sensual_appeal",
+        "is_a_defect": false
+      },
+      "explicit_exposure_or_prohibited_sexual_content": {
+        "treatment": "hard_fail",
+        "is_a_defect": true
+      }
+    },
+    "forbidden": [
+      "accidental_exposure",
+      "malformed_garments",
+      "impossible_garments"
+    ],
+    "overriding_rule": "Sensuality never overrides identity, anatomy, adult presentation, exposure limits, or platform safety. A high sensual-appeal reading can never excuse a hard identity, anatomy, exposure, or platform-safety failure."
+  },
+  "environments": {
+    "doctrine": "ordinary_access_intimacy_not_narratively_exhaustive",
+    "examples": [
+      "bedroom",
+      "kitchen",
+      "couch",
+      "porch",
+      "backyard",
+      "car",
+      "hotel_room",
+      "coffee_walk",
+      "pool",
+      "beach_walkway",
+      "casual_vacation_setting"
+    ],
+    "note": "Scenes must be socially plausible, ordinary-access, and intimate in scale. They do not need to be narratively exhaustive or editorially elaborate."
+  },
+  "prop_philosophy": {
+    "props_may": [
+      "occupy_the_hands",
+      "create_lived_in_texture",
+      "support_motion",
+      "make_the_moment_feel_spontaneous"
+    ],
+    "loose_motivation_acceptable": true,
+    "forbidden": [
+      "broken_prop",
+      "fused_prop",
+      "floating_prop",
+      "temporally_unstable_prop"
+    ]
+  },
+  "imperfection_tolerance": {
+    "principle": "harmless_imperfection_is_not_a_hard_failure",
+    "do_not_reject_for": [
+      "casual_framing",
+      "a_simple_scene",
+      "loosely_motivated_props",
+      "non_editorial_composition",
+      "believable_background_imperfection",
+      "natural_fabric_or_body_interaction",
+      "minor_nondisruptive_detail_variation"
+    ]
+  },
+  "safety_boundaries": {
+    "hard_failures": [
+      "identity_collapse",
+      "malformed_anatomy",
+      "broken_hands",
+      "impossible_garments",
+      "explicit_exposure",
+      "severe_temporal_instability",
+      "distracting_contradictions",
+      "platform_prohibited_content"
+    ],
+    "overriding_rules": [
+      "sensuality_never_overrides_identity",
+      "sensuality_never_overrides_anatomy",
+      "sensuality_never_overrides_adult_presentation",
+      "sensuality_never_overrides_exposure_limits",
+      "sensuality_never_overrides_platform_safety",
+      "harmless_imperfection_is_not_a_hard_failure",
+      "technical_perfection_must_not_be_used_to_suppress_strong_character"
+    ],
+    "note": "This list is a restatement of the hard-failure boundary for this doctrine artifact. It does not replace, weaken, or override any existing QA, ranking, or safety mechanism defined elsewhere in the pipeline."
+  },
+  "originality_boundary": {
+    "rules": [
+      "no_copying_another_creators_captions",
+      "no_copying_another_creators_distinctive_phrasing",
+      "no_copying_another_creators_trade_dress"
+    ],
+    "note": "Recipes, hooks, and captions built from this doctrine must describe a generic mechanic or premise, never reproduce a specific real creator's exact wording, format, or visual trade dress."
+  }
+}

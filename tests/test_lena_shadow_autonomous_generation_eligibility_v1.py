@@ -51,6 +51,7 @@ def _materialize_canonical_assets(tmp_path: Path) -> None:
     _write_json(lena_root / "persona.json", {"persona": "Lena", "voice": "warm"})
     _write_text(identity_root / "lena_identity.py", "EXPECTED_WIDTH = 1024\nEXPECTED_HEIGHT = 1024\n")
     _write_text(identity_root / "lena_higgsfield_identity.py", "EXPECTED_JOB_TYPE = 'higgsfield_text2image'\nEXPECTED_SOUL_NAME = 'Lena'\nEXPECTED_SOUL_TYPE = 'Soul 2.0'\nAPPROVED_CUSTOM_REFERENCE_IDS = {'ref'}\n")
+    _write_json(identity_root / "lena_character_doctrine_v1.json", {"version": "v1"})
     _write_json(lena_root / "lena_content_strategy_v1.json", {"version": "v1"})
     _write_json(lena_root / "world_continuity_policy_v1.json", {"version": "v1"})
     _write_json(lena_root / "life_engine_realism_memory_policy_v1.json", {"version": "v1", "memory_path": "pipeline/state/lena_life_engine_realism_memory_v1.json"})
