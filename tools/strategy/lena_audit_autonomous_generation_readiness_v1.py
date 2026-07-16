@@ -68,6 +68,7 @@ def default_priority_recipes() -> list[str]:
     ]
     active.sort(
         key=lambda recipe: (
+            not recipe.get("controlled_proof_lane", False),
             recipe.get("proof_priority") is None,
             recipe.get("proof_priority", 999),
             recipe.get("id", ""),
@@ -349,7 +350,10 @@ def main() -> int:
         "--recipes",
         nargs="*",
         default=None,
-        help="Priority recipe ids to audit (defaults to all active recipes ordered by proof_priority)",
+        help=(
+            "Priority recipe ids to audit (defaults to all active recipes ordered by "
+            "controlled proof lane, then proof_priority)"
+        ),
     )
     args = parser.parse_args()
 

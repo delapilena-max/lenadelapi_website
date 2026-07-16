@@ -280,6 +280,7 @@ def build_queue(
                 "environment_used": lane["environment_used"],
                 "proof_priority": recipe_meta.get("proof_priority"),
                 "production_proof_mode": recipe_meta.get("production_proof_mode", False),
+                "controlled_proof_lane": recipe_meta.get("controlled_proof_lane", False),
                 "priority_score": total,
                 "why": reasons or lane["autonomy_reasons"],
                 "recommended_packet_command": (
@@ -295,6 +296,7 @@ def build_queue(
 
     lanes.sort(
         key=lambda row: (
+            not row.get("controlled_proof_lane", False),
             -row["priority_score"],
             row["proof_priority"] is None,
             row["proof_priority"] or 999,
@@ -522,7 +524,7 @@ def main() -> int:
         "proof_lane_lock": proof_lane_lock,
         "proof_lane_lock_active": proof_lane_lock_active,
         "queue_policy": {
-            "default_order_source": "recipe bank proof_priority + readiness score + world-state continuity pressure + engagement demand pressure + post outcome pressure",
+            "default_order_source": "recipe bank controlled proof lane + proof_priority + readiness score + world-state continuity pressure + engagement demand pressure + post outcome pressure",
             "rotation_preview_prefers_non_proof_mode": True,
             "proof_lane_lock_suppressed_when_broader_ready": True,
         },

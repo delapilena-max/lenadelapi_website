@@ -59,6 +59,9 @@ def test_genuine_overcorrection_prompt_is_still_excluded() -> None:
 def test_laundromat_prompt_remains_hard_excluded() -> None:
     pack = photo_dump.build_report(DATE, "lenagate20260715085620d1-pack000", 10)
     laundromat_image = pack["images"][5]
+    assert laundromat_image["lane"] == "laundry day"
+    assert "laundromat" in laundromat_image["image_prompt"].lower()
+    assert "laundromat" in laundromat_image["validation"]["low_hook_terms_found"]
 
     reasons = prompt_library._hard_exclude_reasons(laundromat_image)
 

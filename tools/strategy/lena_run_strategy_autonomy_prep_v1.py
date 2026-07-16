@@ -58,6 +58,7 @@ def default_recipe_ids() -> list[str]:
     ]
     active.sort(
         key=lambda recipe: (
+            not recipe.get("controlled_proof_lane", False),
             recipe.get("proof_priority") is None,
             recipe.get("proof_priority", 999),
             recipe.get("id", ""),
@@ -174,7 +175,7 @@ def main() -> int:
         default="",
         help=(
             "Optional comma-separated recipe IDs. "
-            "Defaults to all active recipes ordered by proof_priority."
+            "Defaults to all active recipes ordered by controlled proof lane, then proof_priority."
         ),
     )
     parser.add_argument(

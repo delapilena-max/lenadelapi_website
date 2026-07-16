@@ -281,7 +281,14 @@ def _best_recipe(scene: dict[str, Any], recipes: list[dict[str, Any]]) -> dict[s
         and recipe["creative_temperature"] == scene["creative_temperature"]
         and set(recipe["narrative_roles"]) & set(scene["narrative_roles"])
     ]
-    return min(matches, key=lambda r: (int(r.get("proof_priority", 999)), r["id"])) if matches else None
+    return min(
+        matches,
+        key=lambda r: (
+            not r.get("controlled_proof_lane", False),
+            int(r.get("proof_priority", 999)),
+            r["id"],
+        ),
+    ) if matches else None
 
 
 def _best_hook(recipe: dict[str, Any], hooks: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
@@ -484,7 +491,21 @@ def select_candidate(
             rejected["unknown_canonical_scene"] += 1
             continue
         recipe = _best_recipe(scene, authorities["recipes"])
-        reasons = _candidate_hard_gate(image, scene, blocked, authorities["strategy"], recent["records"], recipe)
+        controlled_proof_lane_allowed = (
+            bool(required_recipe_id)
+            and recipe is not None
+            and recipe.get("id") == required_recipe_id
+            and recipe.get("controlled_proof_lane", False)
+        )
+        candidate_blocked = blocked - {lane} if controlled_proof_lane_allowed else blocked
+        reasons = _candidate_hard_gate(
+            image,
+            scene,
+            candidate_blocked,
+            authorities["strategy"],
+            recent["records"],
+            recipe,
+        )
         if recipe is None:
             reasons.append("no_compatible_active_recipe")
         elif required_recipe_id and recipe["id"] != required_recipe_id:

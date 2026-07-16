@@ -1050,6 +1050,7 @@
         ]
       },
       "production_proof_mode": true,
+      "controlled_proof_lane": true,
       "wardrobe_outfit_id": "wc_p050",
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "Face-priority proof lane for non-red apartment variety while keeping the same lived-in getting-ready realism standard.",
