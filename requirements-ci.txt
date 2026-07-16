@@ -1,0 +1,6 @@
+# Minimal, pinned dependency set required to collect and run the test suite in CI.
+# This is intentionally separate from any future application requirements.txt:
+# it exists only to make `python -m pytest tests -q` deterministic and reproducible.
+# Resolved and verified locally on 2026-07-16 against Python 3.11 and 3.14.
+pytest==9.1.1
+Pillow==12.3.0
