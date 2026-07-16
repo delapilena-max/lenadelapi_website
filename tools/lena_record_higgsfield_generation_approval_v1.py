@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
     CANONICAL_OPERATOR_ID,
     HiggsfieldGenerationApprovalError,
@@ -71,6 +72,9 @@ def main() -> int:
             confirm=args.confirm,
             out_root=out_root,
         )
+    except reconciliation_contract.ReconciliationContractError as exc:
+        print(f"[ABORT] {exc.code}: {exc.detail}")
+        return 1
     except HiggsfieldGenerationApprovalError as exc:
         print(
             json.dumps(

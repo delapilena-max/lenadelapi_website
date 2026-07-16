@@ -13,6 +13,7 @@ from tools import lena_higgsfield_generation_approval_v1 as approval
 from tools import lena_higgsfield_retry_generation_approval_v1 as retry_approval
 from tools import lena_photo_qa_disposition_v1 as photo_qa
 from tools.strategy import lena_build_next_live_image_handoff_v1 as handoff_builder
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.strategy import lena_execute_retry_decision_v1 as retry_decision
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
 
@@ -150,6 +151,7 @@ def test_level_two_approval_records_do_not_grant_posting_authority() -> None:
 def test_handoff_builder_blocks_before_loading_reports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     contract_path = tmp_path / "missing_autonomy_ladder.json"
     monkeypatch.setattr(autonomy_ladder, "CONTRACT_PATH", contract_path)
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
 
     def forbidden(*args, **kwargs):
         raise AssertionError("handoff load_report must not be reached when the ladder is missing")
@@ -157,7 +159,10 @@ def test_handoff_builder_blocks_before_loading_reports(tmp_path: Path, monkeypat
     monkeypatch.setattr(handoff_builder, "load_report", forbidden)
 
     with pytest.raises(handoff_builder.HandoffBuildError) as error:
-        handoff_builder.build_handoff("2026-07-13")
+        handoff_builder.build_handoff(
+            "2026-07-13",
+            "pipeline/strategy/lena/reconciliations/2026-07-13/lena_generation_reconciliation_fixture.json",
+        )
 
     assert "contract_missing" in str(error.value)
 
