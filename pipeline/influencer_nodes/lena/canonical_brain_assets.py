@@ -105,6 +105,13 @@ def canonical_brain_asset_specs() -> list[dict[str, object]]:
             "kind": "file",
         },
         {
+            "asset_id": "character_doctrine",
+            "path": ROOT / "pipeline" / "identity" / "lena_character_doctrine_v1.json",
+            "category": "identity",
+            "required": True,
+            "kind": "file",
+        },
+        {
             "asset_id": "content_strategy",
             "path": LENA_ROOT / "lena_content_strategy_v1.json",
             "category": "strategy",
