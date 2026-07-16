@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 
+from pipeline.prompting import lena_prompt_brain as prompt_brain
 import tools.strategy.lena_audit_autonomous_generation_readiness_v1 as audit
 import tools.strategy.lena_build_autonomous_generation_queue_dryrun_v1 as queue_builder
 import tools.strategy.lena_build_content_batch_dryrun_v1 as batch
@@ -120,6 +122,20 @@ def test_controlled_proof_lane_is_first_in_prep_recommendation_queue_and_run_inp
         limit=2,
     )
     assert [row["recipe_id"] for row in queue] == ["hcr_012", "hcr_011"]
+
+
+def test_controlled_proof_lane_authority_resolves_without_hard_coding_recipe_or_scene() -> None:
+    authority = prompt_brain.resolve_controlled_proof_lane_authority("hcr_012")
+
+    assert authority["recipe"]["id"] == "hcr_012"
+    assert authority["scene"]["lane"] == "mirror outfit check"
+    assert authority["environment"]["environment_id"] == "env_v008"
+    assert authority["wardrobe"]["outfit_id"] == "wc_p050"
+
+    source = inspect.getsource(prompt_brain.resolve_controlled_proof_lane_authority)
+    assert "hcr_012" not in source
+    assert "mirror outfit check" not in source
+    assert "controlled_proof_lane" in source
 
 
 def test_glamorous_mirror_scene_prefers_hcr_012_and_rejects_incompatible_required_recipe() -> None:

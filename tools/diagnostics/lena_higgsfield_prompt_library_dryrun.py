@@ -186,14 +186,25 @@ VALIDATION_LABELS = {
 }
 
 
-def build_library_report(date_str: str, library_prefix: str, packs: int, count_per_pack: int) -> dict:
+def build_library_report(
+    date_str: str,
+    library_prefix: str,
+    packs: int,
+    count_per_pack: int,
+    required_recipe_id: str = "",
+) -> dict:
     pack_reports = []
     for pack_index in range(packs):
         slot_prefix = f"{library_prefix}-pack{pack_index:03d}"
         # count clamping to [MIN_COUNT, MAX_COUNT] happens inside
         # generate_higgsfield_photo_dump_pack() itself, via build_report() --
         # not reimplemented here.
-        pack_report = build_report(date_str, slot_prefix, count_per_pack)
+        pack_report = build_report(
+            date_str,
+            slot_prefix,
+            count_per_pack,
+            required_recipe_id=required_recipe_id if pack_index == 0 else "",
+        )
         pack_reports.append(pack_report)
 
     total_prompts = sum(len(p["images"]) for p in pack_reports)
