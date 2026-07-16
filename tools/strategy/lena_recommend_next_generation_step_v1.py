@@ -91,6 +91,7 @@ def face_priority_proof_sequence() -> list[str]:
     ]
     filtered.sort(
         key=lambda recipe: (
+            not recipe.get("controlled_proof_lane", False),
             recipe.get("proof_priority") is None,
             recipe.get("proof_priority", 999),
             recipe.get("id", ""),
@@ -99,12 +100,26 @@ def face_priority_proof_sequence() -> list[str]:
     return [recipe.get("id", "") for recipe in filtered if recipe.get("id")]
 
 
-def select_next_face_proof_lane(current_recipe_id: str) -> tuple[str, str, str]:
+def select_next_face_proof_lane(
+    current_recipe_id: str,
+    *,
+    prefer_controlled_lane: bool = False,
+) -> tuple[str, str, str]:
     available = face_priority_proof_sequence()
     if not available:
         return "", "", ""
 
-    if current_recipe_id in available and len(available) > 1:
+    controlled_lane = next(
+        (
+            recipe_id
+            for recipe_id in available
+            if (get_recipe(recipe_id) or {}).get("controlled_proof_lane", False)
+        ),
+        "",
+    )
+    if prefer_controlled_lane and controlled_lane:
+        selected_recipe_id = controlled_lane
+    elif current_recipe_id in available and len(available) > 1:
         current_index = available.index(current_recipe_id)
         selected_recipe_id = available[(current_index + 1) % len(available)]
     else:
@@ -494,7 +509,8 @@ def build_recommendation(
         if len(same_lane_rejects) >= 2:
             action_type = "face_priority_skin_realism_proof_lane"
             recipe_id, outfit_id, environment_id = select_next_face_proof_lane(
-                latest_skin_iteration.get("recipe_id", "")
+                latest_skin_iteration.get("recipe_id", ""),
+                prefer_controlled_lane=True,
             )
             rationale = [
                 "The same full-body mirror lane has now produced repeated rejects after the earlier strong candidate.",

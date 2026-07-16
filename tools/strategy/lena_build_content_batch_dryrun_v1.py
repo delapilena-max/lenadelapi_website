@@ -58,7 +58,11 @@ def default_recipe_ids(recipe_bank):
 
     ordered = sorted(
         active_recipes,
-        key=lambda r: (r["proof_priority"], r["id"]),
+        key=lambda r: (
+            not r.get("controlled_proof_lane", False),
+            r["proof_priority"],
+            r["id"],
+        ),
     )
     return [r["id"] for r in ordered]
 
@@ -200,7 +204,7 @@ def main():
         default=None,
         help=(
             "Comma-separated recipe IDs (e.g. hcr_001,hcr_002). "
-            "Defaults to active recipes ordered by proof_priority."
+            "Defaults to active recipes ordered by controlled proof lane, then proof_priority."
         ),
     )
     parser.add_argument(

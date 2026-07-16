@@ -119,6 +119,7 @@ def active_recipes(recipe_bank: dict) -> list[dict]:
     ]
     items.sort(
         key=lambda recipe: (
+            not recipe.get("controlled_proof_lane", False),
             recipe.get("proof_priority") is None,
             recipe.get("proof_priority", 999),
             recipe.get("id", ""),
@@ -375,6 +376,7 @@ def candidate_row(
         "environment_lane": env_lane,
         "context_class": context_class,
         "production_proof_mode": proof_mode,
+        "controlled_proof_lane": recipe.get("controlled_proof_lane", False),
         "proof_priority": proof_priority,
         "score": score,
         "blocked": blocked,
@@ -463,6 +465,7 @@ def main() -> int:
     ]
     broader_candidates.sort(
         key=lambda row: (
+            not row.get("controlled_proof_lane", False),
             -row["score"],
             row["proof_priority"] is None,
             row["proof_priority"] or 999,

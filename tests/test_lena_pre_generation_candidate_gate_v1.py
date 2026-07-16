@@ -559,6 +559,25 @@ def test_required_recipe_missing_raises_even_when_other_candidates_exist(tmp_pat
     assert error.value.code == "required_recipe_candidate_missing"
 
 
+def test_required_recipe_unknown_raises_even_when_other_candidates_exist(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "_git", lambda *args: "a" * 40)
+    monkeypatch.setattr(gate, "verify_authority_inputs_clean", lambda *args, **kwargs: None)
+    auth = authorities([scene("lane a", pillar="p1")], [recipe("hcr_a", pillar="p1")], [hook()])
+    prompt_candidates = [curator(image("lane a", "slot-a"))]
+
+    with pytest.raises(gate.GateError) as error:
+        gate.run_gate(
+            "2026-07-14",
+            tmp_path,
+            required_recipe_id="hcr_unknown",
+            authority_loader=lambda: auth,
+            recent_loader=recent,
+            prompt_builder=lambda *_args: (prompt_candidates, {}),
+        )
+
+    assert error.value.code == "required_recipe_candidate_missing"
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
