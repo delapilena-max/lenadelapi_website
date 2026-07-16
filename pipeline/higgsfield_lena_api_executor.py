@@ -389,6 +389,11 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     learning_path_loaded, learning = load_learning_report(recommendation, date_str)
     queue_loaded_path, queue_report = load_queue_report(date_str)
     packet_report = load_content_packet_report(packet_path, date_str)
+    from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
+        validate_selected_candidate_binding,
+    )
+
+    selected_candidate_binding = validate_selected_candidate_binding(report)
 
     _require_handoff(learning_path_loaded == learning_path, "handoff_learning_path_mismatch", f"{handoff_path} learning artifact path mismatch")
     _require_handoff(queue_loaded_path == queue_path, "handoff_queue_path_mismatch", f"{handoff_path} queue artifact path mismatch")
@@ -401,6 +406,11 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
 
     queue_head = queue_report.get("queue_slots", [])[0]
     _require_handoff(queue_head.get("recipe_id") == recommendation.get("recommendation", {}).get("recommended_recipe_id"), "handoff_queue_head_mismatch", f"{handoff_path} queue head mismatch")
+    _require_handoff(
+        selected_candidate_binding["selected_candidate_recipe_id"] == recommendation.get("recommendation", {}).get("recommended_recipe_id"),
+        "selected_candidate_recommendation_mismatch",
+        "selected candidate recipe does not match the next-generation recommendation",
+    )
     _require_handoff(packet_report.get("recipe_id") == queue_head.get("recipe_id"), "handoff_candidate_recipe_mismatch", f"{handoff_path} selected prompt input recipe mismatch")
     _require_handoff(packet_report.get("packet_id") == report.get("selected_prompt_input", {}).get("packet_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected prompt input packet id mismatch")
     _require_handoff(packet_report.get("strong_hook_id") == report.get("selected_prompt_input", {}).get("hook_id"), "handoff_hook_id_mismatch", f"{handoff_path} selected prompt input hook id mismatch")
@@ -459,6 +469,7 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         "selected_prompt_sha256": expected_sha,
         "regenerated_prompt_sha256": regenerated_sha,
         "prompt_sha_match": True,
+        "selected_candidate_binding_valid": True,
         "provider_model_aspect_soul_agreement": True,
         "provider_call_performed": False,
         "generation_performed": False,

@@ -40,6 +40,7 @@ if str(ROOT) not in sys.path:
 from pipeline.prompting.lena_prompt_brain import (
     generate_higgsfield_photo_dump_pack,
     HIGGSFIELD_FRAMING_LINE,
+    HIGGSFIELD_BODY_SILHOUETTE_ANCHOR,
     HIGGSFIELD_WARDROBE_CASUAL_BLOCK_TERMS,
     HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS,
     HIGGSFIELD_POSE_REINFORCEMENT_LINE,
@@ -85,6 +86,18 @@ def _extract_wardrobe_segment(prompt: str) -> str:
     return match.group(1) if match else ""
 
 
+def _heavy_overcorrection_terms_found(prompt: str) -> list[str]:
+    """Detect heavy-body terms after removing the exact canonical anchor.
+
+    The canonical Lena prompt brain intentionally injects the body anchor
+    block, which contains the phrase "fuller thighs" as an identity cue.
+    That exact canonical block should not trip the overcorrection validator.
+    """
+    lower = prompt.lower()
+    stripped = lower.replace(HIGGSFIELD_BODY_SILHOUETTE_ANCHOR.lower(), "")
+    return [term for term in HEAVY_BODY_OVERCORRECTION_TERMS if term in stripped]
+
+
 def _validate_image(package: dict) -> dict:
     prompt = package["image_prompt"]
     lower = prompt.lower()
@@ -96,9 +109,7 @@ def _validate_image(package: dict) -> dict:
     scene_conflict_terms_found = [
         term for term in HIGGSFIELD_SCENE_ACTION_CONFLICT_TERMS if term in lower
     ]
-    heavy_terms_found = [
-        term for term in HEAVY_BODY_OVERCORRECTION_TERMS if term in lower
-    ]
+    heavy_terms_found = _heavy_overcorrection_terms_found(prompt)
 
     return {
         "framing_present": HIGGSFIELD_FRAMING_LINE in prompt,

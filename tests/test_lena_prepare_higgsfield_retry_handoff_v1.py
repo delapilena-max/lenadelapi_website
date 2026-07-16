@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -36,6 +37,29 @@ ORIGINAL_PROMPT = (
     "anatomically correct with five fingers, believable knuckles, clean thumb placement, and relaxed wrists."
 )
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
+SELECTED_CANDIDATE_REPO_PATH = Path(
+    f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
+)
+
+
+def _selected_candidate_payload() -> dict:
+    return {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "candidate_status": "selected",
+        "generated_at_utc": "2026-07-14T12:00:00+00:00",
+        "candidate": {
+            "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+            "slot_id": ORIGINAL_SLOT,
+            "recipe_id": "hcr_011",
+            "prompt_sha256": PROMPT_SHA,
+        },
+    }
+
+
+def _selected_candidate_sha() -> str:
+    return hashlib.sha256(
+        json.dumps(_selected_candidate_payload(), indent=2).replace("\n", os.linesep).encode("utf-8")
+    ).hexdigest()
 
 
 def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,8 +86,10 @@ def _write_json(path: Path, payload: dict) -> Path:
 def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_live_image_handoff_{DATE}.json"
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / DATE / f"lena_content_packet_dryrun_{DATE}_hcr_011.json"
+    selected_candidate_repo_path = SELECTED_CANDIDATE_REPO_PATH
     handoff_path = tmp_path / handoff_repo_path
     packet_path = tmp_path / packet_repo_path
+    selected_candidate_path = tmp_path / selected_candidate_repo_path
     packet_report = {
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
@@ -78,6 +104,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     }
     _write_json(packet_path, packet_report)
     packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
+    selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
+    selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     handoff_report = {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -98,12 +127,27 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "manual_publish_review_required": True,
         "date": DATE,
         "selected_slot_id": ORIGINAL_SLOT,
+        "selected_recipe_id": "hcr_011",
         "expected_handoff_artifact_path": handoff_repo_path.as_posix(),
+        "source_selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+        "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+        "selected_candidate": {
+            "artifact_path": selected_candidate_repo_path.as_posix(),
+            "artifact_sha256": selected_candidate_sha,
+            "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+            "slot_id": ORIGINAL_SLOT,
+            "recipe_id": "hcr_011",
+            "prompt_sha256": PROMPT_SHA,
+            "schema_version": "lena_pre_generation_candidate_gate_v1",
+            "candidate_status": "selected",
+        },
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
             "prompt_sha256": PROMPT_SHA,
             "prompt_text": ORIGINAL_PROMPT,
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -124,6 +168,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             },
             "selected_prompt_sha256": PROMPT_SHA,
             "selected_prompt_text": ORIGINAL_PROMPT,
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
         },
     }
     _write_json(handoff_path, handoff_report)

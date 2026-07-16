@@ -41,8 +41,8 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
         "schema_version": "v1",
         "approval_type": "higgsfield_single_generation",
         "operator_id": "nicolas",
-        "approved_at_utc": "2026-07-15T12:00:00+00:00",
-        "expires_at_utc": "2026-07-15T12:30:00+00:00",
+        "approved_at_utc": "2099-07-15T12:00:00+00:00",
+        "expires_at_utc": "2099-07-15T12:30:00+00:00",
         "handoff_artifact_path": handoff_repo_path,
         "handoff_artifact_sha256": "a" * 64,
         "handoff_report_type": "lena_next_live_image_handoff",
@@ -135,6 +135,130 @@ def test_missing_approval_fails_closed(tmp_path: Path, monkeypatch: pytest.Monke
     with pytest.raises(wrapper.LiveGenerationAccountingError) as excinfo:
         wrapper.execute_approved_live_generation(handoff_path, tmp_path / "missing_approval.json")
     assert excinfo.value.code == "missing_approval"
+
+
+def test_stale_handoff_is_rejected_by_live_execution_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    stale_handoff_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE / f"lena_next_live_image_handoff_{DATE}.json"
+    stale_handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    stale_handoff_path.write_text(
+        json.dumps(
+            {
+                "report_type": "lena_next_live_image_handoff",
+                "schema_version": "v1",
+                "created_at": "2026-07-15T12:00:00+00:00",
+                "execution_owner": "claude",
+                "provider": "higgsfield",
+                "executor_type": "higgsfield_cli",
+                "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+                "packet_state": "packet_valid_for_claude_review",
+                "dry_run_executor_contract_state": "ready",
+                "live_execution_state": "blocked",
+                "live_execution_authorized": False,
+                "generation_approval_required": True,
+                "manual_operator_approval_required": True,
+                "provider_call_performed": False,
+                "generation_performed": False,
+                "publish_authorized": False,
+                "manual_publish_review_required": True,
+                "date": DATE,
+                "selected_slot_id": SLOT_ID,
+                "selected_recipe_id": RECIPE_ID,
+                "expected_handoff_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json",
+                "selected_prompt_input": {
+                    "prompt_sha256": "b" * 64,
+                },
+                "selected_prompt_input_artifact_sha256": "c" * 64,
+                "structured_executor_inputs": {
+                    "provider": "higgsfield",
+                    "executor_type": "higgsfield_cli",
+                    "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+                    "model": "text2image_soul_v2",
+                    "aspect_ratio": "9:16",
+                    "negative_prompt_enabled": False,
+                    "live_execution_authorized": False,
+                    "date": DATE,
+                    "slot_id": SLOT_ID,
+                    "handoff_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json",
+                    "soul_metadata": {
+                        "name": "Lena",
+                        "type": "Soul 2.0",
+                        "custom_reference_id": CUSTOM_REFERENCE_ID,
+                        "identity_is_prompt_instruction": False,
+                    },
+                    "selected_prompt_sha256": "b" * 64,
+                },
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    approval_path = tmp_path / "approval.json"
+    approval_path.write_text(
+        json.dumps(
+            {
+                "report_type": "lena_higgsfield_generation_approval",
+                "schema_version": "v1",
+                "approval_type": "higgsfield_single_generation",
+                "operator_id": "nicolas",
+                "approved_at_utc": "2099-07-15T12:00:00+00:00",
+                "expires_at_utc": "2099-07-15T12:30:00+00:00",
+                "handoff_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json",
+                "handoff_artifact_sha256": "a" * 64,
+                "handoff_report_type": "lena_next_live_image_handoff",
+                "handoff_schema_version": "v1",
+                "date": DATE,
+                "slot_id": SLOT_ID,
+                "prompt_sha256": "b" * 64,
+                "provider": "Higgsfield",
+                "executor": "Higgsfield CLI repo adapter",
+                "model": "text2image_soul_v2",
+                "aspect_ratio": "9:16",
+                "soul_name": "Lena",
+                "soul_type": "Soul 2.0",
+                "custom_reference_id": CUSTOM_REFERENCE_ID,
+                "confirmation_statement": approval.confirmation_phrase(SLOT_ID),
+                "credits_may_be_spent_acknowledged": True,
+                "authorized_attempts": 1,
+                "upload_authorized": False,
+                "queue_promotion_authorized": False,
+                "publish_authorized": False,
+                "analytics_mutation_authorized": False,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    def validating_context_loader(_handoff: Path, approval_artifact: Path) -> dict[str, object]:
+        approval.validate_generation_approval_artifact(approval_artifact)
+        return {
+            "date": DATE,
+            "slot_id": SLOT_ID,
+            "recipe_id": RECIPE_ID,
+            "handoff_report": {"selected_recipe_id": RECIPE_ID},
+            "source": {"image": {"image_prompt": "mock prompt"}},
+            "packet_validation": {"ok": True},
+            "validation": {"ok": True},
+            "approval_result": {"approval": {}, "handoff_facts": {}},
+            "claim_path": approval.claim_output_path(DATE, SLOT_ID),
+            "receipt_path": approval.receipt_output_path(DATE, SLOT_ID),
+            "manifest_path": wrapper.ROOT / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json",
+            "handoff_artifact": stale_handoff_path,
+            "approval_artifact": approval_artifact,
+            "custom_reference_id": CUSTOM_REFERENCE_ID,
+        }
+
+    with pytest.raises(approval.HiggsfieldGenerationApprovalError) as excinfo:
+        wrapper.execute_approved_live_generation(
+            stale_handoff_path,
+            approval_path,
+            live=True,
+            context_loader=validating_context_loader,
+        )
+    assert excinfo.value.code == "handoff_selected_candidate_provenance_missing"
 
 
 def test_dry_run_reports_no_publish_authority(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

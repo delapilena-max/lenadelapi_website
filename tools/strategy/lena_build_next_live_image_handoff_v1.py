@@ -15,6 +15,7 @@ from pipeline.influencer_nodes.lena import autonomy_ladder
 
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
 CONTENT_PACKETS = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
+PRE_GENERATION_CANDIDATES = ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates"
 
 REPO_EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
 EXECUTION_OWNER = "claude"
@@ -88,6 +89,43 @@ def canonical_slot_id(date_str: str, recipe_id: str) -> str:
 
 def learning_path_from_recommendation(recommendation: dict) -> Path:
     return Path(str(recommendation.get("learning_artifact_path", "")).strip())
+
+
+def selected_candidate_directory(date_str: str) -> Path:
+    return PRE_GENERATION_CANDIDATES / date_str
+
+
+def load_selected_candidate_report(date_str: str) -> tuple[Path, dict]:
+    base = selected_candidate_directory(date_str)
+    if not base.is_dir():
+        raise HandoffBuildError(
+            "[ABORT] missing_selected_candidate: "
+            f"missing selected candidate directory: {base}"
+        )
+    selected: list[tuple[str, Path, dict]] = []
+    for path in sorted(base.glob("lena_pre_generation_candidate_*.json")):
+        try:
+            report = read_json(path)
+        except Exception:
+            continue
+        if (
+            report.get("schema_version") == "lena_pre_generation_candidate_gate_v1"
+            and report.get("candidate_status") == "selected"
+        ):
+            selected.append((str(report.get("generated_at_utc", "")), path, report))
+    if not selected:
+        raise HandoffBuildError(
+            "[ABORT] missing_selected_candidate: "
+            f"no selected candidate artifact found for {date_str}"
+        )
+    if len(selected) != 1:
+        selected_paths = ", ".join(str(path) for _, path, _ in sorted(selected, key=lambda item: (item[0], item[1].name)))
+        raise HandoffBuildError(
+            "[ABORT] ambiguous_selected_candidate: "
+            f"multiple selected candidate artifacts found for {date_str}: {selected_paths}"
+        )
+    _, path, report = selected[0]
+    return path, report
 
 
 def repo_relative_path(path: Path) -> str:
@@ -247,6 +285,10 @@ def build_handoff(date_str: str) -> dict:
 
     learning_path, learning = load_learning_report(recommendation, date_str)
     queue_path, queue_report = load_queue_report(date_str)
+    selected_candidate_path_value, selected_candidate = load_selected_candidate_report(date_str)
+    selected_candidate_body = selected_candidate.get("candidate", {})
+    if not isinstance(selected_candidate_body, dict):
+        selected_candidate_body = {}
 
     learning_summary = learning.get("metrics_resolution_summary", {})
     _require(
@@ -301,6 +343,11 @@ def build_handoff(date_str: str) -> dict:
         queue_head.get("recipe_id") == recommendation_body.get("recommended_recipe_id"),
         "queue_head_mismatch",
         "queue head recipe does not match the recommendation",
+    )
+    _require(
+        str(selected_candidate_body.get("recipe_id", "")).strip() == str(recommendation_body.get("recommended_recipe_id", "")).strip(),
+        "selected_candidate_recommendation_mismatch",
+        "selected candidate recipe does not match the next-generation recommendation",
     )
     proof_lane_lock = queue_report.get("proof_lane_lock", {})
     if queue_report.get("proof_lane_lock_active"):
@@ -357,6 +404,16 @@ def build_handoff(date_str: str) -> dict:
         "expected_handoff_markdown_path": handoff_md_rel_path,
         "selected_slot_id": slot_id,
         "selected_recipe_id": recipe_id,
+        "selected_candidate": {
+            "artifact_path": repo_relative_path(selected_candidate_path_value),
+            "artifact_sha256": sha256_file(selected_candidate_path_value),
+            "candidate_id": selected_candidate_body.get("candidate_id", ""),
+            "slot_id": selected_candidate_body.get("slot_id", ""),
+            "recipe_id": selected_candidate_body.get("recipe_id", ""),
+            "prompt_sha256": selected_candidate_body.get("prompt_sha256", ""),
+            "schema_version": selected_candidate.get("schema_version", ""),
+            "candidate_status": selected_candidate.get("candidate_status", ""),
+        },
         "selected_lane": packet.get("scene_type", ""),
         "selected_hook_id": packet.get("strong_hook_id", ""),
         "selected_hook_text": packet.get("hook_text", ""),
@@ -367,11 +424,15 @@ def build_handoff(date_str: str) -> dict:
         "source_learning_artifact_sha256": sha256_file(learning_path),
         "source_queue_dry_run_artifact_path": repo_relative_path(queue_path),
         "source_queue_dry_run_artifact_sha256": sha256_file(queue_path),
+        "source_selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
+        "source_selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
         "selected_prompt_input_artifact_path": repo_relative_path(packet_path),
         "selected_prompt_input_artifact_sha256": sha256_file(packet_path),
         "selected_prompt_input": {
             "artifact_path": repo_relative_path(packet_path),
             "artifact_sha256": sha256_file(packet_path),
+            "selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
+            "selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
             "artifact_report_type": packet.get("report_type", ""),
             "packet_id": packet.get("packet_id", ""),
             "prompt_sha256": prompt_sha256,
@@ -413,6 +474,8 @@ def build_handoff(date_str: str) -> dict:
             },
             "selected_prompt_input_artifact_path": repo_relative_path(packet_path),
             "selected_prompt_input_artifact_sha256": sha256_file(packet_path),
+            "selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
+            "selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
             "selected_prompt_sha256": prompt_sha256,
             "selected_prompt_text": prompt_text,
             "selected_prompt_text_status": "available",
@@ -494,6 +557,7 @@ def build_handoff(date_str: str) -> dict:
             "recommendation_artifact_valid": True,
             "learning_artifact_valid": True,
             "queue_artifact_valid": True,
+            "selected_candidate_valid": True,
             "selected_prompt_input_valid": True,
             "queue_head_matches_recommendation": True,
             "selected_prompt_input_matches_queue_head": True,
@@ -544,6 +608,9 @@ def write_markdown(path: Path, report: dict) -> None:
         f"- recommendation: `{report['source_recommendation_artifact_path']}`",
         f"- learning: `{report['source_learning_artifact_path']}`",
         f"- queue dry run: `{report['source_queue_dry_run_artifact_path']}`",
+        f"- selected candidate: `{report['source_selected_candidate_artifact_path']}`",
+        f"- selected candidate id: `{report['selected_candidate']['candidate_id']}`",
+        f"- selected candidate recipe: `{report['selected_candidate']['recipe_id']}`",
         f"- selected prompt input: `{report['selected_prompt_input_artifact_path']}`",
         f"- expected handoff artifact: `{report['expected_handoff_artifact_path']}`",
         f"- expected handoff markdown: `{report['expected_handoff_markdown_path']}`",
@@ -589,6 +656,7 @@ def write_markdown(path: Path, report: dict) -> None:
         "## Prompt Identity",
         "",
         f"- selected prompt sha256: `{report['selected_prompt_input']['prompt_sha256']}`",
+        f"- selected candidate sha256: `{report['selected_candidate']['artifact_sha256']}`",
         f"- selected hook text: `{report['selected_hook_text']}`",
         f"- selected caption seed: `{report['selected_caption_seed']}`",
         f"- selected prompt text status: `{report['selected_prompt_input']['prompt_text_status']}`",

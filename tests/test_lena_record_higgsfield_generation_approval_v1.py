@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +15,30 @@ from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 DATE = "2026-07-14"
 SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+
+
+def _selected_candidate_repo_path() -> str:
+    return f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
+
+
+def _selected_candidate_payload() -> dict:
+    return {
+        "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "candidate_status": "selected",
+        "generated_at_utc": "2026-07-14T12:00:00+00:00",
+        "candidate": {
+            "candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
+            "slot_id": SLOT_ID,
+            "recipe_id": "hcr_011",
+            "prompt_sha256": "b" * 64,
+        },
+    }
+
+
+def _selected_candidate_sha() -> str:
+    return hashlib.sha256(
+        json.dumps(_selected_candidate_payload(), indent=2).replace("\n", os.linesep).encode("utf-8")
+    ).hexdigest()
 
 
 def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -30,6 +56,8 @@ def _handoff_repo_path() -> str:
 
 def _valid_handoff_report(*, prompt_sha: str) -> dict:
     handoff_repo_path = _handoff_repo_path()
+    selected_candidate_repo_path = _selected_candidate_repo_path()
+    selected_candidate_sha = _selected_candidate_sha()
     return {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -50,9 +78,26 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
         "manual_publish_review_required": True,
         "date": DATE,
         "selected_slot_id": SLOT_ID,
+        "selected_recipe_id": "hcr_011",
         "expected_handoff_artifact_path": handoff_repo_path,
-        "selected_prompt_input": {"prompt_sha256": prompt_sha},
+        "source_selected_candidate_artifact_path": selected_candidate_repo_path,
+        "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+        "selected_candidate": {
+            "artifact_path": selected_candidate_repo_path,
+            "artifact_sha256": selected_candidate_sha,
+            "candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
+            "slot_id": SLOT_ID,
+            "recipe_id": "hcr_011",
+            "prompt_sha256": prompt_sha,
+            "schema_version": "lena_pre_generation_candidate_gate_v1",
+            "candidate_status": "selected",
+        },
         "selected_prompt_input_artifact_sha256": "a" * 64,
+        "selected_prompt_input": {
+            "prompt_sha256": prompt_sha,
+            "selected_candidate_artifact_path": selected_candidate_repo_path,
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
+        },
         "structured_executor_inputs": {
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
@@ -71,6 +116,8 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
                 "identity_is_prompt_instruction": False,
             },
             "selected_prompt_sha256": prompt_sha,
+            "selected_candidate_artifact_path": selected_candidate_repo_path,
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
         },
     }
 
@@ -78,6 +125,11 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
 def _write_handoff(tmp_path: Path, *, prompt_sha: str = "b" * 64) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    selected_candidate_path = tmp_path / _selected_candidate_repo_path()
+    selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
+    selected_candidate_path.write_text(
+        json.dumps(_selected_candidate_payload(), indent=2), encoding="utf-8"
+    )
     handoff_path.write_text(
         json.dumps(_valid_handoff_report(prompt_sha=prompt_sha), indent=2), encoding="utf-8"
     )
