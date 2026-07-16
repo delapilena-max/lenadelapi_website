@@ -59,6 +59,7 @@ from pipeline.qa.lena_higgsfield_failure_memory import (  # noqa: E402
     compute_higgsfield_failure_memory,
     pattern_key_for_image,
 )
+from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module  # noqa: E402
 
 from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
@@ -192,6 +193,7 @@ def build_library_report(
     packs: int,
     count_per_pack: int,
     required_recipe_id: str = "",
+    presence_contract: dict | None = None,
 ) -> dict:
     pack_reports = []
     for pack_index in range(packs):
@@ -204,6 +206,7 @@ def build_library_report(
             slot_prefix,
             count_per_pack,
             required_recipe_id=required_recipe_id if pack_index == 0 else "",
+            presence_contract=presence_contract,
         )
         pack_reports.append(pack_report)
 
@@ -236,6 +239,12 @@ def build_library_report(
     fake_text_avoidance_checked = 0
     fake_text_avoidance_present = 0
     fake_text_avoidance_missing_slot_ids: list[str] = []
+    human_presence = None
+    if presence_contract is not None:
+        human_presence = presence_plan_module.compile_human_presence_prompt_plan(
+            presence_contract,
+            medium="still_image",
+        )
 
     for pack_report in pack_reports:
         lane_distribution.update(pack_report["lane_distribution"])
@@ -307,7 +316,7 @@ def build_library_report(
     prompt_text_counts = Counter(all_prompt_texts)
     duplicate_prompt_count = sum(c - 1 for c in prompt_text_counts.values() if c > 1)
 
-    return {
+    report = {
         "date": date_str,
         "library_prefix": library_prefix,
         "packs_requested": packs,
@@ -340,6 +349,9 @@ def build_library_report(
         "fake_text_avoidance_missing_slot_ids": fake_text_avoidance_missing_slot_ids,
         "pack_reports": pack_reports,
     }
+    if human_presence is not None:
+        report["human_presence"] = human_presence
+    return report
 
 
 def print_library_report(library: dict, show_prompts: bool) -> None:
@@ -355,6 +367,12 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
     print(f"total warnings (variety + pose-variant, across all packs): {library['warning_count']}")
     print(f"duplicate prompt count      : {library['duplicate_prompt_count']} "
           f"(exact-text repeats beyond the first occurrence)")
+    if library.get("human_presence"):
+        presence = library["human_presence"]
+        print(f"human presence schema      : {presence.get('schema_version')}")
+        print(f"human presence plan hash   : {presence.get('plan_fingerprint_sha256')}")
+        print(f"human presence enabled     : {presence.get('enabled')}")
+        print(f"human presence total bonus : {presence.get('total_bonus')}")
     print()
 
     print("aggregate validation counts (N/N across entire library):")
