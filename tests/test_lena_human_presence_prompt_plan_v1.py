@@ -87,6 +87,91 @@ def test_no_presence_keeps_higgsfield_prompt_package_unchanged() -> None:
     assert base_package["negative_prompt"] == ""
 
 
+def test_legacy_video_prompt_package_path_remains_hpe_free(monkeypatch: pytest.MonkeyPatch) -> None:
+    scene = {
+        "lane": "night out",
+        "action": "walking home",
+        "camera": "steady mid shot",
+        "lighting": "warm city lights",
+        "caption": "night walk",
+    }
+    environment_entry = {
+        "environment_id": "env_test",
+        "name": "city street",
+        "production_lane": "urban_night",
+    }
+    wardrobe_entry = {
+        "outfit_id": "wc_test",
+        "name": "black jacket",
+        "style_lane": "going_out",
+    }
+    expression_entry = {
+        "expression_gaze_id": "exp_test",
+        "label": "soft smile",
+    }
+    pose_entry = {
+        "pose_body_language_id": "pose_test",
+        "label": "weight shift and settle",
+        "hand_risk": "low",
+        "compatibility_tags": ["standing", "walking"],
+    }
+    frame_logic = {
+        "frame_action": "frame",
+        "frame_evidence_objects": ["street"],
+        "frame_forbidden_objects": [],
+        "camera_intent": "mid shot",
+        "scene_coherence_note": "coherent",
+    }
+
+    monkeypatch.setattr(prompt_brain, "validate_saved_prompt_sources", lambda: None)
+    monkeypatch.setattr(prompt_brain, "get_production_scene_pool", lambda: ([scene], {"version": "test-bank", "source": "test-source"}))
+    monkeypatch.setattr(prompt_brain, "choose_scene_production", lambda scene_pool, rng: scene_pool[0])
+    monkeypatch.setattr(prompt_brain, "choose_environment_production", lambda scene, rng: environment_entry)
+    monkeypatch.setattr(prompt_brain, "build_environment_prompt_parts", lambda scene, environment_entry: ("city street at night", "wet pavement"))
+    monkeypatch.setattr(prompt_brain, "choose_reference_mode", lambda media_type, scene: "video_body")
+    monkeypatch.setattr(prompt_brain, "pick_catalog_outfit_production", lambda lane, reference_mode, rng: wardrobe_entry)
+    monkeypatch.setattr(prompt_brain, "format_catalog_wardrobe_override", lambda entry: "black jacket and dark jeans")
+    monkeypatch.setattr(prompt_brain, "build_negative_prompt_for_catalog", lambda entry: "no blur")
+    monkeypatch.setattr(prompt_brain, "build_public_lane_negative_prompt", lambda entry, lane, negative: negative)
+    monkeypatch.setattr(prompt_brain, "choose_expression_gaze_production", lambda rng, lane=None: expression_entry)
+    monkeypatch.setattr(prompt_brain, "format_expression_gaze_line", lambda entry: "Expression: soft smile.")
+    monkeypatch.setattr(prompt_brain, "choose_frame_logic", lambda lane: frame_logic)
+    monkeypatch.setattr(prompt_brain, "format_frame_logic_paragraph", lambda frame_logic, reference_mode: "Frame logic paragraph.")
+    monkeypatch.setattr(prompt_brain, "choose_pose_body_language_production", lambda rng, lane=None, reference_mode=None, exclude_tags=None: pose_entry)
+    monkeypatch.setattr(prompt_brain, "format_pose_body_language_line", lambda entry: "Pose: weight shift and settle.")
+    monkeypatch.setattr(prompt_brain, "reference_policy_for_mode", lambda mode: "Reference policy.")
+    monkeypatch.setattr(prompt_brain, "framing_policy_for_mode", lambda mode: "Framing policy.")
+    monkeypatch.setattr(prompt_brain, "public_capture_lock", lambda lane: "Capture lock.")
+    monkeypatch.setattr(prompt_brain, "public_wardrobe_continuity_lock", lambda wardrobe_entry, lane: "Wardrobe lock.")
+    monkeypatch.setattr(prompt_brain, "build_body_visibility_rule", lambda reference_mode, frame_logic: "Body visibility rule.")
+    monkeypatch.setattr(prompt_brain, "catalog_outfit_silhouette_class", lambda entry: "structured")
+    monkeypatch.setattr(prompt_brain, "reference_priority_for_mode", lambda mode: "priority")
+    monkeypatch.setattr(prompt_brain, "VIDEO_MOTIONS", ("steady handheld drift",))
+    monkeypatch.setattr(prompt_brain, "_clean_public_text", lambda text: text)
+    monkeypatch.setattr(prompt_brain, "_hashtags", lambda rng, lane, count: "#one #two #three")
+    monkeypatch.setattr(prompt_brain, "SCENE_EVIDENCE_CONTRACTS", {})
+
+    package = prompt_brain.generate_prompt_package(DATE, "legacy-video-slot", "video", sequence_index=0)
+
+    expected_video_prompt = (
+        "steady handheld drift. "
+        "The scene is night out: walking home. "
+        "Maintain realistic facial movement, natural blinking, stable identity, believable body motion, "
+        "cinematic but restrained movement, no sudden cuts, no exaggerated gestures."
+    )
+
+    assert package["media_type"] == "video"
+    assert package["lane"] == "night out"
+    assert package["image_prompt"].startswith("Lena Delapi")
+    assert package["video_prompt"] == expected_video_prompt
+    assert package["motion_prompt"] == expected_video_prompt
+    assert package["seed_image_prompt"] == package["image_prompt"]
+    assert package["prompt_brain_version"] == "lena_prompt_brain_v1_9_frame_logic"
+    assert package["duration_seconds"] == 7
+    assert "Presence direction:" not in package["video_prompt"]
+    assert "human_presence" not in package
+
+
 def test_presence_enabled_prompt_package_emits_metadata_and_keeps_controlled_lane_state() -> None:
     contract = lena_profile.build_lena_presence_contract()
     package = prompt_brain.generate_higgsfield_prompt_package(

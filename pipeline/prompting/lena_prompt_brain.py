@@ -3729,7 +3729,6 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
             f"The scene is {scene['lane']}: {scene['action']}. "
             f"Maintain realistic facial movement, natural blinking, stable identity, believable body motion, "
             f"cinematic but restrained movement, no sudden cuts, no exaggerated gestures."
-            f"{presence_text}"
         )
         package["seed_image_prompt"] = package["image_prompt"]
         package["video_prompt"] = _clean_public_text(video_prompt)
