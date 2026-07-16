@@ -103,6 +103,7 @@ from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 # the single source of truth for what a photo-dump-pack slot's final
 # image_prompt and metadata actually are. Never reimplemented here.
 from lena_higgsfield_photo_dump_dryrun import build_report  # noqa: E402
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract  # noqa: E402
 
 # Reuses the already-committed hard-exclusion gate -- the exact same
 # validation the accepted 5-candidate readiness pack was screened with.
@@ -394,6 +395,10 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     )
 
     selected_candidate_binding = validate_selected_candidate_binding(report)
+    reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
+        report,
+        selected_candidate_binding,
+    )
 
     _require_handoff(learning_path_loaded == learning_path, "handoff_learning_path_mismatch", f"{handoff_path} learning artifact path mismatch")
     _require_handoff(queue_loaded_path == queue_path, "handoff_queue_path_mismatch", f"{handoff_path} queue artifact path mismatch")
@@ -407,11 +412,15 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     queue_head = queue_report.get("queue_slots", [])[0]
     _require_handoff(queue_head.get("recipe_id") == recommendation.get("recommendation", {}).get("recommended_recipe_id"), "handoff_queue_head_mismatch", f"{handoff_path} queue head mismatch")
     _require_handoff(
-        selected_candidate_binding["selected_candidate_recipe_id"] == recommendation.get("recommendation", {}).get("recommended_recipe_id"),
-        "selected_candidate_recommendation_mismatch",
-        "selected candidate recipe does not match the next-generation recommendation",
+        selected_candidate_binding["selected_candidate_recipe_id"] == reconciliation_facts["final_candidate"]["recipe_id"],
+        "reconciled_recipe_mismatch",
+        "selected candidate recipe does not match the reconciled handoff recipe",
     )
-    _require_handoff(packet_report.get("recipe_id") == queue_head.get("recipe_id"), "handoff_candidate_recipe_mismatch", f"{handoff_path} selected prompt input recipe mismatch")
+    _require_handoff(
+        packet_report.get("recipe_id") == reconciliation_facts["final_candidate"]["recipe_id"],
+        "selected_candidate_recommendation_mismatch",
+        f"{handoff_path} selected prompt input recipe mismatch",
+    )
     _require_handoff(packet_report.get("packet_id") == report.get("selected_prompt_input", {}).get("packet_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected prompt input packet id mismatch")
     _require_handoff(packet_report.get("strong_hook_id") == report.get("selected_prompt_input", {}).get("hook_id"), "handoff_hook_id_mismatch", f"{handoff_path} selected prompt input hook id mismatch")
     _require_handoff(packet_report.get("hook_text") == report.get("selected_prompt_input", {}).get("hook_text"), "handoff_hook_text_mismatch", f"{handoff_path} selected prompt input hook text mismatch")
@@ -470,6 +479,7 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         "regenerated_prompt_sha256": regenerated_sha,
         "prompt_sha_match": True,
         "selected_candidate_binding_valid": True,
+        "reconciliation_provenance_valid": True,
         "provider_model_aspect_soul_agreement": True,
         "provider_call_performed": False,
         "generation_performed": False,
@@ -1626,6 +1636,9 @@ def main() -> int:
         except HandoffArtifactError as exc:
             print(f"[ABORT] {exc.code}: {exc.detail}")
             return 1
+        except reconciliation_contract.ReconciliationContractError as exc:
+            print(f"[ABORT] {exc.code}: {exc.detail}")
+            return 1
 
         print_handoff_dry_run_report(args.handoff_artifact, report, source, args.custom_reference_id, packet_validation, validation)
 
@@ -1638,6 +1651,9 @@ def main() -> int:
             except HandoffArtifactError as exc:
                 approval_error = exc
                 print(f"[ABORT] approval validation failed: {exc.code}: {exc.detail}")
+            except reconciliation_contract.ReconciliationContractError as exc:
+                approval_error = HandoffArtifactError(exc.code, exc.detail)
+                print(f"[ABORT] {exc.code}: {exc.detail}")
 
         if not live:
             if approval_error is not None:

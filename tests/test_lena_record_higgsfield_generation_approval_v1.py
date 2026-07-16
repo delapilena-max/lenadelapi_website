@@ -10,6 +10,7 @@ import pytest
 
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_record_higgsfield_generation_approval_v1 as record_tool
+import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 
 DATE = "2026-07-14"
@@ -47,7 +48,14 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         approval_mod, "DEFAULT_APPROVAL_ROOT",
         tmp_path / "pipeline" / "approvals" / "lena" / "generation",
     )
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
     monkeypatch.setattr(record_tool, "ROOT", tmp_path)
+
+
+def _write_json(path: Path, payload: dict) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def _handoff_repo_path() -> str:
@@ -130,9 +138,158 @@ def _write_handoff(tmp_path: Path, *, prompt_sha: str = "b" * 64) -> Path:
     selected_candidate_path.write_text(
         json.dumps(_selected_candidate_payload(), indent=2), encoding="utf-8"
     )
-    handoff_path.write_text(
-        json.dumps(_valid_handoff_report(prompt_sha=prompt_sha), indent=2), encoding="utf-8"
-    )
+    learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
+    recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
+    queue_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
+    reconciliation_repo_path = Path("pipeline/strategy/lena/reconciliations") / DATE / "lena_generation_reconciliation_fixture.json"
+    learning_path = tmp_path / learning_repo_path
+    recommendation_path = tmp_path / recommendation_repo_path
+    queue_path = tmp_path / queue_repo_path
+    reconciliation_path = tmp_path / reconciliation_repo_path
+    learning_report = {
+        "report_type": "lena_post_outcome_learning_state",
+        "version": "v1",
+        "date": DATE,
+        "published_post_count": 3,
+        "pending_metrics_posts": [{}],
+        "stale_pending_metrics_posts": [{}],
+        "winner_posts": [{"recipe_id": "hcr_011"}],
+        "queue_boosts": {"preferred_recipe_ids": ["hcr_011"]},
+        "metrics_resolution_summary": {
+            "learning_status": "current",
+            "current_count": 2,
+            "usable_but_incomplete_count": 0,
+            "stale_unresolved_count": 0,
+            "manual_or_future_capability_required_count": 0,
+        },
+    }
+    queue_report = {
+        "report_type": "lena_autonomous_generation_queue_dryrun",
+        "version": "v1",
+        "date": DATE,
+        "dry_run": True,
+        "queue_slots": [
+            {
+                "recipe_id": "hcr_011",
+                "title": "Getting Ready Mirror",
+                "scene_type": "fit_check_mirror_getting_ready",
+                "autonomy_grade": "ready",
+                "payload_headroom": 261,
+                "outfit_used": "wc_p059",
+                "environment_used": "env_p001",
+                "proof_priority": 9,
+                "production_proof_mode": False,
+                "priority_score": 125,
+                "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
+            }
+        ],
+    }
+    _write_json(learning_path, learning_report)
+    recommendation_report = {
+        "report_type": "lena_next_generation_step",
+        "version": "v1",
+        "date": DATE,
+        "learning_artifact_path": learning_repo_path.as_posix(),
+        "learning_status": "current",
+        "learning_status_label": "learning_current",
+        "learning_validation_state": "valid",
+        "learning_validation_error": "",
+        "learning_availability": "available",
+        "learning_published_post_count": 3,
+        "learning_pending_metrics_count": 1,
+        "learning_stale_pending_metrics_count": 1,
+        "learning_resolution_state_summary": {
+            "learning_status": "current",
+            "current_count": 2,
+            "usable_but_incomplete_count": 0,
+            "stale_unresolved_count": 0,
+            "manual_or_future_capability_required_count": 0,
+        },
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "learning_winner_post_count": 1,
+        "recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": "hcr_011",
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids", "winner_posts"],
+            "next_live_gate": "review",
+        },
+    }
+    _write_json(queue_path, queue_report)
+    recommendation_path.write_text(json.dumps(recommendation_report, indent=2), encoding="utf-8")
+    reconciliation_report = {
+        "report_type": "lena_generation_reconciliation",
+        "schema_version": "lena_generation_reconciliation_v1",
+        "date": DATE,
+        "generated_at": "2026-07-14T12:00:00+00:00",
+        "source_revision": "2ed48fd2",
+        "source_revision_commit": "2ed48fd29215ffc499b64f15255f6c4038bf484a",
+        "source_artifacts": {
+            "learning": {
+                "source_artifact_path": learning_repo_path.as_posix(),
+                "source_artifact_sha256": hashlib.sha256(learning_path.read_bytes()).hexdigest(),
+            },
+            "recommendation": {
+                "source_artifact_path": recommendation_repo_path.as_posix(),
+                "source_artifact_sha256": hashlib.sha256(recommendation_path.read_bytes()).hexdigest(),
+            },
+            "selected_candidate": {
+                "source_artifact_path": _selected_candidate_repo_path(),
+                "source_artifact_sha256": _selected_candidate_sha(),
+            },
+        },
+        "learning_status": "current",
+        "recommendation_recipe_id": "hcr_011",
+        "recommendation_outfit_id": "wc_p059",
+        "recommendation_environment_id": "env_p001",
+        "recommendation_action_type": "collect_first_controlled_proof",
+        "selected_candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
+        "selected_candidate_recipe_id": "hcr_011",
+        "selected_candidate_slot_id": SLOT_ID,
+        "selected_candidate_hook_id": "cbn_004",
+        "selected_candidate_prompt_sha256": prompt_sha,
+        "divergence_status": "aligned",
+        "resolution_policy": "selected_candidate_authoritative",
+        "reconciliation_status": "reconciled",
+        "operator_review_required": False,
+        "final_reconciled_candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
+        "final_reconciled_candidate_recipe_id": "hcr_011",
+        "final_reconciled_candidate_slot_id": SLOT_ID,
+        "final_reconciled_candidate_hook_id": "cbn_004",
+        "final_reconciled_candidate_prompt_sha256": prompt_sha,
+        "final_reconciled_candidate_artifact_path": _selected_candidate_repo_path(),
+        "final_reconciled_candidate_artifact_sha256": _selected_candidate_sha(),
+        "exact_next_allowed_action": "build_next_live_image_handoff",
+        "next_allowed_action": {
+            "status": "reconciled",
+            "action": "build_next_live_image_handoff",
+            "reason": "recommendation and selected candidate are aligned and may be handed off",
+        },
+        "dirty_workspace_dependency": False,
+        "shadow_mode_only": True,
+        "provider_call_performed": False,
+        "approval_consumed": False,
+        "claims_written": False,
+        "receipts_written": False,
+        "queue_mutated": False,
+        "publish_performed": False,
+        "blocking_reasons": [],
+    }
+    _write_json(reconciliation_path, reconciliation_report)
+    handoff_report = _valid_handoff_report(prompt_sha=prompt_sha)
+    handoff_report["source_learning_artifact_path"] = learning_repo_path.as_posix()
+    handoff_report["source_learning_artifact_sha256"] = hashlib.sha256(learning_path.read_bytes()).hexdigest()
+    handoff_report["source_recommendation_artifact_path"] = recommendation_repo_path.as_posix()
+    handoff_report["source_recommendation_artifact_sha256"] = hashlib.sha256(recommendation_path.read_bytes()).hexdigest()
+    handoff_report["source_queue_dry_run_artifact_path"] = queue_repo_path.as_posix()
+    handoff_report["source_queue_dry_run_artifact_sha256"] = hashlib.sha256(queue_path.read_bytes()).hexdigest()
+    handoff_report["source_reconciliation_artifact_path"] = reconciliation_repo_path.as_posix()
+    handoff_report["source_reconciliation_artifact_sha256"] = hashlib.sha256(reconciliation_path.read_bytes()).hexdigest()
+    handoff_report["source_reconciliation_decision_artifact_path"] = None
+    handoff_report["source_reconciliation_decision_artifact_sha256"] = None
+    handoff_path.write_text(json.dumps(handoff_report, indent=2), encoding="utf-8")
     return handoff_path
 
 
@@ -256,6 +413,28 @@ def test_recording_refuses_overwrite(
     assert second_code == 1
     stdout = json.loads(capsys.readouterr().out)
     assert stdout["error_code"] == "approval_already_exists"
+
+
+def test_recording_aborts_cleanly_on_missing_reconciliation_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    reconciliation_path = tmp_path / "pipeline" / "strategy" / "lena" / "reconciliations" / DATE / "lena_generation_reconciliation_fixture.json"
+    reconciliation_path.unlink()
+
+    code = _run(
+        monkeypatch,
+        "--handoff-artifact", str(handoff_path),
+        "--operator-id", "nicolas",
+        "--confirm", confirmation_phrase(SLOT_ID),
+    )
+    assert code == 1
+    captured = capsys.readouterr()
+    assert f"[ABORT] missing_reconciliation_artifact: missing required artifact: {reconciliation_path}" in captured.out
+    assert "Traceback" not in captured.err
+    expected_path = tmp_path / "pipeline" / "approvals" / "lena" / "generation" / DATE / f"{SLOT_ID}_higgsfield_generation_approval.json"
+    assert not expected_path.exists()
 
 
 def test_recording_tool_never_imports_executor_or_provider_modules() -> None:

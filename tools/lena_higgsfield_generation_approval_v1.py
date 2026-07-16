@@ -14,6 +14,7 @@ if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
 
@@ -251,6 +252,10 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_path = selected_candidate_binding["selected_candidate_path"]
     selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
     selected_candidate = selected_candidate_binding["selected_candidate"]
+    reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
+        report,
+        selected_candidate_binding,
+    )
 
     structured = report.get("structured_executor_inputs")
     require(
@@ -382,6 +387,9 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
         "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
         "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
+        "reconciliation": reconciliation_facts["reconciliation"],
+        "reconciled_candidate": reconciliation_facts["final_candidate"],
+        "reconciliation_decision": reconciliation_facts["decision"],
     }
 
 
@@ -591,6 +599,9 @@ def build_generation_approval_record(
         "soul_type": handoff_facts["soul_type"],
         "custom_reference_id": handoff_facts["custom_reference_id"],
         "confirmation_statement": confirmation,
+        "reconciliation": handoff_facts.get("reconciliation"),
+        "reconciled_candidate": handoff_facts.get("reconciled_candidate"),
+        "reconciliation_decision": handoff_facts.get("reconciliation_decision"),
         "credits_may_be_spent_acknowledged": True,
         "authorized_attempts": 1,
         "upload_authorized": False,
@@ -741,6 +752,10 @@ def validate_generation_approval_artifact(
         label="approval handoff_artifact_path",
     )
     handoff_facts = inspect_handoff_artifact(handoff_path)
+    reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
+        handoff_facts["report"],
+        validate_selected_candidate_binding(handoff_facts["report"]),
+    )
     require(
         approval.get("handoff_artifact_path") == handoff_facts["handoff_repo_path"],
         "approval_handoff_path_binding_mismatch",
@@ -785,6 +800,21 @@ def validate_generation_approval_artifact(
         custom_reference_id == handoff_facts["custom_reference_id"],
         "approval_custom_reference_id_mismatch",
         "approval custom_reference_id does not match the bound handoff Soul reference",
+    )
+    require(
+        approval.get("reconciliation") == reconciliation_facts["reconciliation"],
+        "approval_reconciliation_binding_mismatch",
+        "approval reconciliation snapshot does not match the bound handoff reconciliation provenance",
+    )
+    require(
+        approval.get("reconciled_candidate") == reconciliation_facts["final_candidate"],
+        "approval_reconciled_candidate_binding_mismatch",
+        "approval reconciled candidate snapshot does not match the bound handoff reconciliation provenance",
+    )
+    require(
+        approval.get("reconciliation_decision") == reconciliation_facts["decision"],
+        "approval_reconciliation_decision_binding_mismatch",
+        "approval reconciliation decision snapshot does not match the bound handoff reconciliation provenance",
     )
 
     return {

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff
+import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 
 
 DATE = "2026-07-13"
@@ -19,6 +21,7 @@ HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact {HANDOFF_PATH}"
 LIVE_COMMAND = f"{HANDOFF_COMMAND} --live"
 PROMPT_INPUT_PATH = f"pipeline/strategy/lena/content_packets/{DATE}/lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
 SELECTED_CANDIDATE_PATH = f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
+RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
 PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
 
 
@@ -200,13 +203,85 @@ def _build_fixture_tree(tmp_root: Path, *, learning_status: str = "current", rec
     queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
     packet_path = packets / f"lena_content_packet_dryrun_{DATE}_{recipe_id}.json"
     selected_path = pre_generation / "lena_pre_generation_candidate_selected.json"
+    reconciliation_path = tmp_root / RECONCILIATION_PATH
 
     learning, _follow_up = _learning_payload(learning_status)
+    selected_recipe = selected_recipe_id or recipe_id
+    reconciliation_aligned = selected_recipe == recipe_id
     _write_json(learning_path, learning)
     _write_json(recommendation_path, _recommendation_payload(learning_path, learning_status))
     _write_json(queue_path, _queue_payload(recipe_id))
     _write_json(packet_path, _packet_payload(prompt_text))
-    _write_json(selected_path, _selected_candidate_payload(selected_recipe_id or recipe_id))
+    _write_json(selected_path, _selected_candidate_payload(selected_recipe))
+    selected_payload = _selected_candidate_payload(selected_recipe)
+    learning_sha256 = reconciliation_contract.sha256_file(learning_path)
+    recommendation_sha256 = reconciliation_contract.sha256_file(recommendation_path)
+    selected_sha256 = reconciliation_contract.sha256_file(selected_path)
+    _write_json(
+        reconciliation_path,
+        {
+            "report_type": "lena_generation_reconciliation",
+            "schema_version": "lena_generation_reconciliation_v1",
+            "date": DATE,
+            "generated_at": "2026-07-14T12:34:56+00:00",
+            "source_revision": "085620d1",
+            "source_revision_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+            "source_artifacts": {
+                "learning": {
+                    "source_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_post_outcome_learning_state_{DATE}.json",
+                    "source_artifact_sha256": learning_sha256,
+                },
+                "recommendation": {
+                    "source_artifact_path": f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_generation_step_{DATE}.json",
+                    "source_artifact_sha256": recommendation_sha256,
+                },
+                "selected_candidate": {
+                    "source_artifact_path": SELECTED_CANDIDATE_PATH,
+                    "source_artifact_sha256": selected_sha256,
+                },
+            },
+            "learning_status": learning_status,
+            "recommendation_recipe_id": recipe_id,
+            "recommendation_outfit_id": "wc_p059",
+            "recommendation_environment_id": "env_p001",
+            "recommendation_action_type": "collect_first_controlled_proof",
+            "selected_candidate_id": selected_payload["candidate"]["candidate_id"],
+            "selected_candidate_recipe_id": selected_payload["candidate"]["recipe_id"],
+            "selected_candidate_slot_id": selected_payload["candidate"]["slot_id"],
+            "selected_candidate_hook_id": selected_payload["candidate"]["hook_id"],
+            "selected_candidate_prompt_sha256": selected_payload["candidate"]["prompt_sha256"],
+            "divergence_status": "aligned" if reconciliation_aligned else "recipe_mismatch",
+            "resolution_policy": "selected_candidate_authoritative" if reconciliation_aligned else "explicit_operator_reconciliation_required",
+            "reconciliation_status": "reconciled" if reconciliation_aligned else "operator_review_required",
+            "operator_review_required": False if reconciliation_aligned else True,
+            "final_reconciled_candidate_id": selected_payload["candidate"]["candidate_id"] if reconciliation_aligned else None,
+            "final_reconciled_candidate_recipe_id": selected_payload["candidate"]["recipe_id"] if reconciliation_aligned else None,
+            "final_reconciled_candidate_slot_id": selected_payload["candidate"]["slot_id"] if reconciliation_aligned else None,
+            "final_reconciled_candidate_hook_id": selected_payload["candidate"]["hook_id"] if reconciliation_aligned else None,
+            "final_reconciled_candidate_prompt_sha256": selected_payload["candidate"]["prompt_sha256"] if reconciliation_aligned else None,
+            "final_reconciled_candidate_artifact_path": SELECTED_CANDIDATE_PATH if reconciliation_aligned else None,
+            "final_reconciled_candidate_artifact_sha256": selected_sha256 if reconciliation_aligned else None,
+            "exact_next_allowed_action": "build_next_live_image_handoff" if reconciliation_aligned else "create_operator_reconciliation_decision",
+            "next_allowed_action": {
+                "status": "reconciled" if reconciliation_aligned else "operator_review_required",
+                "action": "build_next_live_image_handoff" if reconciliation_aligned else "create_operator_reconciliation_decision",
+                "reason": "recommendation and selected candidate are aligned and may be handed off"
+                if reconciliation_aligned
+                else "recommendation and selected candidate require explicit operator reconciliation",
+            },
+            "reconciliation_fingerprint_sha256": "d" * 64,
+            "output_artifact_path": RECONCILIATION_PATH.replace(".json", ".json"),
+            "dirty_workspace_dependency": False,
+            "shadow_mode_only": True,
+            "provider_call_performed": False,
+            "approval_consumed": False,
+            "claims_written": False,
+            "receipts_written": False,
+            "queue_mutated": False,
+            "publish_performed": False,
+            "blocking_reasons": [],
+        },
+    )
     return recommendation_path, learning_path, queue_path, packet_path, selected_path
 
 
@@ -215,6 +290,7 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(handoff, "NEXT_ACTIONS", tmp_path / "pipeline" / "strategy" / "lena" / "next_actions")
     monkeypatch.setattr(handoff, "CONTENT_PACKETS", tmp_path / "pipeline" / "strategy" / "lena" / "content_packets")
     monkeypatch.setattr(handoff, "PRE_GENERATION_CANDIDATES", tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates")
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
 
 
 def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -222,7 +298,7 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
     monkeypatch.setattr(handoff, "iso_now", lambda: "2026-07-14T12:34:56+00:00")
 
-    report = handoff.build_handoff(DATE)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
     json_path, md_path = handoff.save_handoff(report, DATE)
 
     assert report["report_type"] == "lena_next_live_image_handoff"
@@ -291,7 +367,7 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
 def test_learning_status_is_carried_truthfully(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: str, label: str, follow_up: str) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _build_fixture_tree(tmp_path, learning_status=status)
-    report = handoff.build_handoff(DATE)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
     assert report["learning_status"] == status
     assert report["source_recommendation"]["learning_status_label"] == label
     assert report["learning_follow_up_action"] == follow_up
@@ -305,14 +381,15 @@ def test_queue_or_recommendation_mismatch_fails_closed(tmp_path: Path, monkeypat
     queue["queue_slots"][0]["recipe_id"] = "hcr_999"
     _write_json(queue_path, queue)
     with pytest.raises(SystemExit, match="queue_head_mismatch"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
 def test_selected_candidate_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _build_fixture_tree(tmp_path, selected_recipe_id="hcr_008")
-    with pytest.raises(SystemExit, match="selected_candidate_recommendation_mismatch"):
-        handoff.build_handoff(DATE)
+    with pytest.raises(reconciliation_contract.ReconciliationContractError) as excinfo:
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    assert excinfo.value.code == "missing_reconciliation_decision"
 
 
 def test_missing_selected_candidate_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -320,7 +397,7 @@ def test_missing_selected_candidate_fails_closed(tmp_path: Path, monkeypatch: py
     _, _, _, _, selected_path = _build_fixture_tree(tmp_path)
     selected_path.unlink()
     with pytest.raises(SystemExit, match="missing_selected_candidate"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
 def test_multiple_selected_candidates_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -329,7 +406,7 @@ def test_multiple_selected_candidates_fail_closed(tmp_path: Path, monkeypatch: p
     extra_selected = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE / "lena_pre_generation_candidate_extra.json"
     _write_json(extra_selected, _selected_candidate_payload(generated_at_utc="2026-07-14T13:00:00Z"))
     with pytest.raises(SystemExit, match="ambiguous_selected_candidate"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
 def test_malformed_and_non_selected_candidate_artifacts_are_ignored_when_one_selected_remains(
@@ -351,7 +428,7 @@ def test_malformed_and_non_selected_candidate_artifacts_are_ignored_when_one_sel
         "provider_authorized": False,
         "side_effects_performed": [],
     })
-    report = handoff.build_handoff(DATE)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
     assert report["source_selected_candidate_artifact_path"] == SELECTED_CANDIDATE_PATH
 
 
@@ -361,7 +438,7 @@ def test_missing_learning_artifact_fails_closed(tmp_path: Path, monkeypatch: pyt
     learning_path.unlink()
     assert recommendation_path.is_file()
     with pytest.raises(SystemExit, match="missing_learning_artifact"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
 def test_missing_content_packet_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -370,7 +447,28 @@ def test_missing_content_packet_fails_closed(tmp_path: Path, monkeypatch: pytest
     packet_path = tmp_path / "pipeline" / "strategy" / "lena" / "content_packets" / DATE / f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
     packet_path.unlink()
     with pytest.raises(SystemExit, match="missing_artifact"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+
+
+def test_cli_aborts_cleanly_on_missing_reconciliation_artifact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _build_fixture_tree(tmp_path)
+    reconciliation_path = tmp_path / RECONCILIATION_PATH
+    reconciliation_path.unlink()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["handoff", "--date", DATE, "--reconciliation-artifact", RECONCILIATION_PATH],
+    )
+
+    assert handoff.main() == 1
+    captured = capsys.readouterr()
+    assert f"[ABORT] missing_reconciliation_artifact: missing required artifact: {reconciliation_path}" in captured.out
+    assert "Traceback" not in captured.err
 
 
 def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -380,4 +478,4 @@ def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monk
     packet["environment_id"] = "env_wrong"
     _write_json(packet_path, packet)
     with pytest.raises(SystemExit, match="packet_environment_mismatch"):
-        handoff.build_handoff(DATE)
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)

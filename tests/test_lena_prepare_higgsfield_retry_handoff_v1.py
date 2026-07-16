@@ -10,6 +10,7 @@ import pytest
 
 from pipeline import higgsfield_lena_api_executor as executor
 from tools import lena_higgsfield_generation_approval_v1 as approval_mod
+import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_mod
 
 
@@ -75,6 +76,7 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "DEFAULT_OUTPUT_ROOT",
         tmp_path / "pipeline" / "strategy" / "lena" / "retry_handoffs",
     )
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -107,6 +109,144 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+
+    learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
+    recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
+    queue_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
+    reconciliation_repo_path = Path("pipeline/strategy/lena/reconciliations") / DATE / "lena_generation_reconciliation_fixture.json"
+    learning_path = tmp_path / learning_repo_path
+    recommendation_path = tmp_path / recommendation_repo_path
+    queue_path = tmp_path / queue_repo_path
+    reconciliation_path = tmp_path / reconciliation_repo_path
+    learning_report = {
+        "report_type": "lena_post_outcome_learning_state",
+        "version": "v1",
+        "date": DATE,
+        "published_post_count": 3,
+        "pending_metrics_posts": [{}],
+        "stale_pending_metrics_posts": [{}],
+        "winner_posts": [{"recipe_id": "hcr_011"}],
+        "queue_boosts": {"preferred_recipe_ids": ["hcr_011"]},
+        "metrics_resolution_summary": {
+            "learning_status": "current",
+            "current_count": 2,
+            "usable_but_incomplete_count": 0,
+            "stale_unresolved_count": 0,
+            "manual_or_future_capability_required_count": 0,
+        },
+    }
+    recommendation_report = {
+        "report_type": "lena_next_generation_step",
+        "version": "v1",
+        "date": DATE,
+        "learning_artifact_path": learning_repo_path.as_posix(),
+        "learning_status": "current",
+        "learning_status_label": "learning_current",
+        "learning_validation_state": "valid",
+        "learning_validation_error": "",
+        "learning_availability": "available",
+        "learning_published_post_count": 3,
+        "learning_pending_metrics_count": 1,
+        "learning_stale_pending_metrics_count": 1,
+        "learning_resolution_state_summary": learning_report["metrics_resolution_summary"],
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "learning_winner_post_count": 1,
+        "recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": "hcr_011",
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids", "winner_posts"],
+            "next_live_gate": "review",
+        },
+    }
+    queue_report = {
+        "report_type": "lena_autonomous_generation_queue_dryrun",
+        "version": "v1",
+        "date": DATE,
+        "dry_run": True,
+        "queue_slots": [
+            {
+                "recipe_id": "hcr_011",
+                "title": "Getting Ready Mirror",
+                "scene_type": "fit_check_mirror_getting_ready",
+                "autonomy_grade": "ready",
+                "payload_headroom": 261,
+                "outfit_used": "wc_p059",
+                "environment_used": "env_p001",
+                "proof_priority": 9,
+                "production_proof_mode": False,
+                "priority_score": 125,
+                "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
+            }
+        ],
+    }
+    _write_json(learning_path, learning_report)
+    _write_json(recommendation_path, recommendation_report)
+    _write_json(queue_path, queue_report)
+    learning_sha256 = hashlib.sha256(learning_path.read_bytes()).hexdigest()
+    recommendation_sha256 = hashlib.sha256(recommendation_path.read_bytes()).hexdigest()
+    selected_sha256 = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+    reconciliation_report = {
+        "report_type": "lena_generation_reconciliation",
+        "schema_version": "lena_generation_reconciliation_v1",
+        "date": DATE,
+        "generated_at": "2026-07-15T12:00:00+00:00",
+        "source_revision": "085620d1",
+        "source_revision_commit": "085620d1a1dcf6fb647a3111b0b00f7ed652738c",
+        "source_artifacts": {
+            "learning": {
+                "source_artifact_path": learning_repo_path.as_posix(),
+                "source_artifact_sha256": learning_sha256,
+            },
+            "recommendation": {
+                "source_artifact_path": recommendation_repo_path.as_posix(),
+                "source_artifact_sha256": recommendation_sha256,
+            },
+            "selected_candidate": {
+                "source_artifact_path": selected_candidate_repo_path.as_posix(),
+                "source_artifact_sha256": selected_sha256,
+            },
+        },
+        "learning_status": "current",
+        "recommendation_recipe_id": "hcr_011",
+        "recommendation_outfit_id": "wc_p059",
+        "recommendation_environment_id": "env_p001",
+        "recommendation_action_type": "collect_first_controlled_proof",
+        "selected_candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+        "selected_candidate_recipe_id": "hcr_011",
+        "selected_candidate_slot_id": ORIGINAL_SLOT,
+        "selected_candidate_hook_id": "cbn_004",
+        "selected_candidate_prompt_sha256": PROMPT_SHA,
+        "divergence_status": "aligned",
+        "resolution_policy": "selected_candidate_authoritative",
+        "reconciliation_status": "reconciled",
+        "operator_review_required": False,
+        "final_reconciled_candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+        "final_reconciled_candidate_recipe_id": "hcr_011",
+        "final_reconciled_candidate_slot_id": ORIGINAL_SLOT,
+        "final_reconciled_candidate_hook_id": "cbn_004",
+        "final_reconciled_candidate_prompt_sha256": PROMPT_SHA,
+        "final_reconciled_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+        "final_reconciled_candidate_artifact_sha256": selected_sha256,
+        "exact_next_allowed_action": "build_next_live_image_handoff",
+        "next_allowed_action": {
+            "status": "reconciled",
+            "action": "build_next_live_image_handoff",
+            "reason": "recommendation and selected candidate are aligned and may be handed off",
+        },
+        "dirty_workspace_dependency": False,
+        "shadow_mode_only": True,
+        "provider_call_performed": False,
+        "approval_consumed": False,
+        "claims_written": False,
+        "receipts_written": False,
+        "queue_mutated": False,
+        "publish_performed": False,
+        "blocking_reasons": [],
+    }
+    _write_json(reconciliation_path, reconciliation_report)
     handoff_report = {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -131,6 +271,16 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "expected_handoff_artifact_path": handoff_repo_path.as_posix(),
         "source_selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
         "source_selected_candidate_artifact_sha256": selected_candidate_sha,
+        "source_learning_artifact_path": learning_repo_path.as_posix(),
+        "source_learning_artifact_sha256": learning_sha256,
+        "source_recommendation_artifact_path": recommendation_repo_path.as_posix(),
+        "source_recommendation_artifact_sha256": recommendation_sha256,
+        "source_queue_dry_run_artifact_path": queue_repo_path.as_posix(),
+        "source_queue_dry_run_artifact_sha256": hashlib.sha256(queue_path.read_bytes()).hexdigest(),
+        "source_reconciliation_artifact_path": reconciliation_repo_path.as_posix(),
+        "source_reconciliation_artifact_sha256": hashlib.sha256(reconciliation_path.read_bytes()).hexdigest(),
+        "source_reconciliation_decision_artifact_path": None,
+        "source_reconciliation_decision_artifact_sha256": None,
         "selected_candidate": {
             "artifact_path": selected_candidate_repo_path.as_posix(),
             "artifact_sha256": selected_candidate_sha,

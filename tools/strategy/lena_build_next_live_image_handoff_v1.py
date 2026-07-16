@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
 NEXT_ACTIONS = ROOT / "pipeline" / "strategy" / "lena" / "next_actions"
 CONTENT_PACKETS = ROOT / "pipeline" / "strategy" / "lena" / "content_packets"
@@ -260,7 +261,11 @@ def load_queue_report(date_str: str) -> tuple[Path, dict]:
     return path, queue_report
 
 
-def build_handoff(date_str: str) -> dict:
+def build_handoff(
+    date_str: str,
+    reconciliation_artifact_path: str,
+    reconciliation_decision_artifact_path: str | None = None,
+) -> dict:
     try:
         autonomy_ladder.assert_allowed(
             "lena_build_next_live_image_handoff_v1",
@@ -289,6 +294,11 @@ def build_handoff(date_str: str) -> dict:
     selected_candidate_body = selected_candidate.get("candidate", {})
     if not isinstance(selected_candidate_body, dict):
         selected_candidate_body = {}
+    selected_candidate_id = str(selected_candidate_body.get("candidate_id", "")).strip()
+    selected_candidate_slot_id = str(selected_candidate_body.get("slot_id", "")).strip()
+    selected_candidate_recipe_id = str(selected_candidate_body.get("recipe_id", "")).strip()
+    selected_candidate_hook_id = str(selected_candidate_body.get("hook_id", "")).strip()
+    selected_candidate_prompt_sha256 = str(selected_candidate_body.get("prompt_sha256", "")).strip()
 
     learning_summary = learning.get("metrics_resolution_summary", {})
     _require(
@@ -344,11 +354,6 @@ def build_handoff(date_str: str) -> dict:
         "queue_head_mismatch",
         "queue head recipe does not match the recommendation",
     )
-    _require(
-        str(selected_candidate_body.get("recipe_id", "")).strip() == str(recommendation_body.get("recommended_recipe_id", "")).strip(),
-        "selected_candidate_recommendation_mismatch",
-        "selected candidate recipe does not match the next-generation recommendation",
-    )
     proof_lane_lock = queue_report.get("proof_lane_lock", {})
     if queue_report.get("proof_lane_lock_active"):
         _require(
@@ -357,12 +362,22 @@ def build_handoff(date_str: str) -> dict:
             "active proof lane lock does not match queue head",
         )
 
-    recipe_id = str(queue_head.get("recipe_id", "")).strip()
+    reconciliation_provenance = reconciliation_contract.build_handoff_reconciliation_provenance(
+        date_str=date_str,
+        recommendation_recipe_id=str(recommendation_body.get("recommended_recipe_id", "")).strip(),
+        selected_candidate_path=selected_candidate_path_value,
+        selected_candidate_report=selected_candidate,
+        selected_candidate_body=selected_candidate_body,
+        reconciliation_artifact_path=reconciliation_artifact_path,
+        reconciliation_decision_artifact_path=reconciliation_decision_artifact_path,
+    )
+    final_reconciled = reconciliation_provenance["final_candidate"]
+    recipe_id = str(final_reconciled["recipe_id"]).strip()
+    slot_id = str(final_reconciled["slot_id"]).strip()
     packet_path = content_packet_path(date_str, recipe_id)
     packet = load_content_packet_report(packet_path, date_str, recipe_id)
     prompt_text = str(packet.get("compact_provider_prompt_preview", "")).strip()
     prompt_sha256 = str(packet.get("compact_provider_prompt_sha256", "")).strip() or sha256_bytes(prompt_text.encode("utf-8"))
-    slot_id = canonical_slot_id(date_str, recipe_id)
 
     _require(
         str(packet.get("environment_id", "")).strip() == str(queue_head.get("environment_used", "")).strip(),
@@ -407,17 +422,54 @@ def build_handoff(date_str: str) -> dict:
         "selected_candidate": {
             "artifact_path": repo_relative_path(selected_candidate_path_value),
             "artifact_sha256": sha256_file(selected_candidate_path_value),
-            "candidate_id": selected_candidate_body.get("candidate_id", ""),
-            "slot_id": selected_candidate_body.get("slot_id", ""),
-            "recipe_id": selected_candidate_body.get("recipe_id", ""),
-            "prompt_sha256": selected_candidate_body.get("prompt_sha256", ""),
+            "candidate_id": selected_candidate_id,
+            "slot_id": selected_candidate_slot_id,
+            "recipe_id": selected_candidate_recipe_id,
+            "prompt_sha256": selected_candidate_prompt_sha256,
             "schema_version": selected_candidate.get("schema_version", ""),
             "candidate_status": selected_candidate.get("candidate_status", ""),
         },
         "selected_lane": packet.get("scene_type", ""),
-        "selected_hook_id": packet.get("strong_hook_id", ""),
+        "selected_hook_id": selected_candidate_hook_id,
         "selected_hook_text": packet.get("hook_text", ""),
         "selected_caption_seed": packet.get("caption_draft", ""),
+        "source_reconciliation_artifact_path": reconciliation_provenance["reconciliation"]["source_artifact_path"],
+        "source_reconciliation_artifact_sha256": reconciliation_provenance["reconciliation"]["source_artifact_sha256"],
+        "source_reconciliation_schema_version": reconciliation_provenance["reconciliation"]["schema_version"],
+        "source_reconciliation_report_type": reconciliation_provenance["reconciliation"]["report_type"],
+        "source_reconciliation_status": reconciliation_provenance["reconciliation"]["reconciliation_status"],
+        "source_reconciliation_operator_review_required": reconciliation_provenance["reconciliation"]["operator_review_required"],
+        "source_reconciliation_divergence_status": reconciliation_provenance["reconciliation"]["divergence_status"],
+        "source_reconciliation_resolution_policy": reconciliation_provenance["reconciliation"]["resolution_policy"],
+        "source_reconciliation_exact_next_allowed_action": reconciliation_provenance["reconciliation"]["exact_next_allowed_action"],
+        "source_reconciliation_decision_artifact_path": (
+            reconciliation_provenance["decision"]["source_artifact_path"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_artifact_sha256": (
+            reconciliation_provenance["decision"]["source_artifact_sha256"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_id": (
+            reconciliation_provenance["decision"]["decision_id"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_operator_id": (
+            reconciliation_provenance["decision"]["operator_id"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_expires_at_utc": (
+            reconciliation_provenance["decision"]["expires_at_utc"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_authority_scope": (
+            reconciliation_provenance["decision"]["authority_scope"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_live_generation_authorized": (
+            reconciliation_provenance["decision"]["live_generation_authorized"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_publishing_authorized": (
+            reconciliation_provenance["decision"]["publishing_authorized"] if reconciliation_provenance["decision"] else None
+        ),
+        "source_reconciliation_decision_next_allowed_action": (
+            reconciliation_provenance["decision"]["next_allowed_action"] if reconciliation_provenance["decision"] else None
+        ),
+        "reconciled_candidate": reconciliation_provenance["final_candidate"],
         "source_recommendation_artifact_path": repo_relative_path(recommendation_path),
         "source_recommendation_artifact_sha256": sha256_file(recommendation_path),
         "source_learning_artifact_path": repo_relative_path(learning_path),
@@ -501,6 +553,39 @@ def build_handoff(date_str: str) -> dict:
             "generation_performed": False,
             "publish_authorized": False,
             "manual_publish_review_required": True,
+            "reconciliation_artifact_path": reconciliation_provenance["reconciliation"]["source_artifact_path"],
+            "reconciliation_artifact_sha256": reconciliation_provenance["reconciliation"]["source_artifact_sha256"],
+            "reconciliation_status": reconciliation_provenance["reconciliation"]["reconciliation_status"],
+            "reconciliation_divergence_status": reconciliation_provenance["reconciliation"]["divergence_status"],
+            "reconciliation_operator_review_required": reconciliation_provenance["reconciliation"]["operator_review_required"],
+            "reconciliation_resolution_policy": reconciliation_provenance["reconciliation"]["resolution_policy"],
+            "reconciliation_decision_artifact_path": (
+                reconciliation_provenance["decision"]["source_artifact_path"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_artifact_sha256": (
+                reconciliation_provenance["decision"]["source_artifact_sha256"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_id": (
+                reconciliation_provenance["decision"]["decision_id"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_operator_id": (
+                reconciliation_provenance["decision"]["operator_id"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_expires_at_utc": (
+                reconciliation_provenance["decision"]["expires_at_utc"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_authority_scope": (
+                reconciliation_provenance["decision"]["authority_scope"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_live_generation_authorized": (
+                reconciliation_provenance["decision"]["live_generation_authorized"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_publishing_authorized": (
+                reconciliation_provenance["decision"]["publishing_authorized"] if reconciliation_provenance["decision"] else None
+            ),
+            "reconciliation_decision_next_allowed_action": (
+                reconciliation_provenance["decision"]["next_allowed_action"] if reconciliation_provenance["decision"] else None
+            ),
         },
         "source_recommendation": {
             "action_type": recommendation_body.get("action_type", ""),
@@ -569,6 +654,8 @@ def build_handoff(date_str: str) -> dict:
             "live_execution_authorized": False,
             "dry_run_executor_contract_state": "ready",
             "live_execution_state": "blocked",
+            "reconciliation_provenance_valid": True,
+            "reconciliation_decision_required": reconciliation_provenance["reconciliation"]["decision_required"],
         },
     }
     return report
@@ -611,6 +698,8 @@ def write_markdown(path: Path, report: dict) -> None:
         f"- selected candidate: `{report['source_selected_candidate_artifact_path']}`",
         f"- selected candidate id: `{report['selected_candidate']['candidate_id']}`",
         f"- selected candidate recipe: `{report['selected_candidate']['recipe_id']}`",
+        f"- reconciliation artifact: `{report['source_reconciliation_artifact_path']}`",
+        f"- reconciliation decision artifact: `{report['source_reconciliation_decision_artifact_path']}`",
         f"- selected prompt input: `{report['selected_prompt_input_artifact_path']}`",
         f"- expected handoff artifact: `{report['expected_handoff_artifact_path']}`",
         f"- expected handoff markdown: `{report['expected_handoff_markdown_path']}`",
@@ -691,12 +780,29 @@ def save_handoff(report: dict, date_str: str) -> tuple[Path, Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build the deterministic Lena next-live-image handoff packet.")
     parser.add_argument("--date", default=utc_date(), help="UTC date for output folder")
+    parser.add_argument(
+        "--reconciliation-artifact",
+        required=True,
+        help="Path to the reconciliation artifact consumed by the handoff builder",
+    )
+    parser.add_argument(
+        "--reconciliation-decision-artifact",
+        default=None,
+        help="Optional operator reconciliation decision artifact path for divergent cases",
+    )
     args = parser.parse_args()
 
     try:
-        report = build_handoff(args.date)
+        report = build_handoff(
+            args.date,
+            args.reconciliation_artifact,
+            args.reconciliation_decision_artifact,
+        )
     except HandoffBuildError as exc:
         print(str(exc))
+        return 1
+    except reconciliation_contract.ReconciliationContractError as exc:
+        print(f"[ABORT] {exc.code}: {exc.detail}")
         return 1
     except autonomy_ladder.AutonomyLadderError as exc:
         print(f"[ABORT] {exc.code}: {exc.detail}")

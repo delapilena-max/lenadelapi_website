@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
+import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
+import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.lena_higgsfield_generation_approval_v1 import (
     APPROVAL_TTL_MINUTES,
     CANONICAL_OPERATOR_ID,
@@ -29,9 +31,12 @@ from tools.lena_higgsfield_generation_approval_v1 import (
 
 DATE = "2026-07-14"
 SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
-PROMPT_SHA = hashlib.sha256(b"synthetic-approved-prompt-bytes").hexdigest()
+PROMPT_SHA = hashlib.sha256(
+    b"Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+).hexdigest()
 CANDIDATE_ARTIFACT_SHA = hashlib.sha256(b"synthetic-candidate-artifact-bytes").hexdigest()
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
 
 
 def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,6 +45,15 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         approval_mod, "DEFAULT_APPROVAL_ROOT",
         tmp_path / "pipeline" / "approvals" / "lena" / "generation",
     )
+    monkeypatch.setattr(handoff_builder, "ROOT", tmp_path)
+    monkeypatch.setattr(handoff_builder, "NEXT_ACTIONS", tmp_path / "pipeline" / "strategy" / "lena" / "next_actions")
+    monkeypatch.setattr(handoff_builder, "CONTENT_PACKETS", tmp_path / "pipeline" / "strategy" / "lena" / "content_packets")
+    monkeypatch.setattr(
+        handoff_builder,
+        "PRE_GENERATION_CANDIDATES",
+        tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+    )
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
 
 
 def _handoff_repo_path() -> str:
@@ -79,79 +93,254 @@ def _selected_candidate_sha() -> str:
     ).hexdigest()
 
 
-def _valid_handoff_report() -> dict:
-    handoff_repo_path = _handoff_repo_path()
+def _reconciliation_payload() -> dict:
     selected_candidate_repo_path = _selected_candidate_repo_path()
     selected_candidate_sha = _selected_candidate_sha()
     selected_candidate_payload = _selected_candidate_payload()
     return {
-        "report_type": "lena_next_live_image_handoff",
-        "schema_version": "v1",
-        "created_at": "2026-07-14T12:00:00+00:00",
-        "execution_owner": "claude",
-        "provider": "higgsfield",
-        "executor_type": "higgsfield_cli",
-        "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-        "packet_state": "packet_valid_for_claude_review",
-        "dry_run_executor_contract_state": "ready",
-        "live_execution_state": "blocked",
-        "live_execution_authorized": False,
-        "generation_approval_required": True,
-        "manual_operator_approval_required": True,
-        "provider_call_performed": False,
-        "generation_performed": False,
-        "publish_authorized": False,
-        "manual_publish_review_required": True,
-        "date": DATE,
-        "selected_slot_id": SLOT_ID,
-        "selected_recipe_id": "hcr_011",
-        "expected_handoff_artifact_path": handoff_repo_path,
-        "source_selected_candidate_artifact_path": selected_candidate_repo_path,
-        "source_selected_candidate_artifact_sha256": selected_candidate_sha,
-        "selected_candidate": {
+        "reconciliation": {
+            "source_artifact_path": f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_b0000000_dddddddddddd.json",
+            "source_artifact_sha256": "d" * 64,
+            "schema_version": "lena_generation_reconciliation_v1",
+            "report_type": "lena_generation_reconciliation",
+            "date": DATE,
+            "reconciliation_status": "reconciled",
+            "operator_review_required": False,
+            "divergence_status": "aligned",
+            "resolution_policy": "selected_candidate_authoritative",
+            "exact_next_allowed_action": "build_next_live_image_handoff",
+            "decision_required": False,
+        },
+        "reconciled_candidate": {
+            "candidate_id": selected_candidate_payload["candidate"]["candidate_id"],
+            "recipe_id": selected_candidate_payload["candidate"]["recipe_id"],
+            "slot_id": selected_candidate_payload["candidate"]["slot_id"],
+            "hook_id": selected_candidate_payload["candidate"]["hook_id"],
+            "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
             "artifact_path": selected_candidate_repo_path,
             "artifact_sha256": selected_candidate_sha,
-            "candidate_id": selected_candidate_payload["candidate"]["candidate_id"],
-            "slot_id": selected_candidate_payload["candidate"]["slot_id"],
-            "recipe_id": selected_candidate_payload["candidate"]["recipe_id"],
-            "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
-            "schema_version": selected_candidate_payload["schema_version"],
-            "candidate_status": selected_candidate_payload["candidate_status"],
-        },
-        "selected_prompt_input": {
-            "prompt_sha256": PROMPT_SHA,
-            "selected_candidate_artifact_path": selected_candidate_repo_path,
-            "selected_candidate_artifact_sha256": selected_candidate_sha,
-        },
-        "selected_prompt_input_artifact_sha256": CANDIDATE_ARTIFACT_SHA,
-        "structured_executor_inputs": {
-            "provider": "higgsfield",
-            "executor_type": "higgsfield_cli",
-            "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-            "model": "text2image_soul_v2",
-            "aspect_ratio": "9:16",
-            "negative_prompt_enabled": False,
-            "live_execution_authorized": False,
-            "date": DATE,
-            "slot_id": SLOT_ID,
-            "handoff_artifact_path": handoff_repo_path,
-            "selected_candidate_artifact_path": selected_candidate_repo_path,
-            "selected_candidate_artifact_sha256": selected_candidate_sha,
-            "soul_metadata": {
-                "name": "Lena",
-                "type": "Soul 2.0",
-                "custom_reference_id": CUSTOM_REFERENCE_ID,
-                "identity_is_prompt_instruction": False,
-            },
-            "selected_prompt_sha256": PROMPT_SHA,
         },
     }
+
+
+def _valid_handoff_report(tmp_path: Path) -> dict:
+    next_actions = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE
+    packets = tmp_path / "pipeline" / "strategy" / "lena" / "content_packets" / DATE
+    pre_generation = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE
+    recommendations = next_actions / f"lena_next_generation_step_{DATE}.json"
+    learning_path = next_actions / f"lena_post_outcome_learning_state_{DATE}.json"
+    queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{DATE}.json"
+    packet_path = packets / f"lena_content_packet_dryrun_{DATE}_hcr_011.json"
+    selected_candidate_path = pre_generation / "lena_pre_generation_candidate_selected.json"
+    reconciliation_path = tmp_path / RECONCILIATION_PATH
+
+    learning = {
+        "report_type": "lena_post_outcome_learning_state",
+        "version": "v1",
+        "date": DATE,
+        "published_post_count": 3,
+        "pending_metrics_posts": [{}],
+        "stale_pending_metrics_posts": [{}],
+        "winner_posts": [{"recipe_id": "hcr_011"}],
+        "queue_boosts": {"preferred_recipe_ids": ["hcr_011"]},
+        "metrics_resolution_summary": {
+            "learning_status": "current",
+            "current_count": 2,
+            "usable_but_incomplete_count": 0,
+            "stale_unresolved_count": 0,
+            "manual_or_future_capability_required_count": 0,
+        },
+    }
+    recommendation = {
+        "report_type": "lena_next_generation_step",
+        "version": "v1",
+        "date": DATE,
+        "learning_artifact_path": str(learning_path),
+        "learning_status": "current",
+        "learning_status_label": "learning_current",
+        "learning_validation_state": "valid",
+        "learning_validation_error": "",
+        "learning_availability": "available",
+        "learning_published_post_count": 3,
+        "learning_pending_metrics_count": 1,
+        "learning_stale_pending_metrics_count": 1,
+        "learning_resolution_state_summary": learning["metrics_resolution_summary"],
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "learning_winner_post_count": 1,
+        "recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": "hcr_011",
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids", "winner_posts"],
+            "next_live_gate": "review",
+        },
+    }
+    queue = {
+        "report_type": "lena_autonomous_generation_queue_dryrun",
+        "version": "v1",
+        "dry_run": True,
+        "proof_lane_lock": {
+            "action_type": "collect_first_controlled_proof",
+            "recipe_id": "hcr_011",
+            "outfit_id": "wc_p059",
+            "environment_id": "env_p001",
+            "next_live_gate": "review",
+        },
+        "proof_lane_lock_active": True,
+        "queue_slots": [
+            {
+                "recipe_id": "hcr_011",
+                "title": "Parking Garage Flash",
+                "scene_type": "parking_garage_flash",
+                "autonomy_grade": "ready",
+                "payload_headroom": 261,
+                "outfit_used": "wc_p059",
+                "environment_used": "env_p001",
+                "proof_priority": 9,
+                "production_proof_mode": False,
+                "priority_score": 125,
+                "why": ["matches current proof-lane lock from next-step recommendation"],
+                "proof_lane_locked": True,
+            }
+        ],
+    }
+    prompt_text = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+    prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+    packet = {
+        "report_type": "lena_content_packet_dryrun",
+        "schema_version": "v1",
+        "packet_id": "cpkt_20260713_hcr_011",
+        "generated_date": DATE,
+        "generator": "lena_build_content_packet_dryrun_v1",
+        "dry_run": True,
+        "provider_call_enabled": False,
+        "generation_call_performed": False,
+        "publishing_approval": "not_approved",
+        "recipe_id": "hcr_011",
+        "scene_type": "parking_garage_flash",
+        "wardrobe_outfit_id": "wc_p059",
+        "content_pillar": "beautiful_trouble",
+        "platform_targets": ["Instagram Feed"],
+        "best_content_type": "photo",
+        "high_caliber_source_sections": {
+            "subject_pose": "leaning against the elevator wall before heading up",
+            "style_lighting": "warm lobby spill and realistic night shadow falloff",
+            "technical_keywords": "35mm lens, natural grain",
+        },
+        "compact_provider_prompt_preview": prompt_text,
+        "compact_provider_prompt_chars": len(prompt_text),
+        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_sha256": prompt_sha,
+        "strong_hook_id": "cbn_004",
+        "hook_text": "Tried To Dress Down. Failed.",
+        "hook_selection_reason": "highest score",
+        "caption_draft": "caught me on the way in",
+        "caption_followup": "kept the first frame",
+        "environment_id": "env_p001",
+        "environment_context": "Environment: parking garage entry.",
+        "provider_prompt_contract": {
+            "provider_route": "higgsfield_forward_no_live",
+            "live_authority": False,
+            "scene_logic_contract_present": True,
+            "master_identity_body_present": True,
+            "blocked_terms_absent": True,
+            "blocked_terms_found": [],
+            "outfit_controlled": True,
+            "environment_controlled": True,
+        },
+    }
+    selected_candidate = _selected_candidate_payload()
+    reconciliation = _reconciliation_payload()
+
+    for path, payload in (
+        (learning_path, learning),
+        (recommendations, recommendation),
+        (queue_path, queue),
+        (packet_path, packet),
+        (selected_candidate_path, selected_candidate),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    learning_sha256 = reconciliation_contract.sha256_file(learning_path)
+    recommendation_sha256 = reconciliation_contract.sha256_file(recommendations)
+    selected_sha256 = reconciliation_contract.sha256_file(selected_candidate_path)
+    reconciliation_path.parent.mkdir(parents=True, exist_ok=True)
+    reconciliation_path.write_text(
+        json.dumps(
+            {
+                "report_type": "lena_generation_reconciliation",
+                "schema_version": "lena_generation_reconciliation_v1",
+                "date": DATE,
+                "generated_at": "2026-07-14T12:00:00+00:00",
+                "source_revision": "b0000000",
+                "source_revision_commit": "b" * 40,
+                "source_artifacts": {
+                    "learning": {
+                        "source_artifact_path": learning_path.relative_to(tmp_path).as_posix(),
+                        "source_artifact_sha256": learning_sha256,
+                    },
+                    "recommendation": {
+                        "source_artifact_path": recommendations.relative_to(tmp_path).as_posix(),
+                        "source_artifact_sha256": recommendation_sha256,
+                    },
+                    "selected_candidate": {
+                        "source_artifact_path": selected_candidate_path.relative_to(tmp_path).as_posix(),
+                        "source_artifact_sha256": selected_sha256,
+                    },
+                },
+                "learning_status": "current",
+                "recommendation_recipe_id": "hcr_011",
+                "recommendation_outfit_id": "wc_p059",
+                "recommendation_environment_id": "env_p001",
+                "recommendation_action_type": "collect_first_controlled_proof",
+                "selected_candidate_id": selected_candidate["candidate"]["candidate_id"],
+                "selected_candidate_recipe_id": selected_candidate["candidate"]["recipe_id"],
+                "selected_candidate_slot_id": selected_candidate["candidate"]["slot_id"],
+                "selected_candidate_hook_id": selected_candidate["candidate"]["hook_id"],
+                "selected_candidate_prompt_sha256": selected_candidate["candidate"]["prompt_sha256"],
+                "divergence_status": "aligned",
+                "resolution_policy": "selected_candidate_authoritative",
+                "reconciliation_status": "reconciled",
+                "operator_review_required": False,
+                "final_reconciled_candidate_id": selected_candidate["candidate"]["candidate_id"],
+                "final_reconciled_candidate_recipe_id": selected_candidate["candidate"]["recipe_id"],
+                "final_reconciled_candidate_slot_id": selected_candidate["candidate"]["slot_id"],
+                "final_reconciled_candidate_hook_id": selected_candidate["candidate"]["hook_id"],
+                "final_reconciled_candidate_prompt_sha256": selected_candidate["candidate"]["prompt_sha256"],
+                "final_reconciled_candidate_artifact_path": selected_candidate_path.relative_to(tmp_path).as_posix(),
+                "final_reconciled_candidate_artifact_sha256": selected_sha256,
+                "exact_next_allowed_action": "build_next_live_image_handoff",
+                "next_allowed_action": {
+                    "status": "reconciled",
+                    "action": "build_next_live_image_handoff",
+                    "reason": "recommendation and selected candidate are aligned and may be handed off",
+                },
+                "reconciliation_fingerprint_sha256": reconciliation["reconciliation"]["source_artifact_sha256"],
+                "output_artifact_path": reconciliation_path.relative_to(tmp_path).as_posix(),
+                "dirty_workspace_dependency": False,
+                "shadow_mode_only": True,
+                "provider_call_performed": False,
+                "approval_consumed": False,
+                "claims_written": False,
+                "receipts_written": False,
+                "queue_mutated": False,
+                "publish_performed": False,
+                "blocking_reasons": [],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    report = handoff_builder.build_handoff(DATE, RECONCILIATION_PATH)
+    return report
 
 
 def _write_handoff(tmp_path: Path, report: dict | None = None) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
-    handoff_path.write_text(json.dumps(report or _valid_handoff_report(), indent=2), encoding="utf-8")
+    handoff_path.write_text(json.dumps(report or _valid_handoff_report(tmp_path), indent=2), encoding="utf-8")
     selected_candidate_path = tmp_path / _selected_candidate_repo_path()
     selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2), encoding="utf-8")
@@ -751,7 +940,7 @@ def test_inspect_handoff_artifact_fails_closed_on_unsafe_handoff(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutator, expected_code: str
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    report = _valid_handoff_report()
+    report = _valid_handoff_report(tmp_path)
     mutator(report)
     handoff_path = _write_handoff(tmp_path, report)
 
