@@ -10,6 +10,7 @@ from pipeline.prompting.lena_prompt_brain import (
 )
 from tools.diagnostics import lena_higgsfield_photo_dump_dryrun as photo_dump
 from tools.diagnostics import lena_higgsfield_prompt_library_dryrun as prompt_library
+from tools.strategy import lena_human_presence_profile_v1 as lena_profile
 
 
 DATE = "2026-07-15"
@@ -90,6 +91,21 @@ def test_curator_can_select_a_valid_prompt_and_keep_laundromat_skipped(
     assert len(curation["selected"]) == 1
     assert curation["selected"][0]["image"]["slot_id"].startswith("lenagate20260715085620d1-pack000")
     assert curation["candidate_count"] > 0
+
+
+def test_prompt_library_threads_presence_contract_through_the_dry_run_report() -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    library = prompt_library.build_library_report(
+        DATE,
+        "lenagate20260715085620d1",
+        1,
+        10,
+        presence_contract=contract,
+    )
+
+    assert library["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
+    assert library["pack_reports"][0]["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
+    assert library["pack_reports"][0]["images"][0]["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
 
 
 def test_ordinary_photo_dump_pack_output_remains_unchanged_from_main() -> None:

@@ -50,6 +50,7 @@ from pipeline.prompting.lena_prompt_brain import (
     HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
     HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS,
 )
+from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
 from tools.strategy.lena_human_presence_profile_v1 import build_lena_presence_contract
 
 # A photo-dump pack should show real pose variety, not one clone repeated
@@ -152,13 +153,20 @@ def build_report(
     count: int,
     required_recipe_id: str = "",
     presence_contract: dict | None = None,
+    presence_plan: dict | None = None,
 ) -> dict:
+    if presence_plan is None and presence_contract is not None:
+        presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
+            presence_contract,
+            medium="still_image",
+        )
     pack = generate_higgsfield_photo_dump_pack(
         date_str,
         slot_prefix,
         count=count,
         required_recipe_id=required_recipe_id,
         presence_contract=presence_contract,
+        presence_plan=presence_plan,
     )
 
     per_image = []

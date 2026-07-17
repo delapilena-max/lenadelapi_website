@@ -24,10 +24,12 @@ from lena_higgsfield_prompt_library_dryrun import (  # noqa: E402
     build_library_report,
     curate_top_prompts,
 )
+from pipeline.presence import human_presence_candidate_ranking_v1 as presence_ranking  # noqa: E402
 from pipeline.prompting.lena_prompt_brain import ControlledProofLaneError  # noqa: E402
 from pipeline.qa.lena_higgsfield_failure_memory import (  # noqa: E402
     compute_higgsfield_failure_memory,
 )
+from tools.strategy.lena_human_presence_profile_v1 import build_lena_presence_contract  # noqa: E402
 
 
 SCHEMA_VERSION = "lena_pre_generation_candidate_gate_v1"
@@ -40,6 +42,7 @@ AUTHORITY_PATHS = (
     "pipeline/prompt_banks/lena/strong_hook_bank_v1.json",
 )
 OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates"
+DEFAULT_PRESENCE_PROFILE = "lena-default"
 UNSUPPORTED_HOOK_CATEGORIES = {
     "meaningful_choice", "payoff", "callback", "consequence"
 }
@@ -62,6 +65,80 @@ class GateError(RuntimeError):
         super().__init__(detail)
         self.code = code
         self.detail = detail
+
+
+def _presence_observation(image: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "lane": image.get("lane"),
+        "scene_action": scene.get("action"),
+        "activity": scene.get("action"),
+        "reference_mode": image.get("reference_mode"),
+        "camera_text": image.get("camera_text"),
+        "lighting_text": image.get("lighting_text"),
+        "environment_id": image.get("environment_id"),
+        "environment_name": image.get("environment_name"),
+        "expression_gaze_id": image.get("expression_gaze_id"),
+        "expression_gaze_label": image.get("expression_gaze_label"),
+        "expression_text": image.get("expression_text"),
+        "pose_body_language_id": image.get("pose_body_language_id"),
+        "pose_body_language_label": image.get("pose_body_language_label"),
+        "wardrobe_silhouette_class": image.get("wardrobe_silhouette_class"),
+        "effective_wardrobe_silhouette_class": image.get("effective_wardrobe_silhouette_class"),
+        "framing_text": image.get("framing_text"),
+        "caption_seed": image.get("caption_seed"),
+    }
+
+
+def _presence_selector_terms(plan: dict[str, Any], dimension: str) -> list[str]:
+    allowed_terms_by_dimension = {
+        "sensual_presence": {
+            "gaze",
+            "anticipation",
+            "movement",
+            "confidence",
+            "timing",
+            "reaction",
+            "rhythm",
+            "voice",
+            "framing",
+            "safe framing",
+        },
+        "body_presentation": {
+            "safe framing",
+            "reference mode",
+            "realistic proportions",
+            "anatomy continuity",
+            "full body presence",
+            "face priority",
+            "dynamic motion framing",
+            "required realistic",
+            "continuity",
+            "adult",
+        },
+    }
+    section = plan.get(dimension, {})
+    selector_terms = list(section.get("selector_terms", [])) if isinstance(section, dict) else []
+    allowed = allowed_terms_by_dimension.get(dimension)
+    if allowed is None:
+        return selector_terms
+    return [term for term in selector_terms if _normalize_text(term) in allowed]
+
+
+def _presence_rank_order() -> list[str]:
+    return [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+        "human_presence_alignment",
+        "situational_specificity",
+        "lived_in_detail",
+        "character_fit",
+        "followability",
+        "recent_feed_contrast",
+        "higgsfield_curator_score",
+        "recipe_proof_priority",
+        "canonical_hook_score",
+    ]
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -233,21 +310,36 @@ def build_prompt_candidates(
     as_of_date: str,
     head8: str,
     required_recipe_id: str = "",
+    presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     prefix = f"lenagate{as_of_date.replace('-', '')}{head8}"
-    library = build_library_report(
-        as_of_date,
-        prefix,
-        1,
-        10,
-        required_recipe_id=required_recipe_id,
-    )
+    try:
+        library = build_library_report(
+            as_of_date,
+            prefix,
+            1,
+            10,
+            required_recipe_id=required_recipe_id,
+            presence_contract=presence_contract,
+            presence_plan=presence_plan,
+        )
+    except Exception as exc:
+        from pipeline.presence import human_presence_contract_v1 as presence_contract_module
+        from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
+
+        if isinstance(exc, presence_plan_module.HumanPresencePromptPlanError) or isinstance(
+            exc,
+            presence_contract_module.HumanPresenceContractError,
+        ):
+            raise GateError(exc.code, exc.detail) from exc
+        raise
     images = [image for pack in library["pack_reports"] for image in pack["images"]]
     identities = [(image.get("slot_id"), image.get("image_prompt")) for image in images]
     if len(images) != 10 or len({slot for slot, _ in identities}) != 10 or any(not slot or not prompt for slot, prompt in identities):
         raise GateError("non_reproducible_prompt_identity", "the deterministic prompt pack did not expose ten unique prompt identities")
     curation = curate_top_prompts(library, 10)
-    return curation["selected"], {
+    prompt_meta = {
         "pack_count": 1,
         "prompt_count": library["total_prompts"],
         "library_prefix": prefix,
@@ -257,6 +349,9 @@ def build_prompt_candidates(
         "failure_memory_soft_flagged_patterns": curation["failure_memory_soft_flagged_patterns"],
         "failure_memory_excluded_count": curation["failure_memory_excluded_count"],
     }
+    if library.get("human_presence") is not None:
+        prompt_meta["human_presence"] = library["human_presence"]
+    return curation["selected"], prompt_meta
 
 
 def _supports_photo(value: Any) -> bool:
@@ -470,18 +565,30 @@ def _substantive_scores(scene: dict[str, Any], recipe: dict[str, Any], hook: dic
 def _rank_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
     score = candidate["ranking_evidence"]
     contrast = score["feed_contrast"]
-    substantive = (
-        score["failure_memory_caution"], score["physical_interaction_risk"],
+    substantive = [
+        score["failure_memory_caution"],
+        score["physical_interaction_risk"],
         -score["premium_visual_discipline"],
-        -score["situational_specificity"], -score["lived_in_detail"],
-        -score["character_fit"], -score["followability"],
-        contrast["lane_repetitions"], contrast["outfit_repetitions"],
-        contrast["environment_repetitions"], contrast["pose_repetitions"],
-        -score["higgsfield_curator_score"], score["recipe_proof_priority"],
-        -score["hook_score"],
+    ]
+    if "human_presence_bonus" in score:
+        substantive.append(-score["human_presence_bonus"])
+    substantive.extend(
+        [
+            -score["situational_specificity"],
+            -score["lived_in_detail"],
+            -score["character_fit"],
+            -score["followability"],
+            contrast["lane_repetitions"],
+            contrast["outfit_repetitions"],
+            contrast["environment_repetitions"],
+            contrast["pose_repetitions"],
+            -score["higgsfield_curator_score"],
+            score["recipe_proof_priority"],
+            -score["hook_score"],
+        ]
     )
     tie = (candidate["lane"], candidate["recipe_id"], candidate["hook_id"], candidate["slot_id"])
-    return substantive + tie
+    return tuple(substantive) + tie
 
 
 def select_candidate(
@@ -490,11 +597,27 @@ def select_candidate(
     recent: dict[str, Any],
     *,
     required_recipe_id: str = "",
+    presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]], bool]:
     rejected: Counter[str] = Counter()
     valid: list[dict[str, Any]] = []
     blocked = set(authorities["scene_bank"].get("production_blocked_lanes", []))
     saw_required_recipe = False
+    if presence_plan is None and presence_contract is not None:
+        from pipeline.presence import human_presence_contract_v1 as presence_contract_module
+        from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
+
+        try:
+            presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
+                presence_contract,
+                medium="still_image",
+            )
+        except (
+            presence_plan_module.HumanPresencePromptPlanError,
+            presence_contract_module.HumanPresenceContractError,
+        ) as exc:
+            raise GateError(exc.code, exc.detail) from exc
     for curator in prompt_candidates:
         image = curator.get("image", {})
         lane = image.get("lane")
@@ -527,6 +650,9 @@ def select_candidate(
         hook = _best_hook(recipe, authorities["hooks"]) if recipe else None
         if hook is None:
             reasons.append("no_safe_linked_hook")
+        if presence_plan is not None:
+            if image.get("human_presence") != presence_plan:
+                reasons.append("human_presence_plan_mismatch")
         if reasons:
             rejected.update(set(reasons))
             continue
@@ -586,6 +712,15 @@ def select_candidate(
         if generated_environment_id is None:
             candidate.pop("environment_id")
         candidate["ranking_evidence"] = _substantive_scores(scene, recipe, hook, image, recent["records"], curator)
+        if presence_plan is not None:
+            try:
+                candidate["human_presence_ranking"] = presence_ranking.score_candidate_presence_alignment(
+                    presence_plan,
+                    _presence_observation(image, scene),
+                )
+            except presence_ranking.HumanPresenceCandidateRankingError as exc:
+                raise GateError(exc.code, exc.detail) from exc
+            candidate["ranking_evidence"]["human_presence_bonus"] = candidate["human_presence_ranking"]["total_bonus"]
         candidate["deterministic_noncreative_tiebreak"] = [lane, recipe["id"], hook["id"], image["slot_id"]]
         candidate["_prompt"] = image["image_prompt"]
         valid.append(candidate)
@@ -610,9 +745,27 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
     noncritical = _critical_gap_notes(recent)
     status = "selected" if candidate else "abstain"
     clean_candidate = None
+    presence_enabled = prompt_meta.get("human_presence") is not None
     if candidate:
         clean_candidate = {key: value for key, value in candidate.items() if key != "_prompt" and value is not None}
         clean_candidate["exact_proposed_dry_run_command"] = clean_candidate["exact_proposed_dry_run_command"].replace("{as_of_date}", as_of_date)
+    ranking_order = [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+    ]
+    if presence_enabled:
+        ranking_order.append("human_presence_alignment")
+    ranking_order.extend([
+        "situational_specificity",
+        "lived_in_detail",
+        "character_fit",
+        "followability",
+        "recent_feed_contrast",
+        "higgsfield_curator_score",
+        "recipe_proof_priority",
+        "canonical_hook_score",
+    ])
     return {
         "schema_version": SCHEMA_VERSION,
         "influencer_id": "lena",
@@ -627,12 +780,7 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
             "prompt_pack": prompt_meta,
             "recipe_binding_semantics": "strategy compatibility, not prompt provenance",
             "recent_content_evidence_semantics": "exact recorded fields only; missing fields remain unknown",
-            "ranking_order": [
-                "no_failure_memory_caution", "lower_physical_interaction_risk", "premium_visual_discipline",
-                "situational_specificity", "lived_in_detail", "character_fit",
-                "followability", "recent_feed_contrast", "higgsfield_curator_score",
-                "recipe_proof_priority", "canonical_hook_score",
-            ],
+            "ranking_order": ranking_order,
             "tiebreak_label": "deterministic_noncreative_tiebreak",
         },
         "rejected_or_blocked_reasons": rejected,
@@ -679,6 +827,8 @@ def run_gate(
     output_root: Path = OUTPUT_ROOT,
     *,
     required_recipe_id: str = "",
+    presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
     verify_clean: bool = True,
     authority_loader: Callable[[], dict[str, Any]] | None = None,
     recent_loader: Callable[[], dict[str, Any]] | None = None,
@@ -689,8 +839,22 @@ def run_gate(
         verify_authority_inputs_clean()
     authorities = authority_loader() if authority_loader else load_authorities()
     recent = recent_loader() if recent_loader else load_recent_content()
+    if presence_plan is None and presence_contract is not None:
+        from pipeline.presence import human_presence_contract_v1 as presence_contract_module
+        from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
+
+        try:
+            presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
+                presence_contract,
+                medium="still_image",
+            )
+        except (
+            presence_plan_module.HumanPresencePromptPlanError,
+            presence_contract_module.HumanPresenceContractError,
+        ) as exc:
+            raise GateError(exc.code, exc.detail) from exc
     call_kwargs = {}
-    if required_recipe_id:
+    if required_recipe_id or presence_plan is not None:
         try:
             prompt_builder_signature = inspect.signature(prompt_builder)
         except (TypeError, ValueError):
@@ -700,8 +864,26 @@ def run_gate(
                 parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "required_recipe_id"
                 for name, parameter in prompt_builder_signature.parameters.items()
             )
-            if accepts_required_recipe:
+            if accepts_required_recipe and required_recipe_id:
                 call_kwargs["required_recipe_id"] = required_recipe_id
+            if presence_plan is not None:
+                accepts_presence_contract = any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "presence_contract"
+                    for name, parameter in prompt_builder_signature.parameters.items()
+                )
+                accepts_presence_plan = any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "presence_plan"
+                    for name, parameter in prompt_builder_signature.parameters.items()
+                )
+                if accepts_presence_plan:
+                    call_kwargs["presence_plan"] = presence_plan
+                elif accepts_presence_contract:
+                    call_kwargs["presence_contract"] = presence_contract
+                else:
+                    raise GateError(
+                        "unsupported_presence_profile",
+                        "the configured prompt builder does not accept a presence contract",
+                    )
     try:
         candidates, prompt_meta = prompt_builder(as_of_date, authority_commit[:8], **call_kwargs)
     except ControlledProofLaneError as exc:
@@ -711,6 +893,8 @@ def run_gate(
         candidates,
         recent,
         required_recipe_id=required_recipe_id,
+        presence_contract=presence_contract,
+        presence_plan=presence_plan,
     )
     if required_recipe_id and not saw_required_recipe:
         raise GateError(
@@ -726,9 +910,26 @@ def main() -> int:
     parser.add_argument("--date", required=True, help="Decision date (YYYY-MM-DD).")
     parser.add_argument("--out-dir", type=Path, default=OUTPUT_ROOT, help="Artifact root; defaults to the canonical strategy path.")
     parser.add_argument("--required-recipe-id", default="", help="Optional required recipe binding for canonical downstream handoff alignment.")
+    parser.add_argument(
+        "--presence-profile",
+        default="",
+        choices=("", DEFAULT_PRESENCE_PROFILE),
+        help="Optional opt-in presence ranking profile; lena-default enables the deterministic HPE bonus path.",
+    )
     args = parser.parse_args()
+    presence_contract = None
+    if args.presence_profile:
+        if args.presence_profile != DEFAULT_PRESENCE_PROFILE:
+            print(json.dumps({"candidate_status": "blocked", "reason": "unknown_presence_profile", "detail": args.presence_profile, "provider_authorized": False}, sort_keys=True))
+            return 2
+        presence_contract = build_lena_presence_contract()
     try:
-        path, decision, reused = run_gate(args.date, args.out_dir, required_recipe_id=args.required_recipe_id)
+        path, decision, reused = run_gate(
+            args.date,
+            args.out_dir,
+            required_recipe_id=args.required_recipe_id,
+            presence_contract=presence_contract,
+        )
     except GateError as exc:
         print(json.dumps({"candidate_status": "blocked", "reason": exc.code, "detail": exc.detail, "provider_authorized": False}, sort_keys=True))
         return 2

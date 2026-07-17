@@ -11,6 +11,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as gate
+from tools.strategy import lena_human_presence_profile_v1 as lena_profile
+from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan
 
 
 def scene(lane="city bench", pillar="everyday_lena", temperature="quiet", roles=None, **updates):
@@ -93,6 +95,30 @@ def image(lane="city bench", slot="gate-pack000-00-photo", **updates):
         },
     }
     value.update(updates)
+    return value
+
+
+def presence_image(plan: dict[str, object], lane="city bench", slot="gate-pack000-00-photo", **updates):
+    value = image(lane, slot, **updates)
+    value.update(
+        {
+            "human_presence": plan,
+            "reference_mode": " ".join(
+                plan["body_presentation"]["selector_terms"][:2] + plan["viewer_relationship"]["selector_terms"][:2]
+            ),
+            "environment_name": " ".join(plan["viewer_relationship"]["selector_terms"]),
+            "expression_gaze_id": " ".join(plan["gaze_arc"]["selector_terms"][:3]),
+            "expression_gaze_label": " ".join(plan["gaze_arc"]["selector_terms"]),
+            "expression_text": " ".join(plan["expression_arc"]["selector_terms"]),
+            "camera_text": " ".join(plan["viewer_relationship"]["selector_terms"] + plan["movement_dynamics"]["selector_terms"]),
+            "lighting_text": " ".join(plan["sensual_presence"]["selector_terms"]),
+            "pose_body_language_label": " ".join(plan["movement_dynamics"]["selector_terms"]),
+            "effective_wardrobe_silhouette_class": " ".join(plan["sensual_presence"]["selector_terms"]),
+            "wardrobe_silhouette_class": " ".join(plan["body_presentation"]["selector_terms"]),
+            "framing_text": " ".join(plan["body_presentation"]["selector_terms"]),
+            "caption_seed": " ".join(plan["temporal_beats"]["selector_terms"]),
+        }
+    )
     return value
 
 
@@ -693,3 +719,168 @@ def test_real_prompt_builder_creates_exactly_one_ten_image_pack_in_memory():
     assert len(metadata["prompt_identity_sha256"]) == 64
     assert len(candidates) <= 10
     assert all(item["image"]["slot_id"].endswith("-photo") for item in candidates)
+    assert "human_presence" not in metadata
+
+
+def test_build_prompt_candidates_threads_presence_contract_only_when_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[tuple[str, object, object]] = []
+    images = [
+        {"slot_id": f"slot-{index}", "image_prompt": f"prompt {index}"}
+        for index in range(10)
+    ]
+
+    def fake_build_library_report(
+        as_of_date: str,
+        prefix: str,
+        packs: int,
+        count_per_pack: int,
+        required_recipe_id: str = "",
+        presence_contract=None,
+        presence_plan=None,
+    ):
+        seen.append((required_recipe_id, presence_contract, presence_plan))
+        return {
+            "total_prompts": len(images),
+            "pack_reports": [{"images": images}],
+            "failure_memory_hard_excluded_patterns": [],
+            "failure_memory_soft_flagged_patterns": [],
+            "failure_memory_excluded_count": 0,
+            "human_presence": (
+                {"schema_version": "human_presence_prompt_plan_v1", "enabled": True}
+                if presence_contract is not None
+                else None
+            ),
+        }
+
+    def fake_curate_top_prompts(library, limit):
+        return {
+            "selected": [{"image": images[0], "slot_id": images[0]["slot_id"]}],
+            "excluded_count": 0,
+            "failure_memory_hard_excluded_patterns": [],
+            "failure_memory_soft_flagged_patterns": [],
+            "failure_memory_excluded_count": 0,
+        }
+
+    monkeypatch.setattr(gate, "build_library_report", fake_build_library_report)
+    monkeypatch.setattr(gate, "curate_top_prompts", fake_curate_top_prompts)
+
+    selected, prompt_meta = gate.build_prompt_candidates("2026-07-15", "abcdef12", required_recipe_id="hcr_012")
+    assert selected[0]["image"]["slot_id"] == "slot-0"
+    assert seen == [("hcr_012", None, None)]
+    assert "human_presence" not in prompt_meta
+
+    seen.clear()
+    contract = lena_profile.build_lena_presence_contract()
+    selected, prompt_meta = gate.build_prompt_candidates(
+        "2026-07-15",
+        "abcdef12",
+        required_recipe_id="hcr_012",
+        presence_contract=contract,
+    )
+    assert selected[0]["image"]["slot_id"] == "slot-0"
+    assert seen == [("hcr_012", contract, None)]
+    assert prompt_meta["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
+
+
+def test_run_gate_threads_presence_contract_into_prompt_builder(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    compiled = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    seen: dict[str, object] = {}
+    auth = authorities([scene("alpha")], [recipe("hcr_a")], [hook("hook_a")])
+    prompt_candidates = [curator(presence_image(compiled, lane="alpha", slot="slot-a"))]
+
+    def prompt_builder(as_of_date, head8, required_recipe_id="", presence_contract=None):
+        seen["presence_contract"] = presence_contract
+        return prompt_candidates, {"prompt_identity_sha256": "a" * 64}
+
+    monkeypatch.setattr(gate, "_git", lambda *args: "a" * 40)
+    monkeypatch.setattr(gate, "verify_authority_inputs_clean", lambda *args, **kwargs: None)
+    path, decision, reused = gate.run_gate(
+        "2026-07-15",
+        tmp_path,
+        presence_contract=contract,
+        verify_clean=False,
+        authority_loader=lambda: auth,
+        recent_loader=recent,
+        prompt_builder=prompt_builder,
+    )
+
+    assert seen["presence_contract"] == contract
+    assert reused is False
+    assert path.is_file()
+    assert decision["candidate_status"] == "selected"
+
+
+def test_presence_enabled_selection_can_change_the_winner_between_equally_valid_candidates() -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    compiled = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    auth = authorities(
+        [scene("alpha"), scene("beta")],
+        [recipe("hcr_a"), recipe("hcr_b")],
+        [hook("hook_a"), hook("hook_b")],
+    )
+    candidates = [
+        curator(image("alpha", "slot-a")),
+        curator(presence_image(compiled, lane="beta", slot="slot-b")),
+    ]
+
+    selected_default, _ = select(auth, candidates)
+    selected_presence, _, _ = gate.select_candidate(
+        auth,
+        candidates,
+        recent(),
+        presence_contract=contract,
+    )
+
+    assert selected_default["slot_id"] == "slot-a"
+    assert selected_presence["slot_id"] == "slot-b"
+    assert selected_presence["human_presence_ranking"]["total_bonus"] > 0
+
+
+def test_presence_bonus_is_inserted_after_premium_visual_discipline_without_baseline_padding() -> None:
+    selected, _ = select()
+    no_presence = copy.deepcopy(selected)
+    with_presence = copy.deepcopy(selected)
+    with_presence["ranking_evidence"]["human_presence_bonus"] = 2
+
+    base_key = gate._rank_key(no_presence)
+    presence_key = gate._rank_key(with_presence)
+
+    assert presence_key[:3] == base_key[:3]
+    assert presence_key[3] == -2
+    assert presence_key[4:] == base_key[3:]
+    assert len(presence_key) == len(base_key) + 1
+
+
+def test_presence_enabled_ranking_order_includes_alignment_only_when_present() -> None:
+    selected, rejected = select()
+    core_without = gate._decision_core("a" * 40, "2026-07-13", authorities(), selected, rejected, recent(), {})
+    core_with = gate._decision_core(
+        "a" * 40,
+        "2026-07-13",
+        authorities(),
+        selected,
+        rejected,
+        recent(),
+        {"human_presence": {"schema_version": "human_presence_prompt_plan_v1"}},
+    )
+
+    assert "human_presence_alignment" not in core_without["evidence"]["ranking_order"]
+    assert core_with["evidence"]["ranking_order"][:4] == [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+        "human_presence_alignment",
+    ]
+
+
+def test_presence_requested_with_malformed_metadata_fails_closed() -> None:
+    with pytest.raises(gate.GateError) as error:
+        gate.select_candidate(
+            authorities(),
+            [curator()],
+            recent(),
+            presence_contract={"schema_version": "bad"},
+        )
+
+    assert error.value.code == "unknown_schema_version"
