@@ -13,7 +13,7 @@ import tools.lena_higgsfield_generation_approval_v1 as canonical_approval
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval
 import tools.lena_record_higgsfield_retry_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
-from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT, PROMPT_SHA
+from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 from tools.lena_higgsfield_retry_generation_approval_v1 import (
     APPROVAL_TTL_MINUTES,
     HiggsfieldRetryGenerationApprovalError,
