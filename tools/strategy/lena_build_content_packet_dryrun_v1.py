@@ -108,6 +108,11 @@ FACE_PRIORITY_FRAMING = (
     "never full legs, and never the full dress hemline in frame. "
 )
 
+HPE_SUBJECT_PRESENCE_COMPACT = (
+    "Camera-aware, self-possessed, quietly sensual; gaze, expression, posture, object interaction, "
+    "viewer relationship, and framing read as a private getting-ready moment."
+)
+
 DRESS_CONTINUITY_PRIORITY = (
     "If the intended look is a dress, keep it as one continuous dress with no exposed midriff "
     "and never split it into a separate top and skirt. "
@@ -304,12 +309,19 @@ def check_packet_blocked_terms(prompt: str) -> list[str]:
     return [term for term in PACKET_BLOCKED_TERMS if term in prompt_lower]
 
 
+def build_hpe_subject_presence(recipe) -> str:
+    if not recipe.get("production_proof_mode", False):
+        return ""
+    return HPE_SUBJECT_PRESENCE_COMPACT
+
+
 def build_structured_prompt_sections(recipe):
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
     fashion = clean_fragment(recipe.get("fashion_accessories", ""))
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
     subject = clean_fragment(" ".join(subject_parts))
+    subject_presence = build_hpe_subject_presence(recipe)
     action = clean_fragment(recipe.get("subject_pose", ""))
     environment_note = recipe.get("scene_logic_contract", {}).get(
         "environment_realism_notes", ""
@@ -327,6 +339,7 @@ def build_structured_prompt_sections(recipe):
     technical = clean_fragment(" ".join(part for part in technical_parts if part))
     return [
         ("[Subject]", subject),
+        ("[Subject Presence]", subject_presence),
         ("[Action]", action),
         ("[Environment]", environment),
         ("[Cinematography]", cinematography),
@@ -646,6 +659,7 @@ def build_compact_kling_prompt(recipe, max_chars=2499):
                 if recipe.get("content_pillar") == "face_priority_getting_ready"
                 else ""
             ),
+            build_hpe_subject_presence(recipe),
             DRESS_CONTINUITY_PRIORITY if proof_mode else "",
             SKIN_REALISM_COMPACT,
             scene_prefix,

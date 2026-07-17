@@ -117,6 +117,17 @@ def test_rebuild_packet_from_authoritative_sources_reproduces_prompt_preview(mon
     assert rebuilt["compact_provider_prompt_sha256"] == packet["compact_provider_prompt_sha256"]
 
 
+def test_proof_mode_prompt_includes_hpe_presence_profile() -> None:
+    recipe = _recipe()
+    recipe["production_proof_mode"] = True
+    hook = _hook()
+
+    packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
+
+    assert "[Subject Presence]:" in packet["compact_provider_prompt_preview"]
+    assert "Camera-aware, self-possessed, quietly sensual;" in packet["compact_provider_prompt_preview"]
+
+
 def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() -> None:
     recipe_bank = json.loads(Path(packet_builder.RECIPE_BANK).read_text(encoding="utf-8-sig"))
     recipe = next(item for item in recipe_bank["recipes"] if item["id"] == "hcr_011")
