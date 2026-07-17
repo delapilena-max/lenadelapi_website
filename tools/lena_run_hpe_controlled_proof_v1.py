@@ -622,6 +622,7 @@ def _proof_lane_run(
         "schema_version": PROOF_SCHEMA_VERSION,
         "generated_at_utc": _utcnow_iso(),
         "branch": _git_branch(),
+        "authority_commit": _git_commit_sha(),
         "lane_type": lane_type,
         "date": date_str,
         "slot_id": slot_id,
@@ -703,6 +704,17 @@ def _proof_lane_run(
         "manifest_sha256": manifest_sha,
         "candidate_gate_report": gate_report,
         "qa_artifact": qa_artifact,
+        "provider_call_performed": False,
+        "provider_authorized": False,
+        "side_effects_performed": [],
+        "controlled_proof_result": {
+            "lane_type": lane_type,
+            "authority_commit": _git_commit_sha(),
+            "provider_call_performed": False,
+            "provider_authorized": False,
+            "side_effects_performed": [],
+            "ordinary_lane_readiness": "not_applicable",
+        },
     }
     return proof_report
 
@@ -782,15 +794,16 @@ def build_closure_report_from_proof(
     base_commit_sha: str,
 ) -> dict[str, Any]:
     proof_report = dict(proof_report)
-    controlled = "verified" if proof_report["lane_type"] == "controlled_proof" else "not_applicable"
-    ordinary = "verified" if proof_report["lane_type"] == "ordinary_lane" else "not_applicable"
     blocking_findings: list[dict[str, Any]] = []
     if proof_report.get("qa_artifact", {}).get("recommendation") == "integrity_failure":
         blocking_findings.append({"code": "integrity_failure", "detail": "QA artifact recommended integrity failure"})
-    if proof_report.get("qa_artifact", {}).get("semantic_status") == "error" and proof_report.get("semantic_qa_configuration", {}).get("live_presence_semantic_review"):
-        blocking_findings.append({"code": "semantic_error", "detail": "live semantic proof produced an error"})
+    if proof_report.get("qa_artifact", {}).get("semantic_status") == "error":
+        blocking_findings.append({"code": "semantic_error", "detail": "semantic proof produced an error"})
+    mandatory_condition_results = {condition_id: "not_verified" for condition_id in closure_schema.MANDATORY_CONDITION_IDS}
     report = closure_schema.build_closure_verification_report(
         current_commit_sha=_git_commit_sha(),
+        authority_commit_expected=str(proof_report.get("authority_commit") or _git_commit_sha()),
+        authority_commit_final=_git_commit_sha(),
         base_commit_sha=base_commit_sha,
         execution_timestamp_utc=_utcnow_iso(),
         branch=_git_branch(),
@@ -807,9 +820,8 @@ def build_closure_report_from_proof(
         semantic_qa_evidence=proof_report["semantic_qa_evidence"],
         lifecycle_report_evidence=proof_report["lifecycle_report_evidence"],
         authority_boundary_evidence=proof_report["authority_boundary_evidence"],
-        controlled_proof_readiness=controlled,
-        ordinary_lane_readiness=ordinary,
         required_artifact_paths=proof_report["required_artifact_paths"],
+        mandatory_condition_results=mandatory_condition_results,
         blocking_findings=blocking_findings,
     )
     return report
@@ -851,6 +863,11 @@ def main(argv: list[str] | None = None) -> int:
                     "semantic_provider_unsupported",
                     f"only the approved semantic provider {SEMANTIC_PROVIDER_NAME!r} is supported",
                 )
+            if args.semantic_model != SEMANTIC_MODEL_NAME:
+                raise HPEControlledProofError(
+                    "semantic_model_unsupported",
+                    f"only the approved semantic model {SEMANTIC_MODEL_NAME!r} is supported",
+                )
             semantic_provider = evaluate_hpe_semantic_still_image_presence
         proof_report = run_hpe_controlled_proof(
             date_str=args.date,
@@ -867,23 +884,17 @@ def main(argv: list[str] | None = None) -> int:
             semantic_timeout_seconds=args.semantic_timeout_seconds,
             dry_run=args.dry_run,
         )
-        base_commit_sha = _git_commit_sha()
-        closure_report = build_closure_report_from_proof(proof_report, base_commit_sha=base_commit_sha)
-        closure_path = args.output_root / args.date / args.slot_id / f"lena_hpe_closure_verification_{args.slot_id}_{args.image_index:02d}.json"
-        _write_json_atomic(closure_path, closure_report)
     except (HPEControlledProofError, closure_schema.HumanPresenceEngineClosureError) as exc:
         print(json.dumps({"ok": False, "code": exc.code, "detail": exc.detail}, indent=2))
         return 1
 
     payload = {
-        "ok": closure_report["closure_status"] == "verified",
+        "ok": True,
         "proof_report": proof_report,
-        "closure_report": closure_report,
         "proof_report_path": proof_report["proof_report_path"],
-        "closure_report_path": _repo_relative_path(closure_path),
     }
     print(json.dumps(payload, indent=2))
-    return 0 if closure_report["closure_status"] == "verified" else 1
+    return 0
 
 
 if __name__ == "__main__":

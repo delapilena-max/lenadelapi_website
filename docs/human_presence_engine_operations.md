@@ -6,11 +6,11 @@ The Human Presence Engine is a deterministic, evidence-only lane:
 
 - candidate ranking scores prompt-plan alignment;
 - selected-candidate validation binds the chosen candidate to its deterministic dry-run path;
-- prompt-plan compilation turns the contract into the active prompt text;
+- prompt-plan compilation turns the contract into the active prompt text without pushing failure indicators into provider-facing copy;
 - prompt assembly embeds the compiled human-presence plan into the provider-facing prompt package;
 - output QA validates integrity bindings and semantic observations;
 - lifecycle summaries record what happened without authorizing publish, retry, or reconciliation;
-- closure verification gathers the runtime evidence into a canonical report.
+- closure verification independently inspects the proof artifact and gathers the runtime evidence into a canonical report.
 
 The HPE semantic layer is evidence-only. It must not change photo QA authority, approval, rejection, retry, publishing, or reconciliation.
 
@@ -90,4 +90,3 @@ HPE closure is only satisfied when:
 - live semantic proof is supported and bounded;
 - authority boundaries remain unchanged across semantic outcomes;
 - closure verification reports no blocking findings.
-

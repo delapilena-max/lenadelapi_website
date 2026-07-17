@@ -17,7 +17,7 @@
 - [ ] environment interaction
 - [ ] viewer relationship
 - [ ] sensual presence
-- [ ] failure avoidance
+- [ ] failure indicators remain QA-only
 
 ## Controlled Proof
 
@@ -53,7 +53,7 @@
 ## Artifacts
 
 - [ ] proof report
-- [ ] closure report
+- [ ] closure verification report
 - [ ] QA artifact
 - [ ] lifecycle evidence
 
@@ -69,4 +69,3 @@
 - [ ] review complete
 - [ ] no paid call in PR
 - [ ] merged after approval
-

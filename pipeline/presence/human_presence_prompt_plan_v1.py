@@ -341,24 +341,16 @@ def _prompt_text_from_plan(plan: dict[str, Any], medium: str) -> str:
     sensual = plan["sensual_presence"]["directive"]
     body = plan["body_presentation"]["directive"]
     temporal = plan["temporal_beats"]["directive"]
-    failure_indicators = ", ".join(
-        str(item).replace("_", " ") for item in plan.get("failure_indicators", []) if str(item).strip()
-    )
-    failure_avoidance = (
-        f"presence-failure avoidance: avoid {failure_indicators}"
-        if failure_indicators
-        else "presence-failure avoidance: avoid dead or unfocused eyes, frozen expression, mannequin pose, face-body emotion mismatch, and sexual styling without personality"
-    )
     if medium == "still_image":
         return (
             "Presence direction: "
             f"{viewer}. {gaze}. {expression}. {actions}. {movement}. "
-            f"{speech}. {sensual}. {body}. {temporal}. {failure_avoidance}."
+            f"{speech}. {sensual}. {body}. {temporal}."
         )
     return (
         "Presence direction: "
         f"{viewer}. {gaze}. {expression}. {actions}. {movement}. "
-        f"{speech}. {sensual}. {body}. {temporal}. {failure_avoidance}."
+        f"{speech}. {sensual}. {body}. {temporal}."
     )
 
 
