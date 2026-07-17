@@ -31,6 +31,12 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2), encoding="utf-8")
 
 
+def _write_png(path: Path) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1, 1), "white").save(path)
+    return _sha(path)
+
+
 def _all_pass() -> dict:
     return {
         "schema_version": disposition.VISUAL_SCHEMA_VERSION,
@@ -785,8 +791,7 @@ def test_single_provider_exception_becomes_hard_stop_without_retry(harness) -> N
 
 def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     client_options = []
     provider_calls = []
     observations = _all_pass()
@@ -804,7 +809,7 @@ def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -820,8 +825,7 @@ def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch
 
 def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     observations = {"observations": _all_pass()["observations"]}
 
     class FakeMessages:
@@ -832,7 +836,7 @@ def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path,
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -843,8 +847,7 @@ def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path,
 
 def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redacted_diagnostics(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     payload = {"schema_version": "wrong_schema", "observations": _all_pass()["observations"]}
 
     class FakeMessages:
@@ -855,7 +858,7 @@ def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redact
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -868,8 +871,7 @@ def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redact
 
 def test_anthropic_adapter_non_dict_payload_reports_only_redacted_diagnostics(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
 
     class FakeMessages:
         def create(self, **kwargs):
@@ -879,7 +881,7 @@ def test_anthropic_adapter_non_dict_payload_reports_only_redacted_diagnostics(tm
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -915,8 +917,7 @@ def test_malformed_duplicate_identity_observation_fails_closed() -> None:
 
 def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     client_options = []
     provider_calls = []
 
@@ -931,11 +932,11 @@ def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monk
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
-    with pytest.raises(disposition.BoundaryError, match="exactly one structured observation block"):
+    with pytest.raises(disposition.BoundaryError, match="exactly one structured tool block"):
         disposition.call_anthropic_visual_review(request)
     assert client_options == [{"max_retries": 0}]
     assert len(provider_calls) == 1

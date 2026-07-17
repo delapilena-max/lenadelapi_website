@@ -124,10 +124,10 @@ def _build_artifact(
     source_artifacts: dict[str, str | None] | None = None,
     generated_at_utc: str = "2026-07-16T00:00:00Z",
 ) -> dict[str, Any]:
-    return qa_module.build_presence_output_qa_artifact(
+    return qa_module.build_presence_output_qa_artifact_v1(
         integrity_result=integrity_result,
         source_artifacts=source_artifacts or _artifact_source_artifacts(Path(".")),
-        evaluator_version="hpe_2c_pr1_integrity_v1",
+        evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
         generated_at_utc=generated_at_utc,
     )
 
@@ -369,8 +369,40 @@ class TestValidation:
         artifact = self._good_artifact()
         artifact["semantic_status"] = "evaluated"
         with pytest.raises(qa_module.HumanPresenceOutputQAError) as exc_info:
-            qa_module.validate_presence_output_qa_artifact(artifact)
+            qa_module.validate_presence_output_qa_artifact_v1(artifact)
         assert exc_info.value.code == "presence_output_malformed_artifact"
+
+    def test_v2_artifact_requires_semantic_fields(self) -> None:
+        plan = _compiled_plan()
+        plan_fp = ranking.plan_fingerprint_sha256(plan)
+        candidate_decision = _make_candidate_decision()
+        manifest = _make_manifest()
+        integrity = _valid_integrity_result(
+            plan=plan,
+            candidate_decision=candidate_decision,
+            manifest=manifest,
+            image_sha="a" * 64,
+            expected_plan_fp=plan_fp,
+            expected_cd_sha=_canonical_sha256(candidate_decision),
+            expected_mf_sha=_canonical_sha256(manifest),
+            expected_img_sha="a" * 64,
+        )
+        artifact = qa_module.build_presence_output_qa_artifact_v2(
+            integrity_result=integrity,
+            semantic_result={
+                "semantic_status": "not_evaluated",
+                "semantic_findings": [],
+                "semantic_result_provenance": None,
+                "semantic_error": None,
+            },
+            source_artifacts=_artifact_source_artifacts(Path(".")),
+            evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+            generated_at_utc="2026-07-16T00:00:00Z",
+        )
+        assert artifact["schema_version"] == qa_module.SCHEMA_VERSION_V2
+        assert artifact["semantic_result_provenance"] is None
+        assert artifact["semantic_error"] is None
+        assert qa_module.validate_presence_output_qa_artifact_v2(artifact) is artifact
 
     def test_malformed_binding_record_is_rejected(self) -> None:
         artifact = self._good_artifact()
@@ -418,9 +450,9 @@ class TestAtomicWrite:
         path = tmp_path / "sub" / "test.json"
         artifact = {
             "report_type": "human_presence_output_qa",
-            "schema_version": "human_presence_output_qa_v1",
+            "schema_version": qa_module.SCHEMA_VERSION_V1,
             "medium": "still_image",
-            "evaluator_version": "hpe_2c_pr1_integrity_v1",
+            "evaluator_version": "hpe_2c_pr3_integrity_semantic_v1",
             "generated_at_utc": "2026-07-16T00:00:00Z",
             "integrity_status": "valid",
             "integrity_findings": [],
@@ -472,10 +504,17 @@ class TestAtomicWrite:
             },
             "recommendation": "integrity_pass",
         }
-        disposition.write_presence_output_qa_artifact_atomic(path, artifact)
+        written_path, written_artifact, created = disposition.write_presence_output_qa_artifact_atomic(path, artifact)
+        assert written_path == path
+        assert written_artifact == artifact
+        assert created is True
         assert path.exists()
         reloaded = json.loads(path.read_bytes())
         assert reloaded == artifact
+        repeated_path, repeated_artifact, repeated_created = disposition.write_presence_output_qa_artifact_atomic(path, artifact)
+        assert repeated_path == path
+        assert repeated_artifact == artifact
+        assert repeated_created is False
 
     def test_atomic_write_leaves_no_tmp_file(self, tmp_path: Path) -> None:
         path = tmp_path / "artifact.json"
