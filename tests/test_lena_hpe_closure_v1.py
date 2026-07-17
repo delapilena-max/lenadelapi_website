@@ -20,6 +20,7 @@ from pipeline.presence import human_presence_output_qa_v1 as presence_qa
 from pipeline.presence import human_presence_prompt_plan_v1 as plan_module
 from tools import lena_hpe_closure_verification_v1 as closure_verifier
 from tools import lena_run_hpe_controlled_proof_v1 as proof_mod
+from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
 from tools.strategy import lena_human_presence_profile_v1 as lena_profile
 
 
@@ -186,6 +187,123 @@ def test_verifier_recomputes_hashes_and_writes_not_verified_closure_report(tmp_p
     closure_path = tmp_path / "proof" / DATE / SLOT_ID / f"lena_hpe_closure_verification_{SLOT_ID}_00.json"
     assert closure_path.is_file()
     assert json.loads(closure_path.read_text(encoding="utf-8")) == report
+
+
+def test_verifier_main_passes_with_required_expected_commit_and_clean_authority(tmp_path: Path) -> None:
+    image_path = tmp_path / "image.png"
+    manifest_path = tmp_path / "manifest.json"
+    _tiny_png(image_path)
+    _write_manifest(manifest_path, image_path.name)
+
+    proof = proof_mod.run_hpe_controlled_proof(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        candidate_input=None,
+        manifest=manifest_path,
+        image=image_path,
+        output_root=tmp_path / "proof",
+        controlled_proof=True,
+        live_presence_semantic_review=False,
+        dry_run=True,
+    )
+
+    result = closure_verifier.main(
+        [
+            "--output-root",
+            str(tmp_path / "proof"),
+            "--authority-commit-expected",
+            proof["authority_commit"],
+            "--dry-run",
+        ]
+    )
+
+    assert result == 1
+
+
+def test_verifier_main_requires_expected_commit(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        closure_verifier.main(["--output-root", str(tmp_path / "proof"), "--dry-run"])
+
+    assert excinfo.value.code == 2
+
+
+def test_verifier_main_rejects_dirty_authority(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    image_path = tmp_path / "image.png"
+    manifest_path = tmp_path / "manifest.json"
+    _tiny_png(image_path)
+    _write_manifest(manifest_path, image_path.name)
+
+    proof = proof_mod.run_hpe_controlled_proof(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        candidate_input=None,
+        manifest=manifest_path,
+        image=image_path,
+        output_root=tmp_path / "proof",
+        controlled_proof=True,
+        live_presence_semantic_review=False,
+        dry_run=True,
+    )
+
+    monkeypatch.setattr(selector, "verify_authority_inputs_clean", lambda *args, **kwargs: (_ for _ in ()).throw(selector.GateError("authority_conflict", "canonical authority is modified")))
+
+    result = closure_verifier.main(
+        [
+            "--output-root",
+            str(tmp_path / "proof"),
+            "--authority-commit-expected",
+            proof["authority_commit"],
+            "--dry-run",
+        ]
+    )
+
+    assert result == 1
+
+
+def test_verifier_main_rejects_head_movement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    image_path = tmp_path / "image.png"
+    manifest_path = tmp_path / "manifest.json"
+    _tiny_png(image_path)
+    _write_manifest(manifest_path, image_path.name)
+
+    proof = proof_mod.run_hpe_controlled_proof(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        candidate_input=None,
+        manifest=manifest_path,
+        image=image_path,
+        output_root=tmp_path / "proof",
+        controlled_proof=True,
+        live_presence_semantic_review=False,
+        dry_run=True,
+    )
+
+    monkeypatch.setattr(closure_verifier, "_resolve_base_commit_sha", lambda: "b" * 40)
+    original_git_rev_parse = closure_verifier._git_rev_parse
+    call_count = {"count": 0}
+
+    def fake_git_rev_parse(ref: str) -> str:
+        if ref == "HEAD":
+            call_count["count"] += 1
+            return proof["authority_commit"] if call_count["count"] < 3 else "f" * 40
+        return original_git_rev_parse(ref)
+
+    monkeypatch.setattr(closure_verifier, "_git_rev_parse", fake_git_rev_parse)
+
+    result = closure_verifier.main(
+        [
+            "--output-root",
+            str(tmp_path / "proof"),
+            "--authority-commit-expected",
+            proof["authority_commit"],
+            "--dry-run",
+        ]
+    )
+
+    assert result == 1
 
 
 def test_verifier_falls_back_when_origin_main_is_unavailable(

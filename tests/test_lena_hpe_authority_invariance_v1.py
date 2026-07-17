@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -29,9 +30,11 @@ def _write_json(path: Path, payload: dict[str, object]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
     path.write_text(data, encoding="utf-8")
-    import hashlib
-
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _base_payloads(tmp_path: Path) -> dict[str, Path]:
@@ -59,7 +62,32 @@ def _base_payloads(tmp_path: Path) -> dict[str, Path]:
 def _install_approval_monkeypatch(monkeypatch: pytest.MonkeyPatch, paths: dict[str, Path]) -> None:
     monkeypatch.setattr(lifecycle.autonomy_ladder, "assert_allowed", lambda *args, **kwargs: None)
     monkeypatch.setattr(lifecycle, "_load_accounting_report", lambda *_args, **_kwargs: _accounting_report(paths))
-    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *_args, **_kwargs: {"approval": {"report_type": approval.APPROVAL_REPORT_TYPE, "schema_version": approval.APPROVAL_SCHEMA_VERSION}})
+
+    def validate_generation_approval_artifact(approval_path: Path, require_not_expired: bool = False, **_kwargs: object) -> dict[str, object]:
+        artifact = _read_json(Path(approval_path))
+        return {
+            "approval": artifact,
+            "approval_path": Path(approval_path).resolve(),
+            "approval_repo_path": Path(approval_path).resolve().as_posix(),
+            "approval_sha256": approval.sha256_file(Path(approval_path)),
+            "handoff_facts": {
+                "reconciliation": artifact["reconciliation"],
+                "final_candidate": artifact["reconciled_candidate"],
+                "decision": artifact["reconciliation_decision"],
+            },
+            "approved_at_utc": artifact["approved_at_utc"],
+            "expires_at_utc": artifact["expires_at_utc"],
+            "is_expired": False,
+            "scope_summary": {
+                "authorized_attempts": artifact["authorized_attempts"],
+                "upload_authorized": artifact["upload_authorized"],
+                "queue_promotion_authorized": artifact["queue_promotion_authorized"],
+                "publish_authorized": artifact["publish_authorized"],
+                "analytics_mutation_authorized": artifact["analytics_mutation_authorized"],
+            },
+        }
+
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", validate_generation_approval_artifact)
 
     def build_claim(_: dict[str, object]) -> dict[str, object]:
         return {
@@ -165,13 +193,15 @@ def test_lifecycle_control_outcomes_remain_identical_across_injected_hpe_statuse
 ) -> None:
     plan = _compiled_plan()
     paths = _base_payloads(tmp_path)
+    decision = _decision_report(plan)
     _install_approval_monkeypatch(monkeypatch, paths)
     _write_json(paths["account"], _accounting_report(paths))
-    _write_json(paths["decision"], _decision_report(plan))
+    _write_json(paths["decision"], decision)
     _write_json(paths["approval"], {"report_type": approval.APPROVAL_REPORT_TYPE, "schema_version": approval.APPROVAL_SCHEMA_VERSION, "approval_type": approval.APPROVAL_TYPE, "operator_id": approval.CANONICAL_OPERATOR_ID, "approved_at_utc": "2026-07-17T00:00:00Z", "expires_at_utc": "2026-07-17T00:30:00Z", "handoff_artifact_path": "x", "handoff_artifact_sha256": "a" * 64, "handoff_report_type": approval.HANDOFF_REPORT_TYPE, "handoff_schema_version": approval.HANDOFF_SCHEMA_VERSION, "date": "2026-07-17", "slot_id": "slot", "prompt_sha256": "a" * 64, "provider": approval.APPROVAL_PROVIDER, "executor": approval.APPROVAL_EXECUTOR, "model": approval.MODEL, "aspect_ratio": approval.ASPECT_RATIO, "soul_name": approval.SOUL_NAME, "soul_type": approval.SOUL_TYPE, "custom_reference_id": "ref", "confirmation_statement": approval.confirmation_phrase("slot"), "reconciliation": {}, "reconciled_candidate": {}, "reconciliation_decision": {}, "credits_may_be_spent_acknowledged": True, "authorized_attempts": 1, "upload_authorized": False, "queue_promotion_authorized": False, "publish_authorized": False, "analytics_mutation_authorized": False, "immutability": "immutable_once_written", "authorization_identity_mode": "procedural_local_authorization_record_only"})
     _write_json(paths["manifest"], {"provider": "higgsfield", "date": "2026-07-17", "slot_id": "slot", "provider_status": "completed", "saved_image_path": str(paths["image"].resolve()), "generation_claim_artifact_path": paths["claim"].resolve().as_posix(), "generation_execution_receipt_path": paths["receipt"].resolve().as_posix(), "provider_job_id": "job", "image_format_detected": "png"})
     _write_json(paths["claim"], {"report_type": approval.CLAIM_REPORT_TYPE, "schema_version": approval.CLAIM_SCHEMA_VERSION, "claim_type": approval.CLAIM_TYPE, "date": "2026-07-17", "slot_id": "slot", "approved_at_utc": "2026-07-17T00:00:00Z", "claim_written_at_utc": "2026-07-17T00:00:00Z"})
     _write_json(paths["receipt"], {"report_type": approval.RECEIPT_REPORT_TYPE, "schema_version": approval.RECEIPT_SCHEMA_VERSION, "receipt_type": approval.RECEIPT_TYPE, "date": "2026-07-17", "slot_id": "slot", "approved_at_utc": "2026-07-17T00:00:00Z", "receipt_written_at_utc": "2026-07-17T00:00:00Z", "provider_job_id": "job", "provider_status": "completed", "output_path": str(paths["image"].resolve()), "image_format_detected": "png", "actual_manifest_path": paths["manifest"].resolve().as_posix()})
+    approval_result = approval.validate_generation_approval_artifact(paths["approval"], require_not_expired=False)
 
     baseline: dict[str, object] | None = None
     for status in STATUSES:
@@ -191,6 +221,9 @@ def test_lifecycle_control_outcomes_remain_identical_across_injected_hpe_statuse
         )
         assert report["human_presence_output_qa_state"]["semantic_status"] == status
         assert report["human_presence_output_qa_state"]["authority"] == "evidence_only"
+        assert report["side_effect_flags"]["approval_consumed"] is False
+        assert report["side_effect_flags"]["claims_written"] is False
+        assert report["side_effect_flags"]["receipts_written"] is False
         assert report["qa_status"] == "accept"
         assert report["retry_recommended"] is False
         assert report["publish_authorized"] is False
@@ -199,14 +232,23 @@ def test_lifecycle_control_outcomes_remain_identical_across_injected_hpe_statuse
         assert report["next_allowed_action"] == "await_publish_authorization"
         assert report["human_presence_output_qa_state"]["semantic_status"] == status
         projection = {
-            "qa_status": report["qa_status"],
-            "retry_recommended": report["retry_recommended"],
-            "publish_authorized": report["publish_authorized"],
-            "publish_performed": report["publish_performed"],
-            "queue_mutated": report["queue_mutated"],
-            "next_allowed_action": report["next_allowed_action"],
-            "retry_decision_artifact": report["retry_decision_artifact"],
-            "retry_handoff_artifact": report["retry_handoff_artifact"],
+            "photo_qa_status": report["qa_status"],
+            "approval_state": approval_result["approval"]["authorization_identity_mode"],
+            "explicit_rejection_state": report["human_presence_output_qa_state"]["status"],
+            "retry_recommendation": report["retry_recommended"],
+            "retry_artifacts": (report["retry_decision_artifact"], report["retry_handoff_artifact"]),
+            "publish_authorization": report["publish_authorized"],
+            "reconciliation_result": (
+                approval_result["approval"]["reconciliation"],
+                approval_result["approval"]["reconciled_candidate"],
+                approval_result["approval"]["reconciliation_decision"],
+            ),
+            "failure_memory_writes": (
+                report["side_effect_flags"]["claims_written"],
+                report["side_effect_flags"]["receipts_written"],
+                report["side_effect_flags"]["approval_consumed"],
+            ),
+            "post_generation_candidate_selection": decision["candidate"]["candidate_id"],
         }
         if baseline is None:
             baseline = projection

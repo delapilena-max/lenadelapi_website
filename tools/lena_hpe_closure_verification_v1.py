@@ -320,14 +320,17 @@ def verify_closure_report(
     *,
     output_root: Path,
     authority_commit_expected: str,
-    require_clean_authority: bool,
+    require_clean_authority: bool = True,
     dry_run: bool,
 ) -> dict[str, Any]:
     start_head = _git_rev_parse("HEAD")
     if start_head != authority_commit_expected:
         raise HPEClosureVerificationError("authority_commit_mismatch", "expected authority commit does not match the current HEAD")
     if require_clean_authority:
-        selector.verify_authority_inputs_clean()
+        try:
+            selector.verify_authority_inputs_clean()
+        except selector.GateError as exc:
+            raise HPEClosureVerificationError(exc.code, exc.detail) from exc
 
     proof_report_path = _locate_proof_report(output_root)
     proof_report = _load_json_object(proof_report_path)
@@ -359,7 +362,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate a deterministic HPE closure proof report.")
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--authority-commit-expected", required=True)
-    parser.add_argument("--require-clean-authority", action="store_true")
+    parser.add_argument("--require-clean-authority", action="store_true", default=True)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
