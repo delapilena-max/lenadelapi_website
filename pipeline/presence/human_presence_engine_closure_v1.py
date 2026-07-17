@@ -2,61 +2,43 @@ from __future__ import annotations
 
 import hashlib
 import json
-from copy import deepcopy
 from typing import Any
 
 
-SCHEMA_VERSION = "human_presence_engine_closure_v1"
-STATUS_VALUES = ("verified", "not_verified", "blocked", "not_applicable")
-CATEGORY_VALUES = (
-    "ranking",
-    "selection",
-    "gate_binding",
-    "prompt_compilation",
-    "prompt_consumption",
-    "prompt_influence",
-    "qa",
-    "configuration",
-    "lifecycle",
-    "authority",
-    "reconciliation",
-    "integrity",
-    "commit",
+REPORT_TYPE = "human_presence_engine_closure_verification"
+SCHEMA_VERSION = "human_presence_engine_closure_verification_v1"
+STATUS_VALUES = ("verified", "not_verified", "not_applicable", "blocked")
+LANE_VALUES = ("controlled_proof", "ordinary_lane")
+REQUIRED_KEYS = frozenset(
+    {
+        "report_type",
+        "schema_version",
+        "current_commit_sha",
+        "base_commit_sha",
+        "execution_timestamp_utc",
+        "branch",
+        "lane_type",
+        "selected_slot_id",
+        "selected_candidate_id",
+        "hpe_plan_fingerprint_sha256",
+        "candidate_ranking_evidence",
+        "selected_candidate_evidence",
+        "prompt_plan_evidence",
+        "final_prompt_influence_evidence",
+        "integrity_qa_evidence",
+        "semantic_qa_configuration",
+        "semantic_qa_evidence",
+        "lifecycle_report_evidence",
+        "authority_boundary_evidence",
+        "controlled_proof_readiness",
+        "ordinary_lane_readiness",
+        "required_artifact_paths",
+        "closure_status",
+        "blocking_findings",
+    }
 )
-ITEM_IDS = (
-    "candidate_ranking_consumption",
-    "selected_candidate_propagation",
-    "candidate_plan_gate_binding",
-    "prompt_plan_compilation",
-    "active_prompt_builder_consumption",
-    "pose_prompt_influence",
-    "gaze_prompt_influence",
-    "expression_prompt_influence",
-    "body_language_prompt_influence",
-    "object_interaction_prompt_influence",
-    "environment_interaction_classification",
-    "viewer_relationship_prompt_influence",
-    "sensual_presence_prompt_influence",
-    "failure_indicator_qa_influence",
-    "output_integrity_qa",
-    "semantic_configuration",
-    "lifecycle_reporting",
-    "authority_invariance",
-    "reconciliation_invariance",
-    "artifact_integrity",
-    "commit_binding",
-)
-DEFAULT_MANDATORY_CONDITIONS = (
-    "connected-path runtime evidence verified",
-    "prompt-influence matrix verified for supported dimensions",
-    "failure indicators classified as QA-only",
-    "authority-invariance verified",
-    "controlled proof remains outstanding",
-    "live semantic proof remains outstanding",
-    "ordinary proof remains outstanding",
-    "human evidence review remains outstanding",
-    "final CI confirmation remains outstanding",
-)
+_SHA256_RE = frozenset("0123456789abcdef")
+_COMMIT_SHA_RE = frozenset("0123456789abcdef")
 
 
 class HumanPresenceEngineClosureError(RuntimeError):
@@ -72,158 +54,166 @@ def _require(condition: bool, code: str, detail: str) -> None:
 
 
 def _canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("utf-8")
+    return (
+        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n"
+    ).encode("utf-8")
 
 
-def closure_fingerprint_sha256(report: dict[str, Any]) -> str:
-    payload = deepcopy(report)
-    payload.pop("closure_fingerprint_sha256", None)
-    payload.pop("provenance", None)
-    return hashlib.sha256(_canonical_bytes(payload)).hexdigest()
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(char in _SHA256_RE for char in value)
 
 
-def _validate_nonempty_str(value: Any, *, label: str) -> str:
-    _require(isinstance(value, str) and value.strip(), "closure_malformed_artifact", f"{label} must be a non-empty string")
-    return str(value)
+def _is_commit_sha(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 40 and all(char in _COMMIT_SHA_RE for char in value)
 
 
-def _validate_status(value: Any) -> str:
-    _require(value in STATUS_VALUES, "closure_malformed_artifact", f"status {value!r} is not supported")
-    return str(value)
+def _normalize_status(value: Any, *, label: str) -> str:
+    _require(isinstance(value, str), "closure_status_invalid", f"{label} must be a string")
+    normalized = value.strip()
+    _require(normalized in STATUS_VALUES, "closure_status_invalid", f"{label} must be one of {STATUS_VALUES!r}")
+    return normalized
 
 
-def _validate_category(value: Any) -> str:
-    _require(value in CATEGORY_VALUES, "closure_malformed_artifact", f"category {value!r} is not supported")
-    return str(value)
+def _normalize_lane_type(value: Any) -> str:
+    _require(isinstance(value, str), "closure_lane_invalid", "lane_type must be a string")
+    normalized = value.strip()
+    _require(normalized in LANE_VALUES, "closure_lane_invalid", f"lane_type must be one of {LANE_VALUES!r}")
+    return normalized
 
 
-def _validate_item_id(value: Any) -> str:
-    _require(value in ITEM_IDS, "closure_malformed_artifact", f"item_id {value!r} is not supported")
-    return str(value)
+def _normalize_findings(findings: Any) -> list[dict[str, Any]]:
+    _require(isinstance(findings, list), "closure_findings_invalid", "blocking_findings must be a list")
+    normalized: list[dict[str, Any]] = []
+    for index, finding in enumerate(findings):
+        _require(isinstance(finding, dict), "closure_findings_invalid", "blocking_findings entries must be objects")
+        code = str(finding.get("code") or "").strip()
+        detail = str(finding.get("detail") or "").strip()
+        _require(bool(code) and bool(detail), "closure_findings_invalid", "blocking_findings entries need code and detail")
+        normalized.append({"code": code, "detail": detail})
+    return normalized
 
 
-def validate_closure_item(item: Any) -> dict[str, Any]:
-    _require(isinstance(item, dict), "closure_malformed_artifact", "item must be a JSON object")
-    missing = {"item_id", "status", "category", "evidence_ref", "producer", "consumer", "detail", "advisory_only"} - set(item)
-    _require(not missing, "closure_malformed_artifact", f"item is missing required keys: {sorted(missing)}")
-    extra = set(item) - {"item_id", "status", "category", "evidence_ref", "producer", "consumer", "detail", "advisory_only"}
-    _require(not extra, "closure_malformed_artifact", f"item contains unsupported keys: {sorted(extra)}")
-    item_id = _validate_item_id(item["item_id"])
-    status = _validate_status(item["status"])
-    category = _validate_category(item["category"])
-    evidence_ref = _validate_nonempty_str(item["evidence_ref"], label=f"{item_id} evidence_ref")
-    producer = _validate_nonempty_str(item["producer"], label=f"{item_id} producer")
-    consumer = _validate_nonempty_str(item["consumer"], label=f"{item_id} consumer")
-    _require(isinstance(item["advisory_only"], bool), "closure_malformed_artifact", f"{item_id} advisory_only must be boolean")
-    _require(item["detail"] is not None, "closure_malformed_artifact", f"{item_id} detail must not be null")
-    if status == "not_applicable":
-        _require(item["advisory_only"] is True, "closure_malformed_artifact", f"{item_id} not_applicable items must be advisory-only")
+def _normalized_report(report: dict[str, Any]) -> dict[str, Any]:
+    _require(isinstance(report, dict), "closure_report_invalid", "closure report must be a JSON object")
+    missing = [key for key in REQUIRED_KEYS if key not in report]
+    _require(not missing, "closure_report_missing_keys", f"closure report is missing keys: {', '.join(sorted(missing))}")
+    _require(report.get("report_type") == REPORT_TYPE, "closure_report_invalid", "report_type mismatch")
+    _require(report.get("schema_version") == SCHEMA_VERSION, "closure_report_invalid", "schema_version mismatch")
+    _require(_is_sha256(report.get("hpe_plan_fingerprint_sha256")), "closure_report_invalid", "invalid plan fingerprint")
+    _require(_is_commit_sha(report.get("current_commit_sha")), "closure_report_invalid", "invalid current commit sha")
+    _require(_is_commit_sha(report.get("base_commit_sha")), "closure_report_invalid", "invalid base commit sha")
+    _require(isinstance(report.get("execution_timestamp_utc"), str) and report["execution_timestamp_utc"].strip(), "closure_report_invalid", "execution timestamp is missing")
+    _require(isinstance(report.get("branch"), str) and report["branch"].strip(), "closure_report_invalid", "branch is missing")
+    _require(isinstance(report.get("selected_slot_id"), str) and report["selected_slot_id"].strip(), "closure_report_invalid", "selected_slot_id is missing")
+    _require(isinstance(report.get("selected_candidate_id"), str) and report["selected_candidate_id"].strip(), "closure_report_invalid", "selected_candidate_id is missing")
+    _require(isinstance(report.get("candidate_ranking_evidence"), dict), "closure_report_invalid", "candidate_ranking_evidence must be an object")
+    _require(isinstance(report.get("selected_candidate_evidence"), dict), "closure_report_invalid", "selected_candidate_evidence must be an object")
+    _require(isinstance(report.get("prompt_plan_evidence"), dict), "closure_report_invalid", "prompt_plan_evidence must be an object")
+    _require(isinstance(report.get("final_prompt_influence_evidence"), list), "closure_report_invalid", "final_prompt_influence_evidence must be a list")
+    _require(isinstance(report.get("integrity_qa_evidence"), dict), "closure_report_invalid", "integrity_qa_evidence must be an object")
+    _require(isinstance(report.get("semantic_qa_configuration"), dict), "closure_report_invalid", "semantic_qa_configuration must be an object")
+    _require(isinstance(report.get("semantic_qa_evidence"), dict), "closure_report_invalid", "semantic_qa_evidence must be an object")
+    _require(isinstance(report.get("lifecycle_report_evidence"), dict), "closure_report_invalid", "lifecycle_report_evidence must be an object")
+    _require(isinstance(report.get("authority_boundary_evidence"), dict), "closure_report_invalid", "authority_boundary_evidence must be an object")
+    _require(isinstance(report.get("required_artifact_paths"), dict), "closure_report_invalid", "required_artifact_paths must be an object")
+    controlled = _normalize_status(report.get("controlled_proof_readiness"), label="controlled_proof_readiness")
+    ordinary = _normalize_status(report.get("ordinary_lane_readiness"), label="ordinary_lane_readiness")
+    closure_status = _normalize_status(report.get("closure_status"), label="closure_status")
+    lane_type = _normalize_lane_type(report.get("lane_type"))
+    findings = _normalize_findings(report.get("blocking_findings"))
+
+    if findings:
+        _require(closure_status == "blocked", "closure_report_invalid", "blocking findings require blocked closure_status")
+    elif closure_status == "blocked":
+        raise HumanPresenceEngineClosureError("closure_report_invalid", "blocked closure_status requires blocking findings")
+
+    if lane_type == "controlled_proof":
+        _require(controlled != "not_applicable", "closure_report_invalid", "controlled proof readiness cannot be not_applicable")
+    if lane_type == "ordinary_lane":
+        _require(ordinary != "not_applicable", "closure_report_invalid", "ordinary lane readiness cannot be not_applicable")
+
     return {
-        "item_id": item_id,
-        "status": status,
-        "category": category,
-        "evidence_ref": evidence_ref,
-        "producer": producer,
-        "consumer": consumer,
-        "detail": item["detail"],
-        "advisory_only": item["advisory_only"],
-    }
-
-
-def validate_evidence_binding(binding: Any) -> dict[str, Any]:
-    _require(isinstance(binding, dict), "closure_malformed_artifact", "evidence binding must be a JSON object")
-    required = {"binding_id", "status", "source_ref", "observed_sha256", "expected_sha256", "detail"}
-    missing = required - set(binding)
-    _require(not missing, "closure_malformed_artifact", f"evidence binding is missing required keys: {sorted(missing)}")
-    extra = set(binding) - required
-    _require(not extra, "closure_malformed_artifact", f"evidence binding contains unsupported keys: {sorted(extra)}")
-    binding_id = _validate_nonempty_str(binding["binding_id"], label="binding_id")
-    status = _validate_status(binding["status"])
-    source_ref = _validate_nonempty_str(binding["source_ref"], label=f"{binding_id} source_ref")
-    _require(binding["observed_sha256"] is None or isinstance(binding["observed_sha256"], str), "closure_malformed_artifact", f"{binding_id} observed_sha256 must be a string or null")
-    _require(binding["expected_sha256"] is None or isinstance(binding["expected_sha256"], str), "closure_malformed_artifact", f"{binding_id} expected_sha256 must be a string or null")
-    _require(binding["detail"] is not None, "closure_malformed_artifact", f"{binding_id} detail must not be null")
-    return {
-        "binding_id": binding_id,
-        "status": status,
-        "source_ref": source_ref,
-        "observed_sha256": binding["observed_sha256"],
-        "expected_sha256": binding["expected_sha256"],
-        "detail": binding["detail"],
-    }
-
-
-def _overall_status(items: list[dict[str, Any]]) -> str:
-    mandatory = [item for item in items if not item["advisory_only"]]
-    if not mandatory:
-        return "not_verified"
-    if any(item["status"] == "blocked" for item in mandatory):
-        return "blocked"
-    if any(item["status"] in {"not_verified", "not_applicable"} for item in mandatory):
-        return "not_verified"
-    return "verified"
-
-
-def build_human_presence_engine_closure_report(
-    *,
-    items: list[dict[str, Any]],
-    evidence_bindings: list[dict[str, Any]],
-    mandatory_conditions: list[str] | tuple[str, ...] = DEFAULT_MANDATORY_CONDITIONS,
-    not_applicable_reasons: dict[str, str] | None = None,
-    provenance: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    validated_items = [validate_closure_item(item) for item in items]
-    validated_bindings = [validate_evidence_binding(binding) for binding in evidence_bindings]
-    closure_status = _overall_status(validated_items)
-    report = {
-        "schema_version": SCHEMA_VERSION,
+        **report,
+        "controlled_proof_readiness": controlled,
+        "ordinary_lane_readiness": ordinary,
         "closure_status": closure_status,
-        "items": validated_items,
-        "checked_item_count": len(validated_items),
-        "evidence_bindings": validated_bindings,
-        "mandatory_conditions": [str(condition) for condition in mandatory_conditions],
-        "not_applicable_reasons": dict(not_applicable_reasons or {}),
+        "lane_type": lane_type,
+        "blocking_findings": findings,
     }
-    if provenance is not None:
-        _require(isinstance(provenance, dict), "closure_malformed_artifact", "provenance must be a JSON object")
-        report["provenance"] = provenance
-    report["closure_fingerprint_sha256"] = closure_fingerprint_sha256(report)
-    return report
 
 
-def validate_human_presence_engine_closure_report(report: Any) -> dict[str, Any]:
-    _require(isinstance(report, dict), "closure_malformed_artifact", "report must be a JSON object")
-    required = {
-        "schema_version",
-        "closure_status",
-        "items",
-        "checked_item_count",
-        "evidence_bindings",
-        "mandatory_conditions",
-        "not_applicable_reasons",
-        "closure_fingerprint_sha256",
+def _derive_closure_status(*, blocking_findings: list[dict[str, Any]], readiness_values: list[str]) -> str:
+    if blocking_findings:
+        return "blocked"
+    if any(value == "blocked" for value in readiness_values):
+        return "blocked"
+    if all(value in {"verified", "not_applicable"} for value in readiness_values) and any(
+        value == "verified" for value in readiness_values
+    ):
+        return "verified"
+    if any(value == "not_verified" for value in readiness_values):
+        return "not_verified"
+    return "not_applicable"
+
+
+def build_closure_verification_report(
+    *,
+    current_commit_sha: str,
+    base_commit_sha: str,
+    execution_timestamp_utc: str,
+    branch: str,
+    lane_type: str,
+    selected_slot_id: str,
+    selected_candidate_id: str,
+    hpe_plan_fingerprint_sha256: str,
+    candidate_ranking_evidence: dict[str, Any],
+    selected_candidate_evidence: dict[str, Any],
+    prompt_plan_evidence: dict[str, Any],
+    final_prompt_influence_evidence: list[dict[str, Any]],
+    integrity_qa_evidence: dict[str, Any],
+    semantic_qa_configuration: dict[str, Any],
+    semantic_qa_evidence: dict[str, Any],
+    lifecycle_report_evidence: dict[str, Any],
+    authority_boundary_evidence: dict[str, Any],
+    controlled_proof_readiness: str,
+    ordinary_lane_readiness: str,
+    required_artifact_paths: dict[str, Any],
+    blocking_findings: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    report = {
+        "report_type": REPORT_TYPE,
+        "schema_version": SCHEMA_VERSION,
+        "current_commit_sha": current_commit_sha,
+        "base_commit_sha": base_commit_sha,
+        "execution_timestamp_utc": execution_timestamp_utc,
+        "branch": branch,
+        "lane_type": lane_type,
+        "selected_slot_id": selected_slot_id,
+        "selected_candidate_id": selected_candidate_id,
+        "hpe_plan_fingerprint_sha256": hpe_plan_fingerprint_sha256,
+        "candidate_ranking_evidence": candidate_ranking_evidence,
+        "selected_candidate_evidence": selected_candidate_evidence,
+        "prompt_plan_evidence": prompt_plan_evidence,
+        "final_prompt_influence_evidence": final_prompt_influence_evidence,
+        "integrity_qa_evidence": integrity_qa_evidence,
+        "semantic_qa_configuration": semantic_qa_configuration,
+        "semantic_qa_evidence": semantic_qa_evidence,
+        "lifecycle_report_evidence": lifecycle_report_evidence,
+        "authority_boundary_evidence": authority_boundary_evidence,
+        "controlled_proof_readiness": controlled_proof_readiness,
+        "ordinary_lane_readiness": ordinary_lane_readiness,
+        "required_artifact_paths": required_artifact_paths,
+        "blocking_findings": blocking_findings or [],
     }
-    missing = required - set(report)
-    _require(not missing, "closure_malformed_artifact", f"report is missing required keys: {sorted(missing)}")
-    _require(report["schema_version"] == SCHEMA_VERSION, "closure_malformed_artifact", f"schema_version must be {SCHEMA_VERSION!r}")
-    _require(report["closure_status"] in STATUS_VALUES, "closure_malformed_artifact", f"closure_status {report['closure_status']!r} is not supported")
-    _require(isinstance(report["items"], list) and report["items"], "closure_malformed_artifact", "items must be a non-empty array")
-    validated_items = [validate_closure_item(item) for item in report["items"]]
-    _require(report["checked_item_count"] == len(validated_items), "closure_malformed_artifact", "checked_item_count does not match item count")
-    _require(isinstance(report["evidence_bindings"], list), "closure_malformed_artifact", "evidence_bindings must be an array")
-    validated_bindings = [validate_evidence_binding(binding) for binding in report["evidence_bindings"]]
-    _require(isinstance(report["mandatory_conditions"], list), "closure_malformed_artifact", "mandatory_conditions must be an array")
-    _require(isinstance(report["not_applicable_reasons"], dict), "closure_malformed_artifact", "not_applicable_reasons must be a JSON object")
-    if "provenance" in report:
-        _require(isinstance(report["provenance"], dict), "closure_malformed_artifact", "provenance must be a JSON object")
-    item_ids = [item["item_id"] for item in validated_items]
-    _require(len(item_ids) == len(set(item_ids)), "closure_malformed_artifact", "item_ids must be unique")
-    binding_ids = [binding["binding_id"] for binding in validated_bindings]
-    _require(len(binding_ids) == len(set(binding_ids)), "closure_malformed_artifact", "evidence_bindings must be unique")
-    expected_fingerprint = closure_fingerprint_sha256({k: v for k, v in report.items() if k != "closure_fingerprint_sha256"})
-    _require(
-        report["closure_fingerprint_sha256"] == expected_fingerprint,
-        "closure_malformed_artifact",
-        "closure_fingerprint_sha256 does not match canonical content",
+    report["closure_status"] = _derive_closure_status(
+        blocking_findings=report["blocking_findings"],
+        readiness_values=[report["controlled_proof_readiness"], report["ordinary_lane_readiness"]],
     )
+    return _normalized_report(report)
+
+
+def validate_closure_verification_report(report: dict[str, Any]) -> dict[str, Any]:
+    normalized = _normalized_report(report)
+    report.clear()
+    report.update(normalized)
     return report

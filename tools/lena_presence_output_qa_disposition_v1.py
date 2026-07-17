@@ -258,6 +258,7 @@ def run_presence_output_qa(
     live_presence_semantic_review: bool = False,
     semantic_provider: Any | None = None,
     semantic_timeout_seconds: float = 30.0,
+    expected_candidate_decision_sha256: str | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Run presence output QA for a single still image.
 
@@ -308,7 +309,7 @@ def run_presence_output_qa(
             expected_plan_fingerprint_sha256=expected_plan_fingerprint,
             candidate_decision=candidate_decision,
             candidate_decision_sha256=cd_sha,
-            expected_candidate_decision_sha256=None,
+            expected_candidate_decision_sha256=expected_candidate_decision_sha256,
             manifest=manifest,
             manifest_sha256=mf_sha,
             expected_manifest_sha256=None,
