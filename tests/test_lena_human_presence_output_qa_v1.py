@@ -132,6 +132,33 @@ def _build_artifact(
     )
 
 
+def _findings_present_semantic_result(plan: dict[str, Any]) -> dict[str, Any]:
+    plan_values = qa_module._still_image_plan_field_values(plan)
+    return {
+        "semantic_status": "findings_present",
+        "semantic_findings": [
+            {
+                "finding_code": "object_interaction_plan_contradiction",
+                "category": "plan_contradiction",
+                "plan_field_ref": "performance_actions.object_interaction",
+                "plan_field_value": plan_values["performance_actions.object_interaction"],
+                "observed_description": "The hand is not interacting with an object.",
+                "confidence": "high",
+                "image_index": 0,
+                "advisory_only": False,
+            }
+        ],
+        "semantic_result_provenance": {
+            "provider": "anthropic",
+            "model": "claude-sonnet-5",
+            "request_binding_sha256": "a" * 64,
+            "evaluated_at_utc": "2026-07-16T00:00:00Z",
+            "response_schema_version": qa_module.SEMANTIC_RESPONSE_SCHEMA_VERSION,
+        },
+        "semantic_error": None,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Generic module tests
 # ---------------------------------------------------------------------------
@@ -389,20 +416,170 @@ class TestValidation:
         )
         artifact = qa_module.build_presence_output_qa_artifact_v2(
             integrity_result=integrity,
-            semantic_result={
-                "semantic_status": "not_evaluated",
-                "semantic_findings": [],
-                "semantic_result_provenance": None,
-                "semantic_error": None,
-            },
+            semantic_result=_findings_present_semantic_result(plan),
             source_artifacts=_artifact_source_artifacts(Path(".")),
             evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+            compiled_plan_values=qa_module._still_image_plan_field_values(plan),
             generated_at_utc="2026-07-16T00:00:00Z",
         )
         assert artifact["schema_version"] == qa_module.SCHEMA_VERSION_V2
-        assert artifact["semantic_result_provenance"] is None
+        assert artifact["semantic_status"] == "findings_present"
+        assert artifact["semantic_findings"]
+        assert artifact["semantic_result_provenance"] is not None
         assert artifact["semantic_error"] is None
-        assert qa_module.validate_presence_output_qa_artifact_v2(artifact) is artifact
+        payload = json.loads(json.dumps(artifact, sort_keys=True))
+        assert qa_module.validate_presence_output_qa_artifact_v2(payload) is payload
+
+    def test_v2_builder_rejects_mismatched_plan_field_value(self) -> None:
+        plan = _compiled_plan()
+        plan_fp = ranking.plan_fingerprint_sha256(plan)
+        candidate_decision = _make_candidate_decision()
+        manifest = _make_manifest()
+        plan_values = qa_module._still_image_plan_field_values(plan)
+        semantic_result = _findings_present_semantic_result(plan)
+        semantic_result["semantic_findings"][0]["plan_field_value"] = "wrong-value"
+        integrity = _valid_integrity_result(
+            plan=plan,
+            candidate_decision=candidate_decision,
+            manifest=manifest,
+            image_sha="a" * 64,
+            expected_plan_fp=plan_fp,
+            expected_cd_sha=_canonical_sha256(candidate_decision),
+            expected_mf_sha=_canonical_sha256(manifest),
+            expected_img_sha="a" * 64,
+        )
+        with pytest.raises(qa_module.HumanPresenceOutputQAError) as exc_info:
+            qa_module.build_presence_output_qa_artifact_v2(
+                integrity_result=integrity,
+                semantic_result=semantic_result,
+                source_artifacts=_artifact_source_artifacts(Path(".")),
+                evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+                compiled_plan_values=plan_values,
+                generated_at_utc="2026-07-16T00:00:00Z",
+            )
+        assert exc_info.value.code == "presence_output_malformed_artifact"
+
+    @pytest.mark.parametrize(
+        "mutator",
+        [
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "finding_code": "unknown_code"},
+            ),
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "category": "invalid_category"},
+            ),
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "category": "presence_failure_indicator"},
+            ),
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "plan_field_ref": "gaze_arc.start_focus"},
+            ),
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "observed_description": "x" * 301},
+            ),
+            lambda artifact: artifact["semantic_findings"].__setitem__(
+                0,
+                {**artifact["semantic_findings"][0], "image_index": 1},
+            ),
+        ],
+    )
+    def test_v2_validator_rejects_invalid_semantic_finding_variants(self, mutator) -> None:
+        plan = _compiled_plan()
+        plan_fp = ranking.plan_fingerprint_sha256(plan)
+        candidate_decision = _make_candidate_decision()
+        manifest = _make_manifest()
+        integrity = _valid_integrity_result(
+            plan=plan,
+            candidate_decision=candidate_decision,
+            manifest=manifest,
+            image_sha="a" * 64,
+            expected_plan_fp=plan_fp,
+            expected_cd_sha=_canonical_sha256(candidate_decision),
+            expected_mf_sha=_canonical_sha256(manifest),
+            expected_img_sha="a" * 64,
+        )
+        artifact = qa_module.build_presence_output_qa_artifact_v2(
+            integrity_result=integrity,
+            semantic_result=_findings_present_semantic_result(plan),
+            source_artifacts=_artifact_source_artifacts(Path(".")),
+            evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+            compiled_plan_values=qa_module._still_image_plan_field_values(plan),
+            generated_at_utc="2026-07-16T00:00:00Z",
+        )
+        mutator(artifact)
+        with pytest.raises(qa_module.HumanPresenceOutputQAError) as exc_info:
+            qa_module.validate_presence_output_qa_artifact_v2(artifact)
+        assert exc_info.value.code == "presence_output_malformed_artifact"
+
+    @pytest.mark.parametrize(
+        "description",
+        [
+            "wrong person in the background",
+            "Wrong person!",
+            "composition looks off, maybe retry",
+            "face quality seems bad; approval should be rejected",
+            "publishing suitability is poor",
+        ],
+    )
+    def test_v2_validator_rejects_prohibited_observed_descriptions(self, description: str) -> None:
+        plan = _compiled_plan()
+        plan_fp = ranking.plan_fingerprint_sha256(plan)
+        candidate_decision = _make_candidate_decision()
+        manifest = _make_manifest()
+        integrity = _valid_integrity_result(
+            plan=plan,
+            candidate_decision=candidate_decision,
+            manifest=manifest,
+            image_sha="a" * 64,
+            expected_plan_fp=plan_fp,
+            expected_cd_sha=_canonical_sha256(candidate_decision),
+            expected_mf_sha=_canonical_sha256(manifest),
+            expected_img_sha="a" * 64,
+        )
+        artifact = qa_module.build_presence_output_qa_artifact_v2(
+            integrity_result=integrity,
+            semantic_result=_findings_present_semantic_result(plan),
+            source_artifacts=_artifact_source_artifacts(Path(".")),
+            evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+            compiled_plan_values=qa_module._still_image_plan_field_values(plan),
+            generated_at_utc="2026-07-16T00:00:00Z",
+        )
+        artifact["semantic_findings"][0]["observed_description"] = description
+        with pytest.raises(qa_module.HumanPresenceOutputQAError) as exc_info:
+            qa_module.validate_presence_output_qa_artifact_v2(artifact)
+        assert exc_info.value.code == "presence_output_malformed_artifact"
+
+    def test_v2_validator_does_not_require_original_plan_object(self) -> None:
+        plan = _compiled_plan()
+        plan_fp = ranking.plan_fingerprint_sha256(plan)
+        candidate_decision = _make_candidate_decision()
+        manifest = _make_manifest()
+        integrity = _valid_integrity_result(
+            plan=plan,
+            candidate_decision=candidate_decision,
+            manifest=manifest,
+            image_sha="a" * 64,
+            expected_plan_fp=plan_fp,
+            expected_cd_sha=_canonical_sha256(candidate_decision),
+            expected_mf_sha=_canonical_sha256(manifest),
+            expected_img_sha="a" * 64,
+        )
+        artifact = qa_module.build_presence_output_qa_artifact_v2(
+            integrity_result=integrity,
+            semantic_result=_findings_present_semantic_result(plan),
+            source_artifacts=_artifact_source_artifacts(Path(".")),
+            evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+            compiled_plan_values=qa_module._still_image_plan_field_values(plan),
+            generated_at_utc="2026-07-16T00:00:00Z",
+        )
+        serialized = json.dumps(artifact, sort_keys=True)
+        reloaded = json.loads(serialized)
+        assert qa_module.validate_presence_output_qa_artifact_v2(reloaded) is reloaded
 
     def test_malformed_binding_record_is_rejected(self) -> None:
         artifact = self._good_artifact()

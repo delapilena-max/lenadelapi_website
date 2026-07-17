@@ -24,6 +24,7 @@ from pipeline.prompting import lena_prompt_brain  # noqa: E402
 from pipeline.qa import lena_higgsfield_failure_memory as failure_memory  # noqa: E402
 from pipeline.qa import lena_photo_qa  # noqa: E402
 from tools.lena_structured_visual_tool_v1 import (  # noqa: E402
+    StructuredVisualImage,
     StructuredVisualToolError,
     call_anthropic_structured_visual_tool,
 )
@@ -944,6 +945,53 @@ def _review_request(
     }
 
 
+def _visual_request_payload(request: dict[str, Any]) -> dict[str, Any]:
+    image = request["image"]
+    identity_references = request["identity_references"]
+    payload = {key: value for key, value in request.items() if key not in {"image", "identity_references"}}
+    payload["image"] = {
+        "sha256": image["sha256"],
+        "format": image["format"],
+    }
+    if "width" in image:
+        payload["image"]["width"] = image["width"]
+    if "height" in image:
+        payload["image"]["height"] = image["height"]
+    payload["identity_references"] = [
+        {
+            key: value
+            for key, value in {
+                "sha256": ref["sha256"],
+                "format": ref["format"],
+                "width": ref.get("width"),
+                "height": ref.get("height"),
+            }.items()
+            if value is not None
+        }
+        for ref in identity_references
+    ]
+    return payload
+
+
+def _visual_request_images(request: dict[str, Any]) -> list[StructuredVisualImage]:
+    images = [
+        StructuredVisualImage(
+            path=Path(request["image"]["path"]),
+            sha256=str(request["image"]["sha256"]),
+            role="generated_candidate",
+        )
+    ]
+    for index, reference in enumerate(request["identity_references"], start=1):
+        images.append(
+            StructuredVisualImage(
+                path=Path(reference["path"]),
+                sha256=str(reference["sha256"]),
+                role=f"identity_reference_{index}",
+            )
+        )
+    return images
+
+
 def _redacted_tool_input_diagnostics(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {"input_type": type(value).__name__}
@@ -979,11 +1027,11 @@ def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
         for key in VISUAL_OBSERVATION_KEYS
     }
     try:
+        visual_request = _visual_request_payload(request)
         payload = call_anthropic_structured_visual_tool(
-            image_path=Path(request["image"]["path"]),
-            image_sha256=str(request["image"]["sha256"]),
+            images=_visual_request_images(request),
             system_prompt="Return structured observations only; local code assigns disposition.",
-            user_text=json.dumps(request, sort_keys=True, ensure_ascii=False),
+            user_text=json.dumps(visual_request, sort_keys=True, ensure_ascii=False),
             tool_name="submit_visual_observations",
             tool_schema={
                 "type": "object",

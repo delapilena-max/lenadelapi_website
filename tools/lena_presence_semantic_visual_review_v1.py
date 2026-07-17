@@ -24,6 +24,7 @@ from pipeline.presence.human_presence_output_qa_v1 import (
 )
 from tools.lena_structured_visual_tool_v1 import (
     StructuredVisualToolError,
+    StructuredVisualImage,
     call_anthropic_structured_visual_tool,
 )
 
@@ -89,7 +90,6 @@ def _validate_provider_model_authority(provider: str, model: str) -> dict[str, A
 def _semantic_request_payload(
     *,
     plan: dict[str, Any],
-    image_path: Path,
     image_sha256: str,
     image_index: int,
     provider: str,
@@ -112,7 +112,6 @@ def _semantic_request_payload(
             "Do not infer temporal transitions, speech, motion sequences, or behavior across frames. "
             "Return findings only when the rendered person obviously contradicts the compiled HPE plan."
         ),
-        "image_path": str(image_path),
     }
 
 
@@ -147,12 +146,7 @@ def _tool_schema() -> dict[str, Any]:
 
 
 def _response_is_not_assessable(detail: str) -> bool:
-    text = detail.lower()
-    return (
-        "unsupported image format" in text
-        or "image is unreadable" in text
-        or "image bytes changed after validation" in text
-    )
+    return False
 
 
 def _semantic_result_not_assessable(reason: str) -> dict[str, Any]:
@@ -254,7 +248,6 @@ def evaluate_hpe_semantic_still_image_presence(
 
     request_payload = _semantic_request_payload(
         plan=plan,
-        image_path=image_path,
         image_sha256=image_sha256,
         image_index=image_index,
         provider=provider,
@@ -271,8 +264,7 @@ def evaluate_hpe_semantic_still_image_presence(
 
     try:
         raw_payload = call_anthropic_structured_visual_tool(
-            image_path=image_path,
-            image_sha256=image_sha256,
+            images=[StructuredVisualImage(path=image_path, sha256=image_sha256, role="generated_candidate")],
             system_prompt=system_prompt,
             user_text=user_text,
             tool_name=REQUEST_TOOL_NAME,
@@ -283,13 +275,15 @@ def evaluate_hpe_semantic_still_image_presence(
             max_tokens=REQUEST_MAX_TOKENS,
         )
     except StructuredVisualToolError as exc:
-        if _response_is_not_assessable(exc.detail) or exc.code == "image_hash_mismatch":
+        if exc.code in {"image_unreadable", "unsupported_media", "image_hash_mismatch"}:
             return _semantic_result_not_assessable(exc.detail)
-        if exc.code in {"provider_timeout", "provider_rate_limit", "provider_unavailable"}:
+        if exc.code in {"provider_timeout", "provider_rate_limit", "provider_overloaded", "provider_unavailable", "provider_status_error"}:
             mapped_code = {
                 "provider_timeout": "semantic_visual_review_timeout",
                 "provider_rate_limit": "semantic_visual_review_rate_limit",
+                "provider_overloaded": "semantic_visual_review_overloaded",
                 "provider_unavailable": "semantic_visual_review_provider_unavailable",
+                "provider_status_error": "semantic_visual_review_provider_unavailable",
             }[exc.code]
             return _semantic_result_error(
                 mapped_code,
@@ -311,5 +305,6 @@ def evaluate_hpe_semantic_still_image_presence(
             model=provider_authority["approved_model"],
             request_binding_sha256=request_binding_sha256,
         )
-    except StructuredVisualToolError as exc:
-        return _semantic_result_error("semantic_visual_review_invalid_payload", exc.detail[:500])
+    except (HumanPresenceOutputQAError, StructuredVisualToolError) as exc:
+        detail = getattr(exc, "message", None) or getattr(exc, "detail", None) or str(exc)
+        return _semantic_result_error("semantic_visual_review_invalid_payload", str(detail)[:500])

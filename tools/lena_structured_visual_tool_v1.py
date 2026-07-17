@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,13 @@ SUPPORTED_IMAGE_MEDIA_TYPES = {
     "JPG": "image/jpeg",
     "WEBP": "image/webp",
 }
+
+
+@dataclass(frozen=True)
+class StructuredVisualImage:
+    path: Path
+    sha256: str
+    role: str
 
 
 class StructuredVisualToolError(RuntimeError):
@@ -29,9 +37,9 @@ def _image_media_type(path: Path) -> str:
         with Image.open(path) as image:
             image_format = str(image.format or "").upper()
     except (OSError, UnidentifiedImageError, ValueError) as exc:
-        raise StructuredVisualToolError("provider_unavailable", f"image is unreadable: {path}: {exc}") from exc
+        raise StructuredVisualToolError("image_unreadable", f"image is unreadable: {path}: {exc}") from exc
     if image_format not in SUPPORTED_IMAGE_MEDIA_TYPES:
-        raise StructuredVisualToolError("provider_unavailable", f"unsupported image format {image_format!r}: {path}")
+        raise StructuredVisualToolError("unsupported_media", f"unsupported image format {image_format!r}: {path}")
     return SUPPORTED_IMAGE_MEDIA_TYPES[image_format]
 
 
@@ -50,8 +58,7 @@ def _read_bound_image_bytes(path: Path, expected_sha256: str) -> bytes:
 
 def call_anthropic_structured_visual_tool(
     *,
-    image_path: Path,
-    image_sha256: str,
+    images: list[StructuredVisualImage],
     system_prompt: str,
     user_text: str,
     tool_name: str,
@@ -75,19 +82,30 @@ def call_anthropic_structured_visual_tool(
     except ImportError:  # pragma: no cover - CI minimal dependency set
         httpx = None  # type: ignore[assignment]
 
-    media_type = _image_media_type(image_path)
-    image_bytes = _read_bound_image_bytes(image_path, image_sha256)
-    content: list[dict[str, Any]] = [
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media_type,
-                "data": base64.b64encode(image_bytes).decode("ascii"),
-            },
-        },
-        {"type": "text", "text": user_text},
-    ]
+    if not isinstance(images, list) or not images:
+        raise StructuredVisualToolError("provider_unavailable", "at least one structured visual image is required")
+    content: list[dict[str, Any]] = [{"type": "text", "text": user_text}]
+    for index, image in enumerate(images, start=1):
+        if not isinstance(image, StructuredVisualImage):
+            raise StructuredVisualToolError("provider_unavailable", "structured visual images must be StructuredVisualImage objects")
+        media_type = _image_media_type(image.path)
+        image_bytes = _read_bound_image_bytes(image.path, image.sha256)
+        content.append(
+            {
+                "type": "text",
+                "text": f"structured_visual_image_role: {image.role}; structured_visual_image_index: {index}",
+            }
+        )
+        content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64.b64encode(image_bytes).decode("ascii"),
+                },
+            }
+        )
 
     client = anthropic.Anthropic(max_retries=0)
     timeout_errors = tuple(
@@ -100,6 +118,11 @@ def call_anthropic_structured_visual_tool(
     rate_limit_errors = tuple(
         cls for cls in (
             getattr(anthropic, "RateLimitError", None),
+        )
+        if isinstance(cls, type)
+    )
+    overloaded_errors = tuple(
+        cls for cls in (
             getattr(anthropic, "OverloadedError", None),
         )
         if isinstance(cls, type)
@@ -127,7 +150,6 @@ def call_anthropic_structured_visual_tool(
             getattr(anthropic, "RequestTooLargeError", None),
             getattr(anthropic, "UnprocessableEntityError", None),
             getattr(anthropic, "APIResponseValidationError", None),
-            getattr(anthropic, "APIError", None),
         )
         if isinstance(cls, type)
     )
@@ -149,16 +171,18 @@ def call_anthropic_structured_visual_tool(
         raise StructuredVisualToolError("provider_timeout", str(exc)) from exc
     except rate_limit_errors as exc:  # pragma: no cover - exercised via tests
         raise StructuredVisualToolError("provider_rate_limit", str(exc)) from exc
+    except overloaded_errors as exc:  # pragma: no cover - exercised via tests
+        raise StructuredVisualToolError("provider_overloaded", str(exc)) from exc
     except auth_errors as exc:  # pragma: no cover - exercised via tests
         raise StructuredVisualToolError("provider_unavailable", str(exc)) from exc
     except bad_request_errors as exc:  # pragma: no cover - exercised via tests
-        raise StructuredVisualToolError("provider_unavailable", str(exc)) from exc
-    except unavailable_errors as exc:  # pragma: no cover - exercised via tests
         raise StructuredVisualToolError("provider_unavailable", str(exc)) from exc
     except getattr(anthropic, "APIStatusError", tuple()) as exc:  # pragma: no cover - exercised via tests
         status = getattr(exc, "status_code", None)
         if status == 429:
             raise StructuredVisualToolError("provider_rate_limit", str(exc)) from exc
+        raise StructuredVisualToolError("provider_status_error", str(exc)) from exc
+    except unavailable_errors as exc:  # pragma: no cover - exercised via tests
         raise StructuredVisualToolError("provider_unavailable", str(exc)) from exc
 
     blocks = [

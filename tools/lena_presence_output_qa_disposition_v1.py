@@ -20,6 +20,7 @@ from pipeline.presence.human_presence_output_qa_v1 import (  # noqa: E402
     build_presence_output_qa_artifact_v1,
     build_presence_output_qa_artifact_v2,
     evaluate_still_image_presence_integrity,
+    _still_image_plan_field_values,
     validate_presence_output_qa_artifact,
 )
 from tools.lena_presence_semantic_visual_review_v1 import (  # noqa: E402
@@ -334,6 +335,7 @@ def run_presence_output_qa(
     if semantic_provider is None:
         semantic_provider = evaluate_hpe_semantic_still_image_presence
 
+    compiled_plan_values = _still_image_plan_field_values(plan)
     semantic_result = _semantic_not_evaluated()
     if live_presence_semantic_review:
         if integrity_result["integrity_status"] == "invalid":
@@ -354,6 +356,7 @@ def run_presence_output_qa(
         semantic_result=semantic_result,
         source_artifacts=source_artifacts,
         evaluator_version=EVALUATOR_VERSION,
+        compiled_plan_values=compiled_plan_values,
         generated_at_utc=evaluated_at_utc,
     )
     validated = validate_presence_output_qa_artifact(artifact)

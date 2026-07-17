@@ -43,6 +43,7 @@ FINDING_CATEGORIES = (
 SEMANTIC_ERROR_CODES = (
     "semantic_visual_review_timeout",
     "semantic_visual_review_rate_limit",
+    "semantic_visual_review_overloaded",
     "semantic_visual_review_provider_unavailable",
     "semantic_visual_review_malformed_payload",
     "semantic_visual_review_invalid_payload",
@@ -132,6 +133,59 @@ _SEMANTIC_RESULT_PROVENANCE_KEYS = frozenset({
     "evaluated_at_utc",
     "response_schema_version",
 })
+_SEMANTIC_PLAN_FIELD_RULES = {
+    "viewer_relationship.awareness": "fully_aware",
+    "viewer_relationship.performance_level": "lightly_performed",
+    "viewer_relationship.invitation_level": "clear",
+    "gaze_arc.start_focus": "off_camera_activity",
+    "gaze_arc.recognition_behavior": "playful_surprise",
+    "gaze_arc.hold_intensity": "sustained",
+    "expression_arc.start_state": "content_private",
+    "expression_arc.peak_state": "playful_smirk",
+    "performance_actions.primary_action": "hair_play",
+    "performance_actions.object_interaction": "none",
+    "movement_dynamics.weight_transfer": "shift_to_one_leg",
+    "movement_dynamics.asymmetry_level": "slight_asymmetry",
+    "body_presentation.adult_character_required": True,
+    "body_presentation.silhouette_profile.bust_emphasis": "pronounced",
+    "body_presentation.silhouette_profile.waist_hip_contrast": "pronounced",
+    "body_presentation.silhouette_profile.hip_glute_emphasis": "pronounced",
+    "body_presentation.silhouette_profile.proportion_realism": "required_realistic",
+    "body_presentation.silhouette_profile.silhouette_shape_class": "hourglass_voluptuous",
+    "body_presentation.wardrobe_body_interaction": "fabric_tension_visible",
+    "body_presentation.anatomy_continuity_required": True,
+    "body_presentation.gravity_and_soft_tissue_realism": True,
+    "body_presentation.framing_intent": "full_body_presence",
+    "sensual_presence.tier": "natural_sensual_presence",
+    "sensual_presence.exposure_dependency": "low",
+    "sensual_presence.confidence_level": "confident",
+    "failure_indicators.dead_or_unfocused_eyes": True,
+    "failure_indicators.frozen_expression": True,
+    "failure_indicators.mannequin_pose": True,
+    "failure_indicators.face_body_emotion_mismatch": True,
+    "failure_indicators.sexual_styling_without_personality": True,
+}
+_PROHIBITED_OBSERVED_DESCRIPTION_PATTERNS = (
+    r"\bidentity mismatch\b",
+    r"\bwrong person\b",
+    r"\bwrong identity\b",
+    r"\bidentity collapse\b",
+    r"\banatomy defect\b",
+    r"\banatomy defects\b",
+    r"\bhand defect\b",
+    r"\bhand defects\b",
+    r"\bface quality\b",
+    r"\bimage corruption\b",
+    r"\brealism\b",
+    r"\blighting\b",
+    r"\bcomposition\b",
+    r"\baesthetic quality\b",
+    r"\bapproval\b",
+    r"\brejection\b",
+    r"\bpublishing suitability\b",
+    r"\bretry recommendation\b",
+    r"\bwrong person or identity collapse\b",
+)
 
 _BINDING_NAMES = ("plan", "candidate_decision", "manifest", "generated_image")
 _BINDING_STATUSES = frozenset(
@@ -537,11 +591,64 @@ def _semantic_findings_or_empty(findings: Any) -> list[dict[str, Any]]:
     return findings
 
 
+def _normalized_observed_description(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _validate_observed_description(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "observed_description must be a non-empty string",
+        )
+    normalized = _normalized_observed_description(value)
+    if len(normalized) > _SEMANTIC_FINDING_DETAIL_LIMIT:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "observed_description is too long",
+        )
+    for pattern in _PROHIBITED_OBSERVED_DESCRIPTION_PATTERNS:
+        if re.search(pattern, normalized):
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"observed_description contains prohibited HPE-external judgment: {value.strip()!r}",
+            )
+    return value.strip()
+
+
+def _validate_semantic_plan_field_value(
+    plan_field_ref: str,
+    plan_field_value: Any,
+    *,
+    plan_values: dict[str, Any] | None,
+) -> Any:
+    if plan_values is not None:
+        if plan_field_ref not in plan_values:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"plan_field_ref {plan_field_ref!r} was not present in the approved plan subset",
+            )
+        expected_value = plan_values[plan_field_ref]
+    else:
+        if plan_field_ref not in _SEMANTIC_PLAN_FIELD_RULES:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"plan_field_ref {plan_field_ref!r} is not supported by the persisted semantic schema",
+            )
+        expected_value = _SEMANTIC_PLAN_FIELD_RULES[plan_field_ref]
+    if plan_field_value != expected_value:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"plan_field_value for {plan_field_ref!r} does not match the approved plan value",
+        )
+    return plan_field_value
+
+
 def _validate_semantic_finding(
     finding: Any,
     *,
     image_index: int,
-    plan_values: dict[str, Any],
+    plan_values: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if not isinstance(finding, dict):
         raise HumanPresenceOutputQAError(
@@ -579,26 +686,12 @@ def _validate_semantic_finding(
             "presence_output_malformed_artifact",
             f"plan_field_ref {plan_field_ref!r} is not allowed for {code!r}",
         )
-    if plan_field_ref not in plan_values:
-        raise HumanPresenceOutputQAError(
-            "presence_output_malformed_artifact",
-            f"plan_field_ref {plan_field_ref!r} was not present in the approved plan subset",
-        )
-    if finding.get("plan_field_value") != plan_values[plan_field_ref]:
-        raise HumanPresenceOutputQAError(
-            "presence_output_malformed_artifact",
-            f"plan_field_value for {plan_field_ref!r} does not match the compiled plan",
-        )
-    if not isinstance(observed_description, str) or not observed_description.strip():
-        raise HumanPresenceOutputQAError(
-            "presence_output_malformed_artifact",
-            "observed_description must be a non-empty string",
-        )
-    if len(observed_description) > _SEMANTIC_FINDING_DETAIL_LIMIT:
-        raise HumanPresenceOutputQAError(
-            "presence_output_malformed_artifact",
-            "observed_description is too long",
-        )
+    validated_plan_field_value = _validate_semantic_plan_field_value(
+        plan_field_ref,
+        finding["plan_field_value"],
+        plan_values=plan_values,
+    )
+    validated_observed_description = _validate_observed_description(observed_description)
     if confidence not in _SEMANTIC_FINDING_CONFIDENCE:
         raise HumanPresenceOutputQAError(
             "presence_output_malformed_artifact",
@@ -618,8 +711,8 @@ def _validate_semantic_finding(
         "finding_code": code,
         "category": category,
         "plan_field_ref": plan_field_ref,
-        "plan_field_value": finding["plan_field_value"],
-        "observed_description": observed_description.strip(),
+        "plan_field_value": validated_plan_field_value,
+        "observed_description": validated_observed_description,
         "confidence": confidence,
         "image_index": finding_image_index,
         "advisory_only": advisory_only,
@@ -1135,6 +1228,7 @@ def build_presence_output_qa_artifact_v2(
     semantic_result: dict[str, Any],
     source_artifacts: dict[str, str | None],
     evaluator_version: str,
+    compiled_plan_values: dict[str, Any] | None = None,
     generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
     """Assemble the v2 output-QA artifact dict."""
@@ -1145,7 +1239,7 @@ def build_presence_output_qa_artifact_v2(
     semantic = _validate_semantic_result(
         semantic_result,
         image_index=_SEMANTIC_FINDING_IMAGE_INDEX,
-        plan_values=semantic_result.get("_plan_values"),
+        plan_values=compiled_plan_values,
     )
     return {
         "report_type": REPORT_TYPE,
@@ -1172,6 +1266,7 @@ def build_presence_output_qa_artifact(
     integrity_result: dict[str, Any],
     source_artifacts: dict[str, str | None],
     evaluator_version: str,
+    compiled_plan_values: dict[str, Any] | None = None,
     generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
     """Backward-compatible v2 builder alias."""
@@ -1188,6 +1283,7 @@ def build_presence_output_qa_artifact(
         semantic_result=semantic_result,
         source_artifacts=source_artifacts,
         evaluator_version=evaluator_version,
+        compiled_plan_values=compiled_plan_values,
         generated_at_utc=generated_at_utc,
     )
 

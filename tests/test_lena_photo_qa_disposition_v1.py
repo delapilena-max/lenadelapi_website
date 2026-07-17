@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import inspect
 import json
@@ -747,6 +748,64 @@ def test_exactly_one_mocked_bound_visual_call_no_retry_or_fallback(harness) -> N
     assert calls[0]["visual_model"] == "exact-test-model"
     assert result["disposition"] == "accept"
     assert result["provider_called"] is True
+
+
+def test_real_anthropic_adapter_includes_generated_and_reference_images_without_path_leak(
+    harness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider_calls = []
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            provider_calls.append(kwargs)
+            return SimpleNamespace(
+                content=[
+                    SimpleNamespace(
+                        type="tool_use",
+                        name="submit_visual_observations",
+                        input=_all_pass(),
+                    )
+                ]
+            )
+
+    def fake_anthropic(**kwargs):
+        return SimpleNamespace(messages=FakeMessages())
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
+
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=harness["decision_path"],
+        manifest_path=harness["manifest_path"],
+        image_path=harness["image_path"],
+        identity_evidence_path=harness["evidence_path"],
+        reference_specs=[(harness["reference_path"], _sha(harness["reference_path"]))],
+        reference_authority_artifact=harness["kwargs"]["reference_authority_artifact"],
+        reference_authority_sha256=harness["kwargs"]["reference_authority_sha256"],
+        expected_image_sha256=_sha(harness["image_path"]),
+        live_visual_review=True,
+        visual_provider="anthropic",
+        visual_model="exact-test-model",
+        visual_model_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        visual_model_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        failure_memory_loader=lambda: harness["memory"],
+    )
+
+    assert result["disposition"] == "accept"
+    assert len(provider_calls) == 1
+    content = provider_calls[0]["messages"][0]["content"]
+    text_payload = json.dumps(content, sort_keys=True)
+    assert str(harness["image_path"].resolve()) not in text_payload
+    assert str(harness["reference_path"].resolve()) not in text_payload
+    image_blocks = [block for block in content if block["type"] == "image"]
+    assert len(image_blocks) == 2
+    assert base64.b64decode(image_blocks[0]["source"]["data"]) == harness["image_path"].read_bytes()
+    assert base64.b64decode(image_blocks[1]["source"]["data"]) == harness["reference_path"].read_bytes()
+    text_blocks = [block["text"] for block in content if block["type"] == "text"]
+    assert any("generated_candidate" in text for text in text_blocks)
+    assert any("identity_reference_1" in text for text in text_blocks)
 
 
 def test_live_binding_mismatch_blocks_before_reviewer(harness) -> None:
