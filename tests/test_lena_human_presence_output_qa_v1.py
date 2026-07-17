@@ -132,6 +132,32 @@ def _build_artifact(
     )
 
 
+def _good_v2_artifact() -> dict[str, Any]:
+    plan = _compiled_plan()
+    plan_fp = ranking.plan_fingerprint_sha256(plan)
+    candidate_decision = _make_candidate_decision()
+    manifest = _make_manifest()
+    plan_values = qa_module._still_image_plan_field_values(plan)
+    integrity = _valid_integrity_result(
+        plan=plan,
+        candidate_decision=candidate_decision,
+        manifest=manifest,
+        image_sha="a" * 64,
+        expected_plan_fp=plan_fp,
+        expected_cd_sha=_canonical_sha256(candidate_decision),
+        expected_mf_sha=_canonical_sha256(manifest),
+        expected_img_sha="a" * 64,
+    )
+    return qa_module.build_presence_output_qa_artifact_v2(
+        integrity_result=integrity,
+        semantic_result=_findings_present_semantic_result(plan_values),
+        source_artifacts=_artifact_source_artifacts(Path(".")),
+        evaluator_version="hpe_2c_pr3_integrity_semantic_v1",
+        compiled_plan_values=plan_values,
+        generated_at_utc="2026-07-16T00:00:00Z",
+    )
+
+
 def _findings_present_semantic_result(
     plan_values: dict[str, Any],
 ) -> dict[str, Any]:
@@ -1059,3 +1085,22 @@ class TestRunPresenceOutputQA:
         assert calls == []
         assert artifact["schema_version"] == qa_module.SCHEMA_VERSION_V2
         assert artifact["semantic_status"] == "not_evaluated"
+
+
+@pytest.mark.parametrize(
+    "mutator",
+    [
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("observed_description", 123),
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("plan_field_ref", None),
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("observed_description", ""),
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("observed_description", "x" * 301),
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("advisory_only", "true"),
+        lambda artifact: artifact["semantic_findings"][0].__setitem__("advisory_only", 1),
+    ],
+)
+def test_persisted_v2_validation_rejects_string_and_boolean_type_mismatches(mutator) -> None:
+    artifact = _good_v2_artifact()
+    mutator(artifact)
+    with pytest.raises(qa_module.HumanPresenceOutputQAError) as exc_info:
+        qa_module.validate_presence_output_qa_artifact_v2(artifact)
+    assert exc_info.value.code == "presence_output_malformed_artifact"
