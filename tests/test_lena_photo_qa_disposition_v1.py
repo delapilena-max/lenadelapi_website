@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import inspect
 import json
@@ -29,6 +30,12 @@ def _sha(path: Path) -> str:
 def _write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+
+def _write_png(path: Path) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1, 1), "white").save(path)
+    return _sha(path)
 
 
 def _all_pass() -> dict:
@@ -743,6 +750,64 @@ def test_exactly_one_mocked_bound_visual_call_no_retry_or_fallback(harness) -> N
     assert result["provider_called"] is True
 
 
+def test_real_anthropic_adapter_includes_generated_and_reference_images_without_path_leak(
+    harness,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider_calls = []
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            provider_calls.append(kwargs)
+            return SimpleNamespace(
+                content=[
+                    SimpleNamespace(
+                        type="tool_use",
+                        name="submit_visual_observations",
+                        input=_all_pass(),
+                    )
+                ]
+            )
+
+    def fake_anthropic(**kwargs):
+        return SimpleNamespace(messages=FakeMessages())
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
+
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=harness["decision_path"],
+        manifest_path=harness["manifest_path"],
+        image_path=harness["image_path"],
+        identity_evidence_path=harness["evidence_path"],
+        reference_specs=[(harness["reference_path"], _sha(harness["reference_path"]))],
+        reference_authority_artifact=harness["kwargs"]["reference_authority_artifact"],
+        reference_authority_sha256=harness["kwargs"]["reference_authority_sha256"],
+        expected_image_sha256=_sha(harness["image_path"]),
+        live_visual_review=True,
+        visual_provider="anthropic",
+        visual_model="exact-test-model",
+        visual_model_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        visual_model_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        failure_memory_loader=lambda: harness["memory"],
+    )
+
+    assert result["disposition"] == "accept"
+    assert len(provider_calls) == 1
+    content = provider_calls[0]["messages"][0]["content"]
+    text_payload = json.dumps(content, sort_keys=True)
+    assert str(harness["image_path"].resolve()) not in text_payload
+    assert str(harness["reference_path"].resolve()) not in text_payload
+    image_blocks = [block for block in content if block["type"] == "image"]
+    assert len(image_blocks) == 2
+    assert base64.b64decode(image_blocks[0]["source"]["data"]) == harness["image_path"].read_bytes()
+    assert base64.b64decode(image_blocks[1]["source"]["data"]) == harness["reference_path"].read_bytes()
+    text_blocks = [block["text"] for block in content if block["type"] == "text"]
+    assert any("generated_candidate" in text for text in text_blocks)
+    assert any("identity_reference_1" in text for text in text_blocks)
+
+
 def test_live_binding_mismatch_blocks_before_reviewer(harness) -> None:
     calls = []
     result = _evaluate(
@@ -785,8 +850,7 @@ def test_single_provider_exception_becomes_hard_stop_without_retry(harness) -> N
 
 def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     client_options = []
     provider_calls = []
     observations = _all_pass()
@@ -804,7 +868,7 @@ def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -820,8 +884,7 @@ def test_anthropic_adapter_explicitly_disables_sdk_retries(tmp_path, monkeypatch
 
 def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     observations = {"observations": _all_pass()["observations"]}
 
     class FakeMessages:
@@ -832,7 +895,7 @@ def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path,
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -843,8 +906,7 @@ def test_anthropic_adapter_binds_schema_version_when_provider_omits_it(tmp_path,
 
 def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redacted_diagnostics(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     payload = {"schema_version": "wrong_schema", "observations": _all_pass()["observations"]}
 
     class FakeMessages:
@@ -855,7 +917,7 @@ def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redact
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -868,8 +930,7 @@ def test_anthropic_adapter_rejects_conflicting_echoed_schema_version_with_redact
 
 def test_anthropic_adapter_non_dict_payload_reports_only_redacted_diagnostics(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
 
     class FakeMessages:
         def create(self, **kwargs):
@@ -879,7 +940,7 @@ def test_anthropic_adapter_non_dict_payload_reports_only_redacted_diagnostics(tm
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=lambda **kwargs: SimpleNamespace(messages=FakeMessages())))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
@@ -915,8 +976,7 @@ def test_malformed_duplicate_identity_observation_fails_closed() -> None:
 
 def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monkeypatch) -> None:
     image_path = tmp_path / "bound.png"
-    image_bytes = b"bound image bytes"
-    image_path.write_bytes(image_bytes)
+    image_sha = _write_png(image_path)
     client_options = []
     provider_calls = []
 
@@ -931,11 +991,11 @@ def test_anthropic_adapter_malformed_response_fails_without_retry(tmp_path, monk
 
     monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(Anthropic=fake_anthropic))
     request = {
-        "image": {"path": str(image_path), "sha256": hashlib.sha256(image_bytes).hexdigest(), "format": "PNG"},
+        "image": {"path": str(image_path), "sha256": image_sha, "format": "PNG"},
         "identity_references": [],
         "visual_model": disposition.APPROVED_VISUAL_MODEL,
     }
-    with pytest.raises(disposition.BoundaryError, match="exactly one structured observation block"):
+    with pytest.raises(disposition.BoundaryError, match="exactly one structured tool block"):
         disposition.call_anthropic_visual_review(request)
     assert client_options == [{"max_retries": 0}]
     assert len(provider_calls) == 1

@@ -50,6 +50,9 @@ class PresenceOutputQARunner(Protocol):
         media_type: str,
         output_root: Path | None = None,
         evaluated_at_utc: str | None = None,
+        live_presence_semantic_review: bool = False,
+        semantic_provider: Callable[..., dict[str, Any]] | None = None,
+        semantic_timeout_seconds: float = 30.0,
     ) -> tuple[Path, dict[str, Any]]:
         ...
 
@@ -364,6 +367,7 @@ def evaluate_generated_asset_qa_lifecycle(
     human_presence_output_qa_runner: PresenceOutputQARunner = human_presence_qa.run_presence_output_qa,
     qa_output_root: Path | None = None,
     lifecycle_output_root: Path | None = None,
+    live_presence_semantic_review: bool = False,
 ) -> dict[str, Any]:
     if qa_output_root is None:
         qa_output_root = qa_disposition.OUTPUT_ROOT
@@ -468,6 +472,7 @@ def evaluate_generated_asset_qa_lifecycle(
                 manifest_path=manifest_path,
                 image_path=image_path,
                 media_type="still_image",
+                live_presence_semantic_review=live_presence_semantic_review,
             )
             human_presence_output_qa_state = _completed_human_presence_output_qa_state(
                 human_presence_artifact_path,
@@ -565,6 +570,7 @@ def main() -> int:
     parser.add_argument("--identity-evidence-artifact", type=Path)
     parser.add_argument("--qa-output-root", type=Path, default=qa_disposition.OUTPUT_ROOT)
     parser.add_argument("--lifecycle-output-root", type=Path, default=NEXT_ACTIONS)
+    parser.add_argument("--live-presence-semantic-review", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -577,6 +583,7 @@ def main() -> int:
             identity_evidence_artifact=args.identity_evidence_artifact,
             qa_output_root=args.qa_output_root,
             lifecycle_output_root=args.lifecycle_output_root,
+            live_presence_semantic_review=args.live_presence_semantic_review,
         )
     except GeneratedAssetQaLifecycleError as exc:
         print(json.dumps({"ok": False, "code": exc.code, "detail": exc.detail}, indent=2))

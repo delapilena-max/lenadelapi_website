@@ -553,6 +553,7 @@ def test_hpe_success_records_completed_lifecycle_state_and_image_index_zero(
         "manifest_path",
         "image_path",
         "media_type",
+        "live_presence_semantic_review",
     }
     assert captured["date_str"] == DATE
     assert captured["slot_id"] == SLOT_ID
@@ -562,6 +563,7 @@ def test_hpe_success_records_completed_lifecycle_state_and_image_index_zero(
     assert captured["manifest_path"] == fixture["manifest_path"].resolve()
     assert captured["image_path"] == fixture["image_path"].resolve()
     assert captured["media_type"] == "still_image"
+    assert captured["live_presence_semantic_review"] is False
     assert report["qa_status"] == "accept"
     assert report["human_presence_output_qa_state"]["status"] == "completed"
     assert report["human_presence_output_qa_state"]["image_index"] == 0
@@ -574,6 +576,44 @@ def test_hpe_success_records_completed_lifecycle_state_and_image_index_zero(
     assert report["side_effect_flags"]["provider_call_performed"] is False
     assert report["side_effect_flags"]["generation_performed"] is False
     assert report["side_effect_flags"]["qa_run"] is True
+
+
+def test_live_presence_semantic_review_flag_is_forwarded_to_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    captured: dict[str, object] = {}
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        captured.update(kwargs)
+        return presence_output_qa.run_presence_output_qa(
+            date_str=str(kwargs["date_str"]),
+            slot_id=str(kwargs["slot_id"]),
+            image_index=int(kwargs["image_index"]),
+            plan=kwargs["plan"],
+            candidate_decision_path=Path(kwargs["candidate_decision_path"]),
+            manifest_path=Path(kwargs["manifest_path"]),
+            image_path=Path(kwargs["image_path"]),
+            media_type=str(kwargs["media_type"]),
+            output_root=presence_output_qa.OUTPUT_ROOT,
+            evaluated_at_utc="2026-07-15T12:04:00Z",
+        )
+
+    wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+        human_presence_output_qa_runner=hpe_runner,
+        live_presence_semantic_review=True,
+    )
+
+    assert captured["live_presence_semantic_review"] is True
 
 
 def test_hpe_without_plan_fingerprint_still_completes_as_not_assessable(

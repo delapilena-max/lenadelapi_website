@@ -9,12 +9,179 @@ from typing import Any
 from pipeline.presence.human_presence_candidate_ranking_v1 import plan_fingerprint_sha256
 
 
-SCHEMA_VERSION = "human_presence_output_qa_v1"
+SCHEMA_VERSION_V1 = "human_presence_output_qa_v1"
+SCHEMA_VERSION_V2 = "human_presence_output_qa_v2"
+SCHEMA_VERSION = SCHEMA_VERSION_V2
 REPORT_TYPE = "human_presence_output_qa"
 SUPPORTED_MEDIA_TYPES = frozenset({"still_image"})
 INTEGRITY_PASS = "integrity_pass"
 INTEGRITY_FAILURE = "integrity_failure"
 NOT_ASSESSABLE = "not_assessable"
+SEMANTIC_STATUS_ENUM = (
+    "not_evaluated",
+    "not_assessable",
+    "aligned",
+    "findings_present",
+    "error",
+)
+FINDING_CODES = (
+    "pose_plan_contradiction",
+    "gaze_plan_contradiction",
+    "expression_plan_contradiction",
+    "body_language_plan_contradiction",
+    "object_interaction_plan_contradiction",
+    "environment_interaction_mismatch",
+    "dead_eye_presence",
+    "frozen_expression_presence",
+    "mannequin_pose_presence",
+)
+FINDING_CATEGORIES = (
+    "plan_contradiction",
+    "presence_failure_indicator",
+    "environment_mismatch",
+)
+SEMANTIC_ERROR_CODES = (
+    "semantic_visual_review_timeout",
+    "semantic_visual_review_rate_limit",
+    "semantic_visual_review_overloaded",
+    "semantic_visual_review_provider_unavailable",
+    "semantic_visual_review_malformed_payload",
+    "semantic_visual_review_invalid_payload",
+    "semantic_visual_review_config_missing",
+    "semantic_visual_review_unsupported_media",
+    "semantic_visual_review_image_unreadable",
+    "semantic_visual_review_internal_error",
+)
+SEMANTIC_RESPONSE_SCHEMA_VERSION = "human_presence_semantic_visual_observations_v1"
+_SEMANTIC_RESULT_REQUIRED_KEYS = frozenset({
+    "semantic_status",
+    "semantic_findings",
+    "semantic_result_provenance",
+    "semantic_error",
+})
+_SEMANTIC_FINDING_KEYS = frozenset({
+    "finding_code",
+    "category",
+    "plan_field_ref",
+    "plan_field_value",
+    "observed_description",
+    "confidence",
+    "image_index",
+    "advisory_only",
+})
+_SEMANTIC_FINDING_CONFIDENCE = frozenset({"high", "medium", "low"})
+_STILL_IMAGE_PLAN_FIELD_ALLOWLIST = (
+    "viewer_relationship.awareness",
+    "viewer_relationship.performance_level",
+    "viewer_relationship.invitation_level",
+    "gaze_arc.start_focus",
+    "gaze_arc.recognition_behavior",
+    "gaze_arc.hold_intensity",
+    "expression_arc.start_state",
+    "expression_arc.peak_state",
+    "performance_actions.primary_action",
+    "performance_actions.object_interaction",
+    "movement_dynamics.weight_transfer",
+    "movement_dynamics.asymmetry_level",
+    "body_presentation.adult_character_required",
+    "body_presentation.silhouette_profile.bust_emphasis",
+    "body_presentation.silhouette_profile.waist_hip_contrast",
+    "body_presentation.silhouette_profile.hip_glute_emphasis",
+    "body_presentation.silhouette_profile.proportion_realism",
+    "body_presentation.silhouette_profile.silhouette_shape_class",
+    "body_presentation.wardrobe_body_interaction",
+    "body_presentation.anatomy_continuity_required",
+    "body_presentation.gravity_and_soft_tissue_realism",
+    "body_presentation.framing_intent",
+    "sensual_presence.tier",
+    "sensual_presence.exposure_dependency",
+    "sensual_presence.confidence_level",
+    "failure_indicators.dead_or_unfocused_eyes",
+    "failure_indicators.frozen_expression",
+    "failure_indicators.mannequin_pose",
+    "failure_indicators.face_body_emotion_mismatch",
+    "failure_indicators.sexual_styling_without_personality",
+)
+_SEMANTIC_FINDING_TO_CATEGORY = {
+    "pose_plan_contradiction": "plan_contradiction",
+    "gaze_plan_contradiction": "plan_contradiction",
+    "expression_plan_contradiction": "plan_contradiction",
+    "body_language_plan_contradiction": "plan_contradiction",
+    "object_interaction_plan_contradiction": "plan_contradiction",
+    "environment_interaction_mismatch": "environment_mismatch",
+    "dead_eye_presence": "presence_failure_indicator",
+    "frozen_expression_presence": "presence_failure_indicator",
+    "mannequin_pose_presence": "presence_failure_indicator",
+}
+_SEMANTIC_FINDING_TO_PLAN_REF = {
+    "pose_plan_contradiction": "performance_actions.primary_action",
+    "gaze_plan_contradiction": "gaze_arc.start_focus",
+    "expression_plan_contradiction": "expression_arc.peak_state",
+    "body_language_plan_contradiction": "movement_dynamics.weight_transfer",
+    "object_interaction_plan_contradiction": "performance_actions.object_interaction",
+    "environment_interaction_mismatch": "body_presentation.framing_intent",
+    "dead_eye_presence": "failure_indicators.dead_or_unfocused_eyes",
+    "frozen_expression_presence": "failure_indicators.frozen_expression",
+    "mannequin_pose_presence": "failure_indicators.mannequin_pose",
+}
+_SEMANTIC_FINDING_DETAIL_LIMIT = 300
+_SEMANTIC_FINDING_IMAGE_INDEX = 0
+_SEMANTIC_RESULT_PROVENANCE_KEYS = frozenset({
+    "provider",
+    "model",
+    "request_binding_sha256",
+    "evaluated_at_utc",
+    "response_schema_version",
+})
+_SEMANTIC_PLAN_FIELD_RULES = {
+    "viewer_relationship.awareness": {"kind": "string"},
+    "viewer_relationship.performance_level": {"kind": "string"},
+    "viewer_relationship.invitation_level": {"kind": "string"},
+    "gaze_arc.start_focus": {"kind": "string"},
+    "gaze_arc.recognition_behavior": {"kind": "string"},
+    "gaze_arc.hold_intensity": {"kind": "string"},
+    "expression_arc.start_state": {"kind": "string"},
+    "expression_arc.peak_state": {"kind": "string"},
+    "performance_actions.primary_action": {"kind": "string"},
+    "performance_actions.object_interaction": {"kind": "string"},
+    "movement_dynamics.weight_transfer": {"kind": "string"},
+    "movement_dynamics.asymmetry_level": {"kind": "string"},
+    "body_presentation.adult_character_required": {"kind": "bool"},
+    "body_presentation.silhouette_profile.bust_emphasis": {"kind": "string"},
+    "body_presentation.silhouette_profile.waist_hip_contrast": {"kind": "string"},
+    "body_presentation.silhouette_profile.hip_glute_emphasis": {"kind": "string"},
+    "body_presentation.silhouette_profile.proportion_realism": {"kind": "string"},
+    "body_presentation.silhouette_profile.silhouette_shape_class": {"kind": "string"},
+    "body_presentation.wardrobe_body_interaction": {"kind": "string"},
+    "body_presentation.anatomy_continuity_required": {"kind": "bool"},
+    "body_presentation.gravity_and_soft_tissue_realism": {"kind": "bool"},
+    "body_presentation.framing_intent": {"kind": "string"},
+    "sensual_presence.tier": {"kind": "string"},
+    "sensual_presence.exposure_dependency": {"kind": "string"},
+    "sensual_presence.confidence_level": {"kind": "string"},
+    "failure_indicators.dead_or_unfocused_eyes": {"kind": "bool"},
+    "failure_indicators.frozen_expression": {"kind": "bool"},
+    "failure_indicators.mannequin_pose": {"kind": "bool"},
+    "failure_indicators.face_body_emotion_mismatch": {"kind": "bool"},
+    "failure_indicators.sexual_styling_without_personality": {"kind": "bool"},
+}
+_PROHIBITED_OBSERVED_DESCRIPTION_PATTERNS = (
+    r"\bidentity mismatch\b",
+    r"\bwrong person\b",
+    r"\bwrong identity\b",
+    r"\bidentity is wrong\b",
+    r"\bidentity collapse\b",
+    r"\banatomy defect\b",
+    r"\banatomy defects\b",
+    r"\banatomy\s+(?:is|looks)\s+wrong\b",
+    r"\bhand defect\b",
+    r"\bhand defects\b",
+    r"\bhands?\s+(?:are|is|look|looks)\s+wrong\b",
+    r"\bapprove(?:d)?\b",
+    r"\breject(?:ed)?\b",
+    r"\bpublish(?:ing)?\b",
+    r"\bretry\b",
+)
 
 _BINDING_NAMES = ("plan", "candidate_decision", "manifest", "generated_image")
 _BINDING_STATUSES = frozenset(
@@ -288,6 +455,399 @@ def _load_expected_sha_from_artifact(
         if _is_sha256(value):
             return str(value).lower()
     return None
+
+
+def _plan_path_get(plan: dict[str, Any], *path: str) -> Any:
+    current: Any = plan
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"plan is missing required field {'.'.join(path)}",
+            )
+        current = current[key]
+    return current
+
+
+def _failure_indicator_value(plan: dict[str, Any], name: str) -> bool:
+    indicators = _plan_path_get(plan, "failure_indicators")
+    if not isinstance(indicators, list) or not all(isinstance(item, str) for item in indicators):
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "plan failure_indicators must be a JSON array of strings",
+        )
+    return name in indicators
+
+
+def _still_image_plan_field_values(plan: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "viewer_relationship.awareness": _plan_path_get(plan, "viewer_relationship", "contract", "awareness"),
+        "viewer_relationship.performance_level": _plan_path_get(plan, "viewer_relationship", "contract", "performance_level"),
+        "viewer_relationship.invitation_level": _plan_path_get(plan, "viewer_relationship", "contract", "invitation_level"),
+        "gaze_arc.start_focus": _plan_path_get(plan, "gaze_arc", "contract", "start_focus"),
+        "gaze_arc.recognition_behavior": _plan_path_get(plan, "gaze_arc", "contract", "recognition_behavior"),
+        "gaze_arc.hold_intensity": _plan_path_get(plan, "gaze_arc", "contract", "hold_intensity"),
+        "expression_arc.start_state": _plan_path_get(plan, "expression_arc", "contract", "start_state"),
+        "expression_arc.peak_state": _plan_path_get(plan, "expression_arc", "contract", "peak_state"),
+        "performance_actions.primary_action": _plan_path_get(plan, "performance_actions", "contract", "primary_action"),
+        "performance_actions.object_interaction": _plan_path_get(plan, "performance_actions", "contract", "object_interaction"),
+        "movement_dynamics.weight_transfer": _plan_path_get(plan, "movement_dynamics", "contract", "weight_transfer"),
+        "movement_dynamics.asymmetry_level": _plan_path_get(plan, "movement_dynamics", "contract", "asymmetry_level"),
+        "body_presentation.adult_character_required": _plan_path_get(plan, "body_presentation", "contract", "adult_character_required"),
+        "body_presentation.silhouette_profile.bust_emphasis": _plan_path_get(plan, "body_presentation", "contract", "silhouette_profile", "bust_emphasis"),
+        "body_presentation.silhouette_profile.waist_hip_contrast": _plan_path_get(plan, "body_presentation", "contract", "silhouette_profile", "waist_hip_contrast"),
+        "body_presentation.silhouette_profile.hip_glute_emphasis": _plan_path_get(plan, "body_presentation", "contract", "silhouette_profile", "hip_glute_emphasis"),
+        "body_presentation.silhouette_profile.proportion_realism": _plan_path_get(plan, "body_presentation", "contract", "silhouette_profile", "proportion_realism"),
+        "body_presentation.silhouette_profile.silhouette_shape_class": _plan_path_get(plan, "body_presentation", "contract", "silhouette_profile", "silhouette_shape_class"),
+        "body_presentation.wardrobe_body_interaction": _plan_path_get(plan, "body_presentation", "contract", "wardrobe_body_interaction"),
+        "body_presentation.anatomy_continuity_required": _plan_path_get(plan, "body_presentation", "contract", "anatomy_continuity_required"),
+        "body_presentation.gravity_and_soft_tissue_realism": _plan_path_get(plan, "body_presentation", "contract", "gravity_and_soft_tissue_realism"),
+        "body_presentation.framing_intent": _plan_path_get(plan, "body_presentation", "contract", "framing_intent"),
+        "sensual_presence.tier": _plan_path_get(plan, "sensual_presence", "contract", "tier"),
+        "sensual_presence.exposure_dependency": _plan_path_get(plan, "sensual_presence", "contract", "exposure_dependency"),
+        "sensual_presence.confidence_level": _plan_path_get(plan, "sensual_presence", "contract", "confidence_level"),
+        "failure_indicators.dead_or_unfocused_eyes": _failure_indicator_value(plan, "dead_or_unfocused_eyes"),
+        "failure_indicators.frozen_expression": _failure_indicator_value(plan, "frozen_expression"),
+        "failure_indicators.mannequin_pose": _failure_indicator_value(plan, "mannequin_pose"),
+        "failure_indicators.face_body_emotion_mismatch": _failure_indicator_value(plan, "face_body_emotion_mismatch"),
+        "failure_indicators.sexual_styling_without_personality": _failure_indicator_value(plan, "sexual_styling_without_personality"),
+    }
+
+
+def _semantics_base_result(
+    *,
+    semantic_status: str,
+    semantic_findings: list[dict[str, Any]] | None = None,
+    semantic_result_provenance: dict[str, Any] | None = None,
+    semantic_error: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "semantic_status": semantic_status,
+        "semantic_findings": semantic_findings or [],
+        "semantic_result_provenance": semantic_result_provenance,
+        "semantic_error": semantic_error,
+    }
+
+
+def _semantic_error_payload(error_code: str, error_message: str) -> dict[str, Any]:
+    if error_code not in SEMANTIC_ERROR_CODES:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic error code {error_code!r} is not supported",
+        )
+    if not isinstance(error_message, str) or not error_message.strip():
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic error message must be a non-empty string",
+        )
+    return {"error_code": error_code, "error_message": error_message.strip()[:500]}
+
+
+def _semantic_provenance_payload(
+    *,
+    provider: str,
+    model: str,
+    request_binding_sha256: str,
+    evaluated_at_utc: str,
+    response_schema_version: str,
+) -> dict[str, Any]:
+    if not isinstance(model, str) or not model.strip():
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic model must be a non-empty string",
+        )
+    request_binding_sha256 = _require_sha256(request_binding_sha256, "request_binding_sha256")
+    if not isinstance(evaluated_at_utc, str) or not evaluated_at_utc.strip():
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "evaluated_at_utc must be a non-empty string",
+        )
+    if response_schema_version != SEMANTIC_RESPONSE_SCHEMA_VERSION:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic response schema version mismatch",
+        )
+    return {
+        "provider": provider,
+        "model": model,
+        "request_binding_sha256": request_binding_sha256,
+        "evaluated_at_utc": evaluated_at_utc,
+        "response_schema_version": response_schema_version,
+    }
+
+
+def _semantic_findings_or_empty(findings: Any) -> list[dict[str, Any]]:
+    if findings is None:
+        return []
+    if not isinstance(findings, list):
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic_findings must be a JSON array",
+        )
+    return findings
+
+
+def _normalized_observed_description(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def _validate_observed_description(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "observed_description must be a non-empty string",
+        )
+    normalized = _normalized_observed_description(value)
+    if len(normalized) > _SEMANTIC_FINDING_DETAIL_LIMIT:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "observed_description is too long",
+        )
+    for pattern in _PROHIBITED_OBSERVED_DESCRIPTION_PATTERNS:
+        if re.search(pattern, normalized):
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"observed_description contains prohibited HPE-external judgment: {value.strip()!r}",
+            )
+    return value.strip()
+
+
+def _validate_semantic_plan_field_value(
+    plan_field_ref: str,
+    plan_field_value: Any,
+    *,
+    plan_values: dict[str, Any] | None,
+) -> Any:
+    if plan_values is not None:
+        if plan_field_ref not in plan_values:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"plan_field_ref {plan_field_ref!r} was not present in the approved plan subset",
+            )
+        expected_value = plan_values[plan_field_ref]
+    else:
+        rule = _SEMANTIC_PLAN_FIELD_RULES.get(plan_field_ref)
+        if rule is None:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"plan_field_ref {plan_field_ref!r} is not supported by the persisted semantic schema",
+            )
+        kind = rule["kind"]
+        if kind == "bool":
+            if not isinstance(plan_field_value, bool):
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} must be boolean",
+                )
+        elif kind == "string":
+            if not isinstance(plan_field_value, str) or not plan_field_value.strip():
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} must be a non-empty string",
+                )
+            if len(plan_field_value.strip()) > 200:
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} is too long",
+                )
+        else:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"unsupported persisted plan field rule for {plan_field_ref!r}",
+            )
+        return plan_field_value
+    if plan_field_value != expected_value:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"plan_field_value for {plan_field_ref!r} does not match the approved plan value",
+        )
+    return plan_field_value
+
+
+def _validate_semantic_finding(
+    finding: Any,
+    *,
+    image_index: int,
+    plan_values: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(finding, dict):
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic findings must contain JSON objects",
+        )
+    if set(finding) != _SEMANTIC_FINDING_KEYS:
+        extra = sorted(set(finding) - _SEMANTIC_FINDING_KEYS)
+        missing = sorted(_SEMANTIC_FINDING_KEYS - set(finding))
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic finding keys must match the approved schema; missing={missing}, extra={extra}",
+        )
+    code = finding["finding_code"]
+    category = finding["category"]
+    plan_field_ref = finding["plan_field_ref"]
+    observed_description = finding["observed_description"]
+    confidence = finding["confidence"]
+    finding_image_index = finding["image_index"]
+    advisory_only = finding["advisory_only"]
+    if code not in FINDING_CODES:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"finding_code {code!r} is not supported",
+        )
+    expected_category = _SEMANTIC_FINDING_TO_CATEGORY.get(code)
+    if category not in FINDING_CATEGORIES or expected_category != category:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"finding category {category!r} is not compatible with {code!r}",
+        )
+    expected_ref = _SEMANTIC_FINDING_TO_PLAN_REF.get(code)
+    if plan_field_ref not in _STILL_IMAGE_PLAN_FIELD_ALLOWLIST or expected_ref != plan_field_ref:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"plan_field_ref {plan_field_ref!r} is not allowed for {code!r}",
+        )
+    validated_plan_field_value = _validate_semantic_plan_field_value(
+        plan_field_ref,
+        finding["plan_field_value"],
+        plan_values=plan_values,
+    )
+    validated_observed_description = _validate_observed_description(observed_description)
+    if confidence not in _SEMANTIC_FINDING_CONFIDENCE:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"confidence {confidence!r} is not supported",
+        )
+    if finding_image_index != image_index:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"image_index {finding_image_index!r} does not match the requested image index",
+        )
+    if not isinstance(advisory_only, bool):
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "advisory_only must be boolean",
+        )
+    return {
+        "finding_code": code,
+        "category": category,
+        "plan_field_ref": plan_field_ref,
+        "plan_field_value": validated_plan_field_value,
+        "observed_description": validated_observed_description,
+        "confidence": confidence,
+        "image_index": finding_image_index,
+        "advisory_only": advisory_only,
+    }
+
+
+def _validate_semantic_result(
+    value: Any,
+    *,
+    image_index: int,
+    plan_values: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "semantic result must be a JSON object",
+        )
+    public_keys = {key for key in value if not str(key).startswith("_")}
+    if public_keys != _SEMANTIC_RESULT_REQUIRED_KEYS:
+        missing = sorted(_SEMANTIC_RESULT_REQUIRED_KEYS - public_keys)
+        extra = sorted(public_keys - _SEMANTIC_RESULT_REQUIRED_KEYS)
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic result keys must match the approved schema; missing={missing}, extra={extra}",
+        )
+    status = value["semantic_status"]
+    if status not in SEMANTIC_STATUS_ENUM:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic_status {status!r} is not supported",
+        )
+    findings = _semantic_findings_or_empty(value["semantic_findings"])
+    validated_findings = [_validate_semantic_finding(finding, image_index=image_index, plan_values=plan_values) for finding in findings]
+    provenance = value["semantic_result_provenance"]
+    error = value["semantic_error"]
+    if status in {"aligned", "findings_present"}:
+        if provenance is None:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                "semantic_result_provenance is required for evaluated semantic states",
+            )
+        if error is not None:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                "semantic_error must be null for evaluated semantic states",
+            )
+        validated_provenance = _semantic_provenance_payload(
+            provider=str(provenance.get("provider") or ""),
+            model=str(provenance.get("model") or ""),
+            request_binding_sha256=str(provenance.get("request_binding_sha256") or ""),
+            evaluated_at_utc=str(provenance.get("evaluated_at_utc") or ""),
+            response_schema_version=str(provenance.get("response_schema_version") or ""),
+        )
+        validated_error = None
+    else:
+        if provenance is not None:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"semantic_result_provenance must be null when semantic_status is {status!r}",
+            )
+        validated_provenance = None
+        validated_error = None
+        if status == "error":
+            if not isinstance(error, dict):
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    "semantic_error must be an object when semantic_status is error",
+                )
+            validated_error = _semantic_error_payload(
+                error_code=str(error.get("error_code") or ""),
+                error_message=str(error.get("error_message") or ""),
+            )
+        else:
+            if error is not None:
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"semantic_error must be null when semantic_status is {status!r}",
+                )
+            validated_error = None
+    if status == "not_evaluated" and validated_findings:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "not_evaluated artifacts may not carry semantic findings",
+        )
+    if status == "not_assessable" and validated_findings:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "not_assessable artifacts may not carry semantic findings",
+        )
+    if status == "aligned" and validated_findings:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "aligned artifacts may not carry semantic findings",
+        )
+    if status == "findings_present" and not validated_findings:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "findings_present artifacts must carry at least one semantic finding",
+        )
+    if status == "error" and validated_findings:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "error artifacts may not carry semantic findings",
+        )
+    if status in {"not_evaluated", "not_assessable"} and validated_provenance is not None:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic_result_provenance must be null when semantic_status is {status!r}",
+        )
+    return {
+        "semantic_status": status,
+        "semantic_findings": validated_findings,
+        "semantic_result_provenance": validated_provenance,
+        "semantic_error": validated_error,
+    }
 
 
 def evaluate_still_image_presence_integrity(
@@ -624,29 +1184,17 @@ def evaluate_still_image_presence_integrity(
     }
 
 
-def build_presence_output_qa_artifact(
-    *,
+def _build_binding_records_for_artifact(
     integrity_result: dict[str, Any],
     source_artifacts: dict[str, str | None],
-    evaluator_version: str,
-    generated_at_utc: str | None = None,
-) -> dict[str, Any]:
-    """Assemble the full output-QA artifact dict.
-
-    ``integrity_result`` must be the dict returned by
-    ``evaluate_still_image_presence_integrity``. The binding records are
-    preserved verbatim except for path materialization from ``source_artifacts``.
-    """
-
-    status = integrity_result["integrity_status"]
-    recommendation = _INTEGRITY_STATUS_TO_RECOMMENDATION.get(status, NOT_ASSESSABLE)
-    binding_records = []
+) -> list[dict[str, Any]]:
     source_map = {
         "plan": source_artifacts.get("plan_path"),
         "candidate_decision": source_artifacts.get("candidate_decision_path"),
         "manifest": source_artifacts.get("manifest_path"),
         "generated_image": source_artifacts.get("image_path"),
     }
+    binding_records = []
     for record in integrity_result["binding_records"]:
         binding_records.append(
             _binding_record_from_result(
@@ -654,9 +1202,24 @@ def build_presence_output_qa_artifact(
                 source_path=source_map.get(record["binding_name"]),
             )
         )
+    return binding_records
+
+
+def build_presence_output_qa_artifact_v1(
+    *,
+    integrity_result: dict[str, Any],
+    source_artifacts: dict[str, str | None],
+    evaluator_version: str,
+    generated_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Assemble the legacy v1 output-QA artifact dict."""
+
+    status = integrity_result["integrity_status"]
+    recommendation = _INTEGRITY_STATUS_TO_RECOMMENDATION.get(status, NOT_ASSESSABLE)
+    binding_records = _build_binding_records_for_artifact(integrity_result, source_artifacts)
     return {
         "report_type": REPORT_TYPE,
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": SCHEMA_VERSION_V1,
         "medium": "still_image",
         "evaluator_version": evaluator_version,
         "generated_at_utc": generated_at_utc or _utcnow_iso(),
@@ -670,6 +1233,72 @@ def build_presence_output_qa_artifact(
         },
         "recommendation": recommendation,
     }
+
+
+def build_presence_output_qa_artifact_v2(
+    *,
+    integrity_result: dict[str, Any],
+    semantic_result: dict[str, Any],
+    source_artifacts: dict[str, str | None],
+    evaluator_version: str,
+    compiled_plan_values: dict[str, Any] | None = None,
+    generated_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Assemble the v2 output-QA artifact dict."""
+
+    status = integrity_result["integrity_status"]
+    recommendation = _INTEGRITY_STATUS_TO_RECOMMENDATION.get(status, NOT_ASSESSABLE)
+    binding_records = _build_binding_records_for_artifact(integrity_result, source_artifacts)
+    semantic = _validate_semantic_result(
+        semantic_result,
+        image_index=_SEMANTIC_FINDING_IMAGE_INDEX,
+        plan_values=compiled_plan_values,
+    )
+    return {
+        "report_type": REPORT_TYPE,
+        "schema_version": SCHEMA_VERSION_V2,
+        "medium": "still_image",
+        "evaluator_version": evaluator_version,
+        "generated_at_utc": generated_at_utc or _utcnow_iso(),
+        "integrity_status": status,
+        "integrity_findings": integrity_result["integrity_findings"],
+        "semantic_status": semantic["semantic_status"],
+        "semantic_findings": semantic["semantic_findings"],
+        "semantic_result_provenance": semantic["semantic_result_provenance"],
+        "semantic_error": semantic["semantic_error"],
+        "binding_records": binding_records,
+        "source_artifacts": {
+            key: value for key, value in source_artifacts.items() if value is not None
+        },
+        "recommendation": recommendation,
+    }
+
+
+def build_presence_output_qa_artifact(
+    *,
+    integrity_result: dict[str, Any],
+    source_artifacts: dict[str, str | None],
+    evaluator_version: str,
+    compiled_plan_values: dict[str, Any] | None = None,
+    generated_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Backward-compatible v2 builder alias."""
+
+    semantic_result = integrity_result.get("_semantic_result") or {
+        "semantic_status": integrity_result["semantic_status"],
+        "semantic_findings": integrity_result["semantic_findings"],
+        "semantic_result_provenance": None,
+        "semantic_error": None,
+        "_plan_values": {},
+    }
+    return build_presence_output_qa_artifact_v2(
+        integrity_result=integrity_result,
+        semantic_result=semantic_result,
+        source_artifacts=source_artifacts,
+        evaluator_version=evaluator_version,
+        compiled_plan_values=compiled_plan_values,
+        generated_at_utc=generated_at_utc,
+    )
 
 
 def _validate_binding_records(binding_records: Any) -> list[dict[str, Any]]:
@@ -688,9 +1317,7 @@ def _validate_binding_records(binding_records: Any) -> list[dict[str, Any]]:
     return validated
 
 
-def validate_presence_output_qa_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
-    """Validate a presence output QA artifact dict."""
-
+def _validate_artifact_common(artifact: dict[str, Any], *, schema_version: str) -> dict[str, Any]:
     def _fail(detail: str) -> None:
         raise HumanPresenceOutputQAError("presence_output_malformed_artifact", detail)
 
@@ -701,8 +1328,8 @@ def validate_presence_output_qa_artifact(artifact: dict[str, Any]) -> dict[str, 
     if missing:
         _fail(f"artifact is missing required keys: {sorted(missing)}")
 
-    if artifact["schema_version"] != SCHEMA_VERSION:
-        _fail(f"schema_version must be {SCHEMA_VERSION!r}, got {artifact['schema_version']!r}")
+    if artifact["schema_version"] != schema_version:
+        _fail(f"schema_version must be {schema_version!r}, got {artifact['schema_version']!r}")
 
     if artifact["report_type"] != REPORT_TYPE:
         _fail(f"report_type must be {REPORT_TYPE!r}, got {artifact['report_type']!r}")
@@ -720,14 +1347,6 @@ def validate_presence_output_qa_artifact(artifact: dict[str, Any]) -> dict[str, 
             f"recommendation {artifact['recommendation']!r} is inconsistent with "
             f"integrity_status {status!r}; expected {expected_rec!r}"
         )
-
-    if artifact["semantic_status"] != "not_evaluated":
-        _fail(
-            f"semantic_status must be 'not_evaluated' in PR1, "
-            f"got {artifact['semantic_status']!r}"
-        )
-    if artifact["semantic_findings"] != []:
-        _fail(f"semantic_findings must be [] in PR1, got {artifact['semantic_findings']!r}")
 
     binding_records = _validate_binding_records(artifact["binding_records"])
     mismatch_bindings = [record for record in binding_records if record["binding_status"] == "mismatch"]
@@ -773,3 +1392,74 @@ def validate_presence_output_qa_artifact(artifact: dict[str, Any]) -> dict[str, 
             _fail(f"binding_status {record['binding_status']!r} is not allowed")
 
     return artifact
+
+
+def validate_presence_output_qa_artifact_v1(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Validate a legacy v1 presence output QA artifact."""
+
+    artifact = _validate_artifact_common(artifact, schema_version=SCHEMA_VERSION_V1)
+    if artifact["semantic_status"] != "not_evaluated":
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic_status must be 'not_evaluated' in v1, got {artifact['semantic_status']!r}",
+        )
+    if artifact["semantic_findings"] != []:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            f"semantic_findings must be [] in v1, got {artifact['semantic_findings']!r}",
+        )
+    if "semantic_result_provenance" in artifact or "semantic_error" in artifact:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "v1 artifacts may not contain semantic_result_provenance or semantic_error",
+        )
+    return artifact
+
+
+def validate_presence_output_qa_artifact_v2(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Validate a v2 presence output QA artifact."""
+
+    artifact = _validate_artifact_common(artifact, schema_version=SCHEMA_VERSION_V2)
+    if "semantic_result_provenance" not in artifact or "semantic_error" not in artifact:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "v2 artifacts must include semantic_result_provenance and semantic_error",
+        )
+    semantic = _validate_semantic_result(
+        {
+            "semantic_status": artifact["semantic_status"],
+            "semantic_findings": artifact["semantic_findings"],
+            "semantic_result_provenance": artifact["semantic_result_provenance"],
+            "semantic_error": artifact["semantic_error"],
+        },
+        image_index=_SEMANTIC_FINDING_IMAGE_INDEX,
+        plan_values=None,
+    )
+    if semantic["semantic_status"] in {"aligned", "findings_present"} and semantic["semantic_result_provenance"] is None:
+        raise HumanPresenceOutputQAError(
+            "presence_output_malformed_artifact",
+            "validated semantic results must carry provenance",
+        )
+    if semantic["semantic_status"] in {"not_evaluated", "not_assessable"}:
+        if semantic["semantic_result_provenance"] is not None or semantic["semantic_error"] is not None:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                "non-evaluated semantic states must not carry provenance or semantic errors",
+            )
+    return artifact
+
+
+def validate_presence_output_qa_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Validate a presence output QA artifact dict by schema version."""
+
+    if not isinstance(artifact, dict):
+        raise HumanPresenceOutputQAError("presence_output_malformed_artifact", "artifact must be a JSON object")
+    schema_version = artifact.get("schema_version")
+    if schema_version == SCHEMA_VERSION_V1:
+        return validate_presence_output_qa_artifact_v1(artifact)
+    if schema_version == SCHEMA_VERSION_V2:
+        return validate_presence_output_qa_artifact_v2(artifact)
+    raise HumanPresenceOutputQAError(
+        "presence_output_malformed_artifact",
+        f"schema_version {schema_version!r} is not supported",
+    )

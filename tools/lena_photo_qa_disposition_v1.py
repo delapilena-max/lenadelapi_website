@@ -23,6 +23,11 @@ from pipeline.identity import lena_higgsfield_identity as identity  # noqa: E402
 from pipeline.prompting import lena_prompt_brain  # noqa: E402
 from pipeline.qa import lena_higgsfield_failure_memory as failure_memory  # noqa: E402
 from pipeline.qa import lena_photo_qa  # noqa: E402
+from tools.lena_structured_visual_tool_v1 import (  # noqa: E402
+    StructuredVisualImage,
+    StructuredVisualToolError,
+    call_anthropic_structured_visual_tool,
+)
 from tools import lena_higgsfield_qa_bridge_v1 as qa_bridge  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff  # noqa: E402
 from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff  # noqa: E402
@@ -940,6 +945,53 @@ def _review_request(
     }
 
 
+def _visual_request_payload(request: dict[str, Any]) -> dict[str, Any]:
+    image = request["image"]
+    identity_references = request["identity_references"]
+    payload = {key: value for key, value in request.items() if key not in {"image", "identity_references"}}
+    payload["image"] = {
+        "sha256": image["sha256"],
+        "format": image["format"],
+    }
+    if "width" in image:
+        payload["image"]["width"] = image["width"]
+    if "height" in image:
+        payload["image"]["height"] = image["height"]
+    payload["identity_references"] = [
+        {
+            key: value
+            for key, value in {
+                "sha256": ref["sha256"],
+                "format": ref["format"],
+                "width": ref.get("width"),
+                "height": ref.get("height"),
+            }.items()
+            if value is not None
+        }
+        for ref in identity_references
+    ]
+    return payload
+
+
+def _visual_request_images(request: dict[str, Any]) -> list[StructuredVisualImage]:
+    images = [
+        StructuredVisualImage(
+            path=Path(request["image"]["path"]),
+            sha256=str(request["image"]["sha256"]),
+            role="generated_candidate",
+        )
+    ]
+    for index, reference in enumerate(request["identity_references"], start=1):
+        images.append(
+            StructuredVisualImage(
+                path=Path(reference["path"]),
+                sha256=str(reference["sha256"]),
+                role=f"identity_reference_{index}",
+            )
+        )
+    return images
+
+
 def _redacted_tool_input_diagnostics(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {"input_type": type(value).__name__}
@@ -961,24 +1013,6 @@ def _redacted_tool_input_diagnostics(value: Any) -> dict[str, Any]:
 
 def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
     """One bounded call. Lazy import; no retries, fallback, or second candidate."""
-    import anthropic  # type: ignore[import-not-found]
-
-    content: list[dict[str, Any]] = []
-    for role, item in [("generated_image", request["image"]), *[("identity_reference", ref) for ref in request["identity_references"]]]:
-        media_type = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp"}[item["format"]]
-        image_bytes = _read_bound_image_bytes(item)
-        content.append(
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": media_type,
-                    "data": base64.b64encode(image_bytes).decode("ascii"),
-                },
-            }
-        )
-        content.append({"type": "text", "text": f"The preceding image role is {role}."})
-    content.append({"type": "text", "text": json.dumps(request, sort_keys=True, ensure_ascii=False)})
     properties = {
         key: {
             "type": "object",
@@ -992,27 +1026,34 @@ def call_anthropic_visual_review(request: dict[str, Any]) -> dict[str, Any]:
         }
         for key in VISUAL_OBSERVATION_KEYS
     }
-    client = anthropic.Anthropic(max_retries=0)
-    response = client.messages.create(
-        model=request["visual_model"],
-        max_tokens=4096,
-        tools=[{
-            "name": "submit_visual_observations",
-            "description": "Return structured observations only; local code assigns disposition.",
-            "input_schema": {
+    try:
+        visual_request = _visual_request_payload(request)
+        payload = call_anthropic_structured_visual_tool(
+            images=_visual_request_images(request),
+            system_prompt="Return structured observations only; local code assigns disposition.",
+            user_text=json.dumps(visual_request, sort_keys=True, ensure_ascii=False),
+            tool_name="submit_visual_observations",
+            tool_schema={
                 "type": "object",
-                "properties": {"schema_version": {"type": "string", "enum": [VISUAL_SCHEMA_VERSION]}, "observations": {"type": "object", "properties": properties, "required": list(VISUAL_OBSERVATION_KEYS), "additionalProperties": False}},
+                "properties": {
+                    "schema_version": {"type": "string", "enum": [VISUAL_SCHEMA_VERSION]},
+                    "observations": {
+                        "type": "object",
+                        "properties": properties,
+                        "required": list(VISUAL_OBSERVATION_KEYS),
+                        "additionalProperties": False,
+                    },
+                },
                 "required": ["observations"],
                 "additionalProperties": False,
             },
-        }],
-        tool_choice={"type": "tool", "name": "submit_visual_observations"},
-        messages=[{"role": "user", "content": content}],
-    )
-    blocks = [block for block in response.content if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == "submit_visual_observations"]
-    if len(blocks) != 1:
-        raise BoundaryError("visual_review_unavailable", "visual provider did not return exactly one structured observation block")
-    payload = blocks[0].input
+            provider=APPROVED_VISUAL_PROVIDER,
+            model=str(request["visual_model"]),
+            timeout_seconds=30.0,
+            max_tokens=4096,
+        )
+    except StructuredVisualToolError as exc:
+        raise BoundaryError(exc.code, exc.detail) from exc
     if not isinstance(payload, dict):
         diagnostics = _redacted_tool_input_diagnostics(payload)
         raise BoundaryError(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,13 +14,31 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.presence.human_presence_output_qa_v1 import (  # noqa: E402
-    build_presence_output_qa_artifact,
+    HumanPresenceOutputQAError,
+    SCHEMA_VERSION_V1,
+    SCHEMA_VERSION_V2,
+    build_presence_output_qa_artifact_v1,
+    build_presence_output_qa_artifact_v2,
     evaluate_still_image_presence_integrity,
+    _still_image_plan_field_values,
+    validate_presence_output_qa_artifact,
+)
+from tools.lena_presence_semantic_visual_review_v1 import (  # noqa: E402
+    evaluate_hpe_semantic_still_image_presence,
+    SEMANTIC_MODEL_NAME,
+    SEMANTIC_PROVIDER_NAME,
 )
 
 
 OUTPUT_ROOT = ROOT / "pipeline" / "asset_review" / "lena" / "presence_output_qa"
-EVALUATOR_VERSION = "hpe_2c_pr1_integrity_v1"
+EVALUATOR_VERSION = "hpe_2c_pr3_integrity_semantic_v1"
+
+
+class GeneratedAssetQaLifecycleError(RuntimeError):
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 def presence_output_qa_artifact_path(
@@ -79,13 +98,30 @@ def sha256_file(path: Path) -> str:
 
 def write_presence_output_qa_artifact_atomic(
     path: Path, artifact: dict[str, Any]
-) -> None:
-    """Write a presence output QA artifact atomically (tmp → rename)."""
+) -> tuple[Path, dict[str, Any], bool]:
+    """Write a presence output QA artifact atomically without silent overwrite."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(artifact, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    tmp_path.write_text(payload + "\n", encoding="utf-8")
-    tmp_path.replace(path)
+    payload_bytes = (payload + "\n").encode("utf-8")
+    if path.exists():
+        existing = path.read_bytes()
+        if existing == payload_bytes:
+            return path, json.loads(existing), False
+        raise GeneratedAssetQaLifecycleError(
+            "artifact_already_exists",
+            f"refusing to overwrite existing artifact with different content: {path}",
+        )
+    tmp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp_path.write_bytes(payload_bytes)
+        tmp_path.replace(path)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+    return path, artifact, True
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:
@@ -127,6 +163,86 @@ def _source_artifacts(
     return payload
 
 
+def _semantic_not_evaluated() -> dict[str, Any]:
+    return {
+        "semantic_status": "not_evaluated",
+        "semantic_findings": [],
+        "semantic_result_provenance": None,
+        "semantic_error": None,
+        "_plan_values": {},
+    }
+
+
+def _semantic_not_assessable() -> dict[str, Any]:
+    return {
+        "semantic_status": "not_assessable",
+        "semantic_findings": [],
+        "semantic_result_provenance": None,
+        "semantic_error": None,
+        "_plan_values": {},
+    }
+
+
+def _semantic_error(error_code: str, error_message: str) -> dict[str, Any]:
+    return {
+        "semantic_status": "error",
+        "semantic_findings": [],
+        "semantic_result_provenance": None,
+        "semantic_error": {
+            "error_code": error_code,
+            "error_message": error_message[:500],
+        },
+        "_plan_values": {},
+    }
+
+
+def _integrity_result_not_requested(source_artifacts: dict[str, str | None]) -> dict[str, Any]:
+    return {
+        "integrity_status": "not_assessable",
+        "integrity_findings": [{"finding_code": "missing_required_input", "missing": ["plan"]}],
+        "semantic_status": "not_evaluated",
+        "semantic_findings": [],
+        "binding_records": [
+            {
+                "binding_name": "plan",
+                "binding_status": "not_assessable",
+                "observed_sha256": None,
+                "expected_sha256": None,
+                "verification_basis": "hpe_not_requested",
+                "source_path": None,
+                "details": {"reason": "hpe_not_requested"},
+            },
+            {
+                "binding_name": "candidate_decision",
+                "binding_status": "not_assessable",
+                "observed_sha256": None,
+                "expected_sha256": None,
+                "verification_basis": "hpe_not_requested",
+                "source_path": None,
+                "details": {"reason": "hpe_not_requested"},
+            },
+            {
+                "binding_name": "manifest",
+                "binding_status": "not_assessable",
+                "observed_sha256": None,
+                "expected_sha256": None,
+                "verification_basis": "hpe_not_requested",
+                "source_path": None,
+                "details": {"reason": "hpe_not_requested"},
+            },
+            {
+                "binding_name": "generated_image",
+                "binding_status": "not_assessable",
+                "observed_sha256": None,
+                "expected_sha256": None,
+                "verification_basis": "hpe_not_requested",
+                "source_path": None,
+                "details": {"reason": "hpe_not_requested"},
+            },
+        ],
+    }
+
+
 def run_presence_output_qa(
     *,
     date_str: str,
@@ -139,6 +255,9 @@ def run_presence_output_qa(
     media_type: str = "still_image",
     output_root: Path | None = None,
     evaluated_at_utc: str | None = None,
+    live_presence_semantic_review: bool = False,
+    semantic_provider: Any | None = None,
+    semantic_timeout_seconds: float = 30.0,
 ) -> tuple[Path, dict[str, Any]]:
     """Run presence output QA for a single still image.
 
@@ -165,92 +284,81 @@ def run_presence_output_qa(
     )
 
     if plan is None:
-        not_assessable_result = {
-            "integrity_status": "not_assessable",
-            "integrity_findings": [{"finding_code": "missing_required_input", "missing": ["plan"]}],
-            "semantic_status": "not_evaluated",
-            "semantic_findings": [],
-            "binding_records": [
-                {
-                    "binding_name": "plan",
-                    "binding_status": "not_assessable",
-                    "observed_sha256": None,
-                    "expected_sha256": None,
-                    "verification_basis": "hpe_not_requested",
-                    "source_path": None,
-                    "details": {"reason": "hpe_not_requested"},
-                },
-                {
-                    "binding_name": "candidate_decision",
-                    "binding_status": "not_assessable",
-                    "observed_sha256": None,
-                    "expected_sha256": None,
-                    "verification_basis": "hpe_not_requested",
-                    "source_path": None,
-                    "details": {"reason": "hpe_not_requested"},
-                },
-                {
-                    "binding_name": "manifest",
-                    "binding_status": "not_assessable",
-                    "observed_sha256": None,
-                    "expected_sha256": None,
-                    "verification_basis": "hpe_not_requested",
-                    "source_path": None,
-                    "details": {"reason": "hpe_not_requested"},
-                },
-                {
-                    "binding_name": "generated_image",
-                    "binding_status": "not_assessable",
-                    "observed_sha256": None,
-                    "expected_sha256": None,
-                    "verification_basis": "hpe_not_requested",
-                    "source_path": None,
-                    "details": {"reason": "hpe_not_requested"},
-                },
-            ],
-        }
-        artifact = build_presence_output_qa_artifact(
-            integrity_result=not_assessable_result,
+        integrity_result = _integrity_result_not_requested(source_artifacts)
+        artifact = build_presence_output_qa_artifact_v2(
+            integrity_result=integrity_result,
+            semantic_result=_semantic_not_evaluated(),
             source_artifacts=source_artifacts,
             evaluator_version=EVALUATOR_VERSION,
             generated_at_utc=evaluated_at_utc,
         )
-        write_presence_output_qa_artifact_atomic(artifact_path, artifact)
-        return artifact_path, artifact
+        validated = validate_presence_output_qa_artifact(artifact)
+        path, written_artifact, _ = write_presence_output_qa_artifact_atomic(artifact_path, validated)
+        return path, written_artifact
 
-    # Compute SHA-256 from raw file bytes.
-    cd_sha = sha256_file(candidate_decision_path)
-    mf_sha = sha256_file(manifest_path)
-    img_sha = sha256_file(image_path)
+    try:
+        cd_sha = sha256_file(candidate_decision_path)
+        mf_sha = sha256_file(manifest_path)
+        img_sha = sha256_file(image_path)
+        candidate_decision = _load_json_object(candidate_decision_path)
+        manifest = _load_json_object(manifest_path)
+        expected_plan_fingerprint = _extract_expected_plan_fingerprint(candidate_decision)
+        integrity_result = evaluate_still_image_presence_integrity(
+            plan=plan,
+            expected_plan_fingerprint_sha256=expected_plan_fingerprint,
+            candidate_decision=candidate_decision,
+            candidate_decision_sha256=cd_sha,
+            expected_candidate_decision_sha256=None,
+            manifest=manifest,
+            manifest_sha256=mf_sha,
+            expected_manifest_sha256=None,
+            image_sha256=img_sha,
+            expected_image_sha256=None,
+            media_type=media_type,
+            source_artifacts=source_artifacts,
+        )
+    except HumanPresenceOutputQAError as exc:
+        if exc.code == "presence_output_unsupported_media":
+            semantic_result = _semantic_not_assessable()
+            artifact = build_presence_output_qa_artifact_v2(
+                integrity_result=_integrity_result_not_requested(source_artifacts),
+                semantic_result=semantic_result,
+                source_artifacts=source_artifacts,
+                evaluator_version=EVALUATOR_VERSION,
+                generated_at_utc=evaluated_at_utc,
+            )
+            validated = validate_presence_output_qa_artifact(artifact)
+            path, written_artifact, _ = write_presence_output_qa_artifact_atomic(artifact_path, validated)
+            return path, written_artifact
+        raise
 
-    # Load JSON source artifacts.
-    candidate_decision = _load_json_object(candidate_decision_path)
-    manifest = _load_json_object(manifest_path)
+    if semantic_provider is None:
+        semantic_provider = evaluate_hpe_semantic_still_image_presence
 
-    expected_plan_fingerprint = _extract_expected_plan_fingerprint(candidate_decision)
-    plan_source_path = str(candidate_decision_path) if expected_plan_fingerprint else None
-    source_artifacts["plan_path"] = plan_source_path
+    compiled_plan_values = _still_image_plan_field_values(plan)
+    semantic_result = _semantic_not_evaluated()
+    if live_presence_semantic_review:
+        if integrity_result["integrity_status"] == "invalid":
+            semantic_result = _semantic_not_assessable()
+        else:
+            semantic_result = semantic_provider(
+                plan=plan,
+                image_path=image_path,
+                image_sha256=img_sha,
+                image_index=image_index,
+                provider=SEMANTIC_PROVIDER_NAME,
+                model=SEMANTIC_MODEL_NAME,
+                timeout_seconds=semantic_timeout_seconds,
+            )
 
-    integrity_result = evaluate_still_image_presence_integrity(
-        plan=plan,
-        expected_plan_fingerprint_sha256=expected_plan_fingerprint,
-        candidate_decision=candidate_decision,
-        candidate_decision_sha256=cd_sha,
-        expected_candidate_decision_sha256=None,
-        manifest=manifest,
-        manifest_sha256=mf_sha,
-        expected_manifest_sha256=None,
-        image_sha256=img_sha,
-        expected_image_sha256=None,
-        media_type=media_type,
-        source_artifacts=source_artifacts,
-    )
-
-    artifact = build_presence_output_qa_artifact(
+    artifact = build_presence_output_qa_artifact_v2(
         integrity_result=integrity_result,
+        semantic_result=semantic_result,
         source_artifacts=source_artifacts,
         evaluator_version=EVALUATOR_VERSION,
+        compiled_plan_values=compiled_plan_values,
         generated_at_utc=evaluated_at_utc,
     )
-    write_presence_output_qa_artifact_atomic(artifact_path, artifact)
-    return artifact_path, artifact
+    validated = validate_presence_output_qa_artifact(artifact)
+    path, written_artifact, _ = write_presence_output_qa_artifact_atomic(artifact_path, validated)
+    return path, written_artifact
