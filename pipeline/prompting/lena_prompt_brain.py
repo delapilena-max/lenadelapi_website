@@ -5062,6 +5062,9 @@ def generate_higgsfield_prompt_package(
         f"Mood: {HIGGSFIELD_MOOD_HOOK}."
         f"{presence_text}"
     )
+    human_presence_public_text = (
+        _clean_public_text(presence_text).strip() if presence_plan is not None else None
+    )
 
     caption = _clean_public_text(scene["caption"])
     caption = f"{caption}\n\n{_hashtags(rng, scene['lane'], 3)}"
@@ -5129,6 +5132,7 @@ def generate_higgsfield_prompt_package(
     }
     if presence_plan is not None:
         package["human_presence"] = presence_plan
+        package["human_presence_public_text"] = human_presence_public_text
     return package
 
 
@@ -5668,6 +5672,8 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["frame_logic_text"] = package.get("frame_logic_text")
     if package.get("human_presence") is not None:
         meta["human_presence"] = package.get("human_presence")
+    if package.get("human_presence_public_text") is not None:
+        meta["human_presence_public_text"] = package.get("human_presence_public_text")
     meta["image_prompt"] = package["image_prompt"]
     meta["negative_prompt"] = package["negative_prompt"]
     meta["caption"] = package["caption"]

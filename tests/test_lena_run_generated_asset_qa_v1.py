@@ -868,6 +868,115 @@ def test_qa_fail_surfaces_retry_reference_without_executing_retry(
     assert report["side_effect_flags"]["dirty_workspace_dependency"] is False
 
 
+def test_hpe_authority_invariance_matrix_stays_stable_across_semantic_states(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def semantic_provider_for(status: str):
+        def _provider(**kwargs: object) -> dict[str, object]:
+            if status == "error":
+                return {
+                    "semantic_status": "error",
+                    "semantic_findings": [],
+                    "semantic_result_provenance": None,
+                    "semantic_error": {"error_code": "semantic_visual_review_provider_unavailable", "error_message": "synthetic proof provider error"},
+                }
+            if status == "not_assessable":
+                return {
+                    "semantic_status": "not_assessable",
+                    "semantic_findings": [],
+                    "semantic_result_provenance": None,
+                    "semantic_error": None,
+                }
+            findings: list[dict[str, object]] = []
+            if status == "findings_present":
+                findings = [
+                    {
+                        "finding_code": "object_interaction_plan_contradiction",
+                        "category": "plan_contradiction",
+                        "plan_field_ref": "performance_actions.object_interaction",
+                        "plan_field_value": "simple_prop_hold",
+                        "observed_description": "The hand is not interacting with an object.",
+                        "confidence": "high",
+                        "image_index": 0,
+                        "advisory_only": False,
+                    }
+                ]
+            return {
+                "semantic_status": "aligned" if not findings else "findings_present",
+                "semantic_findings": findings,
+                "semantic_result_provenance": {
+                    "provider": kwargs.get("provider", "anthropic"),
+                    "model": kwargs.get("model", "claude-sonnet-5"),
+                    "request_binding_sha256": "a" * 64,
+                    "evaluated_at_utc": "2026-07-15T12:04:00Z",
+                    "response_schema_version": "human_presence_semantic_visual_observations_v1",
+                },
+                "semantic_error": None,
+            }
+
+        return _provider
+
+    statuses = ["aligned", "findings_present", "error", "not_assessable", "not_evaluated"]
+    baseline: dict[str, object] | None = None
+    for status in statuses:
+        qa_root = tmp_path / status / "qa"
+        lifecycle_root = tmp_path / status / "next_actions"
+        report = wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=_photo_qa_accept_runner(fixture),
+            human_presence_output_qa_runner=lambda **kwargs: presence_output_qa.run_presence_output_qa(
+                date_str=str(kwargs["date_str"]),
+                slot_id=str(kwargs["slot_id"]),
+                image_index=int(kwargs["image_index"]),
+                plan=kwargs["plan"],
+                candidate_decision_path=Path(kwargs["candidate_decision_path"]),
+                manifest_path=Path(kwargs["manifest_path"]),
+                image_path=Path(kwargs["image_path"]),
+                media_type=str(kwargs["media_type"]),
+                output_root=qa_root,
+                evaluated_at_utc="2026-07-15T12:04:00Z",
+                live_presence_semantic_review=kwargs["live_presence_semantic_review"],
+                semantic_provider=semantic_provider_for(status) if status != "not_evaluated" else None,
+            ),
+            live_presence_semantic_review=status != "not_evaluated",
+            qa_output_root=qa_root,
+            lifecycle_output_root=lifecycle_root,
+        )
+        summary = {
+            "qa_lifecycle_status": report["qa_lifecycle_status"],
+            "qa_status": report["qa_status"],
+            "publish_authorized": report["publish_authorized"],
+            "publish_performed": report["publish_performed"],
+            "queue_mutated": report["queue_mutated"],
+            "provider_call_performed": report["side_effect_flags"]["provider_call_performed"],
+            "generation_performed": report["side_effect_flags"]["generation_performed"],
+            "qa_run": report["side_effect_flags"]["qa_run"],
+            "retry_executed": report["side_effect_flags"]["retry_executed"],
+            "dirty_workspace_dependency": report["side_effect_flags"]["dirty_workspace_dependency"],
+            "human_presence_authority": report["human_presence_output_qa_state"]["authority"],
+        }
+        if baseline is None:
+            baseline = summary
+        else:
+            assert summary == baseline
+        assert report["human_presence_output_qa_state"]["semantic_status"] in {
+            "aligned",
+            "findings_present",
+            "error",
+            "not_assessable",
+            "not_evaluated",
+        }
+
+
 def test_wrapper_source_does_not_import_provider_publish_or_queue_helpers() -> None:
     source = Path(wrapper.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)

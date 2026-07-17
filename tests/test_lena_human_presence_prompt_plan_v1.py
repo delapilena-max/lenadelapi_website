@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import ast
+import sys
 from pathlib import Path
 
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from pipeline.presence import human_presence_contract_v1 as hpe
 from pipeline.presence import human_presence_prompt_plan_v1 as plan
@@ -189,6 +194,8 @@ def test_presence_enabled_prompt_package_emits_metadata_and_keeps_controlled_lan
     assert package["negative_prompt"] == ""
     assert package["image_prompt"].count("Presence direction:") == 1
     assert package["human_presence"]["prompt_text"] in package["image_prompt"]
+    assert package["human_presence_public_text"] == package["human_presence"]["prompt_text"]
+    assert package["human_presence_public_text"] in package["image_prompt"]
     assert package["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
     assert package["human_presence"]["medium_interpretation"] == "still_image"
     assert package["human_presence"]["selector_weight_adjustments_changed"] is True
@@ -202,6 +209,7 @@ def test_presence_enabled_prompt_package_emits_metadata_and_keeps_controlled_lan
     )
     assert no_presence_package["image_prompt"].count("Presence direction:") == 0
     assert "human_presence" not in no_presence_package
+    assert "human_presence_public_text" not in no_presence_package
 
 
 def test_still_image_presence_plan_is_performance_driven_and_preserves_anatomy_continuity() -> None:

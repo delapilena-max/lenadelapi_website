@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from pipeline.presence import human_presence_prompt_plan_v1 as plan_module
+from pipeline.prompting import lena_prompt_brain as prompt_brain
 from tools import lena_presence_semantic_visual_review_v1 as semantic_review
 from tools.lena_structured_visual_tool_v1 import (
     StructuredVisualImage,
@@ -391,3 +392,46 @@ def test_structured_helper_maps_api_status_error(monkeypatch: pytest.MonkeyPatch
         )
 
     assert exc_info.value.code == "provider_status_error"
+
+
+@pytest.mark.parametrize(
+    ("field_path", "mutator"),
+    [
+        ("viewer_relationship.awareness", lambda contract: contract["viewer_relationship"].__setitem__("awareness", "half_aware_glancing")),
+        ("gaze_arc.start_focus", lambda contract: contract["gaze_arc"].__setitem__("start_focus", "already_on_camera")),
+        ("expression_arc.peak_state", lambda contract: contract["expression_arc"].__setitem__("peak_state", "warm_smile")),
+        ("performance_actions.object_interaction", lambda contract: contract["performance_actions"].__setitem__("object_interaction", "drink_or_cup")),
+        ("movement_dynamics.weight_transfer", lambda contract: contract["movement_dynamics"].__setitem__("weight_transfer", "turn_with_hip_rotation")),
+        ("sensual_presence.tier", lambda contract: contract["sensual_presence"].__setitem__("tier", "overt_sensual_presence")),
+        ("body_presentation.framing_intent", lambda contract: contract["body_presentation"].__setitem__("framing_intent", "face_priority")),
+        ("failure_indicators", lambda contract: contract.__setitem__("failure_indicators", ["dead_or_unfocused_eyes", "mannequin_pose"])),
+    ],
+)
+def test_active_higgsfield_prompt_builder_tracks_presence_axes_and_ignores_failure_indicators(field_path: str, mutator) -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    baseline_plan = plan_module.compile_human_presence_prompt_plan(contract, medium="still_image")
+    baseline_package = prompt_brain.generate_higgsfield_prompt_package(
+        "2026-07-17",
+        "semantic-prompt-slot",
+        "photo",
+        presence_contract=contract,
+        presence_plan=baseline_plan,
+    )
+
+    mutated_contract = json.loads(json.dumps(contract))
+    mutator(mutated_contract)
+    mutated_plan = plan_module.compile_human_presence_prompt_plan(mutated_contract, medium="still_image")
+    mutated_package = prompt_brain.generate_higgsfield_prompt_package(
+        "2026-07-17",
+        "semantic-prompt-slot",
+        "photo",
+        presence_contract=mutated_contract,
+        presence_plan=mutated_plan,
+    )
+
+    if field_path == "failure_indicators":
+        assert mutated_package["image_prompt"] == baseline_package["image_prompt"]
+    else:
+        assert mutated_package["image_prompt"] != baseline_package["image_prompt"]
+    assert "presence-failure avoidance" not in baseline_package["image_prompt"]
+    assert "presence-failure avoidance" not in mutated_package["image_prompt"]

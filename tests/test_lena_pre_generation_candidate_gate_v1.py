@@ -906,3 +906,45 @@ def test_presence_requested_with_malformed_metadata_fails_closed() -> None:
         )
 
     assert error.value.code == "unknown_schema_version"
+
+
+def test_select_candidate_ranking_flips_with_real_scores() -> None:
+    auth = authorities([scene("lane a"), scene("lane b")])
+    selected, reasons, saw_required = gate.select_candidate(auth, [curator(image("lane a", "slot-a"), total=10), curator(image("lane b", "slot-b"), total=90)], recent())
+    assert saw_required is True
+    assert selected["slot_id"] == "slot-b"
+    assert reasons == []
+
+    selected, reasons, _ = gate.select_candidate(auth, [curator(image("lane a", "slot-a"), total=95), curator(image("lane b", "slot-b"), total=5)], recent())
+    assert selected["slot_id"] == "slot-a"
+    assert reasons == []
+
+
+def test_selected_presence_plan_propagates_through_the_real_gate_path() -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    plan = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    auth = authorities([scene("lane a")])
+    candidate = curator(presence_image(plan, "lane a", "slot-a"))
+
+    selected, reasons, saw_required = gate.select_candidate(auth, [candidate], recent(), presence_plan=plan)
+
+    assert saw_required is True
+    assert reasons == []
+    assert selected is not None
+    assert selected["candidate_id"].startswith("slot-a::")
+    assert selected["human_presence_ranking"]["total_bonus"] > 0
+
+
+def test_presence_plan_mismatch_reports_the_exact_gate_reason() -> None:
+    contract = lena_profile.build_lena_presence_contract()
+    plan = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    wrong_plan = copy.deepcopy(plan)
+    wrong_plan["viewer_relationship"]["contract"]["awareness"] = "unaware"
+    auth = authorities([scene("lane a")])
+    candidate = curator(presence_image(wrong_plan, "lane a", "slot-a"))
+
+    selected, reasons, saw_required = gate.select_candidate(auth, [candidate], recent(), presence_plan=plan)
+
+    assert selected is None
+    assert saw_required is True
+    assert reasons == [{"reason": "human_presence_plan_mismatch", "candidate_count": 1}]
