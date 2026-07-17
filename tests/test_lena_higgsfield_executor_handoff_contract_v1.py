@@ -16,6 +16,7 @@ import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
+from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 
 
 DATE = "2026-07-13"
@@ -942,25 +943,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
     retry_date = "2026-07-14"
     original_slot = "higgsfield-20260714-hcr_011-photo"
     custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
-    original_prompt = (
-        "[Subject]: Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult slim-thick hourglass body and face. "
-        "Do not reinterpret her as a different person. Do not slim her into petite, narrow-hipped proportions. Keep full natural "
-        "lifted bust, defined waist, and wide hips. Hair stays reference-true warm medium-brown with visible honey/caramel highlights "
-        "and lighter face-framing pieces. Wardrobe and accessories: Cherry red fitted square-neck mini dress visible from neckline "
-        "through upper torso only. Gold hoop earrings. [Action]: Waist-up or chest-up only. Lena stands near the mirror at a 20-30 "
-        "degree angle toward the mirror or window. Mirror-selfie phone visibility is acceptable if the phone sits low enough to keep "
-        "her face readable. [Environment]: Home getting-ready corner or bedroom vanity area. Mirror edge visible, not full mirror "
-        "dominance. Dresser or small vanity surface, a few products, clothes draped on a chair, shoes near the mirror, warm apartment "
-        "light, and ordinary home clutter kept tasteful. Lived-in and elevated, never hotel-like. [Cinematography]: 85mm portrait "
-        "compression or 50mm close lifestyle portrait, waist-up framing, real phone-camera skin detail, shallow depth of field, "
-        "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio. [Lighting/Style]: Face-first available "
-        "light only. Cool blue-hour window light shapes one side of the face while an ordinary warm bedside lamp lifts the shadow side "
-        "just enough to keep pores, under-eye texture, and lip texture alive. No beauty-dish polish, no ring light, no glam campaign "
-        "finish. [Technical]: Photorealistic high-resolution image with visible pores, fine facial texture, natural under-eye retention, "
-        "imperfect lip texture, tiny tone variation, stray hair strands, realistic catchlights, and scene-true shadow falloff. Face "
-        "detail comes from the Lena character element; keep the facial surface faithful to the approved references. Hands remain "
-        "anatomically correct with five fingers, believable knuckles, clean thumb placement, and relaxed wrists."
-    )
+    original_prompt = ORIGINAL_PROMPT
     original_prompt_sha = hashlib.sha256(original_prompt.encode("utf-8")).hexdigest()
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_next_live_image_handoff_{retry_date}.json"
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / retry_date / f"lena_content_packet_dryrun_{retry_date}_hcr_011.json"

@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 
+from pipeline.presence import human_presence_contract_v1 as hpe_contract
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 
 
@@ -115,6 +116,40 @@ def test_rebuild_packet_from_authoritative_sources_reproduces_prompt_preview(mon
 
     assert rebuilt["compact_provider_prompt_preview"] == packet["compact_provider_prompt_preview"]
     assert rebuilt["compact_provider_prompt_sha256"] == packet["compact_provider_prompt_sha256"]
+
+
+def test_proof_mode_prompt_includes_hpe_presence_profile() -> None:
+    recipe = _recipe()
+    recipe["production_proof_mode"] = True
+    hook = _hook()
+
+    packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
+
+    assert "[Subject Presence]:" in packet["compact_provider_prompt_preview"]
+    assert "Camera-aware, self-possessed, quietly sensual;" in packet["compact_provider_prompt_preview"]
+
+
+def test_non_proof_mode_prompt_excludes_subject_presence_section() -> None:
+    recipe = _recipe()
+    hook = _hook()
+
+    structured = packet_builder.build_structured_kling_prompt(copy.deepcopy(recipe), max_chars=2499)
+    packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
+
+    assert "[Subject Presence]:" not in structured
+    assert "[Subject Presence]:" not in packet["compact_provider_prompt_preview"]
+
+
+def test_proof_mode_prompt_excludes_failure_indicator_vocabulary() -> None:
+    recipe = _recipe()
+    recipe["production_proof_mode"] = True
+    hook = _hook()
+
+    packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
+    prompt = packet["compact_provider_prompt_preview"]
+
+    assert "failure_indicators." not in prompt
+    assert not any(indicator in prompt for indicator in hpe_contract.presence_failure_indicators())
 
 
 def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() -> None:
