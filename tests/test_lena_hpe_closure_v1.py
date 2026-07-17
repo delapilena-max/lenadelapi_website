@@ -189,6 +189,69 @@ def test_verifier_recomputes_hashes_and_writes_not_verified_closure_report(tmp_p
     assert json.loads(closure_path.read_text(encoding="utf-8")) == report
 
 
+def test_controlled_proof_binds_qa_to_stale_candidate_file_hash_without_mutation(tmp_path: Path) -> None:
+    image_path = tmp_path / "image.png"
+    manifest_path = tmp_path / "manifest.json"
+    _tiny_png(image_path)
+    _write_manifest(manifest_path, image_path.name)
+
+    presence_contract = _baseline_contract()
+    presence_plan = plan_module.compile_human_presence_prompt_plan(presence_contract, medium="still_image")
+    seed_root = tmp_path / "seed"
+    candidate_path, candidate_report, _selection_result = proof_mod._synthesize_selected_candidate(
+        lane_type="controlled_proof",
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        output_root=seed_root,
+        presence_contract=presence_contract,
+        presence_plan=presence_plan,
+        gate_report={"evidence": {}},
+    )
+
+    stale_report = copy.deepcopy(candidate_report)
+    stale_report.pop("generated_at_utc", None)
+    stale_report.pop("decision_fingerprint_sha256", None)
+    stale_report.pop("final_action", None)
+    stale_report["decision_fingerprint_sha256"] = selector._sha256_bytes(
+        selector._canonical_bytes(stale_report)
+    )
+    stale_path = tmp_path / "legacy_candidate.json"
+    stale_path.write_text(json.dumps(stale_report, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    candidate_sha = selector._sha256_bytes(stale_path.read_bytes())
+
+    proof = proof_mod.run_hpe_controlled_proof(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        candidate_input=stale_path,
+        manifest=manifest_path,
+        image=image_path,
+        output_root=tmp_path / "proof",
+        controlled_proof=True,
+        live_presence_semantic_review=False,
+        dry_run=True,
+    )
+
+    qa_binding = proof["qa_artifact"]["binding_records"][1]
+    report = closure_verifier.verify_closure_report(
+        output_root=tmp_path / "proof",
+        authority_commit_expected=proof["authority_commit"],
+        require_clean_authority=False,
+        dry_run=False,
+    )
+
+    assert proof["selected_candidate_evidence"]["state"] == "blocked"
+    assert proof["selected_candidate_artifact_sha256"] == candidate_sha
+    assert proof["qa_artifact"]["integrity_status"] == "not_assessable"
+    assert proof["qa_artifact"]["recommendation"] == "not_assessable"
+    assert proof["qa_artifact"]["semantic_status"] == "not_evaluated"
+    assert proof["qa_artifact"]["recommendation"] != "integrity_failure"
+    assert qa_binding["binding_status"] == "verified"
+    assert qa_binding["expected_sha256"] == candidate_sha
+    assert qa_binding["observed_sha256"] == candidate_sha
+    assert report["closure_status"] == "not_verified"
+
+
 def test_verifier_main_passes_with_required_expected_commit_and_clean_authority(tmp_path: Path) -> None:
     image_path = tmp_path / "image.png"
     manifest_path = tmp_path / "manifest.json"
