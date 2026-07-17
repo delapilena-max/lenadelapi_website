@@ -14,12 +14,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from pipeline.presence import human_presence_candidate_ranking_v1 as presence_ranking
+from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan
+from pipeline.presence.human_presence_output_qa_v1 import HumanPresenceOutputQAError
 from pipeline.influencer_nodes.lena import autonomy_ladder
 from tools import lena_higgsfield_generation_approval_v1 as approval
+from tools import lena_presence_output_qa_disposition_v1 as presence_output_qa
 from tools import lena_photo_qa_disposition_v1 as qa_disposition
 from tools.strategy import lena_execute_retry_decision_v1 as retry_decision
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 from tools.strategy import lena_run_generated_asset_qa_v1 as wrapper
+from tools.strategy import lena_human_presence_profile_v1 as lena_profile
 
 
 DATE = "2026-07-15"
@@ -46,6 +51,8 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(approval, "DEFAULT_APPROVAL_ROOT", tmp_path / "pipeline" / "approvals" / "lena" / "generation")
     monkeypatch.setattr(qa_disposition, "ROOT", tmp_path)
     monkeypatch.setattr(qa_disposition, "OUTPUT_ROOT", tmp_path / "pipeline" / "asset_review" / "lena")
+    monkeypatch.setattr(presence_output_qa, "ROOT", tmp_path)
+    monkeypatch.setattr(presence_output_qa, "OUTPUT_ROOT", tmp_path / "pipeline" / "asset_review" / "lena" / "presence_output_qa")
     monkeypatch.setattr(identity, "ROOT", tmp_path)
     monkeypatch.setattr(identity, "HIGGSFIELD_DEBUG_ROOT", tmp_path / "pipeline" / "higgsfield_debug")
     monkeypatch.setattr(retry_decision, "ROOT", tmp_path)
@@ -285,6 +292,79 @@ def _build_fixture(tmp_path: Path) -> dict[str, object]:
     }
 
 
+def _add_hpe_prompt_pack_evidence(
+    decision: dict[str, object],
+    *,
+    plan: dict[str, object],
+    plan_fingerprint_sha256: str | None = None,
+) -> dict[str, object]:
+    decision = json.loads(json.dumps(decision))
+    decision["evidence"] = {"prompt_pack": {"human_presence": plan}}
+    if plan_fingerprint_sha256 is not None:
+        decision["plan_fingerprint_sha256"] = plan_fingerprint_sha256
+    return decision
+
+
+def _build_hpe_fixture(
+    tmp_path: Path,
+    *,
+    include_plan_fingerprint: bool,
+) -> dict[str, object]:
+    fixture = _build_fixture(tmp_path)
+    contract = lena_profile.build_lena_presence_contract()
+    plan = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    decision = json.loads(fixture["decision_path"].read_text(encoding="utf-8"))
+    fingerprint = presence_ranking.plan_fingerprint_sha256(plan)
+    updated = _add_hpe_prompt_pack_evidence(
+        decision,
+        plan=plan,
+        plan_fingerprint_sha256=fingerprint if include_plan_fingerprint else None,
+    )
+    _write_json(fixture["decision_path"], updated)
+    fixture["human_presence_plan"] = plan
+    fixture["human_presence_plan_fingerprint_sha256"] = fingerprint if include_plan_fingerprint else None
+    return fixture
+
+
+def _photo_qa_accept_runner(fixture: dict[str, object]):
+    def qa_runner(**kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": qa_disposition.SCHEMA_VERSION,
+            "influencer_id": "lena",
+            "generated_at_utc": "2026-07-15T12:04:00Z",
+            "authority_commit": "b" * 40,
+            "decision_artifact_path": str(fixture["decision_path"].resolve()),
+            "decision_fingerprint_sha256": "c" * 64,
+            "candidate_id": f"{SLOT_ID}::hcr_011::cbn_fixture",
+            "slot_id": SLOT_ID,
+            "lane": "synthetic lane",
+            "recipe_id": RECIPE_ID,
+            "hook_id": "cbn_fixture",
+            "prompt_sha256": PROMPT_SHA,
+            "image_path": str(fixture["image_path"].resolve()),
+            "image_sha256": _sha(fixture["image_path"]),
+            "generation_provenance": {
+                "date": DATE,
+                "manifest_path": approval.repo_relative_path(fixture["manifest_path"]),
+            },
+            "identity_reference_provenance": {},
+            "qa_inputs": {},
+            "qa_checks": {},
+            "reason_codes": [],
+            "disposition": "accept",
+            "retry_eligible": False,
+            "hard_stop_reason": None,
+            "confidence": "high",
+            "reviewer_type": "local_validation_only",
+            "visual_judgment_source": {},
+            "provider_called": False,
+            "side_effects_performed": [],
+            "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
+        }
+
+    return qa_runner
+
+
 def test_missing_accounting_report_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     with pytest.raises(wrapper.GeneratedAssetQaLifecycleError) as excinfo:
@@ -413,6 +493,8 @@ def test_valid_generated_asset_delegates_to_qa_and_writes_lifecycle_report(
     assert report["qa_status"] == "accept"
     assert report["retry_recommended"] is False
     assert report["next_allowed_action"] == "await_publish_authorization"
+    assert report["human_presence_output_qa_state"]["status"] == "not_requested"
+    assert report["human_presence_output_qa_state"]["reason"] == "hpe_not_requested"
     assert report["publish_authorized"] is False
     assert report["publish_performed"] is False
     assert report["queue_mutated"] is False
@@ -426,6 +508,224 @@ def test_valid_generated_asset_delegates_to_qa_and_writes_lifecycle_report(
     assert report["side_effect_flags"]["dirty_workspace_dependency"] is False
     assert wrapper.report_path(DATE, SLOT_ID, wrapper.NEXT_ACTIONS).is_file()
     assert json.loads(wrapper.report_path(DATE, SLOT_ID, wrapper.NEXT_ACTIONS).read_text(encoding="utf-8")) == report
+
+
+def test_hpe_success_records_completed_lifecycle_state_and_image_index_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    captured: dict[str, object] = {}
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        captured.update(kwargs)
+        return presence_output_qa.run_presence_output_qa(
+            date_str=str(kwargs["date_str"]),
+            slot_id=str(kwargs["slot_id"]),
+            image_index=int(kwargs["image_index"]),
+            plan=kwargs["plan"],
+            candidate_decision_path=Path(kwargs["candidate_decision_path"]),
+            manifest_path=Path(kwargs["manifest_path"]),
+            image_path=Path(kwargs["image_path"]),
+            media_type=str(kwargs["media_type"]),
+            output_root=presence_output_qa.OUTPUT_ROOT,
+            evaluated_at_utc="2026-07-15T12:04:00Z",
+        )
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+        human_presence_output_qa_runner=hpe_runner,
+    )
+
+    assert set(captured) == {
+        "date_str",
+        "slot_id",
+        "image_index",
+        "plan",
+        "candidate_decision_path",
+        "manifest_path",
+        "image_path",
+        "media_type",
+    }
+    assert captured["date_str"] == DATE
+    assert captured["slot_id"] == SLOT_ID
+    assert captured["image_index"] == 0
+    assert captured["plan"] == fixture["human_presence_plan"]
+    assert captured["candidate_decision_path"] == fixture["decision_path"].resolve()
+    assert captured["manifest_path"] == fixture["manifest_path"].resolve()
+    assert captured["image_path"] == fixture["image_path"].resolve()
+    assert captured["media_type"] == "still_image"
+    assert report["qa_status"] == "accept"
+    assert report["human_presence_output_qa_state"]["status"] == "completed"
+    assert report["human_presence_output_qa_state"]["image_index"] == 0
+    assert report["human_presence_output_qa_state"]["integrity_status"] == "not_assessable"
+    assert report["human_presence_output_qa_state"]["recommendation"] == "not_assessable"
+    assert report["human_presence_output_qa_state"]["artifact_path"].endswith(".json")
+    assert report["human_presence_output_qa_state"]["semantic_status"] == "not_evaluated"
+    assert report["human_presence_output_qa_state"]["error_code"] is None
+    assert report["human_presence_output_qa_state"]["authority"] == "evidence_only"
+    assert report["side_effect_flags"]["provider_call_performed"] is False
+    assert report["side_effect_flags"]["generation_performed"] is False
+    assert report["side_effect_flags"]["qa_run"] is True
+
+
+def test_hpe_without_plan_fingerprint_still_completes_as_not_assessable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=False)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+    )
+
+    assert report["human_presence_output_qa_state"]["status"] == "completed"
+    assert report["human_presence_output_qa_state"]["integrity_status"] == "not_assessable"
+    assert report["human_presence_output_qa_state"]["recommendation"] == "not_assessable"
+    assert report["human_presence_output_qa_state"]["reason"] is None
+    assert report["human_presence_output_qa_state"]["artifact_path"].endswith(".json")
+    assert report["qa_status"] == "accept"
+
+
+def test_absent_hpe_metadata_marks_not_requested_and_skips_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    called = {"value": False}
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        called["value"] = True
+        raise AssertionError("HPE runner should not be called when metadata is absent")
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+        human_presence_output_qa_runner=hpe_runner,
+    )
+
+    assert called["value"] is False
+    assert report["qa_status"] == "accept"
+    assert report["human_presence_output_qa_state"]["status"] == "not_requested"
+    assert report["human_presence_output_qa_state"]["reason"] == "hpe_not_requested"
+    assert report["human_presence_output_qa_state"]["artifact_path"] is None
+
+
+def test_malformed_hpe_metadata_is_reported_as_error_without_disguising_as_not_requested(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    decision = json.loads(fixture["decision_path"].read_text(encoding="utf-8"))
+    decision["evidence"] = {"prompt_pack": {"human_presence": "not-a-dict"}}
+    _write_json(fixture["decision_path"], decision)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+    )
+
+    assert report["human_presence_output_qa_state"]["status"] == "error"
+    assert report["human_presence_output_qa_state"]["error_code"] == "presence_output_qa_integration_error"
+    assert report["human_presence_output_qa_state"]["reason"] is None
+    assert report["qa_status"] == "accept"
+
+
+def test_hpe_typed_error_preserves_photo_qa_disposition(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        raise HumanPresenceOutputQAError("presence_output_invalid_sha256", "bad image hash")
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+        human_presence_output_qa_runner=hpe_runner,
+    )
+
+    assert report["qa_status"] == "accept"
+    assert report["human_presence_output_qa_state"]["status"] == "error"
+    assert report["human_presence_output_qa_state"]["error_code"] == "presence_output_invalid_sha256"
+    assert report["human_presence_output_qa_state"]["error_message"] == "bad image hash"
+
+
+def test_hpe_filesystem_error_is_reported_as_integration_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        raise OSError("disk full")
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=_photo_qa_accept_runner(fixture),
+        human_presence_output_qa_runner=hpe_runner,
+    )
+
+    assert report["human_presence_output_qa_state"]["status"] == "error"
+    assert report["human_presence_output_qa_state"]["error_code"] == "presence_output_qa_integration_error"
+    assert report["human_presence_output_qa_state"]["error_message"] == "disk full"
+    assert report["qa_status"] == "accept"
+
+
+def test_unexpected_hpe_exception_is_not_silently_swallowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        raise RuntimeError("unexpected bug")
+
+    with pytest.raises(RuntimeError, match="unexpected bug"):
+        wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=_photo_qa_accept_runner(fixture),
+            human_presence_output_qa_runner=hpe_runner,
+        )
 
 
 def test_qa_fail_surfaces_retry_reference_without_executing_retry(

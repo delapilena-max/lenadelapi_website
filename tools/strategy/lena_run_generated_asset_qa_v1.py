@@ -6,14 +6,16 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Protocol
 
 import tools.lena_higgsfield_generation_approval_v1 as approval
+import tools.lena_presence_output_qa_disposition_v1 as human_presence_qa
 import tools.lena_photo_qa_disposition_v1 as qa_disposition
 import tools.strategy.lena_execute_retry_decision_v1 as retry_decision
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 from pipeline.identity import lena_higgsfield_identity as identity
 from pipeline.influencer_nodes.lena import autonomy_ladder
+from pipeline.presence.human_presence_output_qa_v1 import HumanPresenceOutputQAError
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +34,24 @@ class GeneratedAssetQaLifecycleError(RuntimeError):
         super().__init__(detail)
         self.code = code
         self.detail = detail
+
+
+class PresenceOutputQARunner(Protocol):
+    def __call__(
+        self,
+        *,
+        date_str: str,
+        slot_id: str,
+        image_index: int,
+        plan: dict[str, Any] | None,
+        candidate_decision_path: Path,
+        manifest_path: Path,
+        image_path: Path,
+        media_type: str,
+        output_root: Path | None = None,
+        evaluated_at_utc: str | None = None,
+    ) -> tuple[Path, dict[str, Any]]:
+        ...
 
 
 def utc_date() -> str:
@@ -254,6 +274,84 @@ def _retry_reference_artifacts(
     return repo_relative_path(retry_decision_path), repo_relative_path(retry_handoff_path)
 
 
+def _default_human_presence_output_qa_state() -> dict[str, Any]:
+    return {
+        "schema_version": "human_presence_output_qa_lifecycle_state_v1",
+        "status": "not_requested",
+        "artifact_path": None,
+        "image_index": 0,
+        "integrity_status": None,
+        "recommendation": None,
+        "semantic_status": "not_evaluated",
+        "error_code": None,
+        "error_message": None,
+        "reason": "hpe_not_requested",
+        "authority": "evidence_only",
+    }
+
+
+def _error_human_presence_output_qa_state(error_code: str, error_message: str) -> dict[str, Any]:
+    return {
+        "schema_version": "human_presence_output_qa_lifecycle_state_v1",
+        "status": "error",
+        "artifact_path": None,
+        "image_index": 0,
+        "integrity_status": None,
+        "recommendation": None,
+        "semantic_status": "not_evaluated",
+        "error_code": error_code,
+        "error_message": error_message,
+        "reason": None,
+        "authority": "evidence_only",
+    }
+
+
+def _completed_human_presence_output_qa_state(artifact_path: Path, artifact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": "human_presence_output_qa_lifecycle_state_v1",
+        "status": "completed",
+        "artifact_path": repo_relative_path(artifact_path),
+        "image_index": 0,
+        "integrity_status": artifact.get("integrity_status"),
+        "recommendation": artifact.get("recommendation"),
+        "semantic_status": artifact.get("semantic_status", "not_evaluated"),
+        "error_code": None,
+        "error_message": None,
+        "reason": None,
+        "authority": "evidence_only",
+    }
+
+
+def _resolve_human_presence_output_qa_plan_state(decision_report: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    evidence = decision_report.get("evidence")
+    if evidence is None:
+        return None, _default_human_presence_output_qa_state()
+    if not isinstance(evidence, dict):
+        return None, _error_human_presence_output_qa_state(
+            "presence_output_qa_integration_error",
+            "decision evidence must be a JSON object",
+        )
+    prompt_pack = evidence.get("prompt_pack")
+    if prompt_pack is None:
+        return None, _default_human_presence_output_qa_state()
+    if not isinstance(prompt_pack, dict):
+        return None, _error_human_presence_output_qa_state(
+            "presence_output_qa_integration_error",
+            "decision prompt_pack must be a JSON object",
+        )
+    if "human_presence" not in prompt_pack:
+        return None, _default_human_presence_output_qa_state()
+    human_presence = prompt_pack.get("human_presence")
+    if human_presence is None:
+        return None, _default_human_presence_output_qa_state()
+    if not isinstance(human_presence, dict):
+        return None, _error_human_presence_output_qa_state(
+            "presence_output_qa_integration_error",
+            "decision human_presence plan must be a JSON object",
+        )
+    return human_presence, None
+
+
 def evaluate_generated_asset_qa_lifecycle(
     *,
     live_generation_accounting_artifact: Path,
@@ -263,6 +361,7 @@ def evaluate_generated_asset_qa_lifecycle(
     identity_references: Iterable[tuple[Path, str]],
     identity_evidence_artifact: Path | None = None,
     qa_runner: Callable[..., dict[str, Any]] = qa_disposition.evaluate_photo_qa_disposition,
+    human_presence_output_qa_runner: PresenceOutputQARunner = human_presence_qa.run_presence_output_qa,
     qa_output_root: Path | None = None,
     lifecycle_output_root: Path | None = None,
 ) -> dict[str, Any]:
@@ -356,8 +455,33 @@ def evaluate_generated_asset_qa_lifecycle(
     qa_path, qa_written_artifact, _qa_was_written = qa_disposition.write_disposition_artifact(qa_artifact, output_root=qa_output_root)
     qa_status = str(qa_written_artifact.get("disposition") or qa_artifact.get("disposition") or "blocked")
     retry_recommended = bool(qa_written_artifact.get("retry_eligible"))
+    decision_report = _read_json_object(decision_path, code="decision_artifact_missing_or_invalid", label="decision artifact")
+    human_presence_plan, human_presence_output_qa_state = _resolve_human_presence_output_qa_plan_state(decision_report)
+    if human_presence_output_qa_state is None:
+        try:
+            human_presence_artifact_path, human_presence_artifact = human_presence_output_qa_runner(
+                date_str=date_str,
+                slot_id=slot_id,
+                image_index=0,
+                plan=human_presence_plan,
+                candidate_decision_path=decision_path,
+                manifest_path=manifest_path,
+                image_path=image_path,
+                media_type="still_image",
+            )
+            human_presence_output_qa_state = _completed_human_presence_output_qa_state(
+                human_presence_artifact_path,
+                human_presence_artifact,
+            )
+        except HumanPresenceOutputQAError as exc:
+            human_presence_output_qa_state = _error_human_presence_output_qa_state(exc.code, str(exc))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            human_presence_output_qa_state = _error_human_presence_output_qa_state(
+                "presence_output_qa_integration_error",
+                str(exc),
+            )
     retry_decision_artifact, retry_handoff_artifact = _retry_reference_artifacts(
-        decision_artifact=_read_json_object(decision_path, code="decision_artifact_missing_or_invalid", label="decision artifact"),
+        decision_artifact=decision_report,
         date_str=date_str,
         qa_artifact=qa_written_artifact,
     )
@@ -390,6 +514,7 @@ def evaluate_generated_asset_qa_lifecycle(
         "generation_claim_artifact": repo_relative_path(claim_path),
         "generation_receipt_artifact": repo_relative_path(receipt_path),
         "qa_disposition_artifact": repo_relative_path(qa_path),
+        "human_presence_output_qa_state": human_presence_output_qa_state,
         "qa_status": qa_status,
         "retry_recommended": retry_recommended,
         "retry_decision_artifact": retry_decision_artifact,
