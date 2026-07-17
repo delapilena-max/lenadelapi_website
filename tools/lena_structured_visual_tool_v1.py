@@ -70,7 +70,10 @@ def call_anthropic_structured_visual_tool(
     if timeout_seconds <= 0:
         raise StructuredVisualToolError("provider_unavailable", "timeout_seconds must be positive")
     import anthropic  # type: ignore[import-not-found]
-    import httpx
+    try:
+        import httpx
+    except ImportError:  # pragma: no cover - CI minimal dependency set
+        httpx = None  # type: ignore[assignment]
 
     media_type = _image_media_type(image_path)
     image_bytes = _read_bound_image_bytes(image_path, image_sha256)
@@ -90,7 +93,7 @@ def call_anthropic_structured_visual_tool(
     timeout_errors = tuple(
         cls for cls in (
             getattr(anthropic, "APITimeoutError", None),
-            getattr(httpx, "TimeoutException", None),
+            getattr(httpx, "TimeoutException", None) if httpx is not None else None,
         )
         if isinstance(cls, type)
     )
