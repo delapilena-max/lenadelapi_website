@@ -592,16 +592,9 @@ def _proof_lane_run(
         semantic_provider=semantic_provider,
         semantic_timeout_seconds=semantic_timeout_seconds,
         expected_candidate_decision_sha256=(
-            candidate_report.get("decision_fingerprint_sha256") if candidate_input is not None else None
+            _sha256_file(bound_candidate_path) if candidate_input is not None else None
         ),
     )
-    if candidate_input is not None and selection_result.get("state") == "blocked":
-        qa_artifact["integrity_status"] = "invalid"
-        qa_artifact["semantic_status"] = "not_assessable"
-        qa_artifact["semantic_findings"] = []
-        qa_artifact["semantic_result_provenance"] = None
-        qa_artifact["semantic_error"] = None
-        qa_artifact["recommendation"] = "integrity_failure"
 
     lifecycle_report = {
         "schema_version": "human_presence_engine_proof_lifecycle_v1",
