@@ -4,7 +4,7 @@ Current main merge SHA: `10f1b67d40a0932acfe5730afadc29217f21b775`
 
 Latest merged PR: `#76 - HPE PR4a: closure verification and runtime evidence`
 
-Current HPE status: `PR4A MERGED - CLOSURE ORCHESTRATION AND OPERATIONAL PROOF REMAIN`
+Current HPE status: `PR4A MERGED - CONTROLLED-PROOF EXECUTION AND LATER CLOSURE EVIDENCE REMAIN`
 
 Current aggregate closure status: `not_verified`
 
@@ -25,7 +25,7 @@ Canonical PR4a verifier expectation:
 - result remains `not_verified` until later artifacts exist
 
 Next work item:
-- PR4b only: provider-free controlled-proof orchestration
+- PR4b only: controlled-proof operationalization and real provider-free evidence run
 
 Do not:
 - implement PR4b through PR4d in this session
@@ -37,10 +37,10 @@ Do not:
 - merge anything
 
 Sequence after PR4b:
-1. PR4b: provider-free controlled-proof orchestrator and offline artifact production
-2. PR4c: controlled live semantic proof receipt and ordinary-lane proof support
-3. PR4d: final operator documentation, closure declaration guard, and human evidence-review recording
-4. Post-merge operational proof: controlled proof, one authorized controlled live semantic call, ordinary-lane proof, independent human evidence review, final CI confirmation, closure verifier run
+1. PR4b: operationalize and execute the existing provider-free controlled-proof tool; produce and independently validate the first real controlled-proof artifact
+2. PR4c: controlled live semantic proof receipt; ordinary-lane proof; paid call only with explicit human authorization; no publishing
+3. PR4d: final operator documentation; human evidence-review recording; final closure declaration guard
+4. Post-merge closure confirmation: final CI confirmation; independent verifier run; only then permit `HPE_COMPLETE`
 
 Advisory cleanup:
 - `build_closure_report_from_proof` is dead, fail-closed compatibility code

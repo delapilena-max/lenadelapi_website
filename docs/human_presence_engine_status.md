@@ -4,7 +4,7 @@ Bootstrap note: [next_session_start.md](../next_session_start.md)
 
 ## Current State
 
-`PR4A MERGED - CLOSURE ORCHESTRATION AND OPERATIONAL PROOF REMAIN`
+`PR4A MERGED - CONTROLLED-PROOF EXECUTION AND LATER CLOSURE EVIDENCE REMAIN`
 
 Current aggregate closure status: `not_verified`
 
@@ -54,21 +54,23 @@ Merged facts:
 
 The next session begins with PR4b only:
 
-- provider-free controlled-proof orchestration
-- compose existing authoritative runtime functions rather than reimplementing them
-- emit a bounded controlled-proof artifact
-- bind candidate, plan, decision, prompt, image, integrity artifact, lifecycle evidence, lane, and authority commit
-- require expected-commit and clean-authority guards
-- default to zero provider calls
-- perform no paid generation
+- inspect and validate the already-merged `tools/lena_run_hpe_controlled_proof_v1.py`
+- select a valid existing Higgsfield-generated image and its authoritative candidate/manifest inputs
+- run the existing tool in provider-free mode
+- produce the first real, non-synthetic controlled-proof report
+- verify all bindings against current `main`
+- independently run the PR4a closure verifier against the produced evidence
+- confirm the controlled-proof mandatory condition can be verified
+- confirm all later conditions remain `not_verified`
+- preserve zero provider calls
+- perform no new image generation
+- perform no paid call
 - perform no publishing
 - consume no approval
 - create no retry authority
 - write no failure memory
 - make no reconciliation decision
-- never generate final closure status
-- never satisfy ordinary-lane, live-semantic, human-review, or final-CI conditions
-- keep closure aggregate `not_verified`
+- keep aggregate closure status `not_verified`
 
 ## Advisory Cleanup
 
