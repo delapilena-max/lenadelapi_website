@@ -89,6 +89,24 @@ def test_prompt_text_noise_does_not_change_structured_presence_scoring() -> None
     assert noisy["matched_selector_terms"] == baseline["matched_selector_terms"]
 
 
+def test_unused_prompt_field_and_body_hotness_terms_do_not_raise_the_baseline() -> None:
+    plan = _compiled_plan()
+    adversarial_observation = {
+        "image_prompt": " ".join(
+            plan["body_presentation"]["selector_terms"] + plan["sensual_presence"]["selector_terms"]
+        ),
+        "lighting_text": "low",
+        "wardrobe_silhouette_class": " ".join(plan["body_presentation"]["selector_terms"]),
+        "effective_wardrobe_silhouette_class": " ".join(plan["sensual_presence"]["selector_terms"]),
+    }
+
+    score = ranking.score_candidate_presence_alignment(plan, adversarial_observation)
+
+    assert score["total_bonus"] == 0
+    assert score["dimension_bonuses"]["sensual_presence"] == 0
+    assert score["dimension_bonuses"]["body_presentation"] == 0
+
+
 def test_missing_alignment_remains_zero_without_excluding_the_candidate() -> None:
     plan = _compiled_plan()
     score = ranking.score_candidate_presence_alignment(plan, {})

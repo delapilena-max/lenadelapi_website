@@ -10,6 +10,32 @@ from pipeline.presence import human_presence_prompt_plan_v1 as prompt_plan
 SCHEMA_VERSION = "human_presence_candidate_ranking_v1"
 SCORING_VERSION = "v1"
 MAX_BONUS_PER_DIMENSION = 3
+_PRESENCE_SELECTOR_ALLOWLISTS = {
+    "sensual_presence": {
+        "gaze",
+        "anticipation",
+        "movement",
+        "confidence",
+        "timing",
+        "reaction",
+        "rhythm",
+        "voice",
+        "framing",
+        "safe framing",
+    },
+    "body_presentation": {
+        "safe framing",
+        "reference mode",
+        "realistic proportions",
+        "anatomy continuity",
+        "full body presence",
+        "face priority",
+        "dynamic motion framing",
+        "required realistic",
+        "continuity",
+        "adult",
+    },
+}
 
 
 class HumanPresenceCandidateRankingError(RuntimeError):
@@ -96,6 +122,15 @@ def _score_dimension(
     }
 
 
+def _presence_selector_terms(plan: dict[str, Any], dimension: str) -> list[str]:
+    section = plan.get(dimension, {})
+    selector_terms = list(section.get("selector_terms", [])) if isinstance(section, dict) else []
+    allowed = _PRESENCE_SELECTOR_ALLOWLISTS.get(dimension)
+    if allowed is None:
+        return selector_terms
+    return [term for term in selector_terms if _normalize_text(term) in allowed]
+
+
 def plan_fingerprint_sha256(plan: dict[str, Any]) -> str:
     _require(isinstance(plan, dict), "invalid_presence_plan", "plan must be a JSON object")
     _require(
@@ -165,12 +200,8 @@ def score_candidate_presence_alignment(
             "camera_text",
             "lighting_text",
             "framing_text",
-            "wardrobe_silhouette_class",
-            "effective_wardrobe_silhouette_class",
         ),
         "body_presentation": (
-            "wardrobe_silhouette_class",
-            "effective_wardrobe_silhouette_class",
             "reference_mode",
             "camera_text",
             "framing_text",
@@ -187,7 +218,7 @@ def score_candidate_presence_alignment(
     dimension_results: dict[str, dict[str, Any]] = {}
     for dimension, field_names in dimension_sources.items():
         section = plan.get(dimension, {})
-        selector_terms = list(section.get("selector_terms", [])) if isinstance(section, dict) else []
+        selector_terms = _presence_selector_terms(plan, dimension)
         dimension_results[dimension] = _score_dimension(
             dimension=dimension,
             selector_terms=selector_terms,

@@ -89,6 +89,58 @@ def _presence_observation(image: dict[str, Any], scene: dict[str, Any]) -> dict[
     }
 
 
+def _presence_selector_terms(plan: dict[str, Any], dimension: str) -> list[str]:
+    allowed_terms_by_dimension = {
+        "sensual_presence": {
+            "gaze",
+            "anticipation",
+            "movement",
+            "confidence",
+            "timing",
+            "reaction",
+            "rhythm",
+            "voice",
+            "framing",
+            "safe framing",
+        },
+        "body_presentation": {
+            "safe framing",
+            "reference mode",
+            "realistic proportions",
+            "anatomy continuity",
+            "full body presence",
+            "face priority",
+            "dynamic motion framing",
+            "required realistic",
+            "continuity",
+            "adult",
+        },
+    }
+    section = plan.get(dimension, {})
+    selector_terms = list(section.get("selector_terms", [])) if isinstance(section, dict) else []
+    allowed = allowed_terms_by_dimension.get(dimension)
+    if allowed is None:
+        return selector_terms
+    return [term for term in selector_terms if _normalize_text(term) in allowed]
+
+
+def _presence_rank_order() -> list[str]:
+    return [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+        "human_presence_alignment",
+        "situational_specificity",
+        "lived_in_detail",
+        "character_fit",
+        "followability",
+        "recent_feed_contrast",
+        "higgsfield_curator_score",
+        "recipe_proof_priority",
+        "canonical_hook_score",
+    ]
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(value, dict):
@@ -259,6 +311,7 @@ def build_prompt_candidates(
     head8: str,
     required_recipe_id: str = "",
     presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     prefix = f"lenagate{as_of_date.replace('-', '')}{head8}"
     try:
@@ -269,6 +322,7 @@ def build_prompt_candidates(
             10,
             required_recipe_id=required_recipe_id,
             presence_contract=presence_contract,
+            presence_plan=presence_plan,
         )
     except Exception as exc:
         from pipeline.presence import human_presence_contract_v1 as presence_contract_module
@@ -511,19 +565,30 @@ def _substantive_scores(scene: dict[str, Any], recipe: dict[str, Any], hook: dic
 def _rank_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
     score = candidate["ranking_evidence"]
     contrast = score["feed_contrast"]
-    substantive = (
-        score["failure_memory_caution"], score["physical_interaction_risk"],
+    substantive = [
+        score["failure_memory_caution"],
+        score["physical_interaction_risk"],
         -score["premium_visual_discipline"],
-        -score["situational_specificity"], -score["lived_in_detail"],
-        -score["character_fit"], -score["followability"],
-        contrast["lane_repetitions"], contrast["outfit_repetitions"],
-        contrast["environment_repetitions"], contrast["pose_repetitions"],
-        -score["higgsfield_curator_score"], score["recipe_proof_priority"],
-        -score["hook_score"],
-        -score.get("human_presence_bonus", 0),
+    ]
+    if "human_presence_bonus" in score:
+        substantive.append(-score["human_presence_bonus"])
+    substantive.extend(
+        [
+            -score["situational_specificity"],
+            -score["lived_in_detail"],
+            -score["character_fit"],
+            -score["followability"],
+            contrast["lane_repetitions"],
+            contrast["outfit_repetitions"],
+            contrast["environment_repetitions"],
+            contrast["pose_repetitions"],
+            -score["higgsfield_curator_score"],
+            score["recipe_proof_priority"],
+            -score["hook_score"],
+        ]
     )
     tie = (candidate["lane"], candidate["recipe_id"], candidate["hook_id"], candidate["slot_id"])
-    return substantive + tie
+    return tuple(substantive) + tie
 
 
 def select_candidate(
@@ -533,13 +598,13 @@ def select_candidate(
     *,
     required_recipe_id: str = "",
     presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]], bool]:
     rejected: Counter[str] = Counter()
     valid: list[dict[str, Any]] = []
     blocked = set(authorities["scene_bank"].get("production_blocked_lanes", []))
     saw_required_recipe = False
-    presence_plan = None
-    if presence_contract is not None:
+    if presence_plan is None and presence_contract is not None:
         from pipeline.presence import human_presence_contract_v1 as presence_contract_module
         from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
 
@@ -585,6 +650,9 @@ def select_candidate(
         hook = _best_hook(recipe, authorities["hooks"]) if recipe else None
         if hook is None:
             reasons.append("no_safe_linked_hook")
+        if presence_plan is not None:
+            if image.get("human_presence") != presence_plan:
+                reasons.append("human_presence_plan_mismatch")
         if reasons:
             rejected.update(set(reasons))
             continue
@@ -677,9 +745,27 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
     noncritical = _critical_gap_notes(recent)
     status = "selected" if candidate else "abstain"
     clean_candidate = None
+    presence_enabled = prompt_meta.get("human_presence") is not None
     if candidate:
         clean_candidate = {key: value for key, value in candidate.items() if key != "_prompt" and value is not None}
         clean_candidate["exact_proposed_dry_run_command"] = clean_candidate["exact_proposed_dry_run_command"].replace("{as_of_date}", as_of_date)
+    ranking_order = [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+    ]
+    if presence_enabled:
+        ranking_order.append("human_presence_alignment")
+    ranking_order.extend([
+        "situational_specificity",
+        "lived_in_detail",
+        "character_fit",
+        "followability",
+        "recent_feed_contrast",
+        "higgsfield_curator_score",
+        "recipe_proof_priority",
+        "canonical_hook_score",
+    ])
     return {
         "schema_version": SCHEMA_VERSION,
         "influencer_id": "lena",
@@ -694,12 +780,7 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
             "prompt_pack": prompt_meta,
             "recipe_binding_semantics": "strategy compatibility, not prompt provenance",
             "recent_content_evidence_semantics": "exact recorded fields only; missing fields remain unknown",
-            "ranking_order": [
-                "no_failure_memory_caution", "lower_physical_interaction_risk", "premium_visual_discipline",
-                "situational_specificity", "lived_in_detail", "character_fit",
-                "followability", "recent_feed_contrast", "higgsfield_curator_score",
-                "recipe_proof_priority", "canonical_hook_score",
-            ],
+            "ranking_order": ranking_order,
             "tiebreak_label": "deterministic_noncreative_tiebreak",
         },
         "rejected_or_blocked_reasons": rejected,
@@ -747,6 +828,7 @@ def run_gate(
     *,
     required_recipe_id: str = "",
     presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
     verify_clean: bool = True,
     authority_loader: Callable[[], dict[str, Any]] | None = None,
     recent_loader: Callable[[], dict[str, Any]] | None = None,
@@ -757,8 +839,22 @@ def run_gate(
         verify_authority_inputs_clean()
     authorities = authority_loader() if authority_loader else load_authorities()
     recent = recent_loader() if recent_loader else load_recent_content()
+    if presence_plan is None and presence_contract is not None:
+        from pipeline.presence import human_presence_contract_v1 as presence_contract_module
+        from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module
+
+        try:
+            presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
+                presence_contract,
+                medium="still_image",
+            )
+        except (
+            presence_plan_module.HumanPresencePromptPlanError,
+            presence_contract_module.HumanPresenceContractError,
+        ) as exc:
+            raise GateError(exc.code, exc.detail) from exc
     call_kwargs = {}
-    if required_recipe_id or presence_contract is not None:
+    if required_recipe_id or presence_plan is not None:
         try:
             prompt_builder_signature = inspect.signature(prompt_builder)
         except (TypeError, ValueError):
@@ -768,15 +864,20 @@ def run_gate(
                 parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "required_recipe_id"
                 for name, parameter in prompt_builder_signature.parameters.items()
             )
-            if accepts_required_recipe:
-                if required_recipe_id:
-                    call_kwargs["required_recipe_id"] = required_recipe_id
-            if presence_contract is not None:
+            if accepts_required_recipe and required_recipe_id:
+                call_kwargs["required_recipe_id"] = required_recipe_id
+            if presence_plan is not None:
                 accepts_presence_contract = any(
                     parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "presence_contract"
                     for name, parameter in prompt_builder_signature.parameters.items()
                 )
-                if accepts_presence_contract:
+                accepts_presence_plan = any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "presence_plan"
+                    for name, parameter in prompt_builder_signature.parameters.items()
+                )
+                if accepts_presence_plan:
+                    call_kwargs["presence_plan"] = presence_plan
+                elif accepts_presence_contract:
                     call_kwargs["presence_contract"] = presence_contract
                 else:
                     raise GateError(
@@ -793,6 +894,7 @@ def run_gate(
         recent,
         required_recipe_id=required_recipe_id,
         presence_contract=presence_contract,
+        presence_plan=presence_plan,
     )
     if required_recipe_id and not saw_required_recipe:
         raise GateError(

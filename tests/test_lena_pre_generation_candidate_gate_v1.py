@@ -102,6 +102,7 @@ def presence_image(plan: dict[str, object], lane="city bench", slot="gate-pack00
     value = image(lane, slot, **updates)
     value.update(
         {
+            "human_presence": plan,
             "reference_mode": " ".join(
                 plan["body_presentation"]["selector_terms"][:2] + plan["viewer_relationship"]["selector_terms"][:2]
             ),
@@ -722,7 +723,7 @@ def test_real_prompt_builder_creates_exactly_one_ten_image_pack_in_memory():
 
 
 def test_build_prompt_candidates_threads_presence_contract_only_when_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: list[tuple[str, object]] = []
+    seen: list[tuple[str, object, object]] = []
     images = [
         {"slot_id": f"slot-{index}", "image_prompt": f"prompt {index}"}
         for index in range(10)
@@ -735,8 +736,9 @@ def test_build_prompt_candidates_threads_presence_contract_only_when_explicit(mo
         count_per_pack: int,
         required_recipe_id: str = "",
         presence_contract=None,
+        presence_plan=None,
     ):
-        seen.append((required_recipe_id, presence_contract))
+        seen.append((required_recipe_id, presence_contract, presence_plan))
         return {
             "total_prompts": len(images),
             "pack_reports": [{"images": images}],
@@ -764,7 +766,7 @@ def test_build_prompt_candidates_threads_presence_contract_only_when_explicit(mo
 
     selected, prompt_meta = gate.build_prompt_candidates("2026-07-15", "abcdef12", required_recipe_id="hcr_012")
     assert selected[0]["image"]["slot_id"] == "slot-0"
-    assert seen == [("hcr_012", None)]
+    assert seen == [("hcr_012", None, None)]
     assert "human_presence" not in prompt_meta
 
     seen.clear()
@@ -776,15 +778,16 @@ def test_build_prompt_candidates_threads_presence_contract_only_when_explicit(mo
         presence_contract=contract,
     )
     assert selected[0]["image"]["slot_id"] == "slot-0"
-    assert seen == [("hcr_012", contract)]
+    assert seen == [("hcr_012", contract, None)]
     assert prompt_meta["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
 
 
 def test_run_gate_threads_presence_contract_into_prompt_builder(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     contract = lena_profile.build_lena_presence_contract()
+    compiled = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
     seen: dict[str, object] = {}
     auth = authorities([scene("alpha")], [recipe("hcr_a")], [hook("hook_a")])
-    prompt_candidates = [curator(image("alpha", "slot-a"))]
+    prompt_candidates = [curator(presence_image(compiled, lane="alpha", slot="slot-a"))]
 
     def prompt_builder(as_of_date, head8, required_recipe_id="", presence_contract=None):
         seen["presence_contract"] = presence_contract
@@ -832,6 +835,43 @@ def test_presence_enabled_selection_can_change_the_winner_between_equally_valid_
     assert selected_default["slot_id"] == "slot-a"
     assert selected_presence["slot_id"] == "slot-b"
     assert selected_presence["human_presence_ranking"]["total_bonus"] > 0
+
+
+def test_presence_bonus_is_inserted_after_premium_visual_discipline_without_baseline_padding() -> None:
+    selected, _ = select()
+    no_presence = copy.deepcopy(selected)
+    with_presence = copy.deepcopy(selected)
+    with_presence["ranking_evidence"]["human_presence_bonus"] = 2
+
+    base_key = gate._rank_key(no_presence)
+    presence_key = gate._rank_key(with_presence)
+
+    assert presence_key[:3] == base_key[:3]
+    assert presence_key[3] == -2
+    assert presence_key[4:] == base_key[3:]
+    assert len(presence_key) == len(base_key) + 1
+
+
+def test_presence_enabled_ranking_order_includes_alignment_only_when_present() -> None:
+    selected, rejected = select()
+    core_without = gate._decision_core("a" * 40, "2026-07-13", authorities(), selected, rejected, recent(), {})
+    core_with = gate._decision_core(
+        "a" * 40,
+        "2026-07-13",
+        authorities(),
+        selected,
+        rejected,
+        recent(),
+        {"human_presence": {"schema_version": "human_presence_prompt_plan_v1"}},
+    )
+
+    assert "human_presence_alignment" not in core_without["evidence"]["ranking_order"]
+    assert core_with["evidence"]["ranking_order"][:4] == [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+        "human_presence_alignment",
+    ]
 
 
 def test_presence_requested_with_malformed_metadata_fails_closed() -> None:

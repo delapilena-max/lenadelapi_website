@@ -4913,6 +4913,7 @@ def generate_higgsfield_prompt_package(
     sequence_index: int | None = None,
     required_recipe_id: str = "",
     presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Forward Higgsfield-native prompt builder. Short prompt, no negative
     prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
@@ -4935,12 +4936,18 @@ def generate_higgsfield_prompt_package(
     )
 
     validate_saved_prompt_sources()
-    presence_plan = None
-    if presence_contract is not None:
+    if presence_plan is None and presence_contract is not None:
         presence_plan = presence_plan_module.compile_human_presence_prompt_plan(
             presence_contract,
             medium="motion" if media_type == "video" else "still_image",
         )
+    if presence_plan is not None:
+        expected_medium = "motion" if media_type == "video" else "still_image"
+        if presence_plan.get("medium_interpretation") != expected_medium:
+            raise ControlledProofLaneError(
+                "presence_plan_medium_mismatch",
+                f"presence plan medium {presence_plan.get('medium_interpretation')!r} does not match {expected_medium!r}",
+            )
     production_scene_pool, scene_bank = get_production_scene_pool(required_recipe_id=required_recipe_id)
     if not production_scene_pool:
         raise SystemExit("[ABORT] No production-safe saved photo scenes remain.")
@@ -5040,7 +5047,7 @@ def generate_higgsfield_prompt_package(
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
-    presence_text = f" {presence_plan['prompt_text']}" if presence_plan else ""
+    presence_text = f" Presence direction: {presence_plan['prompt_text']}" if presence_plan else ""
 
     image_prompt = _clean_public_text(
         f"{HIGGSFIELD_FRAMING_LINE} "
@@ -5383,6 +5390,7 @@ def generate_higgsfield_photo_dump_pack(
     count: int = HIGGSFIELD_PHOTO_DUMP_DEFAULT_COUNT,
     required_recipe_id: str = "",
     presence_contract: dict[str, Any] | None = None,
+    presence_plan: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Build a cohesive multi-image Higgsfield-native photo-dump pack.
 
@@ -5436,6 +5444,7 @@ def generate_higgsfield_photo_dump_pack(
                 sequence_index=candidate_seq,
                 required_recipe_id=required_recipe_id if i == 0 else "",
                 presence_contract=presence_contract,
+                presence_plan=presence_plan,
             )
             lane = package["lane"]
             silhouette = package["wardrobe_silhouette_class"]

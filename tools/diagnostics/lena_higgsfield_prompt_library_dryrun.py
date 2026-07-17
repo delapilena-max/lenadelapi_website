@@ -59,8 +59,6 @@ from pipeline.qa.lena_higgsfield_failure_memory import (  # noqa: E402
     compute_higgsfield_failure_memory,
     pattern_key_for_image,
 )
-from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan_module  # noqa: E402
-
 from pipeline.prompting.lena_prompt_brain import (  # noqa: E402
     HIGGSFIELD_PHOTO_DUMP_MIN_COUNT,
     HIGGSFIELD_PHOTO_DUMP_MAX_COUNT,
@@ -194,6 +192,7 @@ def build_library_report(
     count_per_pack: int,
     required_recipe_id: str = "",
     presence_contract: dict | None = None,
+    presence_plan: dict | None = None,
 ) -> dict:
     pack_reports = []
     for pack_index in range(packs):
@@ -207,6 +206,7 @@ def build_library_report(
             count_per_pack,
             required_recipe_id=required_recipe_id if pack_index == 0 else "",
             presence_contract=presence_contract,
+            presence_plan=presence_plan,
         )
         pack_reports.append(pack_report)
 
@@ -239,12 +239,7 @@ def build_library_report(
     fake_text_avoidance_checked = 0
     fake_text_avoidance_present = 0
     fake_text_avoidance_missing_slot_ids: list[str] = []
-    human_presence = None
-    if presence_contract is not None:
-        human_presence = presence_plan_module.compile_human_presence_prompt_plan(
-            presence_contract,
-            medium="still_image",
-        )
+    human_presence = presence_plan or next((pack.get("human_presence") for pack in pack_reports if pack.get("human_presence")), None)
 
     for pack_report in pack_reports:
         lane_distribution.update(pack_report["lane_distribution"])
