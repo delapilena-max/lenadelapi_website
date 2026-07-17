@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -185,6 +186,48 @@ def test_verifier_recomputes_hashes_and_writes_not_verified_closure_report(tmp_p
     closure_path = tmp_path / "proof" / DATE / SLOT_ID / f"lena_hpe_closure_verification_{SLOT_ID}_00.json"
     assert closure_path.is_file()
     assert json.loads(closure_path.read_text(encoding="utf-8")) == report
+
+
+def test_verifier_falls_back_when_origin_main_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    image_path = tmp_path / "image.png"
+    manifest_path = tmp_path / "manifest.json"
+    _tiny_png(image_path)
+    _write_manifest(manifest_path, image_path.name)
+
+    proof = proof_mod.run_hpe_controlled_proof(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        candidate_input=None,
+        manifest=manifest_path,
+        image=image_path,
+        output_root=tmp_path / "proof",
+        controlled_proof=True,
+        live_presence_semantic_review=False,
+        dry_run=True,
+    )
+
+    original_merge_base = closure_verifier._git_merge_base
+
+    def _raise_merge_base(left: str, right: str) -> str:
+        if (left, right) == ("HEAD", "origin/main"):
+            raise subprocess.CalledProcessError(128, ["git", "merge-base", left, right])
+        return original_merge_base(left, right)
+
+    monkeypatch.setattr(closure_verifier, "_git_merge_base", _raise_merge_base)
+
+    report = closure_verifier.verify_closure_report(
+        output_root=tmp_path / "proof",
+        authority_commit_expected=proof["authority_commit"],
+        require_clean_authority=False,
+        dry_run=True,
+    )
+
+    assert report["closure_status"] == "not_verified"
+    assert len(report["base_commit_sha"]) == 40
 
 
 def test_verifier_rejects_head_mismatch(tmp_path: Path) -> None:

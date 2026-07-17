@@ -41,6 +41,18 @@ def _git_merge_base(left: str, right: str) -> str:
     return result.stdout.strip()
 
 
+def _resolve_base_commit_sha() -> str:
+    for base_ref in ("origin/main", "origin/HEAD"):
+        try:
+            return _git_merge_base("HEAD", base_ref)
+        except subprocess.CalledProcessError:
+            continue
+    try:
+        return _git_rev_parse("HEAD^")
+    except subprocess.CalledProcessError:
+        return _git_rev_parse("HEAD")
+
+
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(payload, indent=2, ensure_ascii=True) + "\n"
@@ -324,7 +336,7 @@ def verify_closure_report(
     if proof_report.get("authority_commit") != authority_commit_expected:
         raise HPEClosureVerificationError("authority_commit_mismatch", "proof authority_commit does not match the expected head")
 
-    base_commit_sha = _git_merge_base("HEAD", "origin/main")
+    base_commit_sha = _resolve_base_commit_sha()
     closure_report = _build_closure_report(
         proof_report,
         authority_commit_expected=authority_commit_expected,
