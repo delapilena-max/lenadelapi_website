@@ -187,11 +187,21 @@ def test_presence_enabled_prompt_package_emits_metadata_and_keeps_controlled_lan
     assert package["wardrobe_outfit_id"] == "wc_p050"
     assert package["negative_prompt_enabled"] is False
     assert package["negative_prompt"] == ""
-    assert "Presence direction:" in package["image_prompt"]
+    assert package["image_prompt"].count("Presence direction:") == 1
+    assert package["human_presence"]["prompt_text"] in package["image_prompt"]
     assert package["human_presence"]["schema_version"] == "human_presence_prompt_plan_v1"
     assert package["human_presence"]["medium_interpretation"] == "still_image"
     assert package["human_presence"]["selector_weight_adjustments_changed"] is True
     assert "silent pre-response beat" in package["human_presence"]["speech_behavior"]["directive"]
+
+    no_presence_package = prompt_brain.generate_higgsfield_prompt_package(
+        DATE,
+        SLOT_ID,
+        "photo",
+        required_recipe_id="hcr_012",
+    )
+    assert no_presence_package["image_prompt"].count("Presence direction:") == 0
+    assert "human_presence" not in no_presence_package
 
 
 def test_still_image_presence_plan_is_performance_driven_and_preserves_anatomy_continuity() -> None:

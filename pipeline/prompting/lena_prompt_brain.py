@@ -5047,7 +5047,7 @@ def generate_higgsfield_prompt_package(
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
-    presence_text = f" Presence direction: {presence_plan['prompt_text']}" if presence_plan else ""
+    presence_text = f" {presence_plan['prompt_text']}" if presence_plan else ""
 
     image_prompt = _clean_public_text(
         f"{HIGGSFIELD_FRAMING_LINE} "
