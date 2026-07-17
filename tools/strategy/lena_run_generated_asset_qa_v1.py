@@ -475,7 +475,7 @@ def evaluate_generated_asset_qa_lifecycle(
             )
         except HumanPresenceOutputQAError as exc:
             human_presence_output_qa_state = _error_human_presence_output_qa_state(exc.code, str(exc))
-        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
             human_presence_output_qa_state = _error_human_presence_output_qa_state(
                 "presence_output_qa_integration_error",
                 str(exc),

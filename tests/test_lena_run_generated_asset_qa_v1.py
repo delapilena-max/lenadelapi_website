@@ -707,6 +707,34 @@ def test_hpe_filesystem_error_is_reported_as_integration_error(tmp_path: Path, m
     assert report["qa_status"] == "accept"
 
 
+def test_hpe_type_error_propagates_without_becoming_integration_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    observed = {"called": False}
+
+    def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
+        observed["called"] = True
+        raise TypeError("bad runner wiring")
+
+    with pytest.raises(TypeError, match="bad runner wiring"):
+        wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=_photo_qa_accept_runner(fixture),
+            human_presence_output_qa_runner=hpe_runner,
+        )
+
+    assert observed["called"] is True
+    assert wrapper.report_path(DATE, SLOT_ID, wrapper.NEXT_ACTIONS).exists() is False
+
+
 def test_unexpected_hpe_exception_is_not_silently_swallowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
