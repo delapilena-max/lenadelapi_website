@@ -134,57 +134,53 @@ _SEMANTIC_RESULT_PROVENANCE_KEYS = frozenset({
     "response_schema_version",
 })
 _SEMANTIC_PLAN_FIELD_RULES = {
-    "viewer_relationship.awareness": "fully_aware",
-    "viewer_relationship.performance_level": "lightly_performed",
-    "viewer_relationship.invitation_level": "clear",
-    "gaze_arc.start_focus": "off_camera_activity",
-    "gaze_arc.recognition_behavior": "playful_surprise",
-    "gaze_arc.hold_intensity": "sustained",
-    "expression_arc.start_state": "content_private",
-    "expression_arc.peak_state": "playful_smirk",
-    "performance_actions.primary_action": "hair_play",
-    "performance_actions.object_interaction": "none",
-    "movement_dynamics.weight_transfer": "shift_to_one_leg",
-    "movement_dynamics.asymmetry_level": "slight_asymmetry",
-    "body_presentation.adult_character_required": True,
-    "body_presentation.silhouette_profile.bust_emphasis": "pronounced",
-    "body_presentation.silhouette_profile.waist_hip_contrast": "pronounced",
-    "body_presentation.silhouette_profile.hip_glute_emphasis": "pronounced",
-    "body_presentation.silhouette_profile.proportion_realism": "required_realistic",
-    "body_presentation.silhouette_profile.silhouette_shape_class": "hourglass_voluptuous",
-    "body_presentation.wardrobe_body_interaction": "fabric_tension_visible",
-    "body_presentation.anatomy_continuity_required": True,
-    "body_presentation.gravity_and_soft_tissue_realism": True,
-    "body_presentation.framing_intent": "full_body_presence",
-    "sensual_presence.tier": "natural_sensual_presence",
-    "sensual_presence.exposure_dependency": "low",
-    "sensual_presence.confidence_level": "confident",
-    "failure_indicators.dead_or_unfocused_eyes": True,
-    "failure_indicators.frozen_expression": True,
-    "failure_indicators.mannequin_pose": True,
-    "failure_indicators.face_body_emotion_mismatch": True,
-    "failure_indicators.sexual_styling_without_personality": True,
+    "viewer_relationship.awareness": {"kind": "string"},
+    "viewer_relationship.performance_level": {"kind": "string"},
+    "viewer_relationship.invitation_level": {"kind": "string"},
+    "gaze_arc.start_focus": {"kind": "string"},
+    "gaze_arc.recognition_behavior": {"kind": "string"},
+    "gaze_arc.hold_intensity": {"kind": "string"},
+    "expression_arc.start_state": {"kind": "string"},
+    "expression_arc.peak_state": {"kind": "string"},
+    "performance_actions.primary_action": {"kind": "string"},
+    "performance_actions.object_interaction": {"kind": "string"},
+    "movement_dynamics.weight_transfer": {"kind": "string"},
+    "movement_dynamics.asymmetry_level": {"kind": "string"},
+    "body_presentation.adult_character_required": {"kind": "bool"},
+    "body_presentation.silhouette_profile.bust_emphasis": {"kind": "string"},
+    "body_presentation.silhouette_profile.waist_hip_contrast": {"kind": "string"},
+    "body_presentation.silhouette_profile.hip_glute_emphasis": {"kind": "string"},
+    "body_presentation.silhouette_profile.proportion_realism": {"kind": "string"},
+    "body_presentation.silhouette_profile.silhouette_shape_class": {"kind": "string"},
+    "body_presentation.wardrobe_body_interaction": {"kind": "string"},
+    "body_presentation.anatomy_continuity_required": {"kind": "bool"},
+    "body_presentation.gravity_and_soft_tissue_realism": {"kind": "bool"},
+    "body_presentation.framing_intent": {"kind": "string"},
+    "sensual_presence.tier": {"kind": "string"},
+    "sensual_presence.exposure_dependency": {"kind": "string"},
+    "sensual_presence.confidence_level": {"kind": "string"},
+    "failure_indicators.dead_or_unfocused_eyes": {"kind": "bool"},
+    "failure_indicators.frozen_expression": {"kind": "bool"},
+    "failure_indicators.mannequin_pose": {"kind": "bool"},
+    "failure_indicators.face_body_emotion_mismatch": {"kind": "bool"},
+    "failure_indicators.sexual_styling_without_personality": {"kind": "bool"},
 }
 _PROHIBITED_OBSERVED_DESCRIPTION_PATTERNS = (
     r"\bidentity mismatch\b",
     r"\bwrong person\b",
     r"\bwrong identity\b",
+    r"\bidentity is wrong\b",
     r"\bidentity collapse\b",
     r"\banatomy defect\b",
     r"\banatomy defects\b",
+    r"\banatomy\s+(?:is|looks)\s+wrong\b",
     r"\bhand defect\b",
     r"\bhand defects\b",
-    r"\bface quality\b",
-    r"\bimage corruption\b",
-    r"\brealism\b",
-    r"\blighting\b",
-    r"\bcomposition\b",
-    r"\baesthetic quality\b",
-    r"\bapproval\b",
-    r"\brejection\b",
-    r"\bpublishing suitability\b",
-    r"\bretry recommendation\b",
-    r"\bwrong person or identity collapse\b",
+    r"\bhands?\s+(?:are|is|look|looks)\s+wrong\b",
+    r"\bapprove(?:d)?\b",
+    r"\breject(?:ed)?\b",
+    r"\bpublish(?:ing)?\b",
+    r"\bretry\b",
 )
 
 _BINDING_NAMES = ("plan", "candidate_decision", "manifest", "generated_image")
@@ -630,12 +626,36 @@ def _validate_semantic_plan_field_value(
             )
         expected_value = plan_values[plan_field_ref]
     else:
-        if plan_field_ref not in _SEMANTIC_PLAN_FIELD_RULES:
+        rule = _SEMANTIC_PLAN_FIELD_RULES.get(plan_field_ref)
+        if rule is None:
             raise HumanPresenceOutputQAError(
                 "presence_output_malformed_artifact",
                 f"plan_field_ref {plan_field_ref!r} is not supported by the persisted semantic schema",
             )
-        expected_value = _SEMANTIC_PLAN_FIELD_RULES[plan_field_ref]
+        kind = rule["kind"]
+        if kind == "bool":
+            if not isinstance(plan_field_value, bool):
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} must be boolean",
+                )
+        elif kind == "string":
+            if not isinstance(plan_field_value, str) or not plan_field_value.strip():
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} must be a non-empty string",
+                )
+            if len(plan_field_value.strip()) > 200:
+                raise HumanPresenceOutputQAError(
+                    "presence_output_malformed_artifact",
+                    f"plan_field_value for {plan_field_ref!r} is too long",
+                )
+        else:
+            raise HumanPresenceOutputQAError(
+                "presence_output_malformed_artifact",
+                f"unsupported persisted plan field rule for {plan_field_ref!r}",
+            )
+        return plan_field_value
     if plan_field_value != expected_value:
         raise HumanPresenceOutputQAError(
             "presence_output_malformed_artifact",
@@ -822,13 +842,6 @@ def _validate_semantic_result(
             "presence_output_malformed_artifact",
             f"semantic_result_provenance must be null when semantic_status is {status!r}",
         )
-    if plan_values is not None:
-        for finding in validated_findings:
-            if finding["plan_field_value"] != plan_values.get(finding["plan_field_ref"]):
-                raise HumanPresenceOutputQAError(
-                    "presence_output_malformed_artifact",
-                    f"plan_field_value for {finding['plan_field_ref']!r} does not match the compiled plan",
-                )
     return {
         "semantic_status": status,
         "semantic_findings": validated_findings,
