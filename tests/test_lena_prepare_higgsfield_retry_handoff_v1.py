@@ -19,21 +19,16 @@ DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
-def _proof_prompt() -> str:
-    packet = packet_builder.rebuild_packet_from_authoritative_sources(
-        {
-            "recipe_id": "hcr_011",
-            "strong_hook_id": "mf_001",
-            "generated_date": "2026-07-17",
-            "wardrobe_outfit_id": "wc_p020",
-            "environment_id": "env_v008",
-            "hook_selection_reason": "mirror fitcheck",
-        }
-    )
-    return packet["compact_provider_prompt_preview"]
-
-
-ORIGINAL_PROMPT = _proof_prompt()
+ORIGINAL_PROMPT = packet_builder.rebuild_packet_from_authoritative_sources(
+    {
+        "recipe_id": "hcr_011",
+        "strong_hook_id": "mf_001",
+        "generated_date": "2026-07-17",
+        "wardrobe_outfit_id": "wc_p020",
+        "environment_id": "env_v008",
+        "hook_selection_reason": "mirror fitcheck",
+    }
+)["compact_provider_prompt_preview"]
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
     f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
@@ -390,6 +385,9 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
 
     artifact = retry_mod.validate_retry_handoff_artifact(artifact_path)
     prompt = artifact["retry_prompt_text"]
+    assert prompt.count("[Subject Presence]:") == 1
+    assert packet_builder.HPE_SUBJECT_PRESENCE_COMPACT in prompt
+    assert prompt.index("[Subject]:") < prompt.index("[Subject Presence]:") < prompt.index("[Action]:") < prompt.index("[Environment]:") < prompt.index("[Cinematography]:") < prompt.index("[Lighting/Style]:") < prompt.index("[Technical]:")
     assert report["retry_prompt_headroom_status"] == retry_mod._headroom_status(
         artifact["retry_prompt_budget"] - len(prompt)
     )

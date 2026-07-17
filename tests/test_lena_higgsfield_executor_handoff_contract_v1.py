@@ -12,11 +12,11 @@ import pytest
 import pipeline.higgsfield_lena_api_executor as executor
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval_mod
-import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
+from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 
 
 DATE = "2026-07-13"
@@ -943,16 +943,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
     retry_date = "2026-07-14"
     original_slot = "higgsfield-20260714-hcr_011-photo"
     custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
-    original_prompt = packet_builder.rebuild_packet_from_authoritative_sources(
-        {
-            "recipe_id": "hcr_011",
-            "strong_hook_id": "mf_001",
-            "generated_date": "2026-07-17",
-            "wardrobe_outfit_id": "wc_p020",
-            "environment_id": "env_v008",
-            "hook_selection_reason": "mirror fitcheck",
-        }
-    )["compact_provider_prompt_preview"]
+    original_prompt = ORIGINAL_PROMPT
     original_prompt_sha = hashlib.sha256(original_prompt.encode("utf-8")).hexdigest()
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_next_live_image_handoff_{retry_date}.json"
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / retry_date / f"lena_content_packet_dryrun_{retry_date}_hcr_011.json"
