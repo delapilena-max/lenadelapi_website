@@ -35,25 +35,8 @@ DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
-ORIGINAL_PROMPT = (
-    "[Subject]: Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult slim-thick hourglass body and face. "
-    "Do not reinterpret her as a different person. Do not slim her into petite, narrow-hipped proportions. Keep full natural "
-    "lifted bust, defined waist, and wide hips. Hair stays reference-true warm medium-brown with visible honey/caramel highlights "
-    "and lighter face-framing pieces. Wardrobe and accessories: Cherry red fitted square-neck mini dress visible from neckline "
-    "through upper torso only. Gold hoop earrings. [Action]: Waist-up or chest-up only. Lena stands near the mirror at a 20-30 "
-    "degree angle toward the mirror or window. Mirror-selfie phone visibility is acceptable if the phone sits low enough to keep "
-    "her face readable. [Environment]: Home getting-ready corner or bedroom vanity area. Mirror edge visible, not full mirror "
-    "dominance. Dresser or small vanity surface, a few products, clothes draped on a chair, shoes near the mirror, warm apartment "
-    "light, and ordinary home clutter kept tasteful. Lived-in and elevated, never hotel-like. [Cinematography]: 85mm portrait "
-    "compression or 50mm close lifestyle portrait, waist-up framing, real phone-camera skin detail, shallow depth of field, "
-    "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio. [Lighting/Style]: Face-first available "
-    "light only. Cool blue-hour window light shapes one side of the face while an ordinary warm bedside lamp lifts the shadow side "
-    "just enough to keep pores, under-eye texture, and lip texture alive. No beauty-dish polish, no ring light, no glam campaign "
-    "finish. [Technical]: Photorealistic high-resolution image with visible pores, fine facial texture, natural under-eye retention, "
-    "imperfect lip texture, tiny tone variation, stray hair strands, realistic catchlights, and scene-true shadow falloff. Face "
-    "detail comes from the Lena character element; keep the facial surface faithful to the approved references. Hands remain "
-    "anatomically correct with five fingers, believable knuckles, clean thumb placement, and relaxed wrists."
-)
+PROOF_PACKET_PATH = Path("pipeline/strategy/lena/content_packets/2026-07-17/lena_content_packet_dryrun_2026-07-17_hcr_011.json")
+ORIGINAL_PROMPT = json.loads(PROOF_PACKET_PATH.read_text(encoding="utf-8"))["compact_provider_prompt_preview"]
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 
 
@@ -236,11 +219,12 @@ def test_valid_retry_approval_round_trip(tmp_path: Path, monkeypatch: pytest.Mon
     _patch_roots(tmp_path, monkeypatch)
     seeded = _seed_bound_retry_source(tmp_path)
     approval_path = _record_retry_approval(seeded["retry_handoff_path"])
+    retry_facts = inspect_retry_handoff_artifact(seeded["retry_handoff_path"])
 
     result = validate_retry_generation_approval_artifact(approval_path)
     assert result["is_expired"] is False
     assert result["retry_facts"]["slot_id"] == RETRY_SLOT
-    assert result["retry_facts"]["prompt_sha256"] == "aaa517e1fc9b629415dce57cf77230efd8fae930f8aa903186257dd3a4775cdb"
+    assert result["retry_facts"]["prompt_sha256"] == retry_facts["prompt_sha256"]
     assert result["scope_summary"]["authorized_attempts"] == 1
     assert result["scope_summary"]["upload_authorized"] is False
     assert result["scope_summary"]["queue_promotion_authorized"] is False

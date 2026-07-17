@@ -25,33 +25,31 @@ DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "retry_handoffs"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SLOT_RE = re.compile(r"^(?P<prefix>.+)-(?P<media_type>photo|video)$")
 SECTION_RE = re.compile(
-    r"(?P<section>\[(?:Subject|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)"
-    r"(?P<body>.*?)(?=(?:\s+\[(?:Subject|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)|$)",
+    r"(?P<section>\[(?:Subject|Subject Presence|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)"
+    r"(?P<body>.*?)(?=(?:\s+\[(?:Subject|Subject Presence|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)|$)",
     re.S,
 )
 
 RETRY_ACTION_TEXT = (
-    "Chest-up or waist-up only. Crop above the hips so hips, thighs, and the dress hemline never appear. Lena "
-    "stands near the mirror at a 20-30 degree angle, actively checking or adjusting one gold hoop earring. No "
-    "foreground phone, visible device screens, or direct posed full-torso portrait."
+    "Chest-up or waist-up only. Hips, thighs, and the dress hemline never appear. Lena stands near the mirror at "
+    "a 20-30 degree angle, actively checking or adjusting one gold hoop earring. No foreground phone, visible "
+    "device screens, or direct posed full-torso portrait."
 )
 
 RETRY_ENVIRONMENT_TEXT = (
     "Home getting-ready vanity corner or bedroom vanity area. Visible mirror edge, never full mirror dominance. "
-    "Vanity surface, a few products, chair, shoes near the mirror, warm apartment light, and tasteful home clutter. "
-    "The composition must read as a real getting-ready vanity moment, lived-in and elevated, never hotel-like."
+    "Vanity surface, a few products, chair, shoes, warm apartment light, and tasteful clutter. The composition must "
+    "read as a real getting-ready vanity moment, never hotel-like."
 )
 
 RETRY_CINEMATOGRAPHY_TEXT = (
-    "85mm portrait compression or 50mm close lifestyle portrait, chest-up or waist-up framing only, natural "
-    "skin detail, shallow depth of field, blue-hour ambient mixed with warm lamp fill, candid apartment realism, "
-    "non-studio."
+    "85mm or 50mm portrait compression, chest-up or waist-up framing only, natural skin detail, shallow depth of "
+    "field, blue-hour ambient with warm lamp fill, candid apartment realism, non-studio."
 )
 
 RETRY_TECHNICAL_APPEND = (
-    " Keep the successful face, skin, red dress neckline, blue-hour plus warm-lamp lighting, and clean anatomy. "
-    "No fake freckles or poreless/plastic skin. Keep established Lena identity/body authority; slightly fuller is "
-    "okay, not a hard gate."
+    " Keep the successful face, skin, red dress neckline, and clean anatomy. No fake freckles or poreless/plastic "
+    "skin. Keep established Lena identity/body authority; slightly fuller is okay, not a hard gate."
 )
 
 
@@ -140,16 +138,18 @@ def _replace_sections(prompt_text: str) -> str:
     sections = {match.group("section"): match.group("body").strip() for match in SECTION_RE.finditer(prompt_text)}
     expected = {
         "[Subject]:",
+        "[Subject Presence]:",
         "[Action]:",
         "[Environment]:",
         "[Cinematography]:",
         "[Lighting/Style]:",
         "[Technical]:",
     }
-    if set(sections) != expected:
+    expected_without_presence = expected - {"[Subject Presence]:"}
+    if set(sections) not in (expected, expected_without_presence):
         raise RetryHandoffError(
             "prompt_section_mismatch",
-            "original prompt must contain the exact Subject/Action/Environment/Cinematography/Lighting/Style/Technical sections",
+            "original prompt must contain the expected Subject, optional Subject Presence, Action, Environment, Cinematography, Lighting/Style, and Technical sections",
         )
     sections["[Action]:"] = RETRY_ACTION_TEXT
     sections["[Environment]:"] = RETRY_ENVIRONMENT_TEXT
@@ -157,13 +157,14 @@ def _replace_sections(prompt_text: str) -> str:
     sections["[Technical]:"] = sections["[Technical]:"] + RETRY_TECHNICAL_APPEND
     ordered = (
         "[Subject]:",
+        "[Subject Presence]:",
         "[Action]:",
         "[Environment]:",
         "[Cinematography]:",
         "[Lighting/Style]:",
         "[Technical]:",
     )
-    return " ".join(f"{section} {sections[section]}" for section in ordered)
+    return " ".join(f"{section} {sections[section]}" for section in ordered if section in sections)
 
 
 def _validate_execution_receipt(
