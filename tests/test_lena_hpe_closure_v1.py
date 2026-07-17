@@ -232,7 +232,11 @@ def test_controlled_proof_binds_qa_to_stale_candidate_file_hash_without_mutation
         dry_run=True,
     )
 
-    qa_binding = proof["qa_artifact"]["binding_records"][1]
+    qa_binding = next(
+        record
+        for record in proof["qa_artifact"]["binding_records"]
+        if record["binding_name"] == "candidate_decision"
+    )
     report = closure_verifier.verify_closure_report(
         output_root=tmp_path / "proof",
         authority_commit_expected=proof["authority_commit"],
