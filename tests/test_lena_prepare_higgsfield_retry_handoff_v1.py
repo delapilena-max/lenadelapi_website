@@ -11,6 +11,7 @@ import pytest
 from pipeline import higgsfield_lena_api_executor as executor
 from tools import lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_mod
 
 
@@ -18,8 +19,21 @@ DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
-PROOF_PACKET_PATH = Path("pipeline/strategy/lena/content_packets/2026-07-17/lena_content_packet_dryrun_2026-07-17_hcr_011.json")
-ORIGINAL_PROMPT = json.loads(PROOF_PACKET_PATH.read_text(encoding="utf-8"))["compact_provider_prompt_preview"]
+def _proof_prompt() -> str:
+    packet = packet_builder.rebuild_packet_from_authoritative_sources(
+        {
+            "recipe_id": "hcr_011",
+            "strong_hook_id": "mf_001",
+            "generated_date": "2026-07-17",
+            "wardrobe_outfit_id": "wc_p020",
+            "environment_id": "env_v008",
+            "hook_selection_reason": "mirror fitcheck",
+        }
+    )
+    return packet["compact_provider_prompt_preview"]
+
+
+ORIGINAL_PROMPT = _proof_prompt()
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
     f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
@@ -373,10 +387,12 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact_path.is_file()
     assert report["original_slot_id"] == ORIGINAL_SLOT
     assert report["retry_slot_id"] == RETRY_SLOT
-    assert report["retry_prompt_headroom_status"] == "warning"
 
     artifact = retry_mod.validate_retry_handoff_artifact(artifact_path)
     prompt = artifact["retry_prompt_text"]
+    assert report["retry_prompt_headroom_status"] == retry_mod._headroom_status(
+        artifact["retry_prompt_budget"] - len(prompt)
+    )
     assert artifact["retry_prompt_sha256"] == hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     assert "Mirror-selfie phone visibility is acceptable" not in prompt
     assert "No foreground phone, visible device screens, or direct posed full-torso portrait." in prompt

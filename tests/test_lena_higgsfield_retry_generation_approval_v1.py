@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import tools.lena_higgsfield_generation_approval_v1 as canonical_approval
+import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval
 import tools.lena_record_higgsfield_retry_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
@@ -36,8 +37,21 @@ DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
-PROOF_PACKET_PATH = Path("pipeline/strategy/lena/content_packets/2026-07-17/lena_content_packet_dryrun_2026-07-17_hcr_011.json")
-ORIGINAL_PROMPT = json.loads(PROOF_PACKET_PATH.read_text(encoding="utf-8"))["compact_provider_prompt_preview"]
+def _proof_prompt() -> str:
+    packet = packet_builder.rebuild_packet_from_authoritative_sources(
+        {
+            "recipe_id": "hcr_011",
+            "strong_hook_id": "mf_001",
+            "generated_date": "2026-07-17",
+            "wardrobe_outfit_id": "wc_p020",
+            "environment_id": "env_v008",
+            "hook_selection_reason": "mirror fitcheck",
+        }
+    )
+    return packet["compact_provider_prompt_preview"]
+
+
+ORIGINAL_PROMPT = _proof_prompt()
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
     f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
