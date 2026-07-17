@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as gate
 from tools.strategy import lena_human_presence_profile_v1 as lena_profile
+from pipeline.presence import human_presence_candidate_ranking_v1 as presence_ranking
 from pipeline.presence import human_presence_prompt_plan_v1 as presence_plan
 
 
@@ -540,6 +541,27 @@ def test_matching_rerun_reuses_byte_identical_artifact_and_conflict_refuses_over
     path.write_text(json.dumps(corrupted), encoding="utf-8")
     with pytest.raises(gate.GateError, match="refusing to overwrite"):
         gate.write_decision(core, tmp_path)
+
+
+def test_write_decision_persists_hpe_prompt_pack_human_presence_payload(tmp_path):
+    contract = lena_profile.build_lena_presence_contract()
+    plan = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
+    selected, rejected = select()
+    core = gate._decision_core(
+        "c" * 40,
+        "2026-07-13",
+        authorities(),
+        selected,
+        rejected,
+        recent(),
+        {"human_presence": plan},
+    )
+    path, written, reused = gate.write_decision(core, tmp_path, "2026-07-13T12:00:00Z")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert reused is False
+    assert payload == written
+    assert payload["evidence"]["prompt_pack"]["human_presence"] == plan
 
 
 def test_required_recipe_binding_filters_on_canonical_recipe_selection_not_raw_prompt_candidates():
