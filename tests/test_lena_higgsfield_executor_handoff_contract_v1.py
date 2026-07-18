@@ -353,7 +353,7 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
+        lambda _path, _slot_id_override=None: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
     )
 
     packet = handoff_builder.build_handoff(DATE, str(reconciliation_path.relative_to(tmp_root).as_posix()))
@@ -389,6 +389,59 @@ def test_handoff_dry_run_accepts_valid_packet_and_emits_expected_contract(
     assert "provider_call_performed : False" in stdout
     assert "generation_performed    : False" in stdout
     assert "live_execution_authorized: False" in stdout
+
+
+def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_prompt_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet_path, packet_report = _build_packet_fixture(tmp_path, monkeypatch)
+    original_rebuild = executor._rebuild_packet_prompt_source
+    seen: dict[str, str | None] = {}
+
+    def rebuild(packet_path: Path, slot_id_override: str | None = None):
+        seen["slot_id_override"] = slot_id_override
+        rebuilt_packet, source = original_rebuild(packet_path)
+        if isinstance(slot_id_override, str) and slot_id_override.strip():
+            source["image"]["slot_id"] = slot_id_override
+        return rebuilt_packet, source
+
+    monkeypatch.setattr(executor, "_rebuild_packet_prompt_source", rebuild)
+
+    report, source, packet_validation, validation = executor._validate_handoff_packet(packet_path)
+
+    assert seen["slot_id_override"] == SLOT_ID
+    assert report["selected_slot_id"] == SLOT_ID
+    assert report["selected_recipe_id"] == RECIPE_ID
+    assert source["image"]["slot_id"] == SLOT_ID
+    assert source["image"]["image_prompt"] == packet_report["compact_provider_prompt_preview"]
+    assert packet_validation["slot_id"] == SLOT_ID
+    assert packet_validation["selected_prompt_sha256"] == packet_report["compact_provider_prompt_sha256"]
+    assert packet_validation["regenerated_prompt_sha256"] == packet_report["compact_provider_prompt_sha256"]
+    assert packet_validation["prompt_sha_match"] is True
+    assert packet_validation["selected_candidate_binding_valid"] is True
+    assert packet_validation["reconciliation_provenance_valid"] is True
+    assert validation["ok"] is True
+
+
+def test_validate_handoff_packet_rejects_rebuilt_source_slot_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
+    original_rebuild = executor._rebuild_packet_prompt_source
+
+    def rebuild(packet_path: Path, slot_id_override: str | None = None):
+        rebuilt_packet, source = original_rebuild(packet_path)
+        source["image"]["slot_id"] = "unrelated-slot"
+        return rebuilt_packet, source
+
+    monkeypatch.setattr(executor, "_rebuild_packet_prompt_source", rebuild)
+
+    with pytest.raises(executor.HandoffArtifactError) as excinfo:
+        executor._validate_handoff_packet(packet_path)
+
+    assert excinfo.value.code == "handoff_slot_mismatch"
 
 
 @pytest.mark.parametrize(
@@ -849,7 +902,7 @@ def test_prompt_drift_rejects_before_provider_access(
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path: (copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")),
+        lambda _path, _slot_id_override=None: (copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")),
     )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 

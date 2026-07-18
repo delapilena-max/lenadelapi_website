@@ -439,6 +439,7 @@ def test_report_only_reconciliation_flow_binds_handoff_and_blocks_live_without_a
     assert handoff_report["source_selected_candidate_artifact_path"] == paths["selected_candidate_path"].relative_to(tmp_path).as_posix()
     rebuilt_packet, rebuilt_source = executor._rebuild_packet_prompt_source(paths["packet_path"])
     assert rebuilt_packet["recipe_id"] == SELECTED_RECIPE_ID
+    assert rebuilt_source["image"]["slot_id"] == f"higgsfield-{DATE.replace('-', '')}-{SELECTED_RECIPE_ID}-photo"
     assert isinstance(rebuilt_source["image"]["image_prompt"], str)
     assert rebuilt_source["image"]["image_prompt"]
     assert approval_mod.approval_output_path(DATE, SLOT_ID).exists() is False
