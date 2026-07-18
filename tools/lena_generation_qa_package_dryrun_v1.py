@@ -16,9 +16,12 @@ from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
+DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
+DEFAULT_CANDIDATE_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates"
 DEFAULT_REPORTS_ROOT = ROOT / "pipeline" / "autonomy" / "lena" / "dry_run_cycles"
 DEFAULT_MANIFEST_ROOT = ROOT / "pipeline" / "higgsfield_debug"
-DEFAULT_QA_ROOT = ROOT / "pipeline" / "asset_review" / "lena"
+DEFAULT_IMAGE_ROOT = ROOT / "pipeline" / "higgsfield_library" / "lena"
+DEFAULT_QA_ROOT = ROOT / "pipeline" / "asset_review" / "lena" / "hpe_closure" / "presence_output_qa"
 DEFAULT_PACKET_ROOT = Path(packet_builder.OUTPUT_BASE)
 
 AUTONOMOUS_STAGES = (
@@ -57,6 +60,26 @@ def now_stamp() -> str:
 def _require(condition: bool, code: str, detail: str) -> None:
     if not condition:
         raise LenaGenerationQaPackageDryRunError(code, detail)
+
+
+def _ensure_path_within_root(
+    path: Path,
+    root: Path,
+    *,
+    code: str,
+    label: str,
+    must_exist: bool,
+) -> Path:
+    root_resolved = root.resolve(strict=False)
+    resolved = path.resolve(strict=False)
+    if not resolved.is_relative_to(root_resolved):
+        raise LenaGenerationQaPackageDryRunError(
+            code,
+            f"resolved {label} escapes declared root: {resolved} (root: {root_resolved})",
+        )
+    if must_exist and not resolved.exists():
+        raise LenaGenerationQaPackageDryRunError(code, f"{label} does not exist: {resolved}")
+    return resolved
 
 
 def _read_json_object(path: Path, *, code: str, label: str) -> dict[str, Any]:
@@ -99,8 +122,13 @@ def _report_path(day: str, stamp: str, report_root: Path = DEFAULT_REPORTS_ROOT)
 
 
 def _ensure_report_path_within_root(path: Path, report_root: Path = DEFAULT_REPORTS_ROOT) -> None:
-    if not path.resolve().is_relative_to(report_root.resolve()):
-        raise LenaGenerationQaPackageDryRunError("report_path_escape", f"resolved report path escapes reports root: {path}")
+    _ensure_path_within_root(
+        path,
+        report_root,
+        code="report_path_escape",
+        label="report output path",
+        must_exist=False,
+    )
 
 
 def _manifest_path(manifest_root: Path, date_str: str, slot_id: str) -> Path:
@@ -108,7 +136,7 @@ def _manifest_path(manifest_root: Path, date_str: str, slot_id: str) -> Path:
 
 
 def _qa_path(qa_root: Path, date_str: str, slot_id: str) -> Path:
-    return qa_root / "hpe_closure" / "presence_output_qa" / date_str / slot_id / f"presence_qa_{slot_id}_00.json"
+    return qa_root / date_str / slot_id / f"presence_qa_{slot_id}_00.json"
 
 
 def _packet_output_path(packet_root: Path, date_str: str, recipe_id: str) -> Path:
@@ -116,6 +144,13 @@ def _packet_output_path(packet_root: Path, date_str: str, recipe_id: str) -> Pat
 
 
 def resolve_approved_candidate(approval_artifact: Path) -> dict[str, Any]:
+    approval_artifact = _ensure_path_within_root(
+        approval_artifact,
+        DEFAULT_APPROVAL_ROOT,
+        code="approval_path_escape",
+        label="approval artifact",
+        must_exist=True,
+    )
     try:
         approval_result = approval.validate_generation_approval_artifact(approval_artifact, require_not_expired=True)
     except approval.HiggsfieldGenerationApprovalError as exc:
@@ -125,17 +160,33 @@ def resolve_approved_candidate(approval_artifact: Path) -> dict[str, Any]:
     handoff_facts = approval_result["handoff_facts"]
     candidate = dict(handoff_facts["selected_candidate"])
     _require(bool(candidate.get("candidate_id")), "candidate_missing", "selected candidate is missing")
+    candidate_path = _ensure_path_within_root(
+        Path(str(handoff_facts["selected_candidate_path"])),
+        DEFAULT_CANDIDATE_ROOT,
+        code="candidate_path_escape",
+        label="candidate artifact",
+        must_exist=True,
+    )
+    selected_candidate_sha256 = str(handoff_facts["selected_candidate_sha256"])
+    actual_candidate_sha256 = _sha256_file(candidate_path)
+    _require(
+        actual_candidate_sha256 == selected_candidate_sha256,
+        "candidate_sha_mismatch",
+        "selected candidate file SHA-256 does not match selected_candidate_sha256",
+    )
     return {
         "approval_result": approval_result,
         "approval_path": approval_artifact.resolve(),
         "approval_sha256": _sha256_file(approval_artifact),
         "candidate": candidate,
-        "candidate_path": Path(str(handoff_facts["selected_candidate_path"])).resolve(),
-        "candidate_sha256": str(handoff_facts["selected_candidate_sha256"]),
+        "candidate_path": candidate_path,
+        "candidate_sha256": actual_candidate_sha256,
+        "selected_candidate_sha256": selected_candidate_sha256,
         "date": str(handoff_facts["date"]),
         "slot_id": str(handoff_facts["slot_id"]),
         "prompt_sha256": str(handoff_facts["prompt_sha256"]),
         "authority_commit": str(candidate.get("authority_commit") or ""),
+        "media_type": str(handoff_facts.get("slot_media_type") or "photo"),
         "handoff_path": Path(str(handoff_facts["handoff_path"])).resolve(),
         "handoff_sha256": str(handoff_facts["handoff_sha256"]),
     }
@@ -144,9 +195,23 @@ def resolve_approved_candidate(approval_artifact: Path) -> dict[str, Any]:
 def intake_generation_result(
     *,
     manifest_path: Path,
+    image_root: Path,
+    expected_date: str,
     expected_slot_id: str,
     expected_prompt_sha256: str,
+    expected_candidate_id: str,
+    expected_candidate_sha256: str,
+    expected_recipe_id: str,
+    expected_authority_commit: str,
+    expected_media_type: str,
 ) -> dict[str, Any]:
+    manifest_path = _ensure_path_within_root(
+        manifest_path,
+        DEFAULT_MANIFEST_ROOT,
+        code="manifest_path_escape",
+        label="generation result manifest",
+        must_exist=True,
+    )
     manifest = _read_json_object(manifest_path, code="manifest_missing_or_invalid", label="generation result manifest")
     schema_version = str(manifest.get("schema_version") or "")
     outputs = manifest.get("outputs")
@@ -159,9 +224,79 @@ def intake_generation_result(
         "manifest_output_binding_mismatch",
         "generation result manifest outputs do not include the expected image filename",
     )
-    image_path = manifest_path.parent.parent.parent.parent / "higgsfield_library" / "lena" / manifest_path.parent.parent.name / expected_image_name
-    _require(image_path.is_file(), "generated_image_missing", f"expected generated image is missing: {image_path}")
+    expected_image_root = _ensure_path_within_root(
+        image_root,
+        DEFAULT_IMAGE_ROOT,
+        code="image_root_escape",
+        label="generated image root",
+        must_exist=False,
+    )
+    image_path = expected_image_root / expected_date / expected_image_name
+    image_path = _ensure_path_within_root(
+        image_path,
+        expected_image_root,
+        code="generated_image_path_escape",
+        label="generated image path",
+        must_exist=True,
+    )
     image_sha256 = _sha256_file(image_path)
+
+    binding_report: dict[str, Any] = {
+        "prompt_binding_verified": False,
+        "verified_bindings": {
+            "candidate_id": expected_candidate_id,
+            "candidate_sha256": expected_candidate_sha256,
+            "slot_id": expected_slot_id,
+            "recipe_id": expected_recipe_id,
+            "media_type": expected_media_type,
+            "image_sha256": image_sha256,
+        },
+        "asserted_bindings": {
+            "prompt_sha256": expected_prompt_sha256,
+            "authority_commit": expected_authority_commit,
+            "provider_job_id": None,
+        },
+        "unverified_bindings": [
+            "generation_result_prompt_binding",
+            "provider_job_id",
+        ],
+    }
+
+    optional_binding_checks = {
+        "prompt_sha256": expected_prompt_sha256,
+        "authority_commit": expected_authority_commit,
+        "candidate_id": expected_candidate_id,
+        "slot_id": expected_slot_id,
+        "recipe_id": expected_recipe_id,
+        "media_type": expected_media_type,
+        "candidate_sha256": expected_candidate_sha256,
+        "image_sha256": image_sha256,
+    }
+    for field, expected in optional_binding_checks.items():
+        if field not in manifest:
+            continue
+        observed = str(manifest.get(field) or "")
+        _require(
+            observed == str(expected),
+            f"{field}_binding_mismatch",
+            f"generation result manifest {field} does not match the expected binding",
+        )
+        binding_report["verified_bindings"][field] = observed
+        if field == "prompt_sha256":
+            binding_report["prompt_binding_verified"] = True
+            binding_report["asserted_bindings"].pop("prompt_sha256", None)
+            binding_report["unverified_bindings"] = [
+                item for item in binding_report["unverified_bindings"] if item != "generation_result_prompt_binding"
+            ]
+        if field == "authority_commit":
+            binding_report["asserted_bindings"].pop("authority_commit", None)
+    provider_job_id = manifest.get("provider_job_id")
+    if provider_job_id not in (None, ""):
+        binding_report["verified_bindings"]["provider_job_id"] = str(provider_job_id)
+        binding_report["asserted_bindings"].pop("provider_job_id", None)
+        binding_report["unverified_bindings"] = [
+            item for item in binding_report["unverified_bindings"] if item != "provider_job_id"
+        ]
     return {
         "manifest_path": manifest_path.resolve(),
         "manifest_sha256": _sha256_file(manifest_path),
@@ -170,6 +305,7 @@ def intake_generation_result(
         "image_sha256": image_sha256,
         "expected_slot_id": expected_slot_id,
         "expected_prompt_sha256": expected_prompt_sha256,
+        "binding_report": binding_report,
     }
 
 
@@ -179,6 +315,13 @@ def validate_photo_qa_artifact(
     expected_slot_id: str,
     expected_date: str,
 ) -> dict[str, Any]:
+    qa_artifact_path = _ensure_path_within_root(
+        qa_artifact_path,
+        DEFAULT_QA_ROOT,
+        code="qa_path_escape",
+        label="photo QA artifact",
+        must_exist=True,
+    )
     artifact = _read_json_object(qa_artifact_path, code="qa_artifact_missing_or_invalid", label="photo QA artifact")
     _require(str(artifact.get("slot_id") or "") == expected_slot_id, "qa_slot_mismatch", "photo QA artifact slot_id does not match the approval lineage")
     _require(str(artifact.get("date") or "") == expected_date, "qa_date_mismatch", "photo QA artifact date does not match the approval lineage")
@@ -231,6 +374,13 @@ def build_caption_package(
     except SystemExit as exc:
         raise LenaGenerationQaPackageDryRunError("packet_build_failed", str(exc)) from exc
     packet_path = _packet_output_path(packet_root, approval_context["date"], candidate["recipe_id"])
+    packet_path = _ensure_path_within_root(
+        packet_path,
+        packet_root,
+        code="packet_path_escape",
+        label="packet output path",
+        must_exist=False,
+    )
     _require(not packet_path.exists(), "packet_already_exists", f"refusing to overwrite existing package artifact: {packet_path}")
     try:
         flags, errors = packet_builder.validate_packet(packet, str(packet_path))
@@ -264,9 +414,36 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
         raise LenaGenerationQaPackageDryRunError("report_already_exists", f"dry-run cycle report already exists: {output_path}")
 
     stages: list[dict[str, Any]] = []
+    lineage: dict[str, Any] = {
+        "verified_lineage": {},
+        "asserted_lineage": {},
+        "unverified_bindings": [],
+        "prompt_binding_verified": False,
+    }
     current_stage = "approved_candidate_resolution"
     try:
         approval_context = resolve_approved_candidate(args.approval_artifact)
+        lineage["verified_lineage"].update(
+            {
+                "approval_artifact_path": str(approval_context["approval_path"]),
+                "approval_artifact_sha256": approval_context["approval_sha256"],
+                "candidate_artifact_path": str(approval_context["candidate_path"]),
+                "candidate_artifact_sha256_expected": approval_context["selected_candidate_sha256"],
+                "candidate_artifact_sha256_actual": approval_context["candidate_sha256"],
+                "candidate_id": approval_context["candidate"]["candidate_id"],
+                "slot_id": approval_context["slot_id"],
+                "recipe_id": approval_context["candidate"]["recipe_id"],
+                "media_type": approval_context["media_type"],
+            }
+        )
+        lineage["asserted_lineage"].update(
+            {
+                "prompt_sha256": approval_context["prompt_sha256"],
+                "authority_commit": approval_context["authority_commit"],
+                "provider_job_id": None,
+            }
+        )
+        lineage["unverified_bindings"].extend(["generation_result_prompt_binding", "provider_job_id"])
         stages.append(
             {
                 "stage": "approved_candidate_resolution",
@@ -286,9 +463,36 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
         manifest_path = args.manifest_artifact or _manifest_path(args.manifest_root, approval_context["date"], approval_context["slot_id"])
         generation_context = intake_generation_result(
             manifest_path=manifest_path,
+            image_root=args.image_root,
+            expected_date=approval_context["date"],
             expected_slot_id=approval_context["slot_id"],
             expected_prompt_sha256=approval_context["prompt_sha256"],
+            expected_candidate_id=approval_context["candidate"]["candidate_id"],
+            expected_candidate_sha256=approval_context["candidate_sha256"],
+            expected_recipe_id=approval_context["candidate"]["recipe_id"],
+            expected_authority_commit=approval_context["authority_commit"],
+            expected_media_type=approval_context["media_type"],
         )
+        lineage["verified_lineage"].update(
+            {
+                "manifest_artifact_path": str(generation_context["manifest_path"]),
+                "manifest_artifact_sha256": generation_context["manifest_sha256"],
+                "image_artifact_path": str(generation_context["image_path"]),
+                "image_artifact_sha256": generation_context["image_sha256"],
+            }
+        )
+        binding_report = generation_context["binding_report"]
+        lineage["prompt_binding_verified"] = bool(binding_report["prompt_binding_verified"])
+        if binding_report["prompt_binding_verified"]:
+            lineage["verified_lineage"]["prompt_sha256"] = binding_report["verified_bindings"]["prompt_sha256"]
+            lineage["asserted_lineage"].pop("prompt_sha256", None)
+            lineage["unverified_bindings"] = [item for item in lineage["unverified_bindings"] if item != "generation_result_prompt_binding"]
+        if binding_report["verified_bindings"].get("authority_commit"):
+            lineage["verified_lineage"]["authority_commit"] = binding_report["verified_bindings"]["authority_commit"]
+            lineage["asserted_lineage"].pop("authority_commit", None)
+        if binding_report["verified_bindings"].get("provider_job_id"):
+            lineage["verified_lineage"]["provider_job_id"] = binding_report["verified_bindings"]["provider_job_id"]
+            lineage["asserted_lineage"].pop("provider_job_id", None)
         stages.append(
             {
                 "stage": "generation_result_intake",
@@ -309,6 +513,11 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
             expected_slot_id=approval_context["slot_id"],
             expected_date=approval_context["date"],
         )
+        qa_context_binding = {
+            "qa_artifact_path": str(qa_context["qa_artifact_path"]),
+            "qa_artifact_sha256": qa_context["qa_artifact_sha256"],
+        }
+        lineage["verified_lineage"].update(qa_context_binding)
         stages.append(
             {
                 "stage": "image_qa_validation",
@@ -326,6 +535,12 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
             approval_context=approval_context,
             qa_context=qa_context,
             packet_root=args.packet_root,
+        )
+        lineage["verified_lineage"].update(
+            {
+                "packet_artifact_path": str(packet_context["packet_path"]),
+                "packet_artifact_sha256": packet_context["packet_sha256"],
+            }
         )
         stages.append(
             {
@@ -348,10 +563,19 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
             "finished_at": now_iso(),
             "dry_run_command": _self_command(args),
             "report_path": str(output_path),
+            "publishing_authorized": False,
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "retries_performed": 0,
+            "prompt_binding_verified": lineage["prompt_binding_verified"],
+            "verified_lineage": lineage["verified_lineage"],
+            "asserted_lineage": lineage["asserted_lineage"],
+            "unverified_bindings": lineage["unverified_bindings"],
             "approval_artifact": str(approval_context["approval_path"]),
             "approval_sha256": approval_context["approval_sha256"],
             "candidate_path": str(approval_context["candidate_path"]),
             "candidate_sha256": approval_context["candidate_sha256"],
+            "candidate_sha256_expected": approval_context["selected_candidate_sha256"],
             "candidate_id": approval_context["candidate"]["candidate_id"],
             "slot_id": approval_context["slot_id"],
             "prompt_sha256": approval_context["prompt_sha256"],
@@ -366,12 +590,13 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
             "safeguards": {
                 "provider_calls_performed": 0,
                 "publish_calls_performed": 0,
+                "publishing_authorized": False,
+                "retries_performed": 0,
                 "retry_cap": 0,
                 "hard_spend_cap_usd": 0,
                 "duplicate_rejection": "report_path_must_not_exist_and_packet_path_must_not_exist",
                 "kill_switch": "no_live_command_paths",
                 "fail_closed_stage_handling": True,
-                "single_use_scoped_authorization": True,
                 "receipt_creation": "wrapper_report_json",
                 "recurring_scheduler": False,
             },
@@ -397,15 +622,24 @@ def run_cycle(args: argparse.Namespace) -> dict[str, Any]:
             "report_path": str(output_path),
             "failed_stage": current_stage,
             "error": {"code": exc.code, "detail": exc.detail},
+            "publishing_authorized": False,
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "retries_performed": 0,
+            "prompt_binding_verified": lineage["prompt_binding_verified"],
+            "verified_lineage": lineage["verified_lineage"],
+            "asserted_lineage": lineage["asserted_lineage"],
+            "unverified_bindings": lineage["unverified_bindings"],
             "safeguards": {
                 "provider_calls_performed": 0,
                 "publish_calls_performed": 0,
+                "publishing_authorized": False,
+                "retries_performed": 0,
                 "retry_cap": 0,
                 "hard_spend_cap_usd": 0,
                 "duplicate_rejection": "report_path_must_not_exist_and_packet_path_must_not_exist",
                 "kill_switch": "no_live_command_paths",
                 "fail_closed_stage_handling": True,
-                "single_use_scoped_authorization": True,
                 "receipt_creation": "wrapper_report_json",
                 "recurring_scheduler": False,
             },
@@ -423,6 +657,7 @@ def main() -> int:
     parser.add_argument("--manifest-artifact", type=Path)
     parser.add_argument("--report-root", type=Path, default=DEFAULT_REPORTS_ROOT)
     parser.add_argument("--manifest-root", type=Path, default=DEFAULT_MANIFEST_ROOT)
+    parser.add_argument("--image-root", type=Path, default=DEFAULT_IMAGE_ROOT)
     parser.add_argument("--qa-root", type=Path, default=DEFAULT_QA_ROOT)
     parser.add_argument("--packet-root", type=Path, default=DEFAULT_PACKET_ROOT)
     args = parser.parse_args()
