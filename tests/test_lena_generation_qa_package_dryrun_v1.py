@@ -788,9 +788,10 @@ def test_symlink_escape_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     qa_path = symlink_path / f"presence_qa_{SLOT_ID}_00.json"
     qa_path.write_text("{}", encoding="utf-8")
 
-    with pytest.raises(cycle.LenaGenerationQaPackageDryRunError, match="escapes declared root"):
+    with pytest.raises(cycle.LenaGenerationQaPackageDryRunError) as exc_info:
         cycle.validate_photo_qa_artifact(
             qa_artifact_path=qa_path,
             expected_slot_id=SLOT_ID,
             expected_date=DATE,
         )
+    assert exc_info.value.code == "qa_path_escape"
