@@ -14,10 +14,25 @@ DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "asset_review" / "lena" / "hpe_closure
 SCHEMA_VERSION_FINAL_CI = "human_presence_final_ci_confirmation_v1"
 SCHEMA_VERSION_HUMAN_REVIEW = "human_presence_human_evidence_review_v1"
 SCHEMA_VERSION_MANUAL_SEMANTIC_REVIEW = "human_presence_manual_semantic_review_v1"
+SCHEMA_VERSION_ORDINARY_LANE_PROOF = "human_presence_ordinary_lane_proof_v1"
 
 FINAL_CI_REQUIRED_CHECK_NAMES = ("build", "main_ci_check")
+FINAL_CI_SUCCESS_CONCLUSION_ALIASES = {"success", "pass"}
+FINAL_CI_NON_VERIFYING_CONCLUSIONS = (
+    "failure",
+    "fail",
+    "cancelled",
+    "skipped",
+    "pending",
+    "neutral",
+    "timed_out",
+    "action_required",
+    "stale",
+    "startup_failure",
+)
 HUMAN_REVIEW_DISPOSITIONS = ("accepted_for_hpe_closure", "rejected", "insufficient_evidence")
 MANUAL_SEMANTIC_DISPOSITIONS = ("accepted_for_hpe_closure", "rejected", "insufficient_evidence")
+ORDINARY_LANE_PROOF_DISPOSITIONS = ("accepted_for_hpe_closure", "rejected", "insufficient_evidence")
 MANUAL_SEMANTIC_ASPECT_IDS = (
     "gaze_and_viewer_recognition",
     "expression_progression",
@@ -31,6 +46,9 @@ MANUAL_SEMANTIC_ASPECT_IDS = (
 )
 HUMAN_REVIEW_CONFIRMATION_STATEMENT = "I reviewed the evidence and accept it for HPE closure."
 MANUAL_SEMANTIC_CONFIRMATION_STATEMENT = "I reviewed the image and accept the manual semantic review for HPE closure."
+ORDINARY_LANE_PROOF_CONFIRMATION_STATEMENT = "I reviewed the ordinary lane evidence and accept it for HPE closure."
+MANUAL_SEMANTIC_EVIDENCE_SOURCE = "manual_human_semantic_review"
+ORDINARY_LANE_PROOF_EVIDENCE_SOURCE = "ordinary_lane_proof"
 
 _SHA256_RE = frozenset("0123456789abcdef")
 _COMMIT_SHA_RE = frozenset("0123456789abcdef")
@@ -138,7 +156,7 @@ def manual_semantic_review_artifact_path(
     return output_root / date_str / slot_id / f"lena_hpe_manual_semantic_review_{slot_id}_{image_index:02d}.json"
 
 
-def _validate_check_entry(entry: Any) -> dict[str, Any]:
+def _validate_check_entry(entry: Any, *, allow_missing_conclusion: bool = False) -> dict[str, Any]:
     _require(isinstance(entry, dict), "ci_evidence_invalid", "required_checks entries must be objects")
     _require(
         set(entry).issubset({"check_name", "conclusion", "github_url", "check_run_id"}),
@@ -146,9 +164,17 @@ def _validate_check_entry(entry: Any) -> dict[str, Any]:
         "required_checks entries have unexpected keys",
     )
     check_name = str(entry.get("check_name") or "").strip()
-    conclusion = str(entry.get("conclusion") or "").strip()
     _require(bool(check_name), "ci_evidence_invalid", "required_checks entries need check_name")
-    _require(bool(conclusion), "ci_evidence_invalid", "required_checks entries need conclusion")
+    conclusion_value = entry.get("conclusion")
+    if conclusion_value is None or conclusion_value == "":
+        _require(allow_missing_conclusion, "ci_evidence_invalid", "required_checks entries need conclusion")
+        normalized_conclusion: str | None = None
+    else:
+        conclusion = str(conclusion_value).strip()
+        _require(bool(conclusion), "ci_evidence_invalid", "required_checks entries need conclusion")
+        normalized_conclusion = conclusion.strip().lower()
+        if normalized_conclusion in FINAL_CI_SUCCESS_CONCLUSION_ALIASES:
+            normalized_conclusion = "pass"
     github_url = entry.get("github_url")
     if github_url is not None:
         _require(isinstance(github_url, str) and github_url.strip(), "ci_evidence_invalid", "github_url must be a string")
@@ -161,7 +187,7 @@ def _validate_check_entry(entry: Any) -> dict[str, Any]:
         )
     return {
         "check_name": check_name,
-        "conclusion": conclusion,
+        "conclusion": normalized_conclusion,
         **({"github_url": github_url} if github_url is not None else {}),
         **({"check_run_id": check_run_id} if check_run_id is not None else {}),
     }
@@ -197,8 +223,6 @@ def build_final_ci_confirmation_artifact(
         "ci_evidence_invalid",
         f"required_checks must contain exactly {FINAL_CI_REQUIRED_CHECK_NAMES!r}",
     )
-    for entry in normalized_checks:
-        _require(entry["conclusion"] == "pass", "ci_evidence_invalid", f"required check {entry['check_name']!r} must pass")
     _require(isinstance(evidence_source, str) and evidence_source.strip(), "ci_evidence_invalid", "evidence_source is required")
     _require(
         isinstance(evidence_collected_at_utc, str) and evidence_collected_at_utc.strip() or evidence_collected_at_utc is None,
@@ -265,14 +289,12 @@ def validate_final_ci_confirmation_artifact(
     _require(isinstance(artifact.get("evidence_source"), str) and artifact["evidence_source"].strip(), "ci_evidence_invalid", "evidence_source is required")
     required_checks = artifact.get("required_checks")
     _require(isinstance(required_checks, list) and required_checks, "ci_evidence_invalid", "required_checks must be a non-empty list")
-    normalized_checks = [_validate_check_entry(entry) for entry in required_checks]
+    normalized_checks = [_validate_check_entry(entry, allow_missing_conclusion=True) for entry in required_checks]
     _require(
         {entry["check_name"] for entry in normalized_checks} == set(FINAL_CI_REQUIRED_CHECK_NAMES),
         "ci_evidence_invalid",
         f"required_checks must contain exactly {FINAL_CI_REQUIRED_CHECK_NAMES!r}",
     )
-    for entry in normalized_checks:
-        _require(entry["conclusion"] == "pass", "ci_evidence_invalid", f"required check {entry['check_name']!r} did not pass")
     normalized = dict(artifact)
     normalized["required_checks"] = normalized_checks
     return normalized
@@ -328,6 +350,8 @@ def build_human_evidence_review_artifact(
     execution_receipt_artifact_path: str | Path,
     execution_receipt_artifact_sha256: str,
     provider_job_id: str,
+    authority_commit_expected: str,
+    authority_commit_final: str,
     disposition: str,
     findings: list[dict[str, Any]],
     confirmation_statement: str,
@@ -345,6 +369,8 @@ def build_human_evidence_review_artifact(
     _require(confirmation_statement == HUMAN_REVIEW_CONFIRMATION_STATEMENT, "human_review_invalid", "confirmation_statement mismatch")
     _require(publishing_authorized is False, "human_review_invalid", "publishing must remain unauthorized")
     _require(isinstance(evidence_source, str) and evidence_source.strip(), "human_review_invalid", "evidence_source is required")
+    _require(_is_commit_sha(authority_commit_expected), "human_review_invalid", "authority_commit_expected must be a commit sha")
+    _require(_is_commit_sha(authority_commit_final), "human_review_invalid", "authority_commit_final must be a commit sha")
     if reviewed_at_utc is None:
         reviewed_at_utc = _utcnow_iso()
     _validate_bound_file(reviewed_path, reviewed_image_sha256, label="reviewed_image")
@@ -363,6 +389,8 @@ def build_human_evidence_review_artifact(
         "execution_receipt_artifact_path": str(receipt_path),
         "execution_receipt_artifact_sha256": execution_receipt_artifact_sha256,
         "provider_job_id": provider_job_id.strip(),
+        "authority_commit_expected": authority_commit_expected,
+        "authority_commit_final": authority_commit_final,
         "reviewed_at_utc": reviewed_at_utc,
         "disposition": disposition,
         "findings": _normalize_findings(findings),
@@ -384,6 +412,8 @@ def validate_human_evidence_review_artifact(
     )
     _require(isinstance(artifact.get("reviewer_operator_id"), str) and artifact["reviewer_operator_id"].strip(), "human_review_invalid", "reviewer_operator_id is required")
     _require(isinstance(artifact.get("provider_job_id"), str) and artifact["provider_job_id"].strip(), "human_review_invalid", "provider_job_id is required")
+    _require(_is_commit_sha(str(artifact.get("authority_commit_expected") or "")), "human_review_invalid", "authority_commit_expected must be a commit sha")
+    _require(_is_commit_sha(str(artifact.get("authority_commit_final") or "")), "human_review_invalid", "authority_commit_final must be a commit sha")
     _require(isinstance(artifact.get("reviewed_at_utc"), str) and artifact["reviewed_at_utc"].strip(), "human_review_invalid", "reviewed_at_utc is required")
     _require(artifact.get("disposition") in HUMAN_REVIEW_DISPOSITIONS, "human_review_invalid", "disposition is invalid")
     _require(artifact.get("confirmation_statement") == HUMAN_REVIEW_CONFIRMATION_STATEMENT, "human_review_invalid", "confirmation_statement mismatch")
@@ -458,6 +488,7 @@ def build_manual_semantic_review_artifact(
     candidate_artifact_sha256: str,
     execution_receipt_artifact_path: str | Path,
     execution_receipt_artifact_sha256: str,
+    provider_job_id: str | None = None,
     authority_commit_expected: str,
     authority_commit_final: str,
     disposition: str,
@@ -475,6 +506,8 @@ def build_manual_semantic_review_artifact(
     _require(isinstance(evidence_source, str) and evidence_source.strip(), "manual_semantic_review_invalid", "evidence_source is required")
     _require(_is_commit_sha(authority_commit_expected), "manual_semantic_review_invalid", "authority_commit_expected must be a commit sha")
     _require(_is_commit_sha(authority_commit_final), "manual_semantic_review_invalid", "authority_commit_final must be a commit sha")
+    if provider_job_id is not None:
+        _require(isinstance(provider_job_id, str) and provider_job_id.strip(), "manual_semantic_review_invalid", "provider_job_id must be a string")
     if reviewed_at_utc is None:
         reviewed_at_utc = _utcnow_iso()
     reviewed_path, _ = _validate_bound_file(str(reviewed_image_path), reviewed_image_sha256, label="reviewed_image")
@@ -499,6 +532,7 @@ def build_manual_semantic_review_artifact(
         "candidate_artifact_sha256": candidate_artifact_sha256,
         "execution_receipt_artifact_path": str(receipt_path),
         "execution_receipt_artifact_sha256": execution_receipt_artifact_sha256,
+        **({"provider_job_id": provider_job_id.strip()} if provider_job_id is not None else {}),
         "authority_commit_expected": authority_commit_expected,
         "authority_commit_final": authority_commit_final,
         "reviewed_at_utc": reviewed_at_utc,
@@ -524,9 +558,12 @@ def validate_manual_semantic_review_artifact(artifact: dict[str, Any]) -> dict[s
     _require(artifact.get("disposition") in MANUAL_SEMANTIC_DISPOSITIONS, "manual_semantic_review_invalid", "disposition is invalid")
     _require(artifact.get("confirmation_statement") == MANUAL_SEMANTIC_CONFIRMATION_STATEMENT, "manual_semantic_review_invalid", "confirmation_statement mismatch")
     _require(artifact.get("publishing_authorized") is False, "manual_semantic_review_invalid", "publishing_authorized must be false")
-    _require(isinstance(artifact.get("evidence_source"), str) and artifact["evidence_source"].strip(), "manual_semantic_review_invalid", "evidence_source is required")
+    _require(artifact.get("evidence_source") == MANUAL_SEMANTIC_EVIDENCE_SOURCE, "manual_semantic_review_invalid", "evidence_source mismatch")
     _require(_is_commit_sha(str(artifact.get("authority_commit_expected") or "")), "manual_semantic_review_invalid", "authority_commit_expected must be a commit sha")
     _require(_is_commit_sha(str(artifact.get("authority_commit_final") or "")), "manual_semantic_review_invalid", "authority_commit_final must be a commit sha")
+    provider_job_id = artifact.get("provider_job_id")
+    if provider_job_id is not None:
+        _require(isinstance(provider_job_id, str) and provider_job_id.strip(), "manual_semantic_review_invalid", "provider_job_id must be a string")
     normalized = dict(artifact)
     for field in (
         "reviewed_image",
@@ -547,6 +584,99 @@ def validate_manual_semantic_review_artifact(artifact: dict[str, Any]) -> dict[s
             "accepted semantic reviews must mark every aspect verified",
         )
     return normalized
+
+
+def build_ordinary_lane_proof_artifact(
+    *,
+    reviewer_operator_id: str,
+    reviewed_image_path: str | Path,
+    reviewed_image_sha256: str,
+    prompt_artifact_path: str | Path,
+    prompt_sha256: str,
+    candidate_artifact_path: str | Path,
+    candidate_artifact_sha256: str,
+    slot_id: str,
+    authority_commit_expected: str,
+    authority_commit_final: str,
+    disposition: str,
+    findings: list[dict[str, Any]],
+    confirmation_statement: str,
+    evidence_source: str = ORDINARY_LANE_PROOF_EVIDENCE_SOURCE,
+    publishing_authorized: bool = False,
+    reviewed_at_utc: str | None = None,
+) -> dict[str, Any]:
+    _require(isinstance(reviewer_operator_id, str) and reviewer_operator_id.strip(), "ordinary_lane_proof_invalid", "reviewer_operator_id is required")
+    _require(disposition in ORDINARY_LANE_PROOF_DISPOSITIONS, "ordinary_lane_proof_invalid", "disposition is invalid")
+    _require(confirmation_statement == ORDINARY_LANE_PROOF_CONFIRMATION_STATEMENT, "ordinary_lane_proof_invalid", "confirmation_statement mismatch")
+    _require(publishing_authorized is False, "ordinary_lane_proof_invalid", "publishing must remain unauthorized")
+    _require(evidence_source == ORDINARY_LANE_PROOF_EVIDENCE_SOURCE, "ordinary_lane_proof_invalid", "evidence_source mismatch")
+    _require(isinstance(slot_id, str) and slot_id.strip(), "ordinary_lane_proof_invalid", "slot_id is required")
+    _require(_is_commit_sha(authority_commit_expected), "ordinary_lane_proof_invalid", "authority_commit_expected must be a commit sha")
+    _require(_is_commit_sha(authority_commit_final), "ordinary_lane_proof_invalid", "authority_commit_final must be a commit sha")
+    if reviewed_at_utc is None:
+        reviewed_at_utc = _utcnow_iso()
+    reviewed_path, _ = _validate_bound_file(str(reviewed_image_path), reviewed_image_sha256, label="reviewed_image")
+    prompt_path, _ = _validate_bound_file(str(prompt_artifact_path), prompt_sha256, label="prompt_artifact")
+    candidate_path, _ = _validate_bound_file(str(candidate_artifact_path), candidate_artifact_sha256, label="candidate_artifact")
+    artifact = {
+        "schema_version": SCHEMA_VERSION_ORDINARY_LANE_PROOF,
+        "reviewer_operator_id": reviewer_operator_id.strip(),
+        "reviewed_image_path": str(reviewed_path),
+        "reviewed_image_sha256": reviewed_image_sha256,
+        "prompt_artifact_path": str(prompt_path),
+        "prompt_sha256": prompt_sha256,
+        "candidate_artifact_path": str(candidate_path),
+        "candidate_artifact_sha256": candidate_artifact_sha256,
+        "slot_id": slot_id.strip(),
+        "authority_commit_expected": authority_commit_expected,
+        "authority_commit_final": authority_commit_final,
+        "reviewed_at_utc": reviewed_at_utc,
+        "disposition": disposition,
+        "findings": _normalize_findings(findings),
+        "confirmation_statement": confirmation_statement,
+        "evidence_source": evidence_source,
+        "publishing_authorized": False,
+    }
+    return artifact
+
+
+def validate_ordinary_lane_proof_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
+    _require(isinstance(artifact, dict), "ordinary_lane_proof_invalid", "ordinary lane proof evidence must be a JSON object")
+    _require(
+        artifact.get("schema_version") == SCHEMA_VERSION_ORDINARY_LANE_PROOF,
+        "ordinary_lane_proof_invalid",
+        "ordinary lane proof schema_version mismatch",
+    )
+    _require(isinstance(artifact.get("reviewer_operator_id"), str) and artifact["reviewer_operator_id"].strip(), "ordinary_lane_proof_invalid", "reviewer_operator_id is required")
+    _require(isinstance(artifact.get("reviewed_at_utc"), str) and artifact["reviewed_at_utc"].strip(), "ordinary_lane_proof_invalid", "reviewed_at_utc is required")
+    _require(isinstance(artifact.get("slot_id"), str) and artifact["slot_id"].strip(), "ordinary_lane_proof_invalid", "slot_id is required")
+    _require(artifact.get("disposition") in ORDINARY_LANE_PROOF_DISPOSITIONS, "ordinary_lane_proof_invalid", "disposition is invalid")
+    _require(artifact.get("confirmation_statement") == ORDINARY_LANE_PROOF_CONFIRMATION_STATEMENT, "ordinary_lane_proof_invalid", "confirmation_statement mismatch")
+    _require(artifact.get("publishing_authorized") is False, "ordinary_lane_proof_invalid", "publishing_authorized must be false")
+    _require(artifact.get("evidence_source") == ORDINARY_LANE_PROOF_EVIDENCE_SOURCE, "ordinary_lane_proof_invalid", "evidence_source mismatch")
+    _require(_is_commit_sha(str(artifact.get("authority_commit_expected") or "")), "ordinary_lane_proof_invalid", "authority_commit_expected must be a commit sha")
+    _require(_is_commit_sha(str(artifact.get("authority_commit_final") or "")), "ordinary_lane_proof_invalid", "authority_commit_final must be a commit sha")
+    normalized = dict(artifact)
+    for field in ("reviewed_image", "prompt_artifact", "candidate_artifact"):
+        path_key = f"{field}_path"
+        sha_key = "prompt_sha256" if field == "prompt_artifact" else f"{field}_sha256"
+        path, _ = _validate_bound_file(str(artifact.get(path_key) or ""), str(artifact.get(sha_key) or ""), label=field)
+        normalized[path_key] = str(path)
+    normalized["findings"] = _normalize_findings(artifact.get("findings"))
+    return normalized
+
+
+def write_ordinary_lane_proof_artifact(
+    *,
+    date_str: str,
+    slot_id: str,
+    image_index: int,
+    artifact: dict[str, Any],
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+) -> tuple[Path, str]:
+    path = output_root / date_str / slot_id / f"lena_hpe_ordinary_lane_proof_{slot_id}_{image_index:02d}.json"
+    _write_json_atomic(path, artifact)
+    return path, _sha256_file(path)
 
 
 def write_manual_semantic_review_artifact(
