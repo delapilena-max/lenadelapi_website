@@ -151,6 +151,7 @@ def test_active_prompt_paths_embed_shared_hair_directive_once_and_keep_anchors(m
     assert prompt_brain.HIGGSFIELD_BODY_SILHOUETTE_ANCHOR in higgsfield_prompt
     assert prompt_brain.HIGGSFIELD_FRAMING_LINE in higgsfield_prompt
     assert "Hair: brunette, long to medium-long, thick, naturally wavy" in higgsfield_prompt
+    assert "Hair variation is allowed" in higgsfield_prompt
     assert "exact crown silhouette, exact part location, and exact front-curl shape are not identity traits" in higgsfield_prompt
     assert "Do not reproduce the same elevated front curl" in higgsfield_prompt
     assert "pompadour-like front wave" in higgsfield_prompt

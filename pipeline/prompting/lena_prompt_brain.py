@@ -62,7 +62,7 @@ LENA_MASTER_IDENTITY = (
 
 LENA_HAIR_VARIETY_DIRECTIVE = (
     "Hair: brunette, long to medium-long, thick, naturally wavy -- base identity fixed. "
-    "Explicit hairstyle variation is allowed; exact crown silhouette, exact part location, and exact front-curl shape are not identity traits. "
+    "Hairstyle variation is allowed; exact crown silhouette, exact part location, and exact front-curl shape are not identity traits. "
     "Vary the specific hairstyle each image within that identity: center part, soft side part, one or both ears tucked, "
     "loose low ponytail, casual bun, half-up, brushed back, damp or lightly tousled, or loose waves with a flat crown "
     "and volume through the lengths. "
