@@ -160,6 +160,12 @@ def test_active_prompt_paths_embed_shared_hair_directive_once_and_keep_anchors(m
 
 
 def test_hairstyle_repeat_rule_is_human_qa_only_until_tracker_exists() -> None:
+    """Policy-document completeness check only.
+
+    This test verifies the current visual-QA documentation text. It does not
+    provide runtime image-content classification; hairstyle repetition remains
+    human-QA-controlled through styling_sexy_platform_safe.
+    """
     rules_text = RULES_PATH.read_text(encoding="utf-8")
     assert "human-QA-only" in rules_text
     assert "structured recent-output comparison tracker in code yet" in rules_text
@@ -167,6 +173,13 @@ def test_hairstyle_repeat_rule_is_human_qa_only_until_tracker_exists() -> None:
 
 
 def test_adult_revealing_styles_are_explicitly_allowed_in_visual_qa_rules() -> None:
+    """Policy-document completeness check only.
+
+    This test verifies that the policy text explicitly documents allowed adult
+    styling examples. It does not provide runtime image-content classification;
+    safety disposition remains human-QA-controlled through
+    styling_sexy_platform_safe.
+    """
     rules_text = RULES_PATH.read_text(encoding="utf-8").lower()
     allowed_terms = [
         "scantily clad",
@@ -187,6 +200,12 @@ def test_adult_revealing_styles_are_explicitly_allowed_in_visual_qa_rules() -> N
 
 
 def test_explicit_exposure_and_age_ambiguity_still_fail_in_visual_qa_rules() -> None:
+    """Policy-document completeness check only.
+
+    This test verifies the documented safety exclusions. It does not provide
+    runtime image-content classification; safety disposition remains
+    human-QA-controlled through styling_sexy_platform_safe.
+    """
     rules_text = RULES_PATH.read_text(encoding="utf-8").lower()
     blocked_terms = [
         "visible genitals",
