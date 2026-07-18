@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.presence import human_presence_engine_closure_v1 as closure_schema  # noqa: E402
+from pipeline.presence import human_presence_closure_evidence_v1 as closure_evidence  # noqa: E402
 from tools.lena_run_hpe_controlled_proof_v1 import _load_json_object, _repo_relative_path, _sha256_file  # noqa: E402
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector  # noqa: E402
 
@@ -108,6 +109,10 @@ def _normalise_path(path_value: str) -> Path:
     return path if path.is_absolute() else (ROOT / path).resolve()
 
 
+def _proof_sidecar_path(proof_report_path: Path, proof_report: dict[str, Any], prefix: str) -> Path:
+    return proof_report_path.with_name(f"{prefix}_{proof_report['slot_id']}_{int(proof_report['image_index']):02d}.json")
+
+
 def _validate_failure_indicators_qa_only(proof_report: dict[str, Any]) -> None:
     prompt_plan = proof_report.get("prompt_plan_evidence", {})
     if not isinstance(prompt_plan, dict):
@@ -198,6 +203,18 @@ def _validate_artifact_hashes(proof_report: dict[str, Any]) -> None:
         raise HPEClosureVerificationError("artifact_integrity_mismatch", "qa artifact payload does not match the proof report")
 
 
+def _load_optional_sidecar_artifact(
+    *,
+    proof_report_path: Path,
+    proof_report: dict[str, Any],
+    prefix: str,
+) -> tuple[Path, dict[str, Any]] | None:
+    path = _proof_sidecar_path(proof_report_path, proof_report, prefix)
+    if not path.is_file():
+        return None
+    return path, _load_json_object(path)
+
+
 def _validate_authority_and_lane(proof_report: dict[str, Any], *, authority_commit_expected: str) -> dict[str, str]:
     selected = proof_report.get("selected_candidate_evidence", {})
     if not isinstance(selected, dict):
@@ -238,7 +255,12 @@ def _validate_authority_and_lane(proof_report: dict[str, Any], *, authority_comm
     return {"lane_type": lane_type, "authority_commit": authority_commit}
 
 
-def _derive_mandatory_condition_results(proof_report: dict[str, Any], *, authority_commit_expected: str) -> dict[str, str]:
+def _derive_mandatory_condition_results(
+    proof_report: dict[str, Any],
+    *,
+    authority_commit_expected: str,
+    proof_report_path: Path,
+) -> dict[str, Any]:
     lane_info = _validate_authority_and_lane(proof_report, authority_commit_expected=authority_commit_expected)
     _validate_failure_indicators_qa_only(proof_report)
     _validate_prompt_influence_evidence(proof_report)
@@ -253,23 +275,114 @@ def _derive_mandatory_condition_results(proof_report: dict[str, Any], *, authori
     if not isinstance(integrity_evidence, dict):
         raise HPEClosureVerificationError("evidence_invalid", "integrity evidence is malformed")
 
-    condition_results = {condition_id: "not_verified" for condition_id in closure_schema.MANDATORY_CONDITION_IDS}
+    condition_results: dict[str, Any] = {condition_id: "not_verified" for condition_id in closure_schema.MANDATORY_CONDITION_IDS}
     condition_results["connected_path_runtime_verification"] = "verified"
     condition_results["supported_prompt_influence_verification"] = "verified"
     condition_results["failure_indicator_qa_only_verification"] = "verified"
     condition_results["authority_invariance_verification"] = "verified"
     condition_results["artifact_integrity_verification"] = "verified"
-    condition_results["provider_free_controlled_proof"] = "verified" if lane_info["lane_type"] == "controlled_proof" else "not_verified"
-    live_review = bool(semantic_config.get("live_presence_semantic_review"))
-    if live_review:
-        if semantic_evidence.get("semantic_result_provenance") is None:
-            raise HPEClosureVerificationError("semantic_receipt_missing", "live semantic proof receipt is missing")
-        condition_results["controlled_live_semantic_proof_receipt"] = "verified"
+    lane_applicability = closure_schema.lane_condition_applicability(lane_info["lane_type"])
+    if lane_applicability["provider_free_controlled_proof"]:
+        condition_results["provider_free_controlled_proof"] = "verified"
     else:
-        condition_results["controlled_live_semantic_proof_receipt"] = "not_verified"
-    condition_results["ordinary_lane_proof"] = "verified" if lane_info["lane_type"] == "ordinary_lane" else "not_verified"
-    condition_results["human_evidence_review"] = "not_verified"
-    condition_results["final_ci_confirmation"] = "not_verified"
+        condition_results["provider_free_controlled_proof"] = closure_schema.condition_result("not_applicable")
+
+    live_review = bool(semantic_config.get("live_presence_semantic_review"))
+    if lane_applicability["controlled_live_semantic_proof_receipt"]:
+        if live_review:
+            if semantic_evidence.get("semantic_result_provenance") is None:
+                raise HPEClosureVerificationError("semantic_receipt_missing", "live semantic proof receipt is missing")
+            condition_results["controlled_live_semantic_proof_receipt"] = "verified"
+        else:
+            manual_semantic = _load_optional_sidecar_artifact(
+                proof_report_path=proof_report_path,
+                proof_report=proof_report,
+                prefix="lena_hpe_manual_semantic_review",
+            )
+            if manual_semantic is not None:
+                manual_path, manual_artifact = manual_semantic
+                normalized_manual = closure_evidence.validate_manual_semantic_review_artifact(manual_artifact)
+                if normalized_manual["disposition"] == "accepted_for_hpe_closure":
+                    if normalized_manual["candidate_artifact_sha256"] != str(proof_report.get("selected_candidate_artifact_sha256") or ""):
+                        raise HPEClosureVerificationError(
+                            "manual_semantic_review_mismatch",
+                            "manual semantic review candidate sha256 does not match the proof report",
+                        )
+                    if normalized_manual["reviewed_image_sha256"] != str(proof_report.get("image_sha256") or ""):
+                        raise HPEClosureVerificationError(
+                            "manual_semantic_review_mismatch",
+                            "manual semantic review image sha256 does not match the proof report",
+                        )
+                    if normalized_manual["prompt_sha256"] != str(proof_report.get("prompt_package", {}).get("image_prompt_sha256") or ""):
+                        raise HPEClosureVerificationError(
+                            "manual_semantic_review_mismatch",
+                            "manual semantic review prompt sha256 does not match the proof report",
+                        )
+                    if normalized_manual["authority_commit_final"] != authority_commit_expected:
+                        raise HPEClosureVerificationError(
+                            "manual_semantic_review_mismatch",
+                            "manual semantic review authority commit does not match the proof authority",
+                        )
+                    condition_results["controlled_live_semantic_proof_receipt"] = "verified"
+                    semantic_evidence["semantic_review_source"] = normalized_manual["evidence_source"]
+                    semantic_evidence["manual_semantic_review_artifact_path"] = str(manual_path)
+                else:
+                    condition_results["controlled_live_semantic_proof_receipt"] = "not_verified"
+            else:
+                condition_results["controlled_live_semantic_proof_receipt"] = "not_verified"
+    else:
+        condition_results["controlled_live_semantic_proof_receipt"] = closure_schema.condition_result("not_applicable")
+
+    if lane_applicability["ordinary_lane_proof"]:
+        condition_results["ordinary_lane_proof"] = "verified" if lane_info["lane_type"] == "ordinary_lane" else "not_verified"
+    else:
+        condition_results["ordinary_lane_proof"] = closure_schema.condition_result("not_applicable")
+
+    human_review = _load_optional_sidecar_artifact(
+        proof_report_path=proof_report_path,
+        proof_report=proof_report,
+        prefix="lena_hpe_human_evidence_review",
+    )
+    if human_review is not None:
+        human_path, human_artifact = human_review
+        normalized_human = closure_evidence.validate_human_evidence_review_artifact(human_artifact)
+        if normalized_human["candidate_artifact_sha256"] != str(proof_report.get("selected_candidate_artifact_sha256") or ""):
+            raise HPEClosureVerificationError(
+                "human_review_mismatch",
+                "human review candidate sha256 does not match the proof report",
+            )
+        if normalized_human["reviewed_image_sha256"] != str(proof_report.get("image_sha256") or ""):
+            raise HPEClosureVerificationError(
+                "human_review_mismatch",
+                "human review image sha256 does not match the proof report",
+            )
+        if normalized_human["disposition"] == "accepted_for_hpe_closure":
+            condition_results["human_evidence_review"] = "verified"
+            proof_report.setdefault("authority_boundary_evidence", {})["human_evidence_review_artifact_path"] = str(human_path)
+        else:
+            condition_results["human_evidence_review"] = "not_verified"
+    else:
+        condition_results["human_evidence_review"] = "not_verified"
+
+    final_ci = _load_optional_sidecar_artifact(
+        proof_report_path=proof_report_path,
+        proof_report=proof_report,
+        prefix="lena_hpe_final_ci_confirmation",
+    )
+    if final_ci is not None:
+        _, final_ci_artifact = final_ci
+        normalized_ci = closure_evidence.validate_final_ci_confirmation_artifact(
+            final_ci_artifact,
+            expected_merge_commit_sha=str(proof_report.get("authority_commit") or ""),
+            expected_authority_commit=str(proof_report.get("authority_commit") or ""),
+        )
+        if all(entry["conclusion"] == "pass" for entry in normalized_ci["required_checks"]):
+            condition_results["final_ci_confirmation"] = "verified"
+        else:
+            condition_results["final_ci_confirmation"] = "not_verified"
+    else:
+        condition_results["final_ci_confirmation"] = "not_verified"
+
     condition_results["authority_commit_binding"] = "verified"
     return condition_results
 
@@ -280,10 +393,12 @@ def _build_closure_report(
     authority_commit_expected: str,
     authority_commit_final: str,
     base_commit_sha: str,
+    proof_report_path: Path,
 ) -> dict[str, Any]:
     mandatory_condition_results = _derive_mandatory_condition_results(
         proof_report,
         authority_commit_expected=authority_commit_expected,
+        proof_report_path=proof_report_path,
     )
     blocking_findings: list[dict[str, Any]] = []
     if proof_report.get("qa_artifact", {}).get("recommendation") == "integrity_failure":
@@ -345,6 +460,7 @@ def verify_closure_report(
         authority_commit_expected=authority_commit_expected,
         authority_commit_final=_git_rev_parse("HEAD"),
         base_commit_sha=base_commit_sha,
+        proof_report_path=proof_report_path,
     )
 
     if not dry_run:
