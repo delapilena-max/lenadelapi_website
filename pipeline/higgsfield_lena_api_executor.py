@@ -427,7 +427,7 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     _require_handoff(packet_report.get("caption_draft") == report.get("selected_prompt_input", {}).get("caption_seed"), "handoff_caption_seed_mismatch", f"{handoff_path} selected prompt input caption seed mismatch")
     _require_handoff(report.get("selected_prompt_input", {}).get("exact_proposed_dry_run_command") == expected_dry, "handoff_candidate_command_mismatch", f"{handoff_path} selected prompt input dry-run command mismatch")
 
-    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path)
+    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path, slot_id)
     image = source.get("image", {})
     prompt = image.get("image_prompt")
     _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
@@ -1050,7 +1050,10 @@ def load_content_packet_report(path: Path, expected_date: str) -> dict[str, Any]
     return report
 
 
-def _rebuild_packet_prompt_source(packet_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _rebuild_packet_prompt_source(
+    packet_path: Path,
+    slot_id_override: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
 
     packet_report = load_content_packet_report(packet_path, str(json.loads(packet_path.read_text(encoding="utf-8")).get("generated_date", "")).strip())
@@ -1061,7 +1064,11 @@ def _rebuild_packet_prompt_source(packet_path: Path) -> tuple[dict[str, Any], di
         "handoff_prompt_missing",
         f"{packet_path} rebuilt packet did not produce a prompt",
     )
-    slot_id = f"higgsfield-{packet_report['generated_date'].replace('-', '')}-{packet_report['recipe_id']}-photo"
+    slot_id = (
+        slot_id_override
+        if isinstance(slot_id_override, str) and slot_id_override.strip()
+        else f"higgsfield-{packet_report['generated_date'].replace('-', '')}-{packet_report['recipe_id']}-photo"
+    )
     source = {
         "resolver": "content_packet_dryrun",
         "slot_prefix": packet_report["recipe_id"],
