@@ -271,6 +271,11 @@ def _build_analytics_handoff(auth: dict[str, Any], package: dict[str, Any], publ
 
 
 def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path = REPORT_ROOT) -> dict[str, Any]:
+    if not simulate:
+        raise LenaBoundedLiveCycleError(
+            "live_not_implemented",
+            "live wiring is not yet implemented; use --simulate",
+        )
     auth = _validate_authorization_artifact(auth_artifact)
     auth_data = auth["artifact"]
     day = str(auth_data["date"])
@@ -315,7 +320,14 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
     image = _ensure_path_within_root(Path(str(auth_data["asset_path"])), ROOT / "pipeline" / "higgsfield_library" / "lena", code="asset_path_invalid", label="generated asset", must_exist=True)
     image_sha = _sha256_file(image)
     _require(image_sha == str(auth_data["asset_sha256"]), "asset_sha_mismatch", "generated asset SHA-256 does not match authorization")
-    _require(str(manifest["artifact"].get("saved_image_path") or "") == str(image), "manifest_image_mismatch", "manifest saved image does not match authorization asset")
+    manifest_saved_image = _ensure_path_within_root(
+        Path(str(manifest["artifact"].get("saved_image_path") or "")),
+        ROOT / "pipeline" / "higgsfield_library" / "lena",
+        code="manifest_image_path_invalid",
+        label="manifest saved image",
+        must_exist=True,
+    )
+    _require(manifest_saved_image == image, "manifest_image_mismatch", "manifest saved image does not match authorization asset")
     stages.append(_stage_summary(
         "provider_generation_evidence",
         True,
@@ -325,7 +337,7 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         manifest_sha256=manifest["sha256"],
         generated_image_path=str(image),
         generated_image_sha256=image_sha,
-        provider_calls_performed=0 if simulate else 1,
+        provider_calls_performed=0,
     ))
     qa = _validate_bound_artifact(
         str(auth_data["qa_artifact_path"]),
@@ -338,16 +350,34 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
     qa_status = str(qa_artifact.get("disposition") or qa_artifact.get("overall") or qa_artifact.get("status") or "").lower()
     _require(qa_status not in {"hard_stop", "fail", "rejected"}, "qa_failure", "QA artifact indicates failure")
     stages.append(_stage_summary("image_qa", True, qa_artifact_path=str(qa["path"]), qa_artifact_sha256=qa["sha256"]))
-    package_path = _subreport_path(day, str(auth_data["slot_id"]), "package", report_root)
+    package_path = _ensure_path_within_root(
+        _subreport_path(day, str(auth_data["slot_id"]), "package", report_root),
+        report_root,
+        code="package_path_escape",
+        label="package artifact",
+        must_exist=False,
+    )
     package_path.parent.mkdir(parents=True, exist_ok=True)
     package_path, package = _build_package(auth, provider, qa, package_path)
     package_sha = _sha256_file(package_path)
     stages.append(_stage_summary("caption_package_creation", True, package_artifact_path=str(package_path), package_artifact_sha256=package_sha))
-    publish_path = _subreport_path(day, str(auth_data["slot_id"]), "publish_receipt", report_root)
+    publish_path = _ensure_path_within_root(
+        _subreport_path(day, str(auth_data["slot_id"]), "publish_receipt", report_root),
+        report_root,
+        code="publish_path_escape",
+        label="publish receipt artifact",
+        must_exist=False,
+    )
     publish_path, publish = _build_publish_receipt(auth, package, publish_path)
     publish_sha = _sha256_file(publish_path)
     stages.append(_stage_summary("publish_receipt", True, publish_receipt_artifact_path=str(publish_path), publish_receipt_artifact_sha256=publish_sha))
-    analytics_path = _subreport_path(day, str(auth_data["slot_id"]), "analytics_handoff", report_root)
+    analytics_path = _ensure_path_within_root(
+        _subreport_path(day, str(auth_data["slot_id"]), "analytics_handoff", report_root),
+        report_root,
+        code="analytics_path_escape",
+        label="analytics handoff artifact",
+        must_exist=False,
+    )
     analytics_path, analytics = _build_analytics_handoff(auth, package, {"path": publish_path, "sha256": publish_sha, "artifact": publish}, analytics_path)
     analytics_sha = _sha256_file(analytics_path)
     stages.append(_stage_summary("analytics_handoff", True, analytics_handoff_artifact_path=str(analytics_path), analytics_handoff_artifact_sha256=analytics_sha))
@@ -362,16 +392,17 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         "finished_at": finished_at,
         "authorization_artifact_path": str(auth["path"]),
         "authorization_artifact_sha256": auth["sha256"],
-        "authorization_consumed": True,
-        "authorization_consumed_at_utc": finished_at,
+        "authorization_consumption_implemented": False,
+        "authorization_consumed": False,
+        "authorization_consumed_at_utc": None,
         "authorization_state_before": {
             "single_use": True,
             "consumed": False,
         },
         "authorization_state_after": {
             "single_use": True,
-            "consumed": True,
-            "consumed_at_utc": finished_at,
+            "consumed": False,
+            "consumed_at_utc": None,
         },
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
@@ -393,6 +424,11 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
             "no_second_publish_call": True,
             "analytics_triggered_rerun_blocked": True,
         },
+        "unimplemented_live_guards": [
+            "atomic_authorization_consumption",
+            "provider_execution",
+            "publisher_execution",
+        ],
         "authorized_scope": {
             "slot_id": auth_data["slot_id"],
             "candidate_id": auth_data["candidate_id"],

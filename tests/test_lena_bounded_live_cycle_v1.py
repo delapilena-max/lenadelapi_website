@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import hashlib
 import json
 from pathlib import Path
@@ -204,7 +205,9 @@ def test_simulation_success_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert report["provider_calls_performed"] == 0
     assert report["publish_calls_performed"] == 0
     assert report["retries_performed"] == 0
-    assert report["authorization_consumed"] is True
+    assert report["authorization_consumption_implemented"] is False
+    assert report["authorization_consumed"] is False
+    assert report["authorization_state_after"]["consumed"] is False
     assert report["child_artifacts"]["candidate"]["sha256"] == _sha(bundle["candidate_path"])
     assert report["child_artifacts"]["provider_generation_receipt"]["sha256"] == _sha(bundle["receipt_path"])
     assert report["child_artifacts"]["manifest"]["sha256"] == _sha(bundle["manifest_path"])
@@ -226,6 +229,12 @@ def test_simulation_success_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         (lambda auth: auth.__setitem__("asset_path", str(Path(auth["asset_path"]).with_name("wrong.png"))), "manifest_image_mismatch"),
         (lambda auth: auth.__setitem__("platform", "Facebook Page"), "platform_mismatch"),
         (lambda auth: auth.__setitem__("consumed", True), "authorization_already_consumed"),
+        (lambda auth: auth.__setitem__("report_type", "wrong"), "authorization_report_type_mismatch"),
+        (lambda auth: auth.__setitem__("schema_version", "v0"), "authorization_schema_mismatch"),
+        (lambda auth: auth.__setitem__("one_slot", False), "authorization_one_slot_invalid"),
+        (lambda auth: auth.__setitem__("one_candidate", False), "authorization_one_candidate_invalid"),
+        (lambda auth: auth.__setitem__("one_asset", False), "authorization_one_asset_invalid"),
+        (lambda auth: auth.__setitem__("one_platform", False), "authorization_one_platform_invalid"),
         (lambda auth: auth.__setitem__("provider_call_limit", 2), "provider_call_limit_invalid"),
         (lambda auth: auth.__setitem__("publish_action_limit", 2), "publish_action_limit_invalid"),
         (lambda auth: auth.__setitem__("retry_cap", 1), "retry_cap_invalid"),
@@ -255,6 +264,22 @@ def test_authorization_rejections(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert exc_info.value.code == expected_code
 
 
+def test_live_mode_is_explicitly_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_bundle_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path)
+    before = bundle["auth_path"].read_bytes()
+    report_root = tmp_path / "reports"
+    report_root.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(cycle.LenaBoundedLiveCycleError) as exc_info:
+        cycle.run_cycle(bundle["auth_path"], simulate=False, report_root=report_root)
+
+    assert exc_info.value.code == "live_not_implemented"
+    assert bundle["auth_path"].read_bytes() == before
+    assert list(report_root.rglob("*")) == []
+    assert not (report_root / DATE).exists()
+
+
 def test_duplicate_report_rejected_before_any_stage_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_bundle_roots(monkeypatch, tmp_path)
     bundle = _build_bundle(tmp_path)
@@ -267,6 +292,69 @@ def test_duplicate_report_rejected_before_any_stage_runs(tmp_path: Path, monkeyp
         cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=cycle.REPORT_ROOT)
 
     assert exc_info.value.code == "report_already_exists"
+
+
+def test_subreport_slot_traversal_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_bundle_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path)
+    auth = json.loads(bundle["auth_path"].read_text(encoding="utf-8"))
+    bundle_candidate = json.loads(bundle["candidate_path"].read_text(encoding="utf-8"))
+    traversal_slot = "../../../slot-escape"
+    auth["slot_id"] = traversal_slot
+    auth["candidate_id"] = f"{traversal_slot}::hcr_099::cbn_001"
+    bundle_candidate["candidate"]["slot_id"] = traversal_slot
+    bundle_candidate["candidate"]["candidate_id"] = auth["candidate_id"]
+    bundle_candidate["candidate_artifact_sha256"] = _sha(bundle["candidate_path"])
+    bundle["auth_path"].write_text(json.dumps(auth, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    bundle["candidate_path"].write_text(json.dumps(bundle_candidate, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    auth["candidate_artifact_sha256"] = _sha(bundle["candidate_path"])
+    bundle["auth_path"].write_text(json.dumps(auth, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(cycle.LenaBoundedLiveCycleError) as exc_info:
+        cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=cycle.REPORT_ROOT)
+
+    assert exc_info.value.code == "package_path_escape"
+
+
+def test_subreport_symlink_escape_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_bundle_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path)
+    link_target = tmp_path / "outside_reports"
+    link_target.mkdir(parents=True, exist_ok=True)
+    report_day_root = cycle.REPORT_ROOT / DATE
+    report_day_root.mkdir(parents=True, exist_ok=True)
+    symlink_path = report_day_root / SLOT_ID
+    if not hasattr(os, "symlink"):
+        pytest.skip("symlinks are not supported on this platform")
+    try:
+        os.symlink(link_target, symlink_path, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation not permitted: {exc}")
+
+    with pytest.raises(cycle.LenaBoundedLiveCycleError) as exc_info:
+        cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=cycle.REPORT_ROOT)
+
+    assert exc_info.value.code == "package_path_escape"
+
+
+def test_manifest_image_path_is_compared_by_resolved_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_bundle_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path)
+    manifest = json.loads(bundle["manifest_path"].read_text(encoding="utf-8"))
+    manifest["saved_image_path"] = str(bundle["image_path"].parent / "." / bundle["image_path"].name)
+    bundle["manifest_path"].write_text(json.dumps(manifest, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    receipt = json.loads(bundle["receipt_path"].read_text(encoding="utf-8"))
+    receipt["manifest_sha256"] = _sha(bundle["manifest_path"])
+    bundle["receipt_path"].write_text(json.dumps(receipt, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    auth = json.loads(bundle["auth_path"].read_text(encoding="utf-8"))
+    auth["manifest_sha256"] = _sha(bundle["manifest_path"])
+    auth["provider_generation_receipt_sha256"] = _sha(bundle["receipt_path"])
+    bundle["auth_path"].write_text(json.dumps(auth, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    report = cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=cycle.REPORT_ROOT)
+
+    assert report["ok"] is True
+    assert report["child_artifacts"]["manifest"]["sha256"] == _sha(bundle["manifest_path"])
 
 
 def test_provider_failure_stops_later_stages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -341,3 +429,22 @@ def test_final_receipt_binds_every_artifact_and_action(tmp_path: Path, monkeypat
     assert report["publish_calls_performed"] == 0
     assert report["retries_performed"] == 0
     assert report["safeguards"]["kill_switch"] is True
+
+
+def test_same_authorization_can_be_reused_in_simulation_because_consumption_is_unimplemented(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_bundle_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path)
+    report_root_a = tmp_path / "reports_a"
+    report_root_b = tmp_path / "reports_b"
+    first = cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=report_root_a)
+    second = cycle.run_cycle(bundle["auth_path"], simulate=True, report_root=report_root_b)
+
+    assert first["authorization_consumption_implemented"] is False
+    assert second["authorization_consumption_implemented"] is False
+    assert bundle["auth"]["consumed"] is False
+    assert json.loads(bundle["auth_path"].read_text(encoding="utf-8"))["consumed"] is False
+    assert first["report_path"].startswith(str(report_root_a))
+    assert second["report_path"].startswith(str(report_root_b))
