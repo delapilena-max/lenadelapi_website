@@ -27,7 +27,8 @@ BANNED_PUBLIC_TERMS = [
 IDENTITY_ANCHOR = (
     "Lena Delapi, using the current approved Lena character element as the only identity source of truth. "
     "Match the current Lena element exactly for face, eyes, brows, mouth, jawline, skin tone, hair color, hairline, "
-    "hairstyle family, and overall adult facial geometry. "
+    "hair wave character and broad texture, and overall adult facial geometry. "
+    "Vary the specific hairstyle freely -- exact crown silhouette, part location, and front-curl shape are not fixed identity traits. "
     "Her eyes must stay deep dark brown exactly like the current approved close-up reference, never hazel, never amber, never green-gray, and never lightened. "
     "Do not reinterpret her into a rounder, thinner, younger, wider-smiling, more generic, or more glam substitute face. "
     "Do not beautify away her actual likeness. Keep the same recognizable woman from the current Lena element."
@@ -57,6 +58,16 @@ LENA_MASTER_IDENTITY = (
     "and must not reshape her into a thinner body. "
     "Outfit, pose, lighting, and action may change; "
     "face and body proportions may not."
+)
+
+LENA_HAIR_VARIETY_DIRECTIVE = (
+    "Hair: brunette, long to medium-long, thick, naturally wavy -- base identity fixed. "
+    "Hairstyle variation is allowed; exact crown silhouette, exact part location, and exact front-curl shape are not identity traits. "
+    "Vary the specific hairstyle each image within that identity: center part, soft side part, one or both ears tucked, "
+    "loose low ponytail, casual bun, half-up, brushed back, damp or lightly tousled, or loose waves with a flat crown "
+    "and volume through the lengths. "
+    "Do not reproduce the same elevated front curl, lifted crown crest, pompadour-like front wave, rooster-comb silhouette, "
+    "or oversized forehead wave that repeats across prior outputs."
 )
 
 SKIN_REALISM = (
@@ -210,6 +221,8 @@ OPTIONAL_FILL_NEGATIVE_TERMS = (
     "overstretched smile", "widened smiling face", "broad cartoon grin", "jaw widened by smile",
     "puffed smile cheeks", "pinched doll nose", "filler-look lips", "overly plumped lips",
     "teenified face", "generic instagram face",
+    "elevated front curl", "pompadour-like crown wave", "rooster-comb hair silhouette",
+    "oversized forehead wave", "lifted hair crest", "identical swept-up front hairline",
     "hand through wall", "hand through door", "arm clipping through doorframe",
     "fingers intersecting glass", "limb clipping through furniture", "object-merging hands",
     "hotel room", "luxury suite", "hospitality decor", "showroom interior",
@@ -3653,10 +3666,10 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
     body_descriptor = LENA_MASTER_IDENTITY
 
     image_prompt = (
-        f"{IDENTITY_ANCHOR} {reference_policy} {body_descriptor} {framing_policy} "
-        f"Scene: {scene['action']}. "
-        f"{frame_logic_paragraph} "
-        f"{pose_body_language_line} "
+            f"{IDENTITY_ANCHOR} {LENA_HAIR_VARIETY_DIRECTIVE} {reference_policy} {body_descriptor} {framing_policy} "
+            f"Scene: {scene['action']}. "
+            f"{frame_logic_paragraph} "
+            f"{pose_body_language_line} "
         f"Wardrobe: {wardrobe_override} {PUBLIC_WARDROBE_RULE} {wardrobe_continuity_lock} "
         "Do not substitute a different garment class, do not simplify the outfit into random basics, "
         "and do not replace the specified look with loungewear or underwear-coded clothing. "
@@ -3838,6 +3851,14 @@ HIGGSFIELD_BODY_SILHOUETTE_ANCHOR = (
     "visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult "
     "curvy proportions, not extreme or cartoonish."
 )
+
+# Hairstyle-variety directive (2026-07-17): Higgsfield Soul 2.0 repeatedly
+# reproduces the same elevated-front-curl / lifted-crown-crest silhouette
+# across generations. This shared prompt-brain directive keeps the identity
+# anchors intact while telling both active Lena image-generation paths that
+# specific crown silhouette, part location, and front-curl shape are not
+# identity traits and should vary across outputs.
+HIGGSFIELD_HAIR_VARIETY_DIRECTIVE = LENA_HAIR_VARIETY_DIRECTIVE
 
 # Bug found during manual-test sample review (2026-07-08, same day): the
 # scene bank's own "camera" field (written for Kling, where medium-shot/
@@ -5052,6 +5073,7 @@ def generate_higgsfield_prompt_package(
     image_prompt = _clean_public_text(
         f"{HIGGSFIELD_FRAMING_LINE} "
         f"{HIGGSFIELD_BODY_SILHOUETTE_ANCHOR} "
+        f"{LENA_HAIR_VARIETY_DIRECTIVE} "
         f"Scene: {scene_action}, {environment_text}. "
         f"Wardrobe: {wardrobe_text}. "
         f"Pose: {pose_text}. "
