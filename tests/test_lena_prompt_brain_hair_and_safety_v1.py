@@ -24,37 +24,41 @@ def _stub_kling_prompt_path(monkeypatch):
     }
 
     monkeypatch.setattr(prompt_brain, "validate_saved_prompt_sources", lambda: None)
-    monkeypatch.setattr(prompt_brain, "get_production_scene_pool", lambda: ([scene], {"version": "test"}))
-    monkeypatch.setattr(prompt_brain, "choose_scene_production", lambda pool, rng: scene)
+    monkeypatch.setattr(
+        prompt_brain,
+        "get_production_scene_pool",
+        lambda *args, **kwargs: ([scene], {"version": "test"}),
+    )
+    monkeypatch.setattr(prompt_brain, "choose_scene_production", lambda *args, **kwargs: scene)
     monkeypatch.setattr(
         prompt_brain,
         "choose_environment_production",
-        lambda scene, rng: {"environment_id": "env_001", "name": "Cafe"},
+        lambda *args, **kwargs: {"environment_id": "env_001", "name": "Cafe"},
     )
     monkeypatch.setattr(
         prompt_brain,
         "build_environment_prompt_parts",
-        lambda scene, env: ("warm cafe interior", "menu details"),
+        lambda *args, **kwargs: ("warm cafe interior", "menu details"),
     )
-    monkeypatch.setattr(prompt_brain, "choose_reference_mode", lambda media_type, scene: "full_body")
-    monkeypatch.setattr(prompt_brain, "pick_catalog_outfit_production", lambda lane, reference_mode, rng: wardrobe)
-    monkeypatch.setattr(prompt_brain, "format_catalog_wardrobe_override", lambda wardrobe_entry: "fitted top")
-    monkeypatch.setattr(prompt_brain, "build_negative_prompt_for_catalog", lambda wardrobe_entry: "negative prompt")
+    monkeypatch.setattr(prompt_brain, "choose_reference_mode", lambda *args, **kwargs: "full_body")
+    monkeypatch.setattr(prompt_brain, "pick_catalog_outfit_production", lambda *args, **kwargs: wardrobe)
+    monkeypatch.setattr(prompt_brain, "format_catalog_wardrobe_override", lambda *args, **kwargs: "fitted top")
+    monkeypatch.setattr(prompt_brain, "build_negative_prompt_for_catalog", lambda *args, **kwargs: "negative prompt")
     monkeypatch.setattr(
         prompt_brain,
         "build_public_lane_negative_prompt",
-        lambda wardrobe_entry, lane, negative_prompt: negative_prompt,
+        lambda *args, **kwargs: kwargs.get("negative_prompt", args[2] if len(args) > 2 else "negative prompt"),
     )
     monkeypatch.setattr(
         prompt_brain,
         "choose_expression_gaze_production",
-        lambda rng, lane: {"expression_gaze_id": "exp_001", "label": "direct gaze"},
+        lambda *args, **kwargs: {"expression_gaze_id": "exp_001", "label": "direct gaze"},
     )
-    monkeypatch.setattr(prompt_brain, "format_expression_gaze_line", lambda entry: "direct gaze")
+    monkeypatch.setattr(prompt_brain, "format_expression_gaze_line", lambda *args, **kwargs: "direct gaze")
     monkeypatch.setattr(
         prompt_brain,
         "choose_frame_logic",
-        lambda lane: {
+        lambda *args, **kwargs: {
             "frame_action": "frame action",
             "frame_evidence_objects": [],
             "frame_forbidden_objects": [],
@@ -62,23 +66,23 @@ def _stub_kling_prompt_path(monkeypatch):
             "scene_coherence_note": "note",
         },
     )
-    monkeypatch.setattr(prompt_brain, "format_frame_logic_paragraph", lambda frame_logic, reference_mode: "frame logic")
+    monkeypatch.setattr(prompt_brain, "format_frame_logic_paragraph", lambda *args, **kwargs: "frame logic")
     monkeypatch.setattr(
         prompt_brain,
         "choose_pose_body_language_production",
-        lambda rng, lane, reference_mode, exclude_tags=None: {
+        lambda *args, **kwargs: {
             "pose_body_language_id": "pose_001",
             "label": "hip out",
             "hand_risk": "low",
             "compatibility_tags": [],
         },
     )
-    monkeypatch.setattr(prompt_brain, "format_pose_body_language_line", lambda entry: "hip out")
-    monkeypatch.setattr(prompt_brain, "reference_policy_for_mode", lambda reference_mode: "reference policy")
-    monkeypatch.setattr(prompt_brain, "framing_policy_for_mode", lambda reference_mode: "framing policy")
-    monkeypatch.setattr(prompt_brain, "build_body_visibility_rule", lambda reference_mode, frame_logic: "body visibility rule")
-    monkeypatch.setattr(prompt_brain, "public_capture_lock", lambda lane: "capture lock")
-    monkeypatch.setattr(prompt_brain, "public_wardrobe_continuity_lock", lambda wardrobe_entry, lane: "wardrobe lock")
+    monkeypatch.setattr(prompt_brain, "format_pose_body_language_line", lambda *args, **kwargs: "hip out")
+    monkeypatch.setattr(prompt_brain, "reference_policy_for_mode", lambda *args, **kwargs: "reference policy")
+    monkeypatch.setattr(prompt_brain, "framing_policy_for_mode", lambda *args, **kwargs: "framing policy")
+    monkeypatch.setattr(prompt_brain, "build_body_visibility_rule", lambda *args, **kwargs: "body visibility rule")
+    monkeypatch.setattr(prompt_brain, "public_capture_lock", lambda *args, **kwargs: "capture lock")
+    monkeypatch.setattr(prompt_brain, "public_wardrobe_continuity_lock", lambda *args, **kwargs: "wardrobe lock")
 
 
 def _stub_higgsfield_prompt_path(monkeypatch):
@@ -96,28 +100,32 @@ def _stub_higgsfield_prompt_path(monkeypatch):
     }
 
     monkeypatch.setattr(prompt_brain, "validate_saved_prompt_sources", lambda: None)
-    monkeypatch.setattr(prompt_brain, "get_production_scene_pool", lambda: ([scene], {"version": "test"}))
-    monkeypatch.setattr(prompt_brain, "choose_scene_production", lambda pool, rng: scene)
+    monkeypatch.setattr(
+        prompt_brain,
+        "get_production_scene_pool",
+        lambda *args, **kwargs: ([scene], {"version": "test"}),
+    )
+    monkeypatch.setattr(prompt_brain, "choose_scene_production", lambda *args, **kwargs: scene)
     monkeypatch.setattr(
         prompt_brain,
         "choose_environment_production",
-        lambda scene, rng: {"environment_id": "env_002", "name": "Cafe"},
+        lambda *args, **kwargs: {"environment_id": "env_002", "name": "Cafe"},
     )
     monkeypatch.setattr(
         prompt_brain,
         "build_environment_prompt_parts",
-        lambda scene, env: ("warm cafe interior", "menu details"),
+        lambda *args, **kwargs: ("warm cafe interior", "menu details"),
     )
-    monkeypatch.setattr(prompt_brain, "pick_catalog_outfit_production", lambda lane, reference_mode, rng: wardrobe)
+    monkeypatch.setattr(prompt_brain, "pick_catalog_outfit_production", lambda *args, **kwargs: wardrobe)
     monkeypatch.setattr(
         prompt_brain,
         "choose_expression_gaze_production",
-        lambda rng, lane: {"expression_gaze_id": "exp_002", "label": "direct gaze"},
+        lambda *args, **kwargs: {"expression_gaze_id": "exp_002", "label": "direct gaze"},
     )
     monkeypatch.setattr(
         prompt_brain,
         "choose_pose_body_language_production",
-        lambda rng, lane, reference_mode, exclude_tags=None: {
+        lambda *args, **kwargs: {
             "pose_body_language_id": "pose_002",
             "label": "hip out",
             "hand_risk": "low",
