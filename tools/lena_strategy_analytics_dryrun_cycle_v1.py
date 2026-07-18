@@ -135,6 +135,21 @@ def stage_coverage(strategy_step: dict, analytics_step: dict) -> list[dict]:
     ]
 
 
+def validate_iso_date_or_exit(raw_date: str) -> str:
+    try:
+        parsed = date.fromisoformat(raw_date)
+    except ValueError as exc:
+        raise SystemExit(f"invalid --date value {raw_date!r}: expected YYYY-MM-DD") from exc
+    return parsed.isoformat()
+
+
+def ensure_report_path_within_reports(path: Path) -> None:
+    reports_root = REPORTS.resolve()
+    resolved_path = path.resolve()
+    if not resolved_path.is_relative_to(reports_root):
+        raise SystemExit(f"resolved report path escapes reports root: {resolved_path}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Run the Lena strategy-to-analytics dry-run cycle from one operator command."
@@ -144,9 +159,12 @@ def main() -> int:
     ap.add_argument("--queue-limit", type=int, default=6)
     args = ap.parse_args()
 
+    args.date = validate_iso_date_or_exit(args.date)
+
     started_at = datetime.now().isoformat(timespec="seconds")
     stamp = now_ts()
     output_path = report_path(args.date, stamp)
+    ensure_report_path_within_reports(output_path)
     if output_path.exists():
         raise FileExistsError(f"dry-run cycle report already exists: {output_path}")
 
@@ -164,6 +182,9 @@ def main() -> int:
             "finished_at": datetime.now().isoformat(timespec="seconds"),
             "args": vars(args),
             "report_path": str(output_path),
+            "assumptions": {
+                "strategy_runner": "invokes the existing strategy runner and does not audit its internals",
+            },
             "dry_run_command": build_self_command(args.date, args.queue_limit, args.recipes),
             "safeguards": {
                 "provider_calls_performed": 0,
@@ -218,6 +239,9 @@ def main() -> int:
             "finished_at": datetime.now().isoformat(timespec="seconds"),
             "args": vars(args),
             "report_path": str(output_path),
+            "assumptions": {
+                "strategy_runner": "invokes the existing strategy runner and does not audit its internals",
+            },
             "dry_run_command": build_self_command(args.date, args.queue_limit, args.recipes),
             "safeguards": {
                 "provider_calls_performed": 0,
@@ -261,6 +285,9 @@ def main() -> int:
         "finished_at": datetime.now().isoformat(timespec="seconds"),
         "args": vars(args),
         "report_path": str(output_path),
+        "assumptions": {
+            "strategy_runner": "invokes the existing strategy runner and does not audit its internals",
+        },
         "dry_run_command": build_self_command(args.date, args.queue_limit, args.recipes),
         "safeguards": {
             "provider_calls_performed": 0,
