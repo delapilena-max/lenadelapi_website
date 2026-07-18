@@ -1,0 +1,1271 @@
+{
+  "report_type": "human_presence_engine_controlled_proof",
+  "schema_version": "human_presence_engine_controlled_proof_v1",
+  "generated_at_utc": "2026-07-18T04:05:49.732219Z",
+  "branch": "detached-head",
+  "authority_commit": "6924dc10d7916b3bc91a87953ca3e319171e42fc",
+  "lane_type": "controlled_proof",
+  "date": "2026-07-17",
+  "slot_id": "lenagate202607176924dc10-pack000-00-photo",
+  "image_index": 0,
+  "selected_candidate_artifact_path": "pipeline/strategy/lena/pre_generation_candidates/2026-07-17/lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+  "selected_candidate_artifact_sha256": "6794d29ecf8fad60b80922a2b09d366a404e13518d3dc32eb57504b51219a341",
+  "selected_candidate_id": "lenagate202607176924dc10-pack000-00-photo::hcr_012::mf_001",
+  "selected_candidate_recipe_id": "hcr_012",
+  "selected_candidate_slot_id": "lenagate202607176924dc10-pack000-00-photo",
+  "selected_candidate_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+  "selected_candidate_decision_fingerprint_sha256": "98a3f76d0093b7f880b0601b92fbcb174261ab19b0eef7f5452309aa696ce4c5",
+  "hpe_plan_fingerprint_sha256": "e1e6149f9c7e770d4b7894e37828806110d766fec49afd708961e0851f4f5292",
+  "prompt_package": {
+    "image_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+    "image_prompt": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+    "prompt_brain_version": "lena_prompt_brain_higgsfield_native_v1",
+    "human_presence_prompt_text_sha256": "3fa5dd335c7dda455082be84e2012d63c9f08a8c465c236aca212f0261187acd"
+  },
+  "candidate_ranking_evidence": {},
+  "selected_candidate_evidence": {
+    "schema_version": "lena_execute_selected_candidate_v1",
+    "state": "blocked",
+    "influencer_id": "lena",
+    "decision_artifact_path": "C:\\projects\\ai\\content_bot_pr3_diag\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-17\\lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+    "decision_fingerprint_sha256": "98a3f76d0093b7f880b0601b92fbcb174261ab19b0eef7f5452309aa696ce4c5",
+    "authority_commit": "6924dc10d7916b3bc91a87953ca3e319171e42fc",
+    "candidate_id": "lenagate202607176924dc10-pack000-00-photo::hcr_012::mf_001",
+    "slot_id": "lenagate202607176924dc10-pack000-00-photo",
+    "lane": "mirror outfit check",
+    "recipe_id": "hcr_012",
+    "hook_id": "mf_001",
+    "prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+    "executor_path": "pipeline/higgsfield_lena_api_executor.py",
+    "executor_action": "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-17 --slot-id lenagate202607176924dc10-pack000-00-photo",
+    "validation_results": {
+      "error_code": "stale_decision",
+      "error_detail": "current decision-critical evidence does not reproduce the stored decision",
+      "executor_dry_run_delegated": false
+    },
+    "blockers": [
+      "stale_decision"
+    ],
+    "live_requested": false,
+    "provider_authorized": false,
+    "provider_called": false,
+    "generation_performed": false,
+    "exact_next_allowed_action": "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-17 --slot-id lenagate202607176924dc10-pack000-00-photo",
+    "side_effects_performed": []
+  },
+  "prompt_plan_evidence": {
+    "schema_version": "human_presence_prompt_plan_v1",
+    "medium_interpretation": "still_image",
+    "prompt_text": "Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+    "prompt_text_sha256": "3fa5dd335c7dda455082be84e2012d63c9f08a8c465c236aca212f0261187acd",
+    "failure_indicators": [
+      "dead_or_unfocused_eyes",
+      "frozen_expression",
+      "mannequin_pose",
+      "unmotivated_movement",
+      "continuous_camera_stare",
+      "robotic_dialogue",
+      "repeated_gesture_loop",
+      "abrupt_motion_start_or_stop",
+      "face_body_emotion_mismatch",
+      "no_viewer_recognition_event",
+      "sexual_styling_without_personality"
+    ]
+  },
+  "final_prompt_influence_evidence": [
+    {
+      "field_path": "viewer_relationship.awareness",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "10113de1b5f9b3344298dbd6766e0e5026f0375f1226e20704217b678044b79f",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness half aware glancing; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "gaze_arc.start_focus",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "54b20ac7ebc4267afadd46cb94741284d6fda496b227ff0d2d2e47a5f6dc5ec9",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from already on camera; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "expression_arc.peak_state",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "ebcc801d76eb93a57b2b7b9360bb39cf1a8d96ba96260bc12f7f933147c719b8",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak warm smile; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "performance_actions.primary_action",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "58d351cecdd3e79046e9a9d78a688dc9d3151c2630ce8e18eb0a7b67c9f4734a",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary turn toward camera; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "performance_actions.object_interaction",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "74e5e1058005bef0f84efef24b0211fa5ecddfaa82320542e182cc036e41d008",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction drink or cup; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "performance_actions.movement_motivation",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "09acb8a9ed87c721286a02fbce42fcdf7d097c2716ab3845f67b7dc40a26f0eb",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by environmental cue; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "movement_dynamics.weight_transfer",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "44217923fa492a43343215c5cab3a933da0e31cb12505fdc8ab9561332848400",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer turn with hip rotation; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "sensual_presence.tier",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "db25b31011d9e51d3263cd2df99e2569f5f96bfa4de6d54983fc5ad282da8d0a",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier overt sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "body_presentation.framing_intent",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "9b5b81989ee6f7a7958ab602ccbfb279949ffeb0dfe54779ba28af12b2149dd8",
+      "prompt_changed": true,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent face priority; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    },
+    {
+      "field_path": "failure_indicators",
+      "baseline_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "mutated_prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "prompt_changed": false,
+      "mutated_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+      "baseline_prompt_text": "Full-body three-quarter vertical 9:16 fashion photo, showing the complete outfit from head to shoes with a little space below the shoes. Silhouette: Lena keeps her consistent reference identity with a slightly thicker fit-curvy medium frame and pear-leaning hourglass figure: narrow waist, wide-set pelvis, naturally broad hips, hips and upper thighs clearly wider than her waist and ribcage, fuller upper thighs, a medium rounded butt with natural projection, and a proportional full D-cup bust. She should not read as a skinny runway-model body; her frame has slightly more softness and curve through the hips, thighs, legs, arms, torso, butt, and bust while staying realistic, toned, and not plus-size. Her lower body has visible outward hip flare even in a mostly neutral standing pose; the shape comes from her underlying body structure, not only from a hip-pushed pose. Fitted wardrobe must trace the small waist, broad hips, rounded butt, fuller thighs, and waist-to-hip curve, with full hips visible and no jacket, bag, arm, prop, or railing blocking her hip line. Attractive adult curvy proportions, not extreme or cartoonish. Scene: standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. Wardrobe: fitted dusty rose mauve soft-knit off-shoulder top (dusty rose / mauve pink only, never purple, lilac, or violet; off-shoulder neckline with long knit sleeves on both arms, never strapless, tube, or bandeau); stone-wash straight-leg jeans; thin gold chain necklace, fitted through the waist and hips for a hip-hugging silhouette. Pose: shoulders angled away, face turned back toward the camera. Expression: playful eyebrow raise, slightly skeptical amused look, direct eye contact. Camera: natural getting-ready photo from a friend nearby, three-quarter composition, no full mirror dominance. Framing: keep the complete head, full face, and entire body from top of hair to shoes inside the frame, with visible space above the head and below the shoes; no head or feet cropped. Position her slightly lower within the vertical frame so there is clearly visible, comfortable empty space above the highest point of her hair -- her hair and head must not approach or touch the top edge of the frame. Do not zoom in tightly; keep a natural, relaxed full-body composition with generous headroom, while still preserving her complete head, face, both eyes, full body, and shoes entirely within frame. Lighting: late afternoon window light, soft warm tones. Mood: confident, main-character, IT-girl energy, scroll-stopping feed hook. Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release."
+    }
+  ],
+  "integrity_qa_evidence": {
+    "qa_artifact_path": "pipeline/asset_review/lena/hpe_closure/presence_output_qa/2026-07-17/lenagate202607176924dc10-pack000-00-photo/presence_qa_lenagate202607176924dc10-pack000-00-photo_00.json",
+    "integrity_status": "not_assessable",
+    "recommendation": "not_assessable",
+    "binding_records": [
+      {
+        "binding_name": "plan",
+        "binding_status": "not_assessable",
+        "observed_sha256": "e1e6149f9c7e770d4b7894e37828806110d766fec49afd708961e0851f4f5292",
+        "expected_sha256": null,
+        "verification_basis": "no_independent_upstream_digest",
+        "source_path": null,
+        "details": {
+          "reason": "no_independent_upstream_digest"
+        }
+      },
+      {
+        "binding_name": "candidate_decision",
+        "binding_status": "verified",
+        "observed_sha256": "6794d29ecf8fad60b80922a2b09d366a404e13518d3dc32eb57504b51219a341",
+        "expected_sha256": "6794d29ecf8fad60b80922a2b09d366a404e13518d3dc32eb57504b51219a341",
+        "verification_basis": "json_object_loaded_and_raw_sha_observed",
+        "source_path": "C:\\projects\\ai\\content_bot_pr3_diag\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-17\\lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+        "details": {
+          "structural_validation": "json_object_loaded"
+        }
+      },
+      {
+        "binding_name": "manifest",
+        "binding_status": "structurally_validated",
+        "observed_sha256": "067ea3e6b9142ffa5d0eaa9adcfd37e98f63488ded018bc26b205cc5bcdaea0f",
+        "expected_sha256": null,
+        "verification_basis": "json_object_loaded_and_raw_sha_observed",
+        "source_path": "pipeline\\higgsfield_debug\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo\\lena_hpe_output_qa_manifest.json",
+        "details": {
+          "structural_validation": "json_object_loaded"
+        }
+      },
+      {
+        "binding_name": "generated_image",
+        "binding_status": "not_assessable",
+        "observed_sha256": "3a1aa9cd6c52a9d2945eb2a75c95dae0146be80c4c4e200eec863bc3fe5b2487",
+        "expected_sha256": null,
+        "verification_basis": "no_independent_upstream_digest",
+        "source_path": "pipeline\\higgsfield_library\\lena\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo_seed.png",
+        "details": {
+          "reason": "no_independent_upstream_digest"
+        }
+      }
+    ]
+  },
+  "semantic_qa_configuration": {
+    "live_presence_semantic_review": false,
+    "semantic_provider": null,
+    "semantic_model": "claude-sonnet-5",
+    "semantic_timeout_seconds": 30.0
+  },
+  "semantic_qa_evidence": {
+    "semantic_status": "not_evaluated",
+    "semantic_findings": [],
+    "semantic_result_provenance": null,
+    "semantic_error": null,
+    "qa_artifact_path": "pipeline/asset_review/lena/hpe_closure/presence_output_qa/2026-07-17/lenagate202607176924dc10-pack000-00-photo/presence_qa_lenagate202607176924dc10-pack000-00-photo_00.json",
+    "finding_count": 0
+  },
+  "lifecycle_report_evidence": {
+    "schema_version": "human_presence_engine_proof_lifecycle_v1",
+    "lane_type": "controlled_proof",
+    "qa_status": "not_assessable",
+    "integrity_status": "not_assessable",
+    "semantic_status": "not_evaluated",
+    "publish_authorized": false,
+    "publish_performed": false,
+    "retry_authority": false,
+    "approval_authority": false,
+    "reconciliation_authority": false,
+    "candidate_selection_state": "blocked"
+  },
+  "authority_boundary_evidence": {
+    "qa_status": "not_assessable",
+    "approval": false,
+    "rejection": false,
+    "retry_decision": false,
+    "publishing": false,
+    "reconciliation_authority": false,
+    "failure_memory": false,
+    "candidate_selection_after_generation": "lenagate202607176924dc10-pack000-00-photo::hcr_012::mf_001"
+  },
+  "required_artifact_paths": {
+    "candidate_decision": "pipeline/strategy/lena/pre_generation_candidates/2026-07-17/lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+    "manifest": "pipeline/higgsfield_debug/2026-07-17/lenagate202607176924dc10-pack000-00-photo/lena_hpe_output_qa_manifest.json",
+    "image": "pipeline/higgsfield_library/lena/2026-07-17/lenagate202607176924dc10-pack000-00-photo_seed.png",
+    "qa_artifact": "pipeline/asset_review/lena/hpe_closure/presence_output_qa/2026-07-17/lenagate202607176924dc10-pack000-00-photo/presence_qa_lenagate202607176924dc10-pack000-00-photo_00.json"
+  },
+  "proof_artifact_paths": {
+    "candidate_selection_report": "pipeline/strategy/lena/pre_generation_candidates/2026-07-17/lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+    "qa_artifact": "pipeline/asset_review/lena/hpe_closure/presence_output_qa/2026-07-17/lenagate202607176924dc10-pack000-00-photo/presence_qa_lenagate202607176924dc10-pack000-00-photo_00.json",
+    "manifest": "pipeline/higgsfield_debug/2026-07-17/lenagate202607176924dc10-pack000-00-photo/lena_hpe_output_qa_manifest.json",
+    "image": "pipeline/higgsfield_library/lena/2026-07-17/lenagate202607176924dc10-pack000-00-photo_seed.png"
+  },
+  "image_sha256": "3a1aa9cd6c52a9d2945eb2a75c95dae0146be80c4c4e200eec863bc3fe5b2487",
+  "manifest_sha256": "067ea3e6b9142ffa5d0eaa9adcfd37e98f63488ded018bc26b205cc5bcdaea0f",
+  "candidate_gate_report": {
+    "as_of_date": "2026-07-17",
+    "authority_commit": "6924dc10d7916b3bc91a87953ca3e319171e42fc",
+    "candidate": {
+      "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor.",
+      "audience_choice_action": "none",
+      "candidate_id": "lenagate202607176924dc10-pack000-00-photo::hcr_012::mf_001",
+      "caption_seed": "almost ready and somehow still late",
+      "choice_eligible": true,
+      "concept_summary": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave, a lived-in bedroom getting-ready corner with a mirror edge, dresser surface, draped clothes on a chair, and late afternoon light across the floor. | shoulders angled away, face turned back toward the camera. | playful eyebrow raise, slightly skeptical amused look, direct eye contact.",
+      "creative_temperature": "glamorous",
+      "deterministic_noncreative_tiebreak": [
+        "mirror outfit check",
+        "hcr_012",
+        "mf_001",
+        "lenagate202607176924dc10-pack000-00-photo"
+      ],
+      "environment_id": "env_v008",
+      "exact_proposed_dry_run_command": "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-17 --slot-id lenagate202607176924dc10-pack000-00-photo",
+      "higgsfield_action": "informational dry-run only",
+      "hook_id": "mf_001",
+      "hook_text": "The Mirror Was Not Ready For This",
+      "human_presence_ranking": {
+        "dimension_bonuses": {
+          "body_presentation": 0,
+          "expression_arc": 1,
+          "gaze_arc": 1,
+          "movement_dynamics": 0,
+          "performance_actions": 0,
+          "sensual_presence": 0,
+          "temporal_beats": 0,
+          "viewer_relationship": 0
+        },
+        "dimension_results": {
+          "body_presentation": {
+            "bonus": 0,
+            "dimension": "body_presentation",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "camera_text": null,
+              "framing_text": null,
+              "reference_mode": null
+            },
+            "selector_terms": [
+              "required realistic",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "face priority",
+              "dynamic motion framing"
+            ],
+            "unmatched_selector_terms": [
+              "required realistic",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "face priority",
+              "dynamic motion framing"
+            ]
+          },
+          "expression_arc": {
+            "bonus": 1,
+            "dimension": "expression_arc",
+            "matched_observed_fields": [
+              {
+                "observed_field": "expression_gaze_label",
+                "observed_value": "playful_eyebrow_raise",
+                "selector_term": "playful"
+              }
+            ],
+            "matched_selector_terms": [
+              "playful"
+            ],
+            "observed_fields": {
+              "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave",
+              "expression_gaze_id": "exp_g011",
+              "expression_gaze_label": "playful_eyebrow_raise",
+              "expression_text": null,
+              "pose_body_language_id": "pose_p003",
+              "pose_body_language_label": "shoulders_angled_face_back",
+              "scene_action": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave"
+            },
+            "selector_terms": [
+              "content private",
+              "quick spark",
+              "playful smirk",
+              "lingering amusement",
+              "expression",
+              "smile",
+              "smirk",
+              "warm",
+              "playful",
+              "confident",
+              "spark",
+              "bloom"
+            ],
+            "unmatched_selector_terms": [
+              "content private",
+              "quick spark",
+              "playful smirk",
+              "lingering amusement",
+              "expression",
+              "smile",
+              "smirk",
+              "warm",
+              "confident",
+              "spark",
+              "bloom"
+            ]
+          },
+          "gaze_arc": {
+            "bonus": 1,
+            "dimension": "gaze_arc",
+            "matched_observed_fields": [
+              {
+                "observed_field": "expression_gaze_label",
+                "observed_value": "playful_eyebrow_raise",
+                "selector_term": "playful"
+              }
+            ],
+            "matched_selector_terms": [
+              "playful"
+            ],
+            "observed_fields": {
+              "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave",
+              "camera_text": null,
+              "expression_gaze_id": "exp_g011",
+              "expression_gaze_label": "playful_eyebrow_raise",
+              "expression_text": null,
+              "scene_action": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave"
+            },
+            "selector_terms": [
+              "off camera activity",
+              "internal thought",
+              "playful surprise",
+              "sustained",
+              "look away playful",
+              "gaze",
+              "eye contact",
+              "playful",
+              "confident",
+              "surprise",
+              "recognition",
+              "hold",
+              "release"
+            ],
+            "unmatched_selector_terms": [
+              "off camera activity",
+              "internal thought",
+              "playful surprise",
+              "sustained",
+              "look away playful",
+              "gaze",
+              "eye contact",
+              "confident",
+              "surprise",
+              "recognition",
+              "hold",
+              "release"
+            ]
+          },
+          "movement_dynamics": {
+            "bonus": 0,
+            "dimension": "movement_dynamics",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "camera_text": null,
+              "lighting_text": null,
+              "pose_body_language_id": "pose_p003",
+              "pose_body_language_label": "shoulders_angled_face_back",
+              "reference_mode": null
+            },
+            "selector_terms": [
+              "shift to one leg",
+              "slight asymmetry",
+              "subtle",
+              "natural relaxed",
+              "subtle chest rise",
+              "natural",
+              "relaxed",
+              "fluid",
+              "breath",
+              "shift",
+              "turn"
+            ],
+            "unmatched_selector_terms": [
+              "shift to one leg",
+              "slight asymmetry",
+              "subtle",
+              "natural relaxed",
+              "subtle chest rise",
+              "natural",
+              "relaxed",
+              "fluid",
+              "breath",
+              "shift",
+              "turn"
+            ]
+          },
+          "performance_actions": {
+            "bonus": 0,
+            "dimension": "performance_actions",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave",
+              "pose_body_language_id": "pose_p003",
+              "pose_body_language_label": "shoulders_angled_face_back",
+              "scene_action": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave"
+            },
+            "selector_terms": [
+              "hair play",
+              "weight shift",
+              "none",
+              "internal impulse",
+              "hair",
+              "turn toward camera",
+              "leaning in",
+              "look back",
+              "reaction",
+              "gesture",
+              "settle"
+            ],
+            "unmatched_selector_terms": [
+              "hair play",
+              "weight shift",
+              "none",
+              "internal impulse",
+              "hair",
+              "turn toward camera",
+              "leaning in",
+              "look back",
+              "reaction",
+              "gesture",
+              "settle"
+            ]
+          },
+          "sensual_presence": {
+            "bonus": 0,
+            "dimension": "sensual_presence",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "camera_text": null,
+              "expression_gaze_id": "exp_g011",
+              "expression_gaze_label": "playful_eyebrow_raise",
+              "expression_text": null,
+              "framing_text": null,
+              "lighting_text": null,
+              "pose_body_language_id": "pose_p003",
+              "pose_body_language_label": "shoulders_angled_face_back",
+              "reference_mode": null
+            },
+            "selector_terms": [
+              "gaze",
+              "confidence",
+              "movement",
+              "timing",
+              "voice",
+              "framing"
+            ],
+            "unmatched_selector_terms": [
+              "gaze",
+              "confidence",
+              "movement",
+              "timing",
+              "voice",
+              "framing"
+            ]
+          },
+          "temporal_beats": {
+            "bonus": 0,
+            "dimension": "temporal_beats",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave",
+              "camera_text": null,
+              "caption_seed": null,
+              "reference_mode": null,
+              "scene_action": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave"
+            },
+            "selector_terms": [
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ],
+            "unmatched_selector_terms": [
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ]
+          },
+          "viewer_relationship": {
+            "bonus": 0,
+            "dimension": "viewer_relationship",
+            "matched_observed_fields": [],
+            "matched_selector_terms": [],
+            "observed_fields": {
+              "activity": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave",
+              "camera_text": null,
+              "environment_id": "env_v008",
+              "environment_name": "Getting-Ready Space \u2014 Mixed Light Sources",
+              "lane": "mirror outfit check",
+              "lighting_text": null,
+              "reference_mode": null,
+              "scene_action": "standing beside a bedroom mirror and adjusting one earring while glancing toward the camera like she is about to leave"
+            },
+            "selector_terms": [
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate"
+            ],
+            "unmatched_selector_terms": [
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate"
+            ]
+          }
+        },
+        "enabled": true,
+        "matched_selector_terms": [
+          "playful",
+          "playful"
+        ],
+        "observation_fingerprint_sha256": "7a9fde67bf35cc10cd27a71f4fe6869425c356bab20305f288d68db5fee0af8e",
+        "plan_fingerprint_sha256": "e1e6149f9c7e770d4b7894e37828806110d766fec49afd708961e0851f4f5292",
+        "plan_schema_version": "human_presence_prompt_plan_v1",
+        "schema_version": "human_presence_candidate_ranking_v1",
+        "scoring_version": "v1",
+        "total_bonus": 2,
+        "unmatched_dimensions": [
+          "viewer_relationship",
+          "performance_actions",
+          "movement_dynamics",
+          "sensual_presence",
+          "body_presentation",
+          "temporal_beats"
+        ]
+      },
+      "lane": "mirror outfit check",
+      "narrative_roles": [
+        "setup",
+        "choice",
+        "anticipation"
+      ],
+      "payoff_claimed": false,
+      "payoff_eligible": true,
+      "pose": "shoulders_angled_face_back",
+      "pose_body_language_id": "pose_p003",
+      "primary_pillar": "style_and_getting_ready",
+      "prompt_sha256": "e3baa48b5e0949d42008007c7182ab2a3ca36693a45dfc90e67d46878af065ae",
+      "ranking_evidence": {
+        "balanced_sexuality": "passed sequencing, context, and signal-stacking hard gates",
+        "character_fit": 12,
+        "failure_memory_caution": false,
+        "feed_contrast": {
+          "environment_repetitions": 0,
+          "lane_repetitions": 0,
+          "outfit_repetitions": 0,
+          "pose_repetitions": 0
+        },
+        "followability": 11,
+        "higgsfield_curator_score": 5,
+        "hook_score": 47,
+        "human_presence_bonus": 2,
+        "identity_consistency": "passed canonical Soul identity hard gate",
+        "lived_in_detail": 7,
+        "physical_interaction_risk": 0,
+        "physical_world_credibility": "passed prompt scene/action and pose/scene hard gates",
+        "premium_visual_discipline": 2,
+        "recipe_proof_priority": 2,
+        "situational_specificity": 10
+      },
+      "recipe_binding": "strategy compatibility",
+      "recipe_id": "hcr_012",
+      "scene_identity_field": "lane",
+      "slot_id": "lenagate202607176924dc10-pack000-00-photo",
+      "strategy_compatibility_evidence": {
+        "generated_environment_exact_match": true,
+        "generated_wardrobe_exact_match": true,
+        "recipe_environment_id": "env_v008",
+        "recipe_wardrobe_outfit_id": "wc_p050"
+      },
+      "supporting_pillar": "audience_choice_and_payoff",
+      "wardrobe_outfit_id": "wc_p050"
+    },
+    "candidate_status": "selected",
+    "confidence": "medium",
+    "decision_fingerprint_sha256": "98a3f76d0093b7f880b0601b92fbcb174261ab19b0eef7f5452309aa696ce4c5",
+    "evidence": {
+      "prompt_pack": {
+        "curator_excluded_count": 0,
+        "failure_memory_excluded_count": 0,
+        "failure_memory_hard_excluded_patterns": [],
+        "failure_memory_soft_flagged_patterns": [],
+        "human_presence": {
+          "body_presentation": {
+            "contract": {
+              "adult_character_required": true,
+              "anatomy_continuity_required": true,
+              "framing_intent": "full_body_presence",
+              "gravity_and_soft_tissue_realism": true,
+              "silhouette_profile": {
+                "bust_emphasis": "pronounced",
+                "hip_glute_emphasis": "pronounced",
+                "proportion_realism": "required_realistic",
+                "silhouette_shape_class": "hourglass_voluptuous",
+                "waist_hip_contrast": "pronounced"
+              },
+              "wardrobe_body_interaction": "fabric_tension_visible"
+            },
+            "directive": "body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory",
+            "selector_terms": [
+              "pronounced",
+              "required realistic",
+              "hourglass voluptuous",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "upper body intimate",
+              "face priority",
+              "dynamic motion framing"
+            ]
+          },
+          "character_doctrine_provenance": {
+            "doctrine_authored_against_repository_revision": "94da3c3d9a8722ef53c1cb9a3c0241799e74daf6",
+            "doctrine_version": "v1.0.0",
+            "source_doctrine_artifact_path": "pipeline/identity/lena_character_doctrine_v1.json",
+            "source_doctrine_artifact_sha256": "ec145b6fe7796061d533d18de7902a2f558d90ecbc56aa9df9f7597ba3552144"
+          },
+          "expression_arc": {
+            "contract": {
+              "peak_state": "playful_smirk",
+              "recognition_transition": "quick_spark",
+              "release_state": "lingering_amusement",
+              "start_state": "content_private"
+            },
+            "directive": "expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement",
+            "selector_terms": [
+              "content private",
+              "quick spark",
+              "playful smirk",
+              "lingering amusement",
+              "expression",
+              "smile",
+              "smirk",
+              "warm",
+              "playful",
+              "confident",
+              "spark",
+              "bloom"
+            ]
+          },
+          "failure_indicators": [
+            "dead_or_unfocused_eyes",
+            "frozen_expression",
+            "mannequin_pose",
+            "unmotivated_movement",
+            "continuous_camera_stare",
+            "robotic_dialogue",
+            "repeated_gesture_loop",
+            "abrupt_motion_start_or_stop",
+            "face_body_emotion_mismatch",
+            "no_viewer_recognition_event",
+            "sexual_styling_without_personality"
+          ],
+          "gaze_arc": {
+            "contract": {
+              "discovery_trigger": "internal_thought",
+              "hold_intensity": "sustained",
+              "recognition_behavior": "playful_surprise",
+              "release_behavior": "look_away_playful",
+              "start_focus": "off_camera_activity"
+            },
+            "directive": "gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful",
+            "selector_terms": [
+              "off camera activity",
+              "internal thought",
+              "playful surprise",
+              "sustained",
+              "look away playful",
+              "gaze",
+              "eye contact",
+              "playful",
+              "confident",
+              "surprise",
+              "recognition",
+              "hold",
+              "release"
+            ]
+          },
+          "medium_interpretation": "still_image",
+          "movement_dynamics": {
+            "contract": {
+              "asymmetry_level": "slight_asymmetry",
+              "breath_body_coupling": "subtle_chest_rise",
+              "continuity_required": true,
+              "movement_amplitude": "subtle",
+              "movement_quality": "natural_relaxed",
+              "weight_transfer": "shift_to_one_leg"
+            },
+            "directive": "movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise",
+            "selector_terms": [
+              "shift to one leg",
+              "slight asymmetry",
+              "subtle",
+              "natural relaxed",
+              "subtle chest rise",
+              "natural",
+              "relaxed",
+              "fluid",
+              "breath",
+              "shift",
+              "turn"
+            ]
+          },
+          "performance_actions": {
+            "contract": {
+              "movement_motivation": "internal_impulse",
+              "object_interaction": "none",
+              "primary_action": "hair_play",
+              "secondary_action": "weight_shift",
+              "settling_motion_required": true
+            },
+            "directive": "actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True",
+            "selector_terms": [
+              "hair play",
+              "weight shift",
+              "none",
+              "internal impulse",
+              "hair",
+              "turn toward camera",
+              "leaning in",
+              "look back",
+              "reaction",
+              "gesture",
+              "settle"
+            ]
+          },
+          "prompt_text": "Presence direction: viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed. gaze arc: begin from off camera activity; discover through internal thought; recognition reads as playful surprise; hold intensity sustained; release as look away playful. expression arc: start content private; transition quick spark; peak playful smirk; release lingering amusement. actions: primary hair play; secondary weight shift; object interaction none; movement motivated by internal impulse; settling motion required True. movement: weight transfer shift to one leg; asymmetry slight asymmetry; amplitude subtle; quality natural relaxed; breath-body coupling subtle chest rise. speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue. sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident. body presentation: adult character required; silhouette profile hourglass voluptuous; framing intent full body presence; anatomy continuity and realistic proportions remain mandatory. temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release.",
+          "schema_version": "human_presence_prompt_plan_v1",
+          "selector_bias_terms": {
+            "expression_gaze": [
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate",
+              "off camera activity",
+              "internal thought",
+              "playful surprise",
+              "sustained",
+              "look away playful",
+              "gaze",
+              "eye contact",
+              "playful",
+              "confident",
+              "surprise",
+              "recognition",
+              "hold",
+              "release",
+              "content private",
+              "quick spark",
+              "playful smirk",
+              "lingering amusement",
+              "expression",
+              "smile",
+              "smirk",
+              "spark",
+              "bloom",
+              "natural sensual presence",
+              "confidence",
+              "movement",
+              "timing",
+              "low",
+              "light awareness",
+              "voice",
+              "framing"
+            ],
+            "pose_body_language": [
+              "hair play",
+              "weight shift",
+              "none",
+              "internal impulse",
+              "hair",
+              "turn toward camera",
+              "leaning in",
+              "look back",
+              "reaction",
+              "gesture",
+              "settle",
+              "shift to one leg",
+              "slight asymmetry",
+              "subtle",
+              "natural relaxed",
+              "subtle chest rise",
+              "natural",
+              "relaxed",
+              "fluid",
+              "breath",
+              "shift",
+              "turn",
+              "pronounced",
+              "required realistic",
+              "hourglass voluptuous",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "upper body intimate",
+              "face priority",
+              "dynamic motion framing",
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ],
+            "reference_mode": [
+              "pronounced",
+              "required realistic",
+              "hourglass voluptuous",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "upper body intimate",
+              "face priority",
+              "dynamic motion framing",
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate",
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ],
+            "scene": [
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate",
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ],
+            "wardrobe": [
+              "pronounced",
+              "required realistic",
+              "hourglass voluptuous",
+              "full body presence",
+              "adult",
+              "anatomy continuity",
+              "realistic proportions",
+              "upper body intimate",
+              "face priority",
+              "dynamic motion framing",
+              "natural sensual presence",
+              "gaze",
+              "confidence",
+              "movement",
+              "timing",
+              "low",
+              "light awareness",
+              "confident",
+              "voice",
+              "framing",
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate"
+            ]
+          },
+          "selector_weight_adjustments_changed": true,
+          "sensual_presence": {
+            "contract": {
+              "confidence_level": "confident",
+              "exposure_dependency": "low",
+              "sources": [
+                "gaze",
+                "confidence",
+                "movement",
+                "timing"
+              ],
+              "tier": "natural_sensual_presence",
+              "viewer_tension": "light_awareness"
+            },
+            "directive": "sensual presence: tier natural sensual presence; sources gaze, confidence, movement, timing; exposure dependency low; viewer tension light awareness; confidence confident",
+            "selector_terms": [
+              "natural sensual presence",
+              "gaze",
+              "confidence",
+              "movement",
+              "timing",
+              "low",
+              "light awareness",
+              "confident",
+              "voice",
+              "framing"
+            ]
+          },
+          "speech_behavior": {
+            "contract": {
+              "address_mode": "direct_to_viewer",
+              "breath_visibility": true,
+              "laughter_behavior": "soft_chuckle",
+              "pacing": "conversational",
+              "pause_pattern": "natural_thinking_pause",
+              "reaction_before_dialogue": true,
+              "self_correction_allowed": true
+            },
+            "directive": "speech/reaction: direct to viewer; pacing conversational; pause natural thinking pause; laughter soft chuckle; breath visibility True; self-correction allowed True; reaction before dialogue True; still image interpretation: a silent pre-response beat, with the reaction readable through timing and expression rather than spoken dialogue",
+            "selector_terms": [
+              "direct to viewer",
+              "conversational",
+              "natural thinking pause",
+              "soft chuckle",
+              "reaction",
+              "dialogue",
+              "rhythm",
+              "pause",
+              "silent",
+              "direct",
+              "viewer",
+              "chuckle"
+            ]
+          },
+          "temporal_beats": {
+            "contract": {
+              "action_entry": "mid_activity",
+              "connection_peak": "sustained_engagement",
+              "release_or_exit": "playful_release",
+              "viewer_discovery": "mid_beat"
+            },
+            "directive": "temporal beats: entry mid activity; viewer discovery mid beat; connection peak sustained engagement; release or exit playful release",
+            "selector_terms": [
+              "mid activity",
+              "mid beat",
+              "sustained engagement",
+              "playful release"
+            ]
+          },
+          "viewer_relationship": {
+            "contract": {
+              "awareness": "fully_aware",
+              "emotional_distance": "warm_approachable",
+              "invitation_level": "clear",
+              "mode": "one_person_intimate",
+              "performance_level": "lightly_performed"
+            },
+            "directive": "viewer relationship: one person intimate; awareness fully aware; distance warm approachable; invitation clear; performance lightly performed",
+            "selector_terms": [
+              "one person intimate",
+              "fully aware",
+              "warm approachable",
+              "clear",
+              "lightly performed",
+              "viewer",
+              "direct address",
+              "approachable",
+              "warm",
+              "intimate"
+            ]
+          }
+        },
+        "library_prefix": "lenagate202607176924dc10",
+        "pack_count": 1,
+        "prompt_count": 10,
+        "prompt_identity_sha256": "18541471ff7b7c47625c28f306cbc9f8ae0dc0b8d08f8e12e72da173fa23c9e2"
+      },
+      "ranking_order": [
+        "no_failure_memory_caution",
+        "lower_physical_interaction_risk",
+        "premium_visual_discipline",
+        "human_presence_alignment",
+        "situational_specificity",
+        "lived_in_detail",
+        "character_fit",
+        "followability",
+        "recent_feed_contrast",
+        "higgsfield_curator_score",
+        "recipe_proof_priority",
+        "canonical_hook_score"
+      ],
+      "recent_content_evidence_semantics": "exact recorded fields only; missing fields remain unknown",
+      "recipe_binding_semantics": "strategy compatibility, not prompt provenance",
+      "tiebreak_label": "deterministic_noncreative_tiebreak"
+    },
+    "exact_next_allowed_action": "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-17 --slot-id lenagate202607176924dc10-pack000-00-photo",
+    "expensive_video_boundary": "not evaluated; this gate selects an ordinary Higgsfield still only",
+    "failure_memory_inputs": {
+      "failure_memory_excluded_count": 0,
+      "failure_memory_hard_excluded_patterns": [],
+      "failure_memory_soft_flagged_patterns": [],
+      "semantics": "recorded structured QA/failure outcomes only"
+    },
+    "final_action": "prepare_higgsfield_still_dry_run_for_review",
+    "generated_at_utc": "2026-07-17T23:40:25.367499Z",
+    "influencer_id": "lena",
+    "input_provenance": [
+      {
+        "path": "pipeline/influencer_nodes/lena/persona.json",
+        "semantics": "canonical authority",
+        "sha256": "c2640b939cd0d81234a3f0782857ddc1ebb6e355c749c2c0f44b1a7eb72d13f9"
+      },
+      {
+        "path": "pipeline/influencer_nodes/lena/lena_content_strategy_v1.json",
+        "semantics": "canonical authority",
+        "sha256": "b0d9951e26949d459f3a6a912a0d1570bac5c2ea5c91952c680e32f93cdedb0a"
+      },
+      {
+        "path": "pipeline/prompt_banks/lena/lena_photo_scene_bank_v1.json",
+        "semantics": "canonical authority",
+        "sha256": "efc0c7510f1ed0d4e3687f4ae75d62bacdc14e0d23d0d1e61955f7b241e3ae31"
+      },
+      {
+        "path": "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json",
+        "semantics": "canonical authority",
+        "sha256": "e147356ae59fc17c9bed6f52beeddc12dee6f173855a40246db77b6a783117d9"
+      },
+      {
+        "path": "pipeline/prompt_banks/lena/strong_hook_bank_v1.json",
+        "semantics": "canonical authority",
+        "sha256": "1d37b03335fc38074a15c5ae1e945cb1dc78b7877e7e2fd490d1fa2e784de7b2"
+      }
+    ],
+    "noncritical_evidence_gaps": [
+      "historical creative temperature is unknown; non-high-heat selection remains allowed",
+      "recent outfit identity is unavailable; confidence reduced, selection remains allowed",
+      "recent content evidence is unavailable; selection remains allowed for non-state-dependent candidates"
+    ],
+    "provider_authorized": false,
+    "recent_content_inputs": [],
+    "rejected_or_blocked_reasons": [
+      {
+        "candidate_count": 2,
+        "reason": "action_walk_vs_stationary"
+      },
+      {
+        "candidate_count": 1,
+        "reason": "posture_sitting_vs_standing"
+      },
+      {
+        "candidate_count": 1,
+        "reason": "posture_standing_vs_sitting"
+      },
+      {
+        "candidate_count": 9,
+        "reason": "required_recipe_candidate_missing"
+      },
+      {
+        "candidate_count": 4,
+        "reason": "scene_prompt_material_contradiction"
+      }
+    ],
+    "schema_version": "lena_pre_generation_candidate_gate_v1",
+    "side_effects_performed": [],
+    "strategy_contract": {
+      "canonical_niche": "Glamour, Choices, And Beautiful Trouble",
+      "path": "pipeline/influencer_nodes/lena/lena_content_strategy_v1.json"
+    }
+  },
+  "qa_artifact": {
+    "report_type": "human_presence_output_qa",
+    "schema_version": "human_presence_output_qa_v2",
+    "medium": "still_image",
+    "evaluator_version": "hpe_2c_pr3_integrity_semantic_v1",
+    "generated_at_utc": "2026-07-18T04:05:49.722954Z",
+    "integrity_status": "not_assessable",
+    "integrity_findings": [
+      {
+        "finding_code": "plan_fingerprint_not_assessable",
+        "dimension": "integrity",
+        "severity": "info",
+        "binding_name": "plan",
+        "observed": "e1e6149f9c7e770d4b7894e37828806110d766fec49afd708961e0851f4f5292",
+        "expected": null,
+        "verification_basis": "no_independent_upstream_digest"
+      },
+      {
+        "finding_code": "manifest_structurally_validated",
+        "dimension": "integrity",
+        "severity": "info",
+        "binding_name": "manifest",
+        "observed": "067ea3e6b9142ffa5d0eaa9adcfd37e98f63488ded018bc26b205cc5bcdaea0f",
+        "expected": null,
+        "verification_basis": "json_object_loaded_and_raw_sha_observed"
+      },
+      {
+        "finding_code": "generated_image_not_assessable",
+        "dimension": "integrity",
+        "severity": "info",
+        "binding_name": "generated_image",
+        "observed": "3a1aa9cd6c52a9d2945eb2a75c95dae0146be80c4c4e200eec863bc3fe5b2487",
+        "expected": null,
+        "verification_basis": "no_independent_upstream_digest"
+      }
+    ],
+    "semantic_status": "not_evaluated",
+    "semantic_findings": [],
+    "semantic_result_provenance": null,
+    "semantic_error": null,
+    "binding_records": [
+      {
+        "binding_name": "plan",
+        "binding_status": "not_assessable",
+        "observed_sha256": "e1e6149f9c7e770d4b7894e37828806110d766fec49afd708961e0851f4f5292",
+        "expected_sha256": null,
+        "verification_basis": "no_independent_upstream_digest",
+        "source_path": null,
+        "details": {
+          "reason": "no_independent_upstream_digest"
+        }
+      },
+      {
+        "binding_name": "candidate_decision",
+        "binding_status": "verified",
+        "observed_sha256": "6794d29ecf8fad60b80922a2b09d366a404e13518d3dc32eb57504b51219a341",
+        "expected_sha256": "6794d29ecf8fad60b80922a2b09d366a404e13518d3dc32eb57504b51219a341",
+        "verification_basis": "json_object_loaded_and_raw_sha_observed",
+        "source_path": "C:\\projects\\ai\\content_bot_pr3_diag\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-17\\lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+        "details": {
+          "structural_validation": "json_object_loaded"
+        }
+      },
+      {
+        "binding_name": "manifest",
+        "binding_status": "structurally_validated",
+        "observed_sha256": "067ea3e6b9142ffa5d0eaa9adcfd37e98f63488ded018bc26b205cc5bcdaea0f",
+        "expected_sha256": null,
+        "verification_basis": "json_object_loaded_and_raw_sha_observed",
+        "source_path": "pipeline\\higgsfield_debug\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo\\lena_hpe_output_qa_manifest.json",
+        "details": {
+          "structural_validation": "json_object_loaded"
+        }
+      },
+      {
+        "binding_name": "generated_image",
+        "binding_status": "not_assessable",
+        "observed_sha256": "3a1aa9cd6c52a9d2945eb2a75c95dae0146be80c4c4e200eec863bc3fe5b2487",
+        "expected_sha256": null,
+        "verification_basis": "no_independent_upstream_digest",
+        "source_path": "pipeline\\higgsfield_library\\lena\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo_seed.png",
+        "details": {
+          "reason": "no_independent_upstream_digest"
+        }
+      }
+    ],
+    "source_artifacts": {
+      "candidate_decision_path": "C:\\projects\\ai\\content_bot_pr3_diag\\pipeline\\strategy\\lena\\pre_generation_candidates\\2026-07-17\\lena_pre_generation_candidate_6924dc10_98a3f76d0093.json",
+      "manifest_path": "pipeline\\higgsfield_debug\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo\\lena_hpe_output_qa_manifest.json",
+      "image_path": "pipeline\\higgsfield_library\\lena\\2026-07-17\\lenagate202607176924dc10-pack000-00-photo_seed.png"
+    },
+    "recommendation": "not_assessable"
+  },
+  "provider_call_performed": false,
+  "provider_authorized": false,
+  "side_effects_performed": [],
+  "controlled_proof_result": {
+    "lane_type": "controlled_proof",
+    "authority_commit": "6924dc10d7916b3bc91a87953ca3e319171e42fc",
+    "provider_call_performed": false,
+    "provider_authorized": false,
+    "side_effects_performed": [],
+    "ordinary_lane_readiness": "not_applicable"
+  }
+}
