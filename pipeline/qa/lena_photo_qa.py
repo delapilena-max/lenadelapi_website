@@ -189,6 +189,9 @@ HARD_GATING_CHECKLIST_KEYS: Tuple[str, ...] = tuple(
 # Gating rules (see validate_qa_result()):
 #   - hook_strength == "weak" forces overall: fail. "moderate"/"strong" pass.
 #   - styling_sexy_platform_safe == "fail" forces overall: fail.
+#     This is the explicit-exposure / age-ambiguity boundary, not a ban on
+#     ordinary adult revealing fashion. See 70_visual_qa/RULES.md for the
+#     adult-safe examples that are allowed when the character is clearly adult.
 #   - outfit_variety_vs_recent_posts and scene_variety_vs_recent_posts are
 #     ADVISORY ONLY -- no history-comparison tracker exists yet (not built in
 #     this change), so neither field can force overall regardless of status.

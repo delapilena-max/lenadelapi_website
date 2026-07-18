@@ -153,6 +153,33 @@ This is the reason this folder exists, not an abstract warning.
   still describing a new image. Write a fresh QA result over the old one
   (deliberately, after viewing the new image) every time a slot is rerendered.
 
+## Hairstyle silhouette diversity (2026-07-17)
+
+Repeated hairstyle silhouettes reduce realism and make outputs look templated.
+Higgsfield Soul 2.0 has a documented tendency to reproduce the same elevated
+front curl / lifted crown crest from the identity element across generations.
+
+**What to compare:** before passing an image, compare its crown/front-hair
+silhouette against recent Lena outputs. Flag when the elevated front curl,
+pompadour-like crest, or rooster-comb shape repeats substantially.
+
+**Rejection threshold:** reject an image when its hairstyle silhouette is
+substantially identical to a recent output, unless the recipe explicitly
+requires continuity across a set.
+
+**What is NOT a reject reason:** hairstyle variation itself. Center part,
+side part, tucked ears, loose ponytail, bun, brushed back, tousled, damp --
+these are all valid Lena hairstyles. A different hairstyle from the last image
+is not drift and must not be flagged as identity failure.
+
+**Identity continuity for hair depends only on:** brunette color, long to
+medium-long length, thick volume, naturally wavy base texture. A different
+silhouette with those four traits intact is a pass on identity.
+
+**Implementation status:** this remains human-QA-only for now. There is no
+structured recent-output comparison tracker in code yet, so reviewers compare
+recent Lena outputs by eye. Do not invent a machine similarity score here.
+
 ## Must never do
 
 - Never treat `qa_overall_status` (or any field) from `build_review_bundle()` as
@@ -178,6 +205,34 @@ This is the reason this folder exists, not an abstract warning.
   history-comparison tracker (see "Not yet decided / not yet built") -- until
   then these two fields are structurally incapable of an honest verdict and
   must stay advisory.
+
+## Adult style is not unsafe by itself
+
+For clearly adult fictional Lena images, the following are allowed on their
+own and must not fail safety merely for showing skin or sexual suggestiveness:
+
+- scantily clad
+- bikini
+- lingerie
+- underwear
+- deep cleavage
+- visible midriff
+- exposed thighs and hips
+- tight or sheer clothing
+- sensual or provocative posing
+- bedroom or dressing-room context
+- emphasized curves
+- implied nudity while nipples and genitals remain covered
+
+These still fail safety:
+
+- visible genitals
+- explicit nipple exposure
+- depicted sexual acts
+- masturbation
+- coercive sexual content
+- sexual violence
+- age ambiguity
 
 ## What counts as false-green and must hard-fail
 
