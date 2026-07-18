@@ -8,6 +8,7 @@ REPORT_TYPE = "human_presence_engine_closure_verification"
 SCHEMA_VERSION = "human_presence_engine_closure_verification_v1"
 STATUS_VALUES = ("verified", "not_verified", "not_applicable", "blocked")
 LANE_VALUES = ("controlled_proof", "ordinary_lane")
+LANE_NOT_APPLICABLE_REASON = "lane_not_applicable"
 MANDATORY_CONDITION_IDS = (
     "connected_path_runtime_verification",
     "supported_prompt_influence_verification",
@@ -21,6 +22,31 @@ MANDATORY_CONDITION_IDS = (
     "final_ci_confirmation",
     "authority_commit_binding",
 )
+LANE_CONDITION_APPLICABILITY = {
+    "controlled_proof": {
+        "connected_path_runtime_verification",
+        "supported_prompt_influence_verification",
+        "failure_indicator_qa_only_verification",
+        "authority_invariance_verification",
+        "artifact_integrity_verification",
+        "provider_free_controlled_proof",
+        "controlled_live_semantic_proof_receipt",
+        "human_evidence_review",
+        "final_ci_confirmation",
+        "authority_commit_binding",
+    },
+    "ordinary_lane": {
+        "connected_path_runtime_verification",
+        "supported_prompt_influence_verification",
+        "failure_indicator_qa_only_verification",
+        "authority_invariance_verification",
+        "artifact_integrity_verification",
+        "ordinary_lane_proof",
+        "human_evidence_review",
+        "final_ci_confirmation",
+        "authority_commit_binding",
+    },
+}
 REQUIRED_KEYS = frozenset(
     {
         "report_type",
@@ -92,6 +118,52 @@ def _normalize_lane_type(value: Any) -> str:
     return normalized
 
 
+def lane_condition_applicability(lane_type: str) -> dict[str, bool]:
+    normalized_lane = _normalize_lane_type(lane_type)
+    applicable = LANE_CONDITION_APPLICABILITY[normalized_lane]
+    return {condition_id: condition_id in applicable for condition_id in MANDATORY_CONDITION_IDS}
+
+
+def condition_result(status: str, *, reason: str | None = None) -> dict[str, str] | str:
+    normalized = _normalize_status(status, label="condition_result")
+    if normalized == "not_applicable":
+        return {
+            "status": normalized,
+            "reason": reason.strip() if isinstance(reason, str) and reason.strip() else LANE_NOT_APPLICABLE_REASON,
+        }
+    _require(reason in (None, ""), "closure_status_invalid", "non-applicable results cannot carry a reason")
+    return normalized
+
+
+def _normalize_condition_result(value: Any, *, label: str) -> dict[str, str] | str:
+    if isinstance(value, dict):
+        keys = set(value)
+        _require(
+            keys.issubset({"status", "reason"}),
+            "closure_report_invalid",
+            f"{label} has unexpected keys: {', '.join(sorted(keys - {'status', 'reason'}))}",
+        )
+        status = _normalize_status(value.get("status"), label=f"{label}.status")
+        if status == "not_applicable":
+            reason = str(value.get("reason") or "").strip()
+            _require(
+                reason == LANE_NOT_APPLICABLE_REASON,
+                "closure_report_invalid",
+                f"{label} not_applicable results must use reason {LANE_NOT_APPLICABLE_REASON!r}",
+            )
+            return {"status": status, "reason": reason}
+        _require(
+            value.get("reason") in (None, ""),
+            "closure_report_invalid",
+            f"{label} {status!r} results must not carry a reason",
+        )
+        return status
+    status = _normalize_status(value, label=label)
+    if status == "not_applicable":
+        return {"status": status, "reason": LANE_NOT_APPLICABLE_REASON}
+    return status
+
+
 def _normalize_findings(findings: Any) -> list[dict[str, Any]]:
     _require(isinstance(findings, list), "closure_findings_invalid", "blocking_findings must be a list")
     normalized: list[dict[str, Any]] = []
@@ -104,8 +176,9 @@ def _normalize_findings(findings: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _normalize_mandatory_condition_results(value: Any) -> dict[str, str]:
+def _normalize_mandatory_condition_results(value: Any, *, lane_type: str) -> dict[str, Any]:
     _require(isinstance(value, dict), "closure_report_invalid", "mandatory_condition_results must be an object")
+    lane_applicability = lane_condition_applicability(lane_type)
     missing = [condition_id for condition_id in MANDATORY_CONDITION_IDS if condition_id not in value]
     _require(
         not missing,
@@ -114,24 +187,28 @@ def _normalize_mandatory_condition_results(value: Any) -> dict[str, str]:
     )
     extra = sorted(set(value) - set(MANDATORY_CONDITION_IDS))
     _require(not extra, "closure_report_invalid", f"mandatory_condition_results has unexpected keys: {', '.join(extra)}")
-    normalized: dict[str, str] = {}
+    normalized: dict[str, Any] = {}
     for condition_id in MANDATORY_CONDITION_IDS:
-        status = _normalize_status(value.get(condition_id), label=f"mandatory_condition_results.{condition_id}")
-        _require(
-            status != "not_applicable",
-            "closure_report_invalid",
-            f"mandatory condition {condition_id} cannot be not_applicable",
+        normalized_result = _normalize_condition_result(
+            value.get(condition_id),
+            label=f"mandatory_condition_results.{condition_id}",
         )
-        normalized[condition_id] = status
+        if isinstance(normalized_result, dict) and normalized_result.get("status") == "not_applicable":
+            _require(
+                lane_applicability[condition_id] is False,
+                "closure_report_invalid",
+                f"mandatory condition {condition_id} cannot be not_applicable for lane {lane_type!r}",
+            )
+        normalized[condition_id] = normalized_result
     return normalized
 
 
-def _derive_closure_status(*, blocking_findings: list[dict[str, Any]], mandatory_condition_results: dict[str, str]) -> str:
+def _derive_closure_status(*, blocking_findings: list[dict[str, Any]], mandatory_condition_results: dict[str, Any]) -> str:
     if blocking_findings:
         return "blocked"
-    if any(value == "blocked" for value in mandatory_condition_results.values()):
+    if any((value.get("status") if isinstance(value, dict) else value) == "blocked" for value in mandatory_condition_results.values()):
         return "blocked"
-    if any(value == "not_verified" for value in mandatory_condition_results.values()):
+    if any((value.get("status") if isinstance(value, dict) else value) == "not_verified" for value in mandatory_condition_results.values()):
         return "not_verified"
     return "verified"
 
@@ -175,7 +252,7 @@ def _normalized_report(report: dict[str, Any]) -> dict[str, Any]:
     _require(isinstance(report.get("required_artifact_paths"), dict), "closure_report_invalid", "required_artifact_paths must be an object")
     lane_type = _normalize_lane_type(report.get("lane_type"))
     findings = _normalize_findings(report.get("blocking_findings"))
-    mandatory_condition_results = _normalize_mandatory_condition_results(report.get("mandatory_condition_results"))
+    mandatory_condition_results = _normalize_mandatory_condition_results(report.get("mandatory_condition_results"), lane_type=lane_type)
     closure_status = _normalize_status(report.get("closure_status"), label="closure_status")
 
     expected_status = _derive_closure_status(
@@ -262,7 +339,10 @@ def build_closure_verification_report(
     }
     report["closure_status"] = _derive_closure_status(
         blocking_findings=report["blocking_findings"],
-        mandatory_condition_results=_normalize_mandatory_condition_results(report["mandatory_condition_results"]),
+        mandatory_condition_results=_normalize_mandatory_condition_results(
+            report["mandatory_condition_results"],
+            lane_type=report["lane_type"],
+        ),
     )
     return _normalized_report(report)
 
