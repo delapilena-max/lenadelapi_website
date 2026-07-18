@@ -529,8 +529,10 @@ def test_report_root_symlink_escape_is_rejected_before_any_stage_runs(tmp_path: 
         "--packet-root",
         str(tmp_path / "pipeline" / "strategy" / "lena" / "publish_packets"),
     ])
-    with pytest.raises(cycle.LenaFullAutonomyDryRunError, match="resolved aggregate receipt escapes declared root"):
+    with pytest.raises(cycle.LenaFullAutonomyDryRunError) as exc_info:
         cycle.main()
+
+    assert exc_info.value.code == "strategy_report_path_escape"
 
 
 def test_strategy_child_report_path_escape_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
