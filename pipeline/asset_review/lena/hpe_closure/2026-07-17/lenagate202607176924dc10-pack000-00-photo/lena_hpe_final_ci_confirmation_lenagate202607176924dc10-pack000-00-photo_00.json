@@ -1,0 +1,21 @@
+{
+  "schema_version": "human_presence_final_ci_confirmation_v1",
+  "repository": "delapilena-max/lenadelapi_website",
+  "pr_number": 82,
+  "reviewed_head_sha": "18527be5b9abc91fc9f6b9ebe6de5c85dca9538e",
+  "merge_commit_sha": "63600fc417b3b9b4deaec705c439bb19f64b3f65",
+  "required_checks": [
+    {
+      "check_name": "build",
+      "conclusion": "pass"
+    },
+    {
+      "check_name": "main_ci_check",
+      "conclusion": "pass"
+    }
+  ],
+  "evidence_collected_at_utc": "2026-07-18T04:13:24.055377Z",
+  "evidence_source": "github_ci_human_confirmed",
+  "authority_commit_expected": "6924dc10d7916b3bc91a87953ca3e319171e42fc",
+  "authority_commit_final": "6924dc10d7916b3bc91a87953ca3e319171e42fc"
+}
