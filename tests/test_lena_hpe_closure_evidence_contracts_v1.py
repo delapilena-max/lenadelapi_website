@@ -963,6 +963,70 @@ def test_manual_semantic_review_rejects_non_manual_source_labels(
         closure_evidence.validate_manual_semantic_review_artifact(mutated)
 
 
+def test_manual_semantic_duplicate_sidecars_fail_closed(tmp_path: Path) -> None:
+    proof, image_path, _ = _proof_run(tmp_path)
+    output_root = tmp_path / "proof"
+    candidate_path = Path(proof["selected_candidate_artifact_path"]).resolve()
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text(proof["prompt_package"]["image_prompt"], encoding="utf-8")
+    prompt_sha = hashlib.sha256(prompt_path.read_bytes()).hexdigest()
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text("handoff\n", encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text("receipt\n", encoding="utf-8")
+    manual_artifact = closure_evidence.build_manual_semantic_review_artifact(
+        reviewer_operator_id="nicolas",
+        reviewed_image_path=image_path,
+        reviewed_image_sha256=proof["image_sha256"],
+        prompt_artifact_path=prompt_path,
+        prompt_sha256=prompt_sha,
+        candidate_artifact_path=candidate_path,
+        candidate_artifact_sha256=proof["selected_candidate_artifact_sha256"],
+        execution_receipt_artifact_path=receipt,
+        execution_receipt_artifact_sha256=hashlib.sha256(receipt.read_bytes()).hexdigest(),
+        provider_job_id="job-123",
+        authority_commit_expected=proof["authority_commit"],
+        authority_commit_final=proof["authority_commit"],
+        disposition="accepted_for_hpe_closure",
+        assessment=[
+            {"aspect_id": aspect, "status": "verified", "detail": "observed and acceptable"}
+            for aspect in closure_evidence.MANUAL_SEMANTIC_ASPECT_IDS
+        ],
+        findings=[],
+        confirmation_statement=closure_evidence.MANUAL_SEMANTIC_CONFIRMATION_STATEMENT,
+        evidence_source="manual_human_semantic_review",
+    )
+    closure_evidence.write_manual_semantic_review_artifact(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        artifact=manual_artifact,
+        output_root=output_root,
+    )
+    duplicate_path = output_root / DATE / SLOT_ID / "dup" / f"lena_hpe_manual_semantic_review_{SLOT_ID}_00.json"
+    duplicate_path.parent.mkdir(parents=True, exist_ok=True)
+    conflicting_artifact = dict(manual_artifact)
+    conflicting_artifact["provider_job_id"] = "job-conflict"
+    duplicate_path.write_text(json.dumps(conflicting_artifact, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(closure_verifier.HPEClosureVerificationError, match="multiple lena_hpe_manual_semantic_review sidecars were found"):
+        closure_verifier.verify_closure_report(
+            output_root=output_root,
+            authority_commit_expected=proof["authority_commit"],
+            require_clean_authority=False,
+            dry_run=True,
+            proof_identity=_proof_identity(
+                proof=proof,
+                image_path=image_path,
+                candidate_path=candidate_path,
+                prompt_path=prompt_path,
+                handoff_path=handoff,
+                receipt_path=receipt,
+                provider_job_id="job-123",
+            ),
+        )
+
+
 def test_ordinary_lane_proof_requires_qualified_evidence(tmp_path: Path) -> None:
     proof, image_path, _ = _proof_run(tmp_path, controlled_proof=False)
     output_root = tmp_path / "proof"
@@ -1037,6 +1101,63 @@ def test_ordinary_lane_proof_requires_qualified_evidence(tmp_path: Path) -> None
         "status": "not_applicable",
         "reason": closure_schema.LANE_NOT_APPLICABLE_REASON,
     }
+
+
+def test_ordinary_lane_duplicate_sidecars_fail_closed(tmp_path: Path) -> None:
+    proof, image_path, _ = _proof_run(tmp_path, controlled_proof=False)
+    output_root = tmp_path / "proof"
+    candidate_path = Path(proof["selected_candidate_artifact_path"]).resolve()
+    prompt_path = tmp_path / "prompt.txt"
+    prompt_path.write_text(proof["prompt_package"]["image_prompt"], encoding="utf-8")
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text("handoff\n", encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text("receipt\n", encoding="utf-8")
+    ordinary_slot_id = str(proof.get("selected_candidate_slot_id") or proof.get("slot_id") or SLOT_ID)
+    ordinary_artifact = closure_evidence.build_ordinary_lane_proof_artifact(
+        reviewer_operator_id="nicolas",
+        reviewed_image_path=image_path,
+        reviewed_image_sha256=proof["image_sha256"],
+        prompt_artifact_path=prompt_path,
+        prompt_sha256=proof["prompt_package"]["image_prompt_sha256"],
+        candidate_artifact_path=candidate_path,
+        candidate_artifact_sha256=proof["selected_candidate_artifact_sha256"],
+        slot_id=ordinary_slot_id,
+        authority_commit_expected=proof["authority_commit"],
+        authority_commit_final=proof["authority_commit"],
+        disposition="accepted_for_hpe_closure",
+        findings=[],
+        confirmation_statement=closure_evidence.ORDINARY_LANE_PROOF_CONFIRMATION_STATEMENT,
+    )
+    closure_evidence.write_ordinary_lane_proof_artifact(
+        date_str=DATE,
+        slot_id=SLOT_ID,
+        image_index=0,
+        artifact=ordinary_artifact,
+        output_root=output_root,
+    )
+    duplicate_path = output_root / DATE / SLOT_ID / "dup" / f"lena_hpe_ordinary_lane_proof_{SLOT_ID}_00.json"
+    duplicate_path.parent.mkdir(parents=True, exist_ok=True)
+    conflicting_artifact = dict(ordinary_artifact)
+    conflicting_artifact["authority_commit_final"] = "c" * 40
+    duplicate_path.write_text(json.dumps(conflicting_artifact, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(closure_verifier.HPEClosureVerificationError, match="multiple lena_hpe_ordinary_lane_proof sidecars were found"):
+        closure_verifier.verify_closure_report(
+            output_root=output_root,
+            authority_commit_expected=proof["authority_commit"],
+            require_clean_authority=False,
+            dry_run=True,
+            proof_identity=_proof_identity(
+                proof=proof,
+                image_path=image_path,
+                candidate_path=candidate_path,
+                prompt_path=prompt_path,
+                handoff_path=handoff,
+                receipt_path=receipt,
+                provider_job_id="job-123",
+            ),
+        )
 
 
 def test_provider_backed_semantic_review_remains_supported(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
