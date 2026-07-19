@@ -224,6 +224,13 @@ def _validate_bound_artifact(path_value: str, sha_value: str, *, root: Path, cod
     }
 
 
+def _resolve_candidate_artifact(candidate_artifact: dict[str, Any]) -> dict[str, Any]:
+    resolved_candidate = candidate_artifact.get("candidate")
+    if isinstance(resolved_candidate, dict):
+        return resolved_candidate
+    return candidate_artifact
+
+
 def _authorized_output_paths(expected_output_directory: Path, expected_output_stem: str, allowed_output_extensions: list[str]) -> list[Path]:
     directory = _ensure_path_within_root(
         expected_output_directory,
@@ -975,8 +982,9 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     candidate_sha256 = _sha256_file(candidate_path)
     _require(candidate_sha256 == str(auth_data["candidate_artifact_sha256"]), "candidate_sha_mismatch", "candidate SHA-256 does not match the authorization binding")
     _require(candidate_path == Path(str(auth_data["candidate_artifact_path"])).resolve(), "candidate_path_mismatch", "candidate path does not match the authorization binding")
-    _require(str(candidate.get("candidate_id") or "") == str(auth_data["candidate_id"]), "candidate_id_mismatch", "candidate_id does not match the authorization binding")
-    _require(str(candidate.get("slot_id") or "") == str(auth_data["slot_id"]), "slot_id_mismatch", "slot_id does not match the authorization binding")
+    resolved_candidate = _resolve_candidate_artifact(candidate)
+    _require(str(resolved_candidate.get("candidate_id") or "") == str(auth_data["candidate_id"]), "candidate_id_mismatch", "candidate_id does not match the authorization binding")
+    _require(str(resolved_candidate.get("slot_id") or "") == str(auth_data["slot_id"]), "slot_id_mismatch", "slot_id does not match the authorization binding")
     stages.append(
         _stage_summary(
             "approved_candidate_resolution",
@@ -1370,7 +1378,7 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         label="candidate artifact",
     )
     candidate_artifact = candidate["artifact"]
-    resolved_candidate = candidate_artifact.get("candidate") if isinstance(candidate_artifact.get("candidate"), dict) else candidate_artifact
+    resolved_candidate = _resolve_candidate_artifact(candidate_artifact)
     candidate_id = str(resolved_candidate.get("candidate_id") or "")
     slot_id = str(resolved_candidate.get("slot_id") or "")
     _require(candidate_id == str(auth_data["candidate_id"]), "candidate_id_mismatch", "candidate_id does not match authorization")
