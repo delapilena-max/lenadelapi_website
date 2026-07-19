@@ -134,6 +134,15 @@ def _repo_relative(path: Path) -> str:
         return resolved.as_posix()
 
 
+def _normalized_repo_path_text(raw_path: str) -> str:
+    return str(raw_path).replace("\\", "/").strip()
+
+
+def _path_from_repo_text(raw_path: str) -> Path:
+    path = Path(_normalized_repo_path_text(raw_path))
+    return path if path.is_absolute() else ROOT / path
+
+
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -276,7 +285,8 @@ def _prepare_authorization_scope(
     slot_id = str(handoff_report.get("selected_slot_id") or "")
     candidate = handoff_report.get("selected_candidate")
     candidate = candidate if isinstance(candidate, dict) else {}
-    candidate_path = Path(str(handoff_report.get("selected_candidate_path") or candidate.get("artifact_path") or ""))
+    candidate_path_text = _normalized_repo_path_text(str(handoff_report.get("selected_candidate_path") or candidate.get("artifact_path") or ""))
+    candidate_path = _path_from_repo_text(candidate_path_text)
     candidate_sha256 = str(handoff_report.get("selected_candidate_sha256") or candidate.get("artifact_sha256") or "")
     selected_prompt_input = handoff_report.get("selected_prompt_input")
     selected_prompt_input = selected_prompt_input if isinstance(selected_prompt_input, dict) else {}
@@ -300,16 +310,27 @@ def _prepare_authorization_scope(
         or soul_metadata.get("custom_reference_id")
         or ""
     )
+    candidate_selection_binding = handoff_report.get("candidate_selection_binding")
+    candidate_selection_binding = candidate_selection_binding if isinstance(candidate_selection_binding, dict) else {}
+    provider_execution_binding = handoff_report.get("provider_execution_binding")
+    provider_execution_binding = provider_execution_binding if isinstance(provider_execution_binding, dict) else {}
+    binding_linkage = handoff_report.get("binding_linkage")
+    binding_linkage = binding_linkage if isinstance(binding_linkage, dict) else {}
     binding_error = _handoff_cross_field_binding_split_brain_error(
         slot_id=slot_id,
         candidate_id=str(candidate.get("candidate_id") or ""),
-        source_selected_candidate_artifact_path=str(candidate_path),
+        source_selected_candidate_artifact_path=candidate_path_text,
         source_selected_candidate_artifact_sha256=candidate_sha256,
         selected_candidate_prompt_sha256=str(candidate.get("prompt_sha256") or ""),
         selected_prompt_input_prompt_sha256=str(selected_prompt_input.get("prompt_sha256") or ""),
         structured_executor_inputs_selected_prompt_sha256=str(structured.get("selected_prompt_sha256") or ""),
         selected_candidate_lane=str(candidate.get("lane") or ""),
         selected_prompt_input_lane=str(selected_prompt_input.get("lane") or ""),
+        dual_binding_contract={
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
+        },
     )
     if binding_error is not None:
         code, detail = binding_error
@@ -341,6 +362,9 @@ def _prepare_authorization_scope(
         "custom_reference_id": custom_reference_id,
         "generation_handoff_artifact_path": str(Path(str(handoff_report.get("handoff_artifact_path") or handoff_report.get("selected_handoff_artifact_path") or ""))),
         "generation_handoff_artifact_sha256": str(handoff_report.get("handoff_sha256") or handoff_report.get("selected_handoff_sha256") or ""),
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "selected_candidate": candidate,
     }
 
@@ -373,7 +397,7 @@ def issue_cycle_authorization(
             or raw_selected_candidate.get("artifact_path")
             or raw_handoff.get("candidate_artifact_path")
             or ""
-        ),
+        ).replace("\\", "/"),
         source_selected_candidate_artifact_sha256=str(
             raw_handoff.get("selected_candidate_sha256")
             or raw_selected_candidate.get("artifact_sha256")
@@ -387,10 +411,43 @@ def issue_cycle_authorization(
         ),
         selected_candidate_lane=str(raw_selected_candidate.get("lane") or ""),
         selected_prompt_input_lane=str(raw_selected_prompt_input.get("lane") or ""),
+        dual_binding_contract={
+            "candidate_selection_binding": raw_handoff.get("candidate_selection_binding"),
+            "provider_execution_binding": raw_handoff.get("provider_execution_binding"),
+            "binding_linkage": raw_handoff.get("binding_linkage"),
+        },
     )
     if raw_binding_error is not None:
         code, detail = raw_binding_error
         _require(False, code, detail)
+    raw_provider_binding = raw_handoff.get("provider_execution_binding")
+    raw_provider_binding = raw_provider_binding if isinstance(raw_provider_binding, dict) else {}
+    raw_provider_prompt_sha = _normalized_repo_path_text(str(raw_provider_binding.get("provider_prompt_sha256") or ""))
+    raw_prompt_sha_values = {
+        _normalized_repo_path_text(str(raw_handoff.get("prompt_sha256") or "")),
+        _normalized_repo_path_text(str(raw_selected_prompt_input.get("prompt_sha256") or "")),
+        _normalized_repo_path_text(str((raw_handoff.get("structured_executor_inputs") or {}).get("selected_prompt_sha256") or "")),
+    }
+    raw_prompt_sha_values.discard("")
+    if raw_prompt_sha_values and (len(raw_prompt_sha_values) > 1 or raw_provider_prompt_sha not in raw_prompt_sha_values):
+        _require(
+            False,
+            "handoff_prompt_binding_split_brain",
+            json.dumps(
+                {
+                    "slot_id": str(raw_handoff.get("selected_slot_id") or raw_handoff.get("slot_id") or ""),
+                    "candidate_id": str(raw_selected_candidate.get("candidate_id") or raw_handoff.get("candidate_id") or ""),
+                    "provider_prompt_sha256": raw_provider_prompt_sha,
+                    "raw_prompt_sha_values": sorted(raw_prompt_sha_values),
+                    "selected_candidate_prompt_sha256": str(raw_selected_candidate.get("prompt_sha256") or ""),
+                    "selected_prompt_input_prompt_sha256": str(raw_selected_prompt_input.get("prompt_sha256") or ""),
+                    "structured_executor_inputs_selected_prompt_sha256": str((raw_handoff.get("structured_executor_inputs") or {}).get("selected_prompt_sha256") or ""),
+                },
+                indent=2,
+                ensure_ascii=True,
+                sort_keys=True,
+            ),
+        )
     from pipeline import higgsfield_lena_api_executor as executor
 
     handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
@@ -398,6 +455,7 @@ def issue_cycle_authorization(
     day = scope["date"]
     slot_id = scope["slot_id"]
     candidate_path = _ensure_path_within_root(scope["candidate_artifact_path"], ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates", code="candidate_path_escape", label="candidate artifact", must_exist=True)
+    candidate_path_text = _normalized_repo_path_text(str(handoff_report.get("selected_candidate_path") or raw_handoff.get("selected_candidate_path") or raw_selected_candidate.get("artifact_path") or raw_handoff.get("candidate_artifact_path") or ""))
     expected_output_directory = _ensure_path_within_root(
         Path(str(scope["expected_output_directory"])),
         ROOT / "pipeline" / "higgsfield_library" / "lena",
@@ -445,6 +503,9 @@ def issue_cycle_authorization(
             "candidate_artifact_path": str(candidate_path),
             "candidate_artifact_sha256": _sha256_file(candidate_path),
             "prompt_sha256": scope["prompt_sha256"],
+            "candidate_selection_binding": scope["candidate_selection_binding"],
+            "provider_execution_binding": scope["provider_execution_binding"],
+            "binding_linkage": scope["binding_linkage"],
             "expected_output_directory": str(expected_output_directory),
             "expected_output_stem": expected_output_stem,
             "allowed_output_extensions": allowed_output_extensions,
@@ -525,6 +586,9 @@ def issue_cycle_authorization(
                 "policy_artifact_sha256": policy_result["sha256"],
                 "candidate_artifact_path": str(candidate_path),
                 "candidate_artifact_sha256": _sha256_file(candidate_path),
+                "candidate_selection_binding": scope["candidate_selection_binding"],
+                "provider_execution_binding": scope["provider_execution_binding"],
+                "binding_linkage": scope["binding_linkage"],
                 "expected_output_directory": str(expected_output_directory),
                 "expected_output_stem": expected_output_stem,
                 "allowed_output_extensions": allowed_output_extensions,
@@ -561,6 +625,7 @@ def validate_cycle_authorization_artifact(
     *,
     policy_result: dict[str, Any] | None = None,
     handoff_report: dict[str, Any] | None = None,
+    allow_consumed: bool = False,
 ) -> dict[str, Any]:
     auth_path = _ensure_path_within_root(
         auth_path,
@@ -575,7 +640,12 @@ def validate_cycle_authorization_artifact(
     _require(auth.get("authorization_mode") == AUTHORIZATION_MODE, "authorization_mode_invalid", f"authorization_mode must be {AUTHORIZATION_MODE!r}")
     _require(auth.get("authorization_issuer") == AUTHORIZATION_ISSUER, "authorization_issuer_invalid", f"authorization_issuer must be {AUTHORIZATION_ISSUER!r}")
     _require(auth.get("single_use") is True, "authorization_single_use_invalid", "authorization must be single-use")
-    _require(auth.get("consumed") is False, "authorization_already_consumed", "authorization has already been consumed")
+    consumed = auth.get("consumed")
+    _require(
+        consumed is False or (allow_consumed and consumed is True),
+        "authorization_already_consumed",
+        "authorization has already been consumed",
+    )
     _require(auth.get("kill_switch_enabled") is True, "authorization_kill_switch_disabled", "kill switch must be enabled")
     _require(int(auth.get("provider_call_cap_per_cycle", 0)) == 1, "provider_call_cap_invalid", "provider call cap must be one")
     _require(int(auth.get("publish_action_cap_per_cycle", 0)) == 1, "publish_action_cap_invalid", "publish action cap must be one")
@@ -629,16 +699,30 @@ def validate_cycle_authorization_artifact(
         must_exist=False,
     )
     _authorized_output_paths(expected_output_directory, str(auth.get("expected_output_stem") or ""), allowed_output_extensions)
+    if handoff_report is not None and handoff_report.get("platform") is not None:
+        _require(
+            str(auth.get("platform") or "") == str(handoff_report.get("platform") or ""),
+            "platform_invalid",
+            "authorization platform must match handoff",
+        )
+    resolved_candidate_path = _ensure_path_within_root(
+        Path(str(auth.get("candidate_artifact_path") or "")),
+        ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+        code="candidate_path_escape",
+        label="candidate artifact",
+        must_exist=True,
+    )
     if handoff_report is not None:
         selected_candidate = handoff_report.get("selected_candidate")
         selected_candidate = selected_candidate if isinstance(selected_candidate, dict) else {}
         selected_prompt_input = handoff_report.get("selected_prompt_input")
         selected_prompt_input = selected_prompt_input if isinstance(selected_prompt_input, dict) else {}
         selected_candidate_path_value = str(handoff_report.get("selected_candidate_path") or selected_candidate.get("artifact_path") or "")
+        candidate_path_text = _normalized_repo_path_text(selected_candidate_path_value)
         selected_candidate_sha_value = str(handoff_report.get("selected_candidate_sha256") or selected_candidate.get("artifact_sha256") or "")
         selected_prompt_sha_value = str(handoff_report.get("prompt_sha256") or selected_prompt_input.get("prompt_sha256") or selected_candidate.get("prompt_sha256") or "")
         resolved_selected_candidate_path = _ensure_path_within_root(
-            Path(selected_candidate_path_value),
+            _path_from_repo_text(selected_candidate_path_value),
             ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
             code="candidate_path_escape",
             label="selected candidate artifact",
@@ -656,39 +740,71 @@ def validate_cycle_authorization_artifact(
             "handoff_sha_mismatch",
             "generation handoff SHA does not match the artifact bytes",
         )
-        resolved_candidate_path = _ensure_path_within_root(
-            Path(str(auth.get("candidate_artifact_path") or "")),
-            ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
-            code="candidate_path_escape",
-            label="candidate artifact",
-            must_exist=True,
-        )
         _require(
             str(auth.get("candidate_artifact_path") or "") == str(resolved_selected_candidate_path),
             "authorization_candidate_path_mismatch",
             "authorization candidate path does not match handoff",
         )
+    _require(
+        str(auth.get("candidate_artifact_sha256") or "") == _sha256_file(resolved_candidate_path),
+        "authorization_candidate_sha_mismatch",
+        "authorization candidate SHA does not match the artifact bytes",
+    )
+    candidate_selection_binding = auth.get("candidate_selection_binding")
+    provider_execution_binding = auth.get("provider_execution_binding")
+    binding_linkage = auth.get("binding_linkage")
+    _require(
+        isinstance(candidate_selection_binding, dict),
+        "authorization_candidate_selection_binding_missing",
+        "authorization candidate_selection_binding must be present",
+    )
+    _require(
+        isinstance(provider_execution_binding, dict),
+        "authorization_provider_execution_binding_missing",
+        "authorization provider_execution_binding must be present",
+    )
+    _require(
+        isinstance(binding_linkage, dict),
+        "authorization_binding_linkage_missing",
+        "authorization binding_linkage must be present",
+    )
+    resolved_candidate_path = _ensure_path_within_root(
+        Path(str(auth.get("candidate_artifact_path") or "")),
+        ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+        code="candidate_path_escape",
+        label="candidate artifact",
+        must_exist=True,
+    )
+    if handoff_report is not None:
+        selected_prompt_input = handoff_report.get("selected_prompt_input")
+        selected_prompt_input = selected_prompt_input if isinstance(selected_prompt_input, dict) else {}
+        structured = handoff_report.get("structured_executor_inputs")
+        structured = structured if isinstance(structured, dict) else {}
         _require(
-            str(auth.get("candidate_artifact_sha256") or "") == _sha256_file(resolved_candidate_path),
-            "authorization_candidate_sha_mismatch",
-            "authorization candidate SHA does not match the artifact bytes",
+            provider_execution_binding.get("content_packet_artifact_path") == str(handoff_report.get("selected_prompt_input_artifact_path") or selected_prompt_input.get("artifact_path") or ""),
+            "authorization_provider_execution_path_mismatch",
+            "authorization provider_execution_binding path does not match handoff",
         )
-        binding_error = _handoff_cross_field_binding_split_brain_error(
-            slot_id=str(handoff_report.get("selected_slot_id") or ""),
-            candidate_id=str(selected_candidate.get("candidate_id") or ""),
-            source_selected_candidate_artifact_path=str(resolved_selected_candidate_path),
-            source_selected_candidate_artifact_sha256=_sha256_file(resolved_selected_candidate_path),
-            selected_candidate_prompt_sha256=str(selected_candidate.get("prompt_sha256") or ""),
-            selected_prompt_input_prompt_sha256=str(selected_prompt_input.get("prompt_sha256") or ""),
-            structured_executor_inputs_selected_prompt_sha256=str(
-                (handoff_report.get("structured_executor_inputs") or {}).get("selected_prompt_sha256") or ""
-            ),
-            selected_candidate_lane=str(selected_candidate.get("lane") or ""),
-            selected_prompt_input_lane=str(selected_prompt_input.get("lane") or ""),
+        _require(
+            provider_execution_binding.get("provider_prompt_sha256") == str(selected_prompt_input.get("prompt_sha256") or ""),
+            "authorization_provider_execution_prompt_sha_mismatch",
+            "authorization provider_execution_binding prompt SHA does not match handoff",
         )
-        if binding_error is not None:
-            code, detail = binding_error
-            _require(False, code, detail)
+        _require(
+            provider_execution_binding.get("provider_prompt_sha256") == str(structured.get("selected_prompt_sha256") or ""),
+            "authorization_provider_execution_prompt_sha_mismatch",
+            "authorization provider_execution_binding prompt SHA does not match handoff",
+        )
+        _require(
+            _normalized_repo_path_text(str(handoff_report.get("prompt_sha256") or "")) == str(provider_execution_binding.get("provider_prompt_sha256") or ""),
+            "authorization_provider_execution_prompt_sha_mismatch",
+            "authorization provider_execution_binding prompt SHA does not match handoff",
+        )
+        _require(
+            provider_execution_binding.get("provider_lane") == str(selected_prompt_input.get("lane") or ""),
+            "authorization_provider_execution_lane_mismatch",
+            "authorization provider_execution_binding lane does not match handoff",
+        )
         _require(str(auth.get("date") or "") == str(handoff_report.get("date") or ""), "authorization_date_mismatch", "authorization date does not match handoff")
         _require(str(auth.get("slot_id") or "") == str(handoff_report.get("selected_slot_id") or ""), "authorization_slot_mismatch", "authorization slot_id does not match handoff")
         _require(str(auth.get("candidate_id") or "") == str(selected_candidate.get("candidate_id") or ""), "authorization_candidate_mismatch", "authorization candidate_id does not match handoff")

@@ -6,6 +6,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -34,6 +35,8 @@ REVIEWED_LANE_BINDING_ALIASES = {
     "readypack lane": {"parking_garage_flash"},
     "parking_garage_flash": {"readypack lane"},
 }
+PROMPT_FAMILY_CANDIDATE_SELECTION = "prompt_library_candidate"
+PROMPT_FAMILY_PROVIDER_EXECUTION = "compact_provider_prompt"
 
 
 class HandoffBuildError(SystemExit):
@@ -181,6 +184,7 @@ def _handoff_cross_field_binding_split_brain_error(
     structured_executor_inputs_selected_prompt_sha256: str,
     selected_candidate_lane: str,
     selected_prompt_input_lane: str,
+    dual_binding_contract: dict[str, Any] | None = None,
 ) -> tuple[str, str] | None:
     binding_context = {
         "slot_id": slot_id,
@@ -193,6 +197,90 @@ def _handoff_cross_field_binding_split_brain_error(
         "selected_candidate_lane": selected_candidate_lane,
         "selected_prompt_input_lane": selected_prompt_input_lane,
     }
+    if isinstance(dual_binding_contract, dict):
+        binding_context["dual_binding_contract"] = dual_binding_contract
+        candidate_binding = dual_binding_contract.get("candidate_selection_binding")
+        provider_binding = dual_binding_contract.get("provider_execution_binding")
+        linkage = dual_binding_contract.get("binding_linkage")
+        if not isinstance(candidate_binding, dict) or not isinstance(provider_binding, dict) or not isinstance(linkage, dict):
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+
+        required_candidate_keys = (
+            "selected_candidate_artifact_path",
+            "selected_candidate_artifact_sha256",
+            "candidate_id",
+            "slot_id",
+            "recipe_id",
+            "candidate_prompt_sha256",
+            "candidate_lane",
+            "source_prompt_family",
+        )
+        required_provider_keys = (
+            "content_packet_artifact_path",
+            "content_packet_artifact_sha256",
+            "recipe_id",
+            "slot_id",
+            "provider_prompt_sha256",
+            "provider_lane",
+            "source_prompt_family",
+            "provider",
+        )
+        required_linkage_keys = (
+            "recommendation_artifact_path",
+            "recommendation_artifact_sha256",
+            "queue_artifact_path",
+            "queue_artifact_sha256",
+            "selected_candidate_artifact_path",
+            "selected_candidate_artifact_sha256",
+            "content_packet_artifact_path",
+            "content_packet_artifact_sha256",
+            "recipe_id",
+            "slot_id",
+            "candidate_id",
+            "outfit_id",
+            "environment_id",
+            "candidate_lane",
+            "provider_lane",
+            "candidate_prompt_family",
+            "provider_prompt_family",
+            "prompt_family_relationship",
+        )
+        if any(not str(candidate_binding.get(key, "")).strip() for key in required_candidate_keys):
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if any(not str(provider_binding.get(key, "")).strip() for key in required_provider_keys):
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if any(not str(linkage.get(key, "")).strip() for key in required_linkage_keys):
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+
+        if candidate_binding.get("selected_candidate_artifact_path") != binding_context["source_selected_candidate_artifact_path"]:
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if candidate_binding.get("selected_candidate_artifact_sha256") != binding_context["source_selected_candidate_artifact_sha256"]:
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if provider_binding.get("content_packet_artifact_path") != linkage.get("content_packet_artifact_path"):
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if provider_binding.get("content_packet_artifact_sha256") != linkage.get("content_packet_artifact_sha256"):
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if candidate_binding.get("candidate_lane") != linkage.get("candidate_lane") or provider_binding.get("provider_lane") != linkage.get("provider_lane"):
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if candidate_binding.get("candidate_id") != candidate_id or candidate_binding.get("slot_id") != slot_id:
+            return "handoff_dual_binding_slot_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if linkage.get("candidate_id") != candidate_id:
+            return "handoff_dual_binding_slot_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if candidate_binding.get("recipe_id") != linkage.get("recipe_id") or provider_binding.get("recipe_id") != linkage.get("recipe_id"):
+            return "handoff_dual_binding_recipe_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if provider_binding.get("slot_id") != linkage.get("slot_id") or candidate_binding.get("slot_id") != linkage.get("slot_id"):
+            return "handoff_dual_binding_slot_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if linkage.get("selected_candidate_artifact_path") != candidate_binding.get("selected_candidate_artifact_path"):
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if linkage.get("selected_candidate_artifact_sha256") != candidate_binding.get("selected_candidate_artifact_sha256"):
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if linkage.get("content_packet_artifact_sha256") != provider_binding.get("content_packet_artifact_sha256"):
+            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if linkage.get("candidate_prompt_family") != PROMPT_FAMILY_CANDIDATE_SELECTION or linkage.get("provider_prompt_family") != PROMPT_FAMILY_PROVIDER_EXECUTION:
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        if candidate_binding.get("source_prompt_family") != PROMPT_FAMILY_CANDIDATE_SELECTION or provider_binding.get("source_prompt_family") != PROMPT_FAMILY_PROVIDER_EXECUTION:
+            return "handoff_dual_binding_linkage_missing", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+        return None
     prompt_values = {
         value
         for value in (
@@ -424,6 +512,47 @@ def build_handoff(
     packet = load_content_packet_report(packet_path, date_str, recipe_id)
     prompt_text = str(packet.get("compact_provider_prompt_preview", "")).strip()
     prompt_sha256 = str(packet.get("compact_provider_prompt_sha256", "")).strip() or sha256_bytes(prompt_text.encode("utf-8"))
+    candidate_selection_binding = {
+        "selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
+        "selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
+        "candidate_id": selected_candidate_id,
+        "slot_id": selected_candidate_slot_id,
+        "recipe_id": selected_candidate_recipe_id,
+        "candidate_prompt_sha256": selected_candidate_prompt_sha256,
+        "candidate_lane": str(selected_candidate_body.get("lane", "")).strip(),
+        "source_prompt_family": PROMPT_FAMILY_CANDIDATE_SELECTION,
+    }
+    provider_execution_binding = {
+        "content_packet_artifact_path": repo_relative_path(packet_path),
+        "content_packet_artifact_sha256": sha256_file(packet_path),
+        "recipe_id": recipe_id,
+        "slot_id": slot_id,
+        "provider_prompt_sha256": prompt_sha256,
+        "provider_lane": str(packet.get("scene_type", "")).strip(),
+        "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
+        "provider": PROVIDER,
+        "model": MODEL,
+    }
+    binding_linkage = {
+        "recommendation_artifact_path": repo_relative_path(recommendation_path),
+        "recommendation_artifact_sha256": sha256_file(recommendation_path),
+        "queue_artifact_path": repo_relative_path(queue_path),
+        "queue_artifact_sha256": sha256_file(queue_path),
+        "selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
+        "selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
+        "content_packet_artifact_path": repo_relative_path(packet_path),
+        "content_packet_artifact_sha256": sha256_file(packet_path),
+        "recipe_id": recipe_id,
+        "slot_id": slot_id,
+        "candidate_id": selected_candidate_id,
+        "outfit_id": str(packet.get("wardrobe_outfit_id", "")).strip(),
+        "environment_id": str(packet.get("environment_id", "")).strip(),
+        "candidate_lane": str(selected_candidate_body.get("lane", "")).strip(),
+        "provider_lane": str(packet.get("scene_type", "")).strip(),
+        "candidate_prompt_family": PROMPT_FAMILY_CANDIDATE_SELECTION,
+        "provider_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
+        "prompt_family_relationship": "candidate prompt family and provider prompt family are intentionally distinct for the same recipe/slot chain",
+    }
 
     split_brain_error = _handoff_cross_field_binding_split_brain_error(
         slot_id=slot_id,
@@ -435,6 +564,11 @@ def build_handoff(
         structured_executor_inputs_selected_prompt_sha256=prompt_sha256,
         selected_candidate_lane=str(selected_candidate_body.get("lane", "")).strip(),
         selected_prompt_input_lane=str(packet.get("scene_type", "")).strip(),
+        dual_binding_contract={
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
+        },
     )
     if split_brain_error is not None:
         code, detail = split_brain_error
@@ -487,9 +621,11 @@ def build_handoff(
             "slot_id": selected_candidate_slot_id,
             "recipe_id": selected_candidate_recipe_id,
             "prompt_sha256": selected_candidate_prompt_sha256,
+            "source_prompt_family": PROMPT_FAMILY_CANDIDATE_SELECTION,
             "schema_version": selected_candidate.get("schema_version", ""),
             "candidate_status": selected_candidate.get("candidate_status", ""),
         },
+        "candidate_selection_binding": candidate_selection_binding,
         "selected_lane": packet.get("scene_type", ""),
         "selected_hook_id": selected_candidate_hook_id,
         "selected_hook_text": packet.get("hook_text", ""),
@@ -559,6 +695,7 @@ def build_handoff(
             "hook_text": packet.get("hook_text", ""),
             "caption_seed": packet.get("caption_draft", ""),
             "activity": packet.get("high_caliber_source_sections", {}).get("subject_pose", ""),
+            "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
             "concept_summary": " | ".join(
                 part
                 for part in (
@@ -593,6 +730,7 @@ def build_handoff(
             "selected_prompt_text": prompt_text,
             "selected_prompt_text_status": "available",
             "selected_prompt_text_available": True,
+            "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
             "handoff_artifact_path": handoff_json_rel_path,
             "handoff_markdown_path": handoff_md_rel_path,
             "expected_image_path": repo_relative_path(
@@ -648,6 +786,8 @@ def build_handoff(
                 reconciliation_provenance["decision"]["next_allowed_action"] if reconciliation_provenance["decision"] else None
             ),
         },
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "source_recommendation": {
             "action_type": recommendation_body.get("action_type", ""),
             "recommended_recipe_id": recommendation_body.get("recommended_recipe_id", ""),
@@ -705,6 +845,9 @@ def build_handoff(
             "queue_artifact_valid": True,
             "selected_candidate_valid": True,
             "selected_prompt_input_valid": True,
+            "candidate_selection_binding_valid": True,
+            "provider_execution_binding_valid": True,
+            "binding_linkage_valid": True,
             "queue_head_matches_recommendation": True,
             "selected_prompt_input_matches_queue_head": True,
             "selected_prompt_input_matches_repo_executor": True,

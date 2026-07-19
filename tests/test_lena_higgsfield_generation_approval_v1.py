@@ -381,6 +381,10 @@ def test_inspect_handoff_artifact_extracts_expected_facts(tmp_path: Path, monkey
     assert facts["selected_candidate_slot_id"] == SLOT_ID
     assert facts["selected_candidate_recipe_id"] == "hcr_011"
     assert facts["selected_candidate_prompt_sha256"] == PROMPT_SHA
+    assert facts["provider_execution_binding"]["provider_prompt_sha256"] == PROMPT_SHA
+    assert facts["provider_execution_binding"]["provider_lane"] == "parking_garage_flash"
+    assert facts["binding_linkage"]["candidate_prompt_family"] == "prompt_library_candidate"
+    assert facts["binding_linkage"]["provider_prompt_family"] == "compact_provider_prompt"
 
 
 # --- build + validate round trip ---------------------------------------------

@@ -249,7 +249,7 @@ def run_recovery(
     else:
         cycle._write_json_atomic(paths["attestation"], attestation)
     attestation_sha = cycle._sha256_file(paths["attestation"])
-    qa_artifact = qa_evaluator(decision_path=candidate_path, manifest_path=paths["manifest"], image_path=paths["image"], identity_evidence_path=identity_path, reference_specs=reference_specs, reference_authority_artifact=reference_authority_path, reference_authority_sha256=reference_authority_sha, expected_image_sha256=contract.image_sha256)
+    qa_artifact = qa_evaluator(decision_path=paths["authorization"], manifest_path=paths["manifest"], image_path=paths["image"], identity_evidence_path=identity_path, reference_specs=reference_specs, reference_authority_artifact=reference_authority_path, reference_authority_sha256=reference_authority_sha, expected_image_sha256=contract.image_sha256)
     qa_artifact, expected_qa_path = _bound_recovery_qa_disposition_artifact(
         qa_artifact,
         contract=contract,

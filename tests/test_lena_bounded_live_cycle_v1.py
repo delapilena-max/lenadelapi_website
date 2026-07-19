@@ -181,11 +181,12 @@ def _build_bundle(
         "date": date_str,
         "selected_slot_id": slot_id,
         "selected_recipe_id": RECIPE_ID,
-        "selected_candidate_path": str(candidate_path),
+        "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
         "selected_candidate_sha256": _sha(candidate_path),
         "selected_candidate": candidate,
         "prompt_sha256": PROMPT_SHA,
         "custom_reference_id": CUSTOM_REFERENCE_ID,
+        "platform": platform,
         "live_execution_authorized": False,
         "generation_approval_required": True,
         "manual_operator_approval_required": True,
@@ -200,9 +201,10 @@ def _build_bundle(
             "date": date_str,
             "selected_slot_id": slot_id,
             "selected_recipe_id": RECIPE_ID,
-            "selected_candidate_path": str(candidate_path),
+            "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
             "selected_candidate_sha256": _sha(candidate_path),
             "prompt_sha256": PROMPT_SHA,
+            "selected_prompt_sha256": PROMPT_SHA,
             "expected_output_directory": (Path("pipeline") / "higgsfield_library" / "lena" / date_str).as_posix(),
             "expected_output_stem": f"{slot_id}_seed",
             "allowed_output_extensions": list(approval.ALLOWED_OUTPUT_EXTENSIONS),
@@ -248,6 +250,80 @@ def _build_bundle(
     recommendation_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_next_generation_step_{date_str}.json"
     learning_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_post_outcome_learning_state_{date_str}.json"
     queue_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_autonomous_generation_queue_dryrun_{date_str}.json"
+
+    candidate_selection_binding = {
+        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
+        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "candidate_id": candidate["candidate_id"],
+        "slot_id": slot_id,
+        "recipe_id": RECIPE_ID,
+        "candidate_prompt_sha256": PROMPT_SHA,
+        "candidate_lane": candidate["lane"],
+        "source_prompt_family": "prompt_library_candidate",
+    }
+    provider_execution_binding = {
+        "content_packet_artifact_path": packet_repo_path.as_posix(),
+        "content_packet_artifact_sha256": _sha(packet_path),
+        "recipe_id": RECIPE_ID,
+        "slot_id": slot_id,
+        "provider_prompt_sha256": PROMPT_SHA,
+        "provider_lane": packet["lane"],
+        "source_prompt_family": "compact_provider_prompt",
+        "provider": "higgsfield",
+        "model": "text2image_soul_v2",
+    }
+    binding_linkage = {
+        "recommendation_artifact_path": recommendation_path.relative_to(tmp_path).as_posix(),
+        "recommendation_artifact_sha256": "",
+        "queue_artifact_path": queue_path.relative_to(tmp_path).as_posix(),
+        "queue_artifact_sha256": "",
+        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
+        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "content_packet_artifact_path": packet_repo_path.as_posix(),
+        "content_packet_artifact_sha256": _sha(packet_path),
+        "recipe_id": RECIPE_ID,
+        "slot_id": slot_id,
+        "candidate_id": candidate["candidate_id"],
+        "outfit_id": "wc_p059",
+        "environment_id": "env_p001",
+        "candidate_lane": candidate["lane"],
+        "provider_lane": packet["lane"],
+        "candidate_prompt_family": "prompt_library_candidate",
+        "provider_prompt_family": "compact_provider_prompt",
+        "prompt_family_relationship": "candidate prompt family and provider prompt family are intentionally distinct for the same recipe/slot chain",
+    }
+    selected_prompt_input = {
+        "artifact_path": packet_repo_path.as_posix(),
+        "artifact_sha256": _sha(packet_path),
+        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
+        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "artifact_report_type": packet["report_type"],
+        "packet_id": packet["packet_id"],
+        "prompt_sha256": PROMPT_SHA,
+        "prompt_text": packet["compact_provider_prompt_preview"],
+        "prompt_text_status": "available",
+        "prompt_text_available": True,
+        "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
+        "lane": packet["lane"],
+        "recipe_id": RECIPE_ID,
+        "hook_id": HOOK_ID,
+        "hook_text": packet["hook_text"],
+        "caption_seed": CAPTION,
+        "activity": "leaning against the elevator wall before heading up",
+        "source_prompt_family": "compact_provider_prompt",
+        "concept_summary": "parking_garage_flash | leaning against the elevator wall before heading up | warm lobby spill and realistic night shadow falloff",
+    }
+    handoff.update(
+        {
+            "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
+            "selected_prompt_input_artifact_sha256": _sha(packet_path),
+            "selected_prompt_input": selected_prompt_input,
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
+        }
+    )
+    _write_json(handoff_path, handoff)
     recommendation = {
         "report_type": "lena_next_generation_step",
         "version": "v1",
@@ -300,6 +376,11 @@ def _build_bundle(
     _write_json(learning_path, learning)
     _write_json(queue_path, queue)
 
+    binding_linkage["recommendation_artifact_sha256"] = _sha(recommendation_path)
+    binding_linkage["queue_artifact_sha256"] = _sha(queue_path)
+    handoff["binding_linkage"] = binding_linkage
+    _write_json(handoff_path, handoff)
+
     def fake_validate_handoff_packet(handoff_file: Path):
         assert handoff_file.resolve() == handoff_path.resolve()
         report = {
@@ -322,9 +403,12 @@ def _build_bundle(
             "date": date_str,
             "selected_slot_id": slot_id,
             "selected_recipe_id": RECIPE_ID,
-            "selected_candidate_path": str(candidate_path),
+            "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
             "selected_candidate_sha256": _sha(candidate_path),
             "selected_candidate": candidate,
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
             "platform": platform,
             "expected_output_directory": (Path("pipeline") / "higgsfield_library" / "lena" / date_str).as_posix(),
             "expected_output_stem": f"{slot_id}_seed",
@@ -338,6 +422,8 @@ def _build_bundle(
                 "caption_seed": packet["caption_draft"],
                 "prompt_sha256": PROMPT_SHA,
                 "artifact_path": packet_repo_path.as_posix(),
+                "lane": packet["lane"],
+                "recipe_id": RECIPE_ID,
                 "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
             },
             "source_recommendation_artifact_path": (Path("pipeline/strategy/lena/next_actions") / date_str / f"lena_next_generation_step_{date_str}.json").as_posix(),

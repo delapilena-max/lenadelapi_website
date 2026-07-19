@@ -174,15 +174,23 @@ def _validate_authorization_artifact(auth_path: Path, *, simulate: bool) -> dict
         label="generation handoff artifact",
         must_exist=True,
     )
+    if handoff_report := standing_autonomy._read_json_object(
+        handoff_path,
+        code="handoff_missing_or_invalid",
+        label="generation handoff artifact",
+    ):
+        if handoff_report.get("platform") is not None:
+            _require(
+                str(auth_json.get("platform") or "") == str(handoff_report.get("platform") or ""),
+                "platform_invalid",
+                "authorization platform must match handoff",
+            )
     try:
-        handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
         auth_result = standing_autonomy.validate_cycle_authorization_artifact(
             auth_path,
             policy_result=policy_result,
             handoff_report=handoff_report,
         )
-    except executor.HandoffArtifactError as exc:
-        raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
     except standing_autonomy.StandingAutonomyPolicyError as exc:
         raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
     auth = auth_result["artifact"]
@@ -212,9 +220,6 @@ def _validate_authorization_artifact(auth_path: Path, *, simulate: bool) -> dict
         "path": handoff_path.resolve(),
         "sha256": standing_autonomy._sha256_file(handoff_path),
         "report": handoff_report,
-        "source": source,
-        "packet_validation": packet_validation,
-        "validation": validation,
     }
     auth_result["policy"] = policy_result
     auth_result["pre_consumption_sha256"] = _sha256_file(auth_path)
@@ -1120,9 +1125,6 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         "slot_id": str(auth_data["slot_id"]),
         "recipe_id": str(auth["handoff"]["report"].get("selected_recipe_id") or auth_data.get("recipe_id") or ""),
         "handoff_report": auth["handoff"]["report"],
-        "source": auth["handoff"]["source"],
-        "packet_validation": auth["handoff"]["packet_validation"],
-        "validation": auth["handoff"]["validation"],
         "approval_result": approval_result,
         "claim_path": approval.claim_output_path(day, str(auth_data["slot_id"])),
         "receipt_path": approval.receipt_output_path(day, str(auth_data["slot_id"])),
@@ -1218,7 +1220,7 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     )
     reference_authority_path, reference_authority_sha256, reference_specs = _load_reference_specs()
     qa_artifact = photo_qa.evaluate_photo_qa_disposition(
-        decision_path=live_requirements["candidate_path"],
+        decision_path=auth["path"],
         manifest_path=manifest_path,
         image_path=generated_image_path,
         identity_evidence_path=identity_evidence_path,
