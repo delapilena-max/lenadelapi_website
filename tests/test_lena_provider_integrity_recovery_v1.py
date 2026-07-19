@@ -18,7 +18,7 @@ DATE = "2026-07-17"
 SLOT = "lenagate202607176924dc10-pack000-00-photo"
 JOB = "97cc0b2f-5360-45db-943b-a7a146ca3590"
 ORIGINAL_AUTH_SHA = "a" * 64
-FIXED_IDENTITY_UTC = "2026-07-19T05:00:00+00:00"
+SEEDED_IDENTITY_UTC = "2001-01-01T00:00:00+00:00"
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -40,7 +40,6 @@ def _build_recovery_bundle(
     monkeypatch.setattr(cycle, "ROOT", tmp_path)
     monkeypatch.setattr(photo_qa, "OUTPUT_ROOT", tmp_path / "pipeline" / "asset_review" / "lena")
     monkeypatch.setattr(identity, "HIGGSFIELD_DEBUG_ROOT", tmp_path / "pipeline" / "higgsfield_debug")
-    monkeypatch.setattr(identity, "_utc_now", lambda: FIXED_IDENTITY_UTC)
     report_root = tmp_path / "reports"
 
     auth_path = tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles" / DATE / f"lena_bounded_live_cycle_authorization_{DATE}_{SLOT}.json"
@@ -90,6 +89,9 @@ def _build_recovery_bundle(
             image_sha256=_sha(image_path),
             identity_evidence_path=paths["identity"],
         )
+        identity_record = json.loads(paths["identity"].read_text(encoding="utf-8"))
+        identity_record["verified_at_utc"] = SEEDED_IDENTITY_UTC
+        _write_json(paths["identity"], identity_record)
         _write_json(
             paths["attestation"],
             {
@@ -158,6 +160,7 @@ def test_valid_recovery_skips_provider_and_reaches_one_publish(tmp_path: Path, m
     assert report["retries_performed"] == 0
     assert state == {"provider": 0, "qa": 1, "publish": 1}
     assert paths["identity"].read_bytes() == identity_before
+    assert json.loads(paths["identity"].read_text(encoding="utf-8"))["verified_at_utc"] == SEEDED_IDENTITY_UTC
     attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
     assert attestation["original_provider_receipt_sha256"] == contract.receipt_sha256
     assert attestation["manifest_sha256"] == contract.manifest_sha256
@@ -254,5 +257,5 @@ def test_recovery_rejects_mismatched_partial_identity_evidence(tmp_path: Path, m
     _write_json(paths["identity"], identity_record)
     with pytest.raises(cycle.LenaBoundedLiveCycleError) as exc:
         _run_valid(contract, paths, state)
-    assert exc.value.code == "identity_evidence_already_exists"
+    assert exc.value.code == "recovery_identity_evidence_mismatch"
     assert state == {"provider": 0, "qa": 0, "publish": 0}
