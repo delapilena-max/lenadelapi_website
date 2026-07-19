@@ -1,0 +1,34 @@
+{
+  "report_type": "lena_standing_autonomy_policy",
+  "schema_version": "v1",
+  "policy_id": "lena_standing_autonomy_policy_v1",
+  "policy_version": "v1",
+  "autonomy_enabled": true,
+  "live_generation_enabled": true,
+  "live_publishing_enabled": true,
+  "kill_switch_enabled": true,
+  "allowed_provider": "Higgsfield",
+  "allowed_model": "text2image_soul_v2",
+  "allowed_soul": "Lena",
+  "allowed_platforms": [
+    "Instagram Feed",
+    "Facebook Page"
+  ],
+  "provider_call_cap_per_cycle": 1,
+  "publish_action_cap_per_cycle": 1,
+  "retry_cap_per_cycle": 0,
+  "maximum_cycles_per_day": 1,
+  "maximum_provider_calls_per_day": 1,
+  "maximum_publish_actions_per_day": 1,
+  "daily_spend_ceiling": 1,
+  "spend_unit": "provider_credits",
+  "allowed_media_types": [
+    "photo"
+  ],
+  "duplicate_content_rejection_enabled": true,
+  "qa_required": true,
+  "identity_verification_required": true,
+  "analytics_triggered_regeneration_disabled": true,
+  "effective_at_utc": "2026-07-18T00:00:00Z",
+  "expires_at_utc": "2026-07-19T00:00:00Z"
+}
