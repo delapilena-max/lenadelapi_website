@@ -87,6 +87,58 @@ def _assert_no_prior_downstream_evidence(paths: dict[str, Path], contract: Recov
                 raise cycle.LenaBoundedLiveCycleError("recovery_completed_aggregate_exists", "a completed aggregate receipt already exists")
 
 
+def _bound_recovery_qa_disposition_artifact(
+    qa_artifact: dict[str, Any],
+    *,
+    contract: RecoveryContract,
+    paths: dict[str, Path],
+    authorization: dict[str, Any],
+    identity_sha256: str,
+    attestation_sha256: str,
+) -> tuple[dict[str, Any], Path]:
+    if not isinstance(qa_artifact, dict):
+        raise cycle.LenaBoundedLiveCycleError("recovery_qa_disposition_invalid", "QA disposition artifact must be a JSON object")
+
+    def _require_or_bind(container: dict[str, Any], key: str, expected: Any, *, label: str) -> None:
+        actual = container.get(key)
+        if actual not in (None, "", expected):
+            raise cycle.LenaBoundedLiveCycleError(
+                "recovery_qa_disposition_binding_mismatch",
+                f"{label} does not match the recovery binding",
+            )
+        container[key] = expected
+
+    bound = json.loads(json.dumps(qa_artifact))
+    _require_or_bind(bound, "schema_version", photo_qa.SCHEMA_VERSION, label="schema_version")
+    _require_or_bind(bound, "influencer_id", "lena", label="influencer_id")
+    _require_or_bind(bound, "slot_id", contract.slot_id, label="slot_id")
+    _require_or_bind(bound, "image_sha256", contract.image_sha256, label="image_sha256")
+    _require_or_bind(bound, "candidate_id", authorization.get("candidate_id"), label="candidate_id")
+
+    provenance = bound.get("generation_provenance")
+    if provenance is None:
+        provenance = {}
+    elif not isinstance(provenance, dict):
+        raise cycle.LenaBoundedLiveCycleError("recovery_qa_disposition_invalid", "generation_provenance must be a JSON object")
+    else:
+        provenance = dict(provenance)
+
+    _require_or_bind(provenance, "date", contract.date, label="generation_provenance.date")
+    _require_or_bind(provenance, "provider_job_id", contract.provider_job_id, label="generation_provenance.provider_job_id")
+    _require_or_bind(provenance, "manifest_path", cycle._repo_relative(paths["manifest"]), label="generation_provenance.manifest_path")
+    _require_or_bind(provenance, "manifest_sha256", contract.manifest_sha256, label="generation_provenance.manifest_sha256")
+    _require_or_bind(provenance, "generated_image_path", cycle._repo_relative(paths["image"]), label="generation_provenance.generated_image_path")
+    _require_or_bind(provenance, "generated_image_sha256", contract.image_sha256, label="generation_provenance.generated_image_sha256")
+    _require_or_bind(provenance, "recovery_attestation_path", cycle._repo_relative(paths["attestation"]), label="generation_provenance.recovery_attestation_path")
+    _require_or_bind(provenance, "recovery_attestation_sha256", attestation_sha256, label="generation_provenance.recovery_attestation_sha256")
+    _require_or_bind(provenance, "identity_evidence_path", cycle._repo_relative(paths["identity"]), label="generation_provenance.identity_evidence_path")
+    _require_or_bind(provenance, "identity_evidence_sha256", identity_sha256, label="generation_provenance.identity_evidence_sha256")
+    bound["generation_provenance"] = provenance
+
+    disposition_path = photo_qa.disposition_artifact_path(bound, photo_qa.OUTPUT_ROOT)
+    return bound, disposition_path
+
+
 def _validate_recovery_evidence(contract: RecoveryContract, report_root: Path) -> dict[str, Any]:
     paths = _paths(contract, report_root)
     authorization = _load_bound_json(paths["authorization"], contract.authorization_sha256, "authorization")
@@ -198,7 +250,16 @@ def run_recovery(
         cycle._write_json_atomic(paths["attestation"], attestation)
     attestation_sha = cycle._sha256_file(paths["attestation"])
     qa_artifact = qa_evaluator(decision_path=candidate_path, manifest_path=paths["manifest"], image_path=paths["image"], identity_evidence_path=identity_path, reference_specs=reference_specs, reference_authority_artifact=reference_authority_path, reference_authority_sha256=reference_authority_sha, expected_image_sha256=contract.image_sha256)
+    qa_artifact, expected_qa_path = _bound_recovery_qa_disposition_artifact(
+        qa_artifact,
+        contract=contract,
+        paths=paths,
+        authorization=authorization,
+        identity_sha256=cycle._sha256_file(identity_path),
+        attestation_sha256=attestation_sha,
+    )
     qa_path, qa_record, _ = qa_writer(qa_artifact)
+    cycle._require(qa_path.resolve() == expected_qa_path.resolve(), "recovery_qa_disposition_path_mismatch", "QA disposition path does not match the bound recovery artifact")
     cycle._require(str(qa_record.get("disposition") or "") == "accept", "qa_rejected", "photo QA did not accept the generated image")
     cycle._require(str(qa_record.get("overall") or "pass") in {"pass", "approved"}, "qa_overall_invalid", "photo QA artifact did not pass overall")
 
