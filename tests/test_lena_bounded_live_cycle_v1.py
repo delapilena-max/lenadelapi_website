@@ -1183,6 +1183,40 @@ def test_live_binding_mismatches_fail_closed(tmp_path: Path, monkeypatch: pytest
     assert json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))["consumed"] is False
 
 
+def test_issue_cycle_authorization_rejects_split_brain_handoff(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch)
+    auth_path = Path(bundle["auth_path"])
+    auth_path.unlink()
+
+    handoff_path = Path(bundle["handoff_path"])
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff["structured_executor_inputs"]["selected_prompt_sha256"] = "f" * 64
+    handoff["structured_executor_inputs"]["selected_prompt_text"] = "split-brain prompt"
+    handoff["prompt_sha256"] = "f" * 64
+    _write_json(handoff_path, handoff)
+
+    provider_calls = {"count": 0}
+
+    def fail_if_called(*args, **kwargs):
+        provider_calls["count"] += 1
+        raise AssertionError("provider executor should not be called")
+
+    monkeypatch.setattr(higgsfield_executor, "execute_approved_handoff_live_generation", fail_if_called)
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.issue_cycle_authorization(
+            Path(bundle["policy_path"]),
+            handoff_path,
+            auth_root=tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles",
+            report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+        )
+    assert exc_info.value.code == "handoff_prompt_binding_split_brain"
+    assert provider_calls["count"] == 0
+    assert not auth_path.exists()
+
+
 def test_live_report_path_symlink_escape_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_roots(monkeypatch, tmp_path)
     _patch_clock(monkeypatch)

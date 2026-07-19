@@ -30,6 +30,10 @@ NEGATIVE_PROMPT_ENABLED = False
 DEFAULT_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 SOUL_NAME = "Lena"
 SOUL_TYPE = "Soul 2.0"
+REVIEWED_LANE_BINDING_ALIASES = {
+    "readypack lane": {"parking_garage_flash"},
+    "parking_garage_flash": {"readypack lane"},
+}
 
 
 class HandoffBuildError(SystemExit):
@@ -164,6 +168,48 @@ def handoff_executor_argv(handoff_artifact_path: str, *, live: bool = False) -> 
 def _require(condition: bool, code: str, message: str) -> None:
     if not condition:
         raise HandoffBuildError(f"[ABORT] {code}: {message}")
+
+
+def _handoff_cross_field_binding_split_brain_error(
+    *,
+    slot_id: str,
+    candidate_id: str,
+    source_selected_candidate_artifact_path: str,
+    source_selected_candidate_artifact_sha256: str,
+    selected_candidate_prompt_sha256: str,
+    selected_prompt_input_prompt_sha256: str,
+    structured_executor_inputs_selected_prompt_sha256: str,
+    selected_candidate_lane: str,
+    selected_prompt_input_lane: str,
+) -> tuple[str, str] | None:
+    binding_context = {
+        "slot_id": slot_id,
+        "candidate_id": candidate_id,
+        "source_selected_candidate_artifact_path": source_selected_candidate_artifact_path,
+        "source_selected_candidate_artifact_sha256": source_selected_candidate_artifact_sha256,
+        "selected_candidate_prompt_sha256": selected_candidate_prompt_sha256,
+        "selected_prompt_input_prompt_sha256": selected_prompt_input_prompt_sha256,
+        "structured_executor_inputs_selected_prompt_sha256": structured_executor_inputs_selected_prompt_sha256,
+        "selected_candidate_lane": selected_candidate_lane,
+        "selected_prompt_input_lane": selected_prompt_input_lane,
+    }
+    prompt_values = {
+        value
+        for value in (
+            selected_candidate_prompt_sha256,
+            selected_prompt_input_prompt_sha256,
+            structured_executor_inputs_selected_prompt_sha256,
+        )
+        if value
+    }
+    if len(prompt_values) > 1:
+        return "handoff_prompt_binding_split_brain", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+    candidate_lane = selected_candidate_lane.strip()
+    prompt_input_lane = selected_prompt_input_lane.strip()
+    if candidate_lane and prompt_input_lane:
+        if candidate_lane != prompt_input_lane and prompt_input_lane not in REVIEWED_LANE_BINDING_ALIASES.get(candidate_lane, set()):
+            return "handoff_lane_binding_split_brain", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
+    return None
 
 
 def load_report(
@@ -378,6 +424,21 @@ def build_handoff(
     packet = load_content_packet_report(packet_path, date_str, recipe_id)
     prompt_text = str(packet.get("compact_provider_prompt_preview", "")).strip()
     prompt_sha256 = str(packet.get("compact_provider_prompt_sha256", "")).strip() or sha256_bytes(prompt_text.encode("utf-8"))
+
+    split_brain_error = _handoff_cross_field_binding_split_brain_error(
+        slot_id=slot_id,
+        candidate_id=selected_candidate_id,
+        source_selected_candidate_artifact_path=repo_relative_path(selected_candidate_path_value),
+        source_selected_candidate_artifact_sha256=sha256_file(selected_candidate_path_value),
+        selected_candidate_prompt_sha256=selected_candidate_prompt_sha256,
+        selected_prompt_input_prompt_sha256=prompt_sha256,
+        structured_executor_inputs_selected_prompt_sha256=prompt_sha256,
+        selected_candidate_lane=str(selected_candidate_body.get("lane", "")).strip(),
+        selected_prompt_input_lane=str(packet.get("scene_type", "")).strip(),
+    )
+    if split_brain_error is not None:
+        code, detail = split_brain_error
+        _require(False, code, detail)
 
     _require(
         str(packet.get("environment_id", "")).strip() == str(queue_head.get("environment_used", "")).strip(),

@@ -479,3 +479,54 @@ def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monk
     _write_json(packet_path, packet)
     with pytest.raises(SystemExit, match="packet_environment_mismatch"):
         handoff.build_handoff(DATE, RECONCILIATION_PATH)
+
+
+def test_prompt_binding_split_brain_fails_closed_before_handoff_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    packet["compact_provider_prompt_sha256"] = "f" * 64
+    _write_json(packet_path, packet)
+
+    with pytest.raises(SystemExit, match="handoff_prompt_binding_split_brain"):
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+
+
+def test_lane_binding_split_brain_fails_closed_before_handoff_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    packet["scene_type"] = "fit_check_mirror_getting_ready"
+    _write_json(packet_path, packet)
+
+    with pytest.raises(SystemExit, match="handoff_lane_binding_split_brain"):
+        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+
+
+def test_structured_executor_prompt_binding_split_brain_guard_rejects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    candidate = {
+        "candidate_id": f"{SLOT_ID}::{RECIPE_ID}::cbn_004",
+        "slot_id": SLOT_ID,
+        "lane": "parking_garage_flash",
+        "recipe_id": RECIPE_ID,
+        "prompt_sha256": hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest(),
+    }
+    error = handoff._handoff_cross_field_binding_split_brain_error(
+        slot_id=SLOT_ID,
+        candidate_id=candidate["candidate_id"],
+        source_selected_candidate_artifact_path=SELECTED_CANDIDATE_PATH,
+        source_selected_candidate_artifact_sha256=hashlib.sha256((tmp_path / SELECTED_CANDIDATE_PATH).read_bytes()).hexdigest(),
+        selected_candidate_prompt_sha256=candidate["prompt_sha256"],
+        selected_prompt_input_prompt_sha256=candidate["prompt_sha256"],
+        structured_executor_inputs_selected_prompt_sha256="f" * 64,
+        selected_candidate_lane=candidate["lane"],
+        selected_prompt_input_lane=str(packet["scene_type"]),
+    )
+    assert error is not None
+    code, detail = error
+    assert code == "handoff_prompt_binding_split_brain"
+    assert candidate["candidate_id"] in detail
+    assert "structured_executor_inputs_selected_prompt_sha256" in detail
