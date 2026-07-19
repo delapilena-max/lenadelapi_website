@@ -1,0 +1,40 @@
+{
+  "version": "v2.9.1_auto_queue_publisher",
+  "name": "Lena Approved Queue Autonomous Publisher",
+  "mission": "Publish exactly one bounded scheduled slot at a time with explicit autonomous policy authorization and fail-closed claim, export, and receipt handling.",
+  "boundary": {
+    "auto_queue_building": true,
+    "auto_publish_queue": false,
+    "scheduled_autonomous_mode": "separate_policy_gate_required",
+    "autonomous_enabled_by_default": false,
+    "autonomous_publish_requires_distinct_policy": true,
+    "live_posting_requires_explicit_flags": true,
+    "manual_live_mode_unchanged": true,
+    "auto_replying": false,
+    "auto_dm_sending": false,
+    "auto_outreach": false,
+    "no_replies_dms_or_outreach": true
+  },
+  "operations": {
+    "queue_claim": "atomic_slot_claim",
+    "slot_limit_per_invocation": 1,
+    "slot_keywords": [
+      "morning",
+      "afternoon",
+      "evening"
+    ],
+    "require_queue_build_before_first_slot": true,
+    "require_clean_export_revalidation_before_dispatch": true,
+    "require_platform_receipts": true,
+    "require_idempotent_post_log_sync": true
+  },
+  "safety": {
+    "queue_building_allowed": true,
+    "duplicate_prevention": true,
+    "already_posted_skip": true,
+    "bounded_retries": true,
+    "crash_recovery": true,
+    "stale_claim_handling": true,
+    "partial_platform_failure_fail_closed": true
+  }
+}

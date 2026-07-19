@@ -1,0 +1,57 @@
+{
+  "version": "v2.9.1_auto_queue_publisher",
+  "policy_id": "lena_approved_queue_auto_publisher_policy_v2_8",
+  "policy_version": "v2.8.0",
+  "repository_name": "delapilena-max/lenadelapi_website",
+  "authority_version": "main",
+  "authority_commit": "93af74b972f9c28d474b8c15decaf813e212c17e",
+  "autonomous_mode": "scheduled_autonomous",
+  "autonomous_enabled": false,
+  "autonomous_enabled_by_default": false,
+  "autonomous_policy_state": "disabled_by_default",
+  "policy_effective_at_utc": "2026-07-19T00:00:00Z",
+  "policy_expires_at_utc": "2026-12-31T23:59:59Z",
+  "approved_slots": [
+    "morning",
+    "afternoon",
+    "evening"
+  ],
+  "hard_item_limit_per_invocation": 1,
+  "queue_claim_lease_seconds": 1800,
+  "max_attempts_per_row": 3,
+  "autonomous_queue_platforms": [
+    "Instagram Feed",
+    "Facebook Page"
+  ],
+  "manual_live_mode_unchanged": true,
+  "manual_live_flags": [
+    "--live",
+    "--i-understand-this-can-publish"
+  ],
+  "autonomous_mode_requires_distinct_policy_gate": true,
+  "require_queue_build_before_first_publish_slot": true,
+  "require_clean_export_revalidation": true,
+  "require_atomic_queue_claim": true,
+  "require_platform_receipts": true,
+  "require_idempotent_post_log_sync": true,
+  "require_bounded_retries": true,
+  "allow_replies": false,
+  "allow_dms": false,
+  "allow_outreach": false,
+  "safety": {
+    "auto_replying": false,
+    "auto_dm_sending": false,
+    "auto_outreach": false,
+    "delete_after_publish": false,
+    "duplicate_prevention": true,
+    "already_posted_skip": true
+  },
+  "publish_mode": "explicit_live_connector_required",
+  "queue_enabled": true,
+  "autopublish_enabled": false,
+  "live_posting_requires_explicit_flags": true,
+  "required_live_flags": [
+    "--live",
+    "--i-understand-this-can-publish"
+  ]
+}
