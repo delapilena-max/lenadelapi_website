@@ -481,26 +481,34 @@ def test_packet_outfit_or_environment_mismatch_fails_closed(tmp_path: Path, monk
         handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
-def test_prompt_binding_split_brain_fails_closed_before_handoff_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_explicit_dual_binding_allows_provider_prompt_family_split(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     packet["compact_provider_prompt_sha256"] = "f" * 64
     _write_json(packet_path, packet)
 
-    with pytest.raises(SystemExit, match="handoff_prompt_binding_split_brain"):
-        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    assert report["candidate_selection_binding"]["source_prompt_family"] == "prompt_library_candidate"
+    assert report["provider_execution_binding"]["source_prompt_family"] == "compact_provider_prompt"
+    assert report["candidate_selection_binding"]["candidate_prompt_sha256"] == report["selected_candidate"]["prompt_sha256"]
+    assert report["provider_execution_binding"]["provider_prompt_sha256"] == "f" * 64
+    assert report["selected_candidate"]["prompt_sha256"] != report["selected_prompt_input"]["prompt_sha256"]
+    assert report["binding_linkage"]["prompt_family_relationship"].startswith("candidate prompt family and provider prompt family are intentionally distinct")
 
 
-def test_lane_binding_split_brain_fails_closed_before_handoff_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_explicit_dual_binding_allows_provider_lane_family_split(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _, _, _, packet_path, _ = _build_fixture_tree(tmp_path)
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
     packet["scene_type"] = "fit_check_mirror_getting_ready"
     _write_json(packet_path, packet)
 
-    with pytest.raises(SystemExit, match="handoff_lane_binding_split_brain"):
-        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    assert report["candidate_selection_binding"]["candidate_lane"] == "parking_garage_flash"
+    assert report["provider_execution_binding"]["provider_lane"] == "fit_check_mirror_getting_ready"
+    assert report["selected_prompt_input"]["lane"] == "fit_check_mirror_getting_ready"
+    assert report["provider_execution_binding"]["provider_lane"] == "fit_check_mirror_getting_ready"
 
 
 def test_structured_executor_prompt_binding_split_brain_guard_rejects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

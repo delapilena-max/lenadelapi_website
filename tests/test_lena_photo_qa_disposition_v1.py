@@ -396,6 +396,41 @@ def test_original_selected_candidate_no_provider_behavior_is_unchanged(harness) 
     assert result["qa_inputs"]["decision_kind"] == "selected_candidate"
 
 
+def test_authorization_bound_manifest_uses_provider_binding(harness, tmp_path: Path) -> None:
+    decision = dict(harness["decision"])
+    candidate = dict(decision["candidate"])
+    candidate["lane"] = "mirror outfit check"
+    provider_prompt = (
+        "Scene: standing naturally. Wardrobe: fixture outfit. "
+        "Expression: calm expression. Provider lane: fit_check_mirror_getting_ready."
+    )
+    provider_prompt_sha = hashlib.sha256(provider_prompt.encode("utf-8")).hexdigest()
+    manifest = dict(harness["manifest"])
+    manifest["lane"] = "fit_check_mirror_getting_ready"
+    manifest["prompt_sha256"] = provider_prompt_sha
+    manifest["image_prompt"] = provider_prompt
+    manifest_path = tmp_path / "provider-bound-manifest.json"
+    _write_json(manifest_path, manifest)
+    image = disposition._inspect_image(harness["image_path"], generated=True)
+    provider_binding = {
+        "provider_lane": "fit_check_mirror_getting_ready",
+        "provider_prompt_sha256": provider_prompt_sha,
+        "slot_id": harness["slot"],
+    }
+
+    result = disposition._validate_manifest(
+        manifest_path,
+        decision,
+        candidate,
+        image,
+        "authorization_bound_handoff",
+        provider_binding=provider_binding,
+    )
+
+    assert result["lane"] == "fit_check_mirror_getting_ready"
+    assert result["prompt_sha256"] == provider_prompt_sha
+
+
 @pytest.mark.parametrize(
     ("key", "reason"),
     [

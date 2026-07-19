@@ -252,6 +252,7 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_path = selected_candidate_binding["selected_candidate_path"]
     selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
     selected_candidate = selected_candidate_binding["selected_candidate"]
+    selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
     reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
         report,
         selected_candidate_binding,
@@ -300,8 +301,10 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     )
 
     slot_id = str(report.get("selected_slot_id") or "").strip()
+    selected_recipe_id = str(report.get("selected_recipe_id") or "").strip()
     date_str = str(report.get("date") or "").strip()
     require(slot_id, "handoff_slot_missing", "handoff selected_slot_id is missing")
+    require(selected_recipe_id, "handoff_selected_recipe_id_missing", "handoff selected_recipe_id is missing")
     require(date_str, "handoff_date_missing", "handoff date is missing")
     require(
         structured.get("date") == date_str,
@@ -368,6 +371,212 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         label="handoff selected_prompt_input_artifact_sha256",
     )
 
+    candidate_selection_binding = report.get("candidate_selection_binding")
+    provider_execution_binding = report.get("provider_execution_binding")
+    binding_linkage = report.get("binding_linkage")
+    if not (
+        isinstance(candidate_selection_binding, dict)
+        and isinstance(provider_execution_binding, dict)
+        and isinstance(binding_linkage, dict)
+    ):
+        return {
+            "report": report,
+            "handoff_path": handoff_path,
+            "handoff_repo_path": handoff_repo_path,
+            "handoff_sha256": sha256_file(handoff_path),
+            "date": date_str,
+            "slot_id": slot_id,
+            "prompt_sha256": prompt_sha,
+            "custom_reference_id": custom_reference_id,
+            "soul_name": soul.get("name"),
+            "soul_type": soul.get("type"),
+            "selected_candidate_path": selected_candidate_path,
+            "selected_candidate_repo_path": repo_relative_path(selected_candidate_path) if selected_candidate_path else "",
+            "selected_candidate_sha256": selected_candidate_sha_value,
+            "selected_candidate": selected_candidate,
+            "selected_candidate_id": selected_candidate_binding["selected_candidate_id"],
+            "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
+            "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
+            "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
+            "candidate_selection_binding": candidate_selection_binding or {},
+            "provider_execution_binding": provider_execution_binding or {},
+            "binding_linkage": binding_linkage or {},
+            "reconciliation": reconciliation_facts["reconciliation"],
+            "reconciled_candidate": reconciliation_facts["final_candidate"],
+            "reconciliation_decision": reconciliation_facts["decision"],
+        }
+    require(
+        isinstance(candidate_selection_binding, dict),
+        "handoff_candidate_selection_binding_missing",
+        "handoff candidate_selection_binding must be a JSON object",
+    )
+    require(
+        isinstance(provider_execution_binding, dict),
+        "handoff_provider_execution_binding_missing",
+        "handoff provider_execution_binding must be a JSON object",
+    )
+    require(
+        isinstance(binding_linkage, dict),
+        "handoff_binding_linkage_missing",
+        "handoff binding_linkage must be a JSON object",
+    )
+    require(
+        candidate_selection_binding.get("source_prompt_family") == "prompt_library_candidate",
+        "handoff_candidate_selection_source_family_invalid",
+        "candidate_selection_binding.source_prompt_family must be prompt_library_candidate",
+    )
+    require(
+        provider_execution_binding.get("source_prompt_family") == "compact_provider_prompt",
+        "handoff_provider_execution_source_family_invalid",
+        "provider_execution_binding.source_prompt_family must be compact_provider_prompt",
+    )
+    require(
+        candidate_selection_binding.get("selected_candidate_artifact_path") == selected_candidate_path_value,
+        "handoff_candidate_selection_path_mismatch",
+        "candidate_selection_binding selected candidate path must match the selected candidate artifact",
+    )
+    require(
+        candidate_selection_binding.get("selected_candidate_artifact_sha256") == selected_candidate_sha_value,
+        "handoff_candidate_selection_sha_mismatch",
+        "candidate_selection_binding selected candidate SHA must match the selected candidate artifact",
+    )
+    selected_candidate_body = selected_candidate.get("candidate")
+    require(
+        isinstance(selected_candidate_body, dict),
+        "handoff_selected_candidate_body_missing",
+        "selected candidate artifact must contain a candidate object",
+    )
+    require(
+        candidate_selection_binding.get("candidate_id") == selected_candidate_body.get("candidate_id"),
+        "handoff_candidate_selection_id_mismatch",
+        "candidate_selection_binding candidate_id must match the selected candidate artifact",
+    )
+    require(
+        candidate_selection_binding.get("slot_id") == selected_candidate_body.get("slot_id"),
+        "handoff_candidate_selection_slot_mismatch",
+        "candidate_selection_binding slot_id must match the selected candidate artifact",
+    )
+    require(
+        candidate_selection_binding.get("recipe_id") == selected_candidate_body.get("recipe_id"),
+        "handoff_candidate_selection_recipe_mismatch",
+        "candidate_selection_binding recipe_id must match the selected candidate artifact",
+    )
+    require(
+        candidate_selection_binding.get("candidate_prompt_sha256") == selected_candidate_body.get("prompt_sha256"),
+        "handoff_candidate_selection_prompt_sha_mismatch",
+        "candidate_selection_binding candidate prompt SHA must match the selected candidate artifact",
+    )
+    require(
+        candidate_selection_binding.get("candidate_lane") == selected_candidate_body.get("lane"),
+        "handoff_candidate_selection_lane_mismatch",
+        "candidate_selection_binding candidate lane must match the selected candidate artifact",
+    )
+    require(
+        provider_execution_binding.get("content_packet_artifact_path") == report.get("selected_prompt_input_artifact_path"),
+        "handoff_provider_execution_path_mismatch",
+        "provider_execution_binding packet path must match the selected prompt input artifact",
+    )
+    require(
+        provider_execution_binding.get("content_packet_artifact_sha256") == report.get("selected_prompt_input_artifact_sha256"),
+        "handoff_provider_execution_sha_mismatch",
+        "provider_execution_binding packet SHA must match the selected prompt input artifact",
+    )
+    require(
+        provider_execution_binding.get("recipe_id") == selected_recipe_id,
+        "handoff_provider_execution_recipe_mismatch",
+        "provider_execution_binding recipe_id must match the selected recipe",
+    )
+    require(
+        provider_execution_binding.get("slot_id") == slot_id,
+        "handoff_provider_execution_slot_mismatch",
+        "provider_execution_binding slot_id must match the selected slot",
+    )
+    require(
+        provider_execution_binding.get("provider_prompt_sha256") == prompt_sha,
+        "handoff_provider_execution_prompt_sha_mismatch",
+        "provider_execution_binding provider prompt SHA must match structured selected_prompt_sha256",
+    )
+    require(
+        provider_execution_binding.get("provider_lane") == selected_prompt.get("lane"),
+        "handoff_provider_execution_lane_mismatch",
+        "provider_execution_binding provider lane must match selected_prompt_input lane",
+    )
+    require(
+        provider_execution_binding.get("provider") == "higgsfield",
+        "handoff_provider_execution_provider_mismatch",
+        "provider_execution_binding provider must be higgsfield",
+    )
+    require(
+        provider_execution_binding.get("model") == "text2image_soul_v2",
+        "handoff_provider_execution_model_mismatch",
+        "provider_execution_binding model must be text2image_soul_v2",
+    )
+    require(
+        binding_linkage.get("recommendation_artifact_path") == report.get("source_recommendation_artifact_path"),
+        "handoff_binding_linkage_recommendation_path_mismatch",
+        "binding_linkage recommendation artifact path must match the handoff provenance",
+    )
+    require(
+        binding_linkage.get("recommendation_artifact_sha256") == report.get("source_recommendation_artifact_sha256"),
+        "handoff_binding_linkage_recommendation_sha_mismatch",
+        "binding_linkage recommendation artifact sha must match the handoff provenance",
+    )
+    require(
+        binding_linkage.get("queue_artifact_path") == report.get("source_queue_dry_run_artifact_path"),
+        "handoff_binding_linkage_queue_path_mismatch",
+        "binding_linkage queue artifact path must match the handoff provenance",
+    )
+    require(
+        binding_linkage.get("queue_artifact_sha256") == report.get("source_queue_dry_run_artifact_sha256"),
+        "handoff_binding_linkage_queue_sha_mismatch",
+        "binding_linkage queue artifact sha must match the handoff provenance",
+    )
+    require(
+        binding_linkage.get("selected_candidate_artifact_path") == selected_candidate_path_value,
+        "handoff_binding_linkage_candidate_path_mismatch",
+        "binding_linkage selected candidate path must match the selected candidate artifact",
+    )
+    require(
+        binding_linkage.get("selected_candidate_artifact_sha256") == selected_candidate_sha_value,
+        "handoff_binding_linkage_candidate_sha_mismatch",
+        "binding_linkage selected candidate SHA must match the selected candidate artifact",
+    )
+    require(
+        binding_linkage.get("content_packet_artifact_path") == report.get("selected_prompt_input_artifact_path"),
+        "handoff_binding_linkage_packet_path_mismatch",
+        "binding_linkage content packet path must match the selected prompt input artifact",
+    )
+    require(
+        binding_linkage.get("content_packet_artifact_sha256") == report.get("selected_prompt_input_artifact_sha256"),
+        "handoff_binding_linkage_packet_sha_mismatch",
+        "binding_linkage content packet sha must match the selected prompt input artifact",
+    )
+    require(
+        binding_linkage.get("recipe_id") == selected_recipe_id,
+        "handoff_binding_linkage_recipe_mismatch",
+        "binding_linkage recipe_id must match the selected recipe",
+    )
+    require(
+        binding_linkage.get("slot_id") == slot_id,
+        "handoff_binding_linkage_slot_mismatch",
+        "binding_linkage slot_id must match the selected slot",
+    )
+    require(
+        binding_linkage.get("candidate_id") == selected_candidate_body.get("candidate_id"),
+        "handoff_binding_linkage_candidate_mismatch",
+        "binding_linkage candidate_id must match the selected candidate",
+    )
+    require(
+        binding_linkage.get("candidate_lane") == candidate_selection_binding.get("candidate_lane"),
+        "handoff_binding_linkage_candidate_lane_mismatch",
+        "binding_linkage candidate_lane must match the candidate selection binding",
+    )
+    require(
+        binding_linkage.get("provider_lane") == provider_execution_binding.get("provider_lane"),
+        "handoff_binding_linkage_provider_lane_mismatch",
+        "binding_linkage provider_lane must match the provider execution binding",
+    )
+
     return {
         "report": report,
         "handoff_path": handoff_path,
@@ -387,6 +596,9 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
         "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
         "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "reconciliation": reconciliation_facts["reconciliation"],
         "reconciled_candidate": reconciliation_facts["final_candidate"],
         "reconciliation_decision": reconciliation_facts["decision"],
@@ -566,7 +778,13 @@ def build_generation_approval_record(
         "approval_operator_mismatch",
         f"operator_id must be exactly {CANONICAL_OPERATOR_ID!r}",
     )
-    expected_confirmation = confirmation_phrase(handoff_facts["slot_id"])
+    slot_id = str(handoff_facts.get("slot_id") or "").strip()
+    require(
+        slot_id,
+        "approval_slot_missing",
+        "handoff slot_id is missing",
+    )
+    expected_confirmation = confirmation_phrase(slot_id)
     require(
         confirmation == expected_confirmation,
         "approval_confirmation_mismatch",
@@ -589,8 +807,11 @@ def build_generation_approval_record(
         "handoff_report_type": report.get("report_type"),
         "handoff_schema_version": report.get("schema_version"),
         "date": handoff_facts["date"],
-        "slot_id": handoff_facts["slot_id"],
+        "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
+        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
+        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
+        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
         "provider": APPROVAL_PROVIDER,
         "executor": APPROVAL_EXECUTOR,
         "model": MODEL,
@@ -857,6 +1078,9 @@ def build_generation_claim_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
+        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
+        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
+        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
         "operator_id": approval["operator_id"],
         "provider": approval["provider"],
         "executor": approval["executor"],
@@ -916,6 +1140,9 @@ def build_generation_execution_receipt_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
+        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
+        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
+        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
         "outcome": outcome,
         "failure_stage": failure_stage,
         "error_text": error_text,

@@ -23,6 +23,8 @@ from pipeline.identity import lena_higgsfield_identity as identity  # noqa: E402
 from pipeline.prompting import lena_prompt_brain  # noqa: E402
 from pipeline.qa import lena_higgsfield_failure_memory as failure_memory  # noqa: E402
 from pipeline.qa import lena_photo_qa  # noqa: E402
+from tools import lena_higgsfield_generation_approval_v1 as approval  # noqa: E402
+from tools import lena_standing_autonomy_policy_v1 as standing_autonomy  # noqa: E402
 from tools.lena_structured_visual_tool_v1 import (  # noqa: E402
     StructuredVisualImage,
     StructuredVisualToolError,
@@ -528,26 +530,55 @@ def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]
     raise BoundaryError("decision_binding_mismatch", "wrong_schema_version: artifact is not a Lena pre-generation candidate decision or retry decision")
 
 
+def _resolve_generation_binding_context(
+    decision_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any], str, dict[str, Any] | None]:
+    try:
+        artifact = handoff._read_artifact(decision_path)
+    except handoff.ConsumerError as exc:
+        raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
+    report_type = artifact.get("report_type")
+    if report_type == standing_autonomy.AUTH_REPORT_TYPE:
+        auth = standing_autonomy.validate_cycle_authorization_artifact(decision_path)
+        handoff_facts = approval.inspect_handoff_artifact(
+            Path(str(auth["artifact"]["generation_handoff_artifact_path"]))
+        )
+        decision, candidate = _validate_selected_decision(Path(handoff_facts["selected_candidate_path"]))
+        standing_autonomy.validate_cycle_authorization_artifact(
+            decision_path,
+            handoff_report=handoff_facts["report"],
+        )
+        return decision, candidate, "authorization_bound_handoff", handoff_facts
+    decision, candidate, decision_kind = _validate_decision(decision_path)
+    return decision, candidate, decision_kind, None
+
+
 def _validate_manifest(
     path: Path,
     decision: dict[str, Any],
     candidate: dict[str, Any],
     image: dict[str, Any],
     decision_kind: str,
+    *,
+    provider_binding: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = _read_json_object(path, "provenance_mismatch", "Higgsfield result manifest")
+    provider_binding = provider_binding if isinstance(provider_binding, dict) else {}
+    expected_lane = str(provider_binding.get("provider_lane") or candidate["lane"])
+    expected_prompt_sha256 = str(provider_binding.get("provider_prompt_sha256") or candidate["prompt_sha256"])
+    expected_slot_id = str(provider_binding.get("slot_id") or candidate["slot_id"])
     expected = {
         "provider": "higgsfield",
         "date": decision["as_of_date"],
-        "slot_id": candidate["slot_id"],
-        "lane": candidate["lane"],
-        "prompt_sha256": candidate["prompt_sha256"],
+        "slot_id": expected_slot_id,
+        "lane": expected_lane,
+        "prompt_sha256": expected_prompt_sha256,
     }
     mismatches = [f"{key}: expected {value!r}, got {manifest.get(key)!r}" for key, value in expected.items() if manifest.get(key) != value]
     if mismatches:
         raise BoundaryError("provenance_mismatch", "manifest binding mismatch: " + "; ".join(mismatches))
     prompt = manifest.get("image_prompt")
-    if not isinstance(prompt, str) or _sha256_bytes(prompt.encode("utf-8")) != candidate["prompt_sha256"]:
+    if not isinstance(prompt, str) or _sha256_bytes(prompt.encode("utf-8")) != expected_prompt_sha256:
         raise BoundaryError("provenance_mismatch", "manifest prompt text does not re-hash to the selected prompt SHA")
     try:
         bridge_image = qa_bridge._resolve_image_path(manifest).resolve()
@@ -590,7 +621,7 @@ def _validate_manifest(
     for key in ("live_attempt_count", "retry_count"):
         if type(manifest.get(key)) is not int:
             raise BoundaryError("provenance_mismatch", f"manifest {key} must be an integer")
-    if decision_kind == "selected_candidate":
+    if decision_kind in {"selected_candidate", "authorization_bound_handoff"}:
         exact_context["retry_count"] = 0
     else:
         retry_contract = manifest.get("retry_execution_contract")
@@ -1144,14 +1175,24 @@ def evaluate_photo_qa_disposition(
         )
         if not isinstance(reference_authority_artifact, Path) or not SHA256_RE.fullmatch(str(reference_authority_sha256)):
             raise BoundaryError("identity_evidence_invalid", "committed identity-reference authority path and SHA-256 are required")
-        decision, candidate, decision_kind = _validate_decision(decision_path.resolve())
+        decision, candidate, decision_kind, binding_context = _resolve_generation_binding_context(decision_path.resolve())
+        provider_binding = None
+        if binding_context is not None:
+            provider_binding = binding_context.get("provider_execution_binding")
         image = _inspect_image(image_path.resolve(), generated=True)
         if not SHA256_RE.fullmatch(str(expected_image_sha256)) or image["sha256"] != expected_image_sha256:
             raise BoundaryError(
                 "image_hash_mismatch",
                 f"generated image SHA does not match explicit expected SHA: expected {expected_image_sha256}, got {image['sha256']}",
             )
-        manifest = _validate_manifest(manifest_path.resolve(), decision, candidate, image, decision_kind)
+        manifest = _validate_manifest(
+            manifest_path.resolve(),
+            decision,
+            candidate,
+            image,
+            decision_kind,
+            provider_binding=provider_binding,
+        )
         identity_evidence = _validate_identity_evidence(
             identity_evidence_path.resolve(), decision, candidate, manifest, image
         )
@@ -1258,6 +1299,7 @@ def evaluate_photo_qa_disposition(
             "authority_commit": decision["authority_commit"],
             "decision_artifact_path": str(decision_path.resolve()),
             "decision_fingerprint_sha256": active_fingerprint,
+            "binding_mode": "authorization_bound_handoff" if binding_context is not None else "selected_candidate",
             "candidate_id": candidate["candidate_id"],
             "slot_id": candidate["slot_id"],
             "lane": candidate["lane"],
@@ -1266,10 +1308,12 @@ def evaluate_photo_qa_disposition(
             "prompt_sha256": candidate["prompt_sha256"],
             "image_path": image["path"],
             "image_sha256": image["sha256"],
+            "provider_execution_binding": provider_binding,
             "generation_provenance": {
                 "manifest_path": str(manifest_path.resolve()),
                 "manifest_sha256": _sha256_file(manifest_path),
                 "date": decision["as_of_date"],
+                "binding_mode": "authorization_bound_handoff" if binding_context is not None else "selected_candidate",
                 "field_sources": {
                     "candidate_and_authority": str(decision_path.resolve()),
                     "provider_generation": str(manifest_path.resolve()),
@@ -1282,6 +1326,7 @@ def evaluate_photo_qa_disposition(
                 "custom_reference_id": manifest["custom_reference_id"],
                 "soul_name": manifest["cli_soul_name"],
                 "soul_type": manifest["cli_soul_type"],
+                "provider_execution_binding": provider_binding,
             },
             "identity_reference_provenance": {
                 **reference_authority,
