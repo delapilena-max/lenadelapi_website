@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import lena_higgsfield_generation_approval_v1 as approval
+from tools.strategy.lena_build_next_live_image_handoff_v1 import _handoff_cross_field_binding_split_brain_error
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_ROOT = ROOT / "pipeline" / "config"
@@ -299,6 +300,20 @@ def _prepare_authorization_scope(
         or soul_metadata.get("custom_reference_id")
         or ""
     )
+    binding_error = _handoff_cross_field_binding_split_brain_error(
+        slot_id=slot_id,
+        candidate_id=str(candidate.get("candidate_id") or ""),
+        source_selected_candidate_artifact_path=str(candidate_path),
+        source_selected_candidate_artifact_sha256=candidate_sha256,
+        selected_candidate_prompt_sha256=str(candidate.get("prompt_sha256") or ""),
+        selected_prompt_input_prompt_sha256=str(selected_prompt_input.get("prompt_sha256") or ""),
+        structured_executor_inputs_selected_prompt_sha256=str(structured.get("selected_prompt_sha256") or ""),
+        selected_candidate_lane=str(candidate.get("lane") or ""),
+        selected_prompt_input_lane=str(selected_prompt_input.get("lane") or ""),
+    )
+    if binding_error is not None:
+        code, detail = binding_error
+        _require(False, code, detail)
     return {
         "date": date_str,
         "slot_id": slot_id,
@@ -345,6 +360,37 @@ def issue_cycle_authorization(
         label="generation handoff artifact",
         must_exist=True,
     )
+    raw_handoff = _read_json_object(handoff_path, code="handoff_missing_or_invalid", label="generation handoff artifact")
+    raw_selected_candidate = raw_handoff.get("selected_candidate")
+    raw_selected_candidate = raw_selected_candidate if isinstance(raw_selected_candidate, dict) else {}
+    raw_selected_prompt_input = raw_handoff.get("selected_prompt_input")
+    raw_selected_prompt_input = raw_selected_prompt_input if isinstance(raw_selected_prompt_input, dict) else {}
+    raw_binding_error = _handoff_cross_field_binding_split_brain_error(
+        slot_id=str(raw_handoff.get("selected_slot_id") or raw_handoff.get("slot_id") or ""),
+        candidate_id=str(raw_selected_candidate.get("candidate_id") or raw_handoff.get("candidate_id") or ""),
+        source_selected_candidate_artifact_path=str(
+            raw_handoff.get("selected_candidate_path")
+            or raw_selected_candidate.get("artifact_path")
+            or raw_handoff.get("candidate_artifact_path")
+            or ""
+        ),
+        source_selected_candidate_artifact_sha256=str(
+            raw_handoff.get("selected_candidate_sha256")
+            or raw_selected_candidate.get("artifact_sha256")
+            or raw_handoff.get("candidate_artifact_sha256")
+            or ""
+        ),
+        selected_candidate_prompt_sha256=str(raw_selected_candidate.get("prompt_sha256") or ""),
+        selected_prompt_input_prompt_sha256=str(raw_selected_prompt_input.get("prompt_sha256") or raw_handoff.get("prompt_sha256") or ""),
+        structured_executor_inputs_selected_prompt_sha256=str(
+            (raw_handoff.get("structured_executor_inputs") or {}).get("selected_prompt_sha256") or ""
+        ),
+        selected_candidate_lane=str(raw_selected_candidate.get("lane") or ""),
+        selected_prompt_input_lane=str(raw_selected_prompt_input.get("lane") or ""),
+    )
+    if raw_binding_error is not None:
+        code, detail = raw_binding_error
+        _require(False, code, detail)
     from pipeline import higgsfield_lena_api_executor as executor
 
     handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
@@ -627,6 +673,22 @@ def validate_cycle_authorization_artifact(
             "authorization_candidate_sha_mismatch",
             "authorization candidate SHA does not match the artifact bytes",
         )
+        binding_error = _handoff_cross_field_binding_split_brain_error(
+            slot_id=str(handoff_report.get("selected_slot_id") or ""),
+            candidate_id=str(selected_candidate.get("candidate_id") or ""),
+            source_selected_candidate_artifact_path=str(resolved_selected_candidate_path),
+            source_selected_candidate_artifact_sha256=_sha256_file(resolved_selected_candidate_path),
+            selected_candidate_prompt_sha256=str(selected_candidate.get("prompt_sha256") or ""),
+            selected_prompt_input_prompt_sha256=str(selected_prompt_input.get("prompt_sha256") or ""),
+            structured_executor_inputs_selected_prompt_sha256=str(
+                (handoff_report.get("structured_executor_inputs") or {}).get("selected_prompt_sha256") or ""
+            ),
+            selected_candidate_lane=str(selected_candidate.get("lane") or ""),
+            selected_prompt_input_lane=str(selected_prompt_input.get("lane") or ""),
+        )
+        if binding_error is not None:
+            code, detail = binding_error
+            _require(False, code, detail)
         _require(str(auth.get("date") or "") == str(handoff_report.get("date") or ""), "authorization_date_mismatch", "authorization date does not match handoff")
         _require(str(auth.get("slot_id") or "") == str(handoff_report.get("selected_slot_id") or ""), "authorization_slot_mismatch", "authorization slot_id does not match handoff")
         _require(str(auth.get("candidate_id") or "") == str(selected_candidate.get("candidate_id") or ""), "authorization_candidate_mismatch", "authorization candidate_id does not match handoff")
