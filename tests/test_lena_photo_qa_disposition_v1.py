@@ -613,6 +613,13 @@ def _production_dual_binding_fixture(
     handoff["provider_execution_binding"]["provider_prompt_sha256"] = provider_prompt_sha
     handoff["structured_executor_inputs"]["selected_prompt_text"] = provider_prompt_text
     handoff["structured_executor_inputs"]["selected_prompt_sha256"] = provider_prompt_sha
+    reference_image_source_path = tmp_path / "lena_dual_binding_reference.png"
+    Image.new("RGB", (64, 64), "gray").save(reference_image_source_path)
+    reference_image_path = ROOT / "tests" / "fixtures" / "lena_dual_binding_reference.png"
+    reference_image_path.parent.mkdir(parents=True, exist_ok=True)
+    reference_image_path.write_bytes(reference_image_source_path.read_bytes())
+    request.addfinalizer(lambda: reference_image_source_path.unlink() if reference_image_source_path.exists() else None)
+    request.addfinalizer(lambda: reference_image_path.unlink() if reference_image_path.exists() else None)
     reference_manifest_path = (
         ROOT
         / "pipeline"
@@ -622,6 +629,7 @@ def _production_dual_binding_fixture(
         / "readypack0709-pack004-08-wardrobe-test-c"
         / "result_manifest.json"
     )
+    reference_authority_path = tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
     reference_manifest = {
         "provider": "higgsfield",
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
@@ -629,11 +637,10 @@ def _production_dual_binding_fixture(
         "job_type": identity.EXPECTED_JOB_TYPE,
         "custom_reference_id": str(auth["custom_reference_id"]),
     }
+    reference_manifest_bytes = json.dumps(reference_manifest, indent=2, ensure_ascii=True).encode("utf-8")
+    reference_manifest_sha = hashlib.sha256(reference_manifest_bytes).hexdigest()
     _write_json(reference_manifest_path, reference_manifest)
     request.addfinalizer(lambda: reference_manifest_path.unlink() if reference_manifest_path.exists() else None)
-    reference_authority_path = tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
-    reference_image_path = REFERENCE_IMAGE
-    reference_manifest_sha = _sha(reference_manifest_path)
     reference_manifest_oid = "616f2d524153abbd3bb73fdcaf29530af83c0334"
     synthetic_reference_authority = {
         "schema_version": "lena_identity_reference_authority_v1",
@@ -647,8 +654,8 @@ def _production_dual_binding_fixture(
                     "authority_id": "lena_visual_reference_authority_v1",
                     "references": [
                         {
-                            "path": REFERENCE_IMAGE.relative_to(ROOT).as_posix(),
-                            "sha256": _sha(REFERENCE_IMAGE),
+                            "path": reference_image_path.relative_to(ROOT).as_posix(),
+                            "sha256": _sha(reference_image_path),
                         }
                     ],
                 }
@@ -656,8 +663,8 @@ def _production_dual_binding_fixture(
         ).hexdigest(),
         "references": [
             {
-                "path": REFERENCE_IMAGE.relative_to(ROOT).as_posix(),
-                "sha256": _sha(REFERENCE_IMAGE),
+                "path": reference_image_path.relative_to(ROOT).as_posix(),
+                "sha256": _sha(reference_image_path),
             }
         ],
         "reference_metadata": [
@@ -670,7 +677,7 @@ def _production_dual_binding_fixture(
                 "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
                 "job_type": "text2image_soul_v2",
                 "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-                "provenance_manifest": "pipeline/higgsfield_debug/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c/result_manifest.json",
+                "provenance_manifest": reference_manifest_path.relative_to(ROOT).as_posix(),
                 "provenance_manifest_sha256": reference_manifest_sha,
                 "provenance_manifest_git_blob_oid": reference_manifest_oid,
                 "authority_scope": "identity_continuity_not_style",
@@ -697,7 +704,6 @@ def _production_dual_binding_fixture(
     _write_json(reference_authority_path, synthetic_reference_authority)
     reference_authority_bytes = reference_authority_path.read_bytes()
     reference_image_bytes = reference_image_path.read_bytes()
-    reference_manifest_bytes = reference_manifest_path.read_bytes()
     original_git_show_bytes = disposition._git_show_bytes
     original_git_blob_oid = disposition._git_blob_oid
 
@@ -803,8 +809,8 @@ def _production_dual_binding_fixture(
         "image_path": image_path,
         "reference_authority_path": reference_authority_path,
         "reference_authority_sha": _sha(reference_authority_path),
-        "reference_image_path": REFERENCE_IMAGE,
-        "reference_image_sha": _sha(REFERENCE_IMAGE),
+        "reference_image_path": reference_image_path,
+        "reference_image_sha": _sha(reference_image_path),
         "provider_lane": provider_binding["provider_lane"],
         "provider_prompt_sha256": provider_binding["provider_prompt_sha256"],
         "date": date_str,
