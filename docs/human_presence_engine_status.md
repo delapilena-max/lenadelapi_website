@@ -4,7 +4,7 @@ Bootstrap note: [next_session_start.md](../next_session_start.md)
 
 ## Current State
 
-`PR4A MERGED - CONTROLLED-PROOF EXECUTION AND LATER CLOSURE EVIDENCE REMAIN`
+`PR4B RECORDED - CONTROLLED-PROOF VERIFIED, LATER CLOSURE EVIDENCE REMAIN`
 
 Current aggregate closure status: `not_verified`
 
@@ -50,27 +50,42 @@ Merged facts:
 - PR #75: versioned semantic presence QA
 - PR #76: PR4a closure verification and runtime evidence
 
+## PR4b Result
+
+On July 19, 2026, PR4b executed the provider-free controlled-proof path successfully against current `main`.
+
+- authority commit: `5b68453b96613e65bed1e68b17af7dc7ee440afb`
+- controlled recipe: `hcr_012`
+- scene: `mirror outfit check`
+- selected candidate: `lenagate202607175b68453b-pack000-00-photo::hcr_012::mf_001`
+- controlled-proof report SHA-256: `bbd0104a68e0e254709e95a70524d9ded4508505c7fd85b0c9ae641208d0caa5`
+- candidate report SHA-256: `ba207464ae16f79c2bed10d4fa4899a53b4d610639db1f16e9f7666f0f50ab2f`
+- QA artifact SHA-256: `d091594c0ec88676633077e3f2f1c3188f9f468e69c45182605e9428a8a48202`
+- closure report SHA-256: `47bd67bdfefc07c89e1c727038581f97301b5b230c6b0a711473dd5a73557612`
+
+Verifier disposition:
+
+- `closure_status`: `not_verified`
+- `provider_free_controlled_proof`: `verified`
+- `controlled_live_semantic_proof_receipt`: `not_verified`
+- `ordinary_lane_proof`: `not_applicable`
+- `human_evidence_review`: `not_verified`
+- `final_ci_confirmation`: `not_verified`
+- `authority_commit_binding`: `verified`
+- blocking findings: none
+
+`not_verified` is expected here because the later HPE closure stages have not yet been performed.
+
 ## Next Work
 
-The next session begins with PR4b only:
+The next session begins with PR4c only:
 
-- inspect and validate the already-merged `tools/lena_run_hpe_controlled_proof_v1.py`
-- select a valid existing Higgsfield-generated image and its authoritative candidate/manifest inputs
-- run the existing tool in provider-free mode
-- produce the first real, non-synthetic controlled-proof report
-- verify all bindings against current `main`
-- independently run the PR4a closure verifier against the produced evidence
-- confirm the controlled-proof mandatory condition can be verified
-- confirm all later conditions remain `not_verified`
-- preserve zero provider calls
-- perform no new image generation
-- perform no paid call
-- perform no publishing
-- consume no approval
-- create no retry authority
-- write no failure memory
-- make no reconciliation decision
-- keep aggregate closure status `not_verified`
+- inspect and validate the already-merged `tools/lena_hpe_closure_verification_v1.py` and live semantic proof path
+- produce the controlled live semantic proof receipt when explicitly authorized
+- produce the ordinary-lane proof
+- verify the later closure conditions against current `main`
+- preserve zero provider calls in dry-run and no publish activity until explicitly authorized
+- keep aggregate closure status `not_verified` until the later stages are actually performed
 
 ## Advisory Cleanup
 
