@@ -30,5 +30,5 @@
   "identity_verification_required": true,
   "analytics_triggered_regeneration_disabled": true,
   "effective_at_utc": "2026-07-18T00:00:00Z",
-  "expires_at_utc": "2026-07-19T00:00:00Z"
+  "expires_at_utc": null
 }

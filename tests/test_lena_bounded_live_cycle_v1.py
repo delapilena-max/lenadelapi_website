@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -131,7 +131,7 @@ def _policy_payload(*, autonomy_enabled: bool = True, live_generation_enabled: b
         "identity_verification_required": True,
         "analytics_triggered_regeneration_disabled": True,
         "effective_at_utc": "2026-07-18T00:00:00Z",
-        "expires_at_utc": expires_at_utc or "2026-07-19T00:00:00Z",
+        "expires_at_utc": expires_at_utc,
     }
 
 
@@ -805,6 +805,28 @@ def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: P
     assert sidecar["human_per_cycle_approval_present"] is False
 
 
+def test_non_expiring_standing_policy_validates_and_issues_short_lived_cycle_authorization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch)
+    policy = standing_autonomy.validate_policy_artifact(Path(bundle["policy_path"]))
+    assert policy["expires_at_utc"] is None
+    Path(bundle["auth_path"]).unlink()
+
+    auth_bundle = standing_autonomy.issue_cycle_authorization(
+        Path(bundle["policy_path"]),
+        Path(bundle["handoff_path"]),
+        auth_root=tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles",
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+    auth = json.loads(Path(auth_bundle["path"]).read_text(encoding="utf-8"))
+    issued_at = datetime(2026, 7, 18, 1, 2, 3, tzinfo=timezone.utc)
+    expires_at = datetime.fromisoformat(str(auth["expires_at_utc"]).replace("Z", "+00:00"))
+    assert expires_at > issued_at
+    assert expires_at - issued_at <= timedelta(minutes=30)
+    assert auth["consumed"] is False
+
+
 @pytest.mark.parametrize(
     "mutator, expected_code",
     [
@@ -814,7 +836,8 @@ def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: P
         (lambda policy: policy.__setitem__("live_generation_enabled", False), "policy_live_generation_disabled"),
         (lambda policy: policy.__setitem__("live_publishing_enabled", False), "policy_live_publishing_disabled"),
         (lambda policy: policy.__setitem__("kill_switch_enabled", False), "policy_kill_switch_disabled"),
-        (lambda policy: policy.__setitem__("expires_at_utc", "2020-07-18T00:00:00Z"), "policy_expiry_order_invalid"),
+        (lambda policy: policy.__setitem__("effective_at_utc", "2026-07-20T00:00:00Z"), "policy_effective_at_future_invalid"),
+        (lambda policy: policy.__setitem__("expires_at_utc", "2026-07-18T00:00:00Z"), "policy_expired"),
         (lambda policy: policy.__setitem__("daily_spend_ceiling", 0.0), "policy_daily_spend_ceiling_invalid"),
     ],
 )
