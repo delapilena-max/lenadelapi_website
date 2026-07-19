@@ -146,6 +146,7 @@ def _build_bundle(
     daily_spend_ceiling: float = 25.0,
     consumed: bool = False,
     policy_overrides: dict | None = None,
+    nested_candidate: bool = False,
 ) -> dict[str, Path | dict]:
     candidate_path = _candidate_path(tmp_path, date_str)
     handoff_path = _handoff_path(tmp_path, date_str)
@@ -163,7 +164,8 @@ def _build_bundle(
         "final_action": "prepare_higgsfield_still_dry_run_for_review",
         "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date_str} --slot-id {slot_id}",
     }
-    _write_json(candidate_path, candidate)
+    candidate_file = {"candidate": candidate} if nested_candidate else candidate
+    _write_json(candidate_path, candidate_file)
     policy = _policy_payload(daily_spend_ceiling=daily_spend_ceiling)
     if policy_overrides:
         policy.update(policy_overrides)
@@ -448,6 +450,28 @@ def _build_bundle(
         "handoff": handoff,
         "image_path": image_path,
     }
+
+
+def _rewrite_candidate_shape_and_bindings(bundle: dict[str, Path | dict], *, nested_candidate: dict) -> None:
+    candidate_path = Path(bundle["candidate_path"])
+    handoff_path = Path(bundle["handoff_path"])
+    auth_path = Path(bundle["auth_path"])
+    _write_json(candidate_path, {"candidate": nested_candidate})
+    candidate_sha = _sha(candidate_path)
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff["selected_candidate_sha256"] = candidate_sha
+    if isinstance(handoff.get("selected_candidate"), dict):
+        handoff["selected_candidate"]["artifact_sha256"] = candidate_sha
+    handoff["handoff_sha256"] = _json_sha_without_keys(handoff, {"handoff_sha256"})
+    _write_json(handoff_path, handoff)
+    auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    auth["candidate_artifact_sha256"] = candidate_sha
+    auth["generation_handoff_artifact_sha256"] = _sha(handoff_path)
+    if isinstance(auth.get("audited_inputs"), dict):
+        auth["audited_inputs"]["candidate_artifact_sha256"] = candidate_sha
+        auth["audited_inputs"]["handoff_artifact_sha256"] = _sha(handoff_path)
+    auth["authorization_artifact_sha256"] = _json_sha_without_keys(auth, {"authorization_artifact_sha256"})
+    _write_auth_json(auth_path, auth)
 
 
 def _build_simulation_artifacts(tmp_path: Path, bundle: dict[str, Path | dict], *, qa_disposition: str = "accept", qa_overall: str = "pass") -> dict[str, Path | dict]:
@@ -762,6 +786,23 @@ def test_policy_issue_and_simulation_success_chain_without_consumption(tmp_path:
     assert first["child_artifacts"]["authorization_artifact"]["path"].endswith(f"{SLOT_ID}.json")
 
 
+def test_simulation_nested_candidate_artifact_shape_validates_without_consumption(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, nested_candidate=True)
+    bundle = _build_simulation_artifacts(tmp_path, bundle)
+
+    report = _run_cycle(bundle, simulate=True, report_root=tmp_path / "reports")
+
+    assert report["ok"] is True
+    assert report["simulation_mode"] is True
+    assert report["live_execution"] is False
+    assert report["authorization_consumed"] is False
+    assert report["provider_calls_performed"] == 0
+    assert report["publish_calls_performed"] == 0
+    assert json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))["consumed"] is False
+
+
 def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_roots(monkeypatch, tmp_path)
     _patch_clock(monkeypatch)
@@ -803,6 +844,59 @@ def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: P
     assert sidecar["publish_authorized_by_policy"] is True
     assert sidecar["human_per_cycle_approval_required"] is False
     assert sidecar["human_per_cycle_approval_present"] is False
+
+
+@pytest.mark.parametrize("nested_candidate", [False, True], ids=["flat", "nested"])
+def test_live_candidate_artifact_shape_normalization_validates_both_candidate_shapes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nested_candidate: bool
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, nested_candidate=nested_candidate)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+
+    report = _run_cycle(bundle, simulate=False, report_root=tmp_path / "reports")
+
+    assert report["ok"] is True
+    assert report["live_execution"] is True
+    assert report["simulation_mode"] is False
+    assert report["provider_calls_performed"] == 1
+    assert report["publish_calls_performed"] == 1
+    assert state["provider_calls"] == 1
+    assert state["publish_calls"] == 1
+    assert report["child_artifacts"]["candidate_artifact"]["sha256"] == _sha(Path(bundle["candidate_path"]))
+    assert json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))["consumed"] is True
+
+
+@pytest.mark.parametrize(
+    "field, expected_code",
+    [
+        ("candidate_id", "candidate_id_mismatch"),
+        ("slot_id", "slot_id_mismatch"),
+    ],
+)
+def test_live_nested_candidate_binding_mismatches_fail_closed_without_provider_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str, expected_code: str
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, nested_candidate=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    nested_candidate = json.loads(Path(bundle["candidate_path"]).read_text(encoding="utf-8"))["candidate"]
+    nested_candidate[field] = f"mismatch-{field}"
+    _rewrite_candidate_shape_and_bindings(bundle, nested_candidate=nested_candidate)
+
+    kind, value = _run_cycle_outcome(bundle, simulate=False, report_root=tmp_path / "reports")
+    if kind == "error":
+        assert value.code == expected_code
+    else:
+        assert value["ok"] is False
+        assert value["failure"]["code"] == expected_code
+
+    assert int(state["provider_calls"]) == 0
+    assert int(state["publish_calls"]) == 0
+    assert int(state["qa_calls"]) == 0
+    assert json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))["consumed"] is True
 
 
 def test_non_expiring_standing_policy_validates_and_issues_short_lived_cycle_authorization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
