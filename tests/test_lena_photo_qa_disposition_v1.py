@@ -373,10 +373,7 @@ def _production_dual_binding_fixture(
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
     handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
-    prompt_source = json.loads(
-        (ROOT / "pipeline" / "strategy" / "lena" / "next_actions" / "2026-07-17" / "lena_next_live_image_handoff_2026-07-17.json").read_text(encoding="utf-8")
-    )
-    selected_prompt_text = str(prompt_source["structured_executor_inputs"]["selected_prompt_text"])
+    selected_prompt_text = "provider prompt preview"
     canonical_pose_text = "weight shifted onto one hip, stance easy and unforced"
     canonical_expression = disposition.lena_prompt_brain._higgsfield_safe_expression_text(
         "",
