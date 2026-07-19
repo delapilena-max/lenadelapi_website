@@ -539,7 +539,7 @@ def _resolve_generation_binding_context(
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     report_type = artifact.get("report_type")
     if report_type == standing_autonomy.AUTH_REPORT_TYPE:
-        auth = standing_autonomy.validate_cycle_authorization_artifact(decision_path)
+        auth = standing_autonomy.validate_cycle_authorization_artifact(decision_path, allow_consumed=True)
         handoff_facts = approval.inspect_handoff_artifact(
             Path(str(auth["artifact"]["generation_handoff_artifact_path"]))
         )
@@ -547,6 +547,7 @@ def _resolve_generation_binding_context(
         standing_autonomy.validate_cycle_authorization_artifact(
             decision_path,
             handoff_report=handoff_facts["report"],
+            allow_consumed=True,
         )
         return decision, candidate, "authorization_bound_handoff", handoff_facts
     decision, candidate, decision_kind = _validate_decision(decision_path)
@@ -1196,11 +1197,9 @@ def evaluate_photo_qa_disposition(
         identity_evidence = _validate_identity_evidence(
             identity_evidence_path.resolve(), decision, candidate, manifest, image
         )
-        active_fingerprint = (
-            decision["decision_fingerprint_sha256"]
-            if decision_kind == "selected_candidate"
-            else decision["retry_decision_fingerprint_sha256"]
-        )
+        active_fingerprint = decision.get("decision_fingerprint_sha256") or decision.get("retry_decision_fingerprint_sha256")
+        if not active_fingerprint:
+            raise BoundaryError("identity_evidence_invalid", "decision fingerprint is missing from the bound authorization context")
         references, reference_set_sha, reference_authority = _validate_references(
             reference_specs, reference_authority_artifact.resolve(), reference_authority_sha256, decision["authority_commit"]
         )

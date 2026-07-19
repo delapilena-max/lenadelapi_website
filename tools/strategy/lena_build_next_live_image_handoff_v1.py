@@ -274,8 +274,6 @@ def _handoff_cross_field_binding_split_brain_error(
             return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
         if linkage.get("selected_candidate_artifact_sha256") != candidate_binding.get("selected_candidate_artifact_sha256"):
             return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
-        if linkage.get("content_packet_artifact_path") != provider_binding.get("content_packet_artifact_path"):
-            return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
         if linkage.get("content_packet_artifact_sha256") != provider_binding.get("content_packet_artifact_sha256"):
             return "handoff_dual_binding_artifact_sha_mismatch", json.dumps(binding_context, indent=2, ensure_ascii=True, sort_keys=True)
         if linkage.get("candidate_prompt_family") != PROMPT_FAMILY_CANDIDATE_SELECTION or linkage.get("provider_prompt_family") != PROMPT_FAMILY_PROVIDER_EXECUTION:

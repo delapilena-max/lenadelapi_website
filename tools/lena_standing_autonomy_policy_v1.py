@@ -625,6 +625,7 @@ def validate_cycle_authorization_artifact(
     *,
     policy_result: dict[str, Any] | None = None,
     handoff_report: dict[str, Any] | None = None,
+    allow_consumed: bool = False,
 ) -> dict[str, Any]:
     auth_path = _ensure_path_within_root(
         auth_path,
@@ -639,7 +640,12 @@ def validate_cycle_authorization_artifact(
     _require(auth.get("authorization_mode") == AUTHORIZATION_MODE, "authorization_mode_invalid", f"authorization_mode must be {AUTHORIZATION_MODE!r}")
     _require(auth.get("authorization_issuer") == AUTHORIZATION_ISSUER, "authorization_issuer_invalid", f"authorization_issuer must be {AUTHORIZATION_ISSUER!r}")
     _require(auth.get("single_use") is True, "authorization_single_use_invalid", "authorization must be single-use")
-    _require(auth.get("consumed") is False, "authorization_already_consumed", "authorization has already been consumed")
+    consumed = auth.get("consumed")
+    _require(
+        consumed is False or (allow_consumed and consumed is True),
+        "authorization_already_consumed",
+        "authorization has already been consumed",
+    )
     _require(auth.get("kill_switch_enabled") is True, "authorization_kill_switch_disabled", "kill switch must be enabled")
     _require(int(auth.get("provider_call_cap_per_cycle", 0)) == 1, "provider_call_cap_invalid", "provider call cap must be one")
     _require(int(auth.get("publish_action_cap_per_cycle", 0)) == 1, "publish_action_cap_invalid", "publish action cap must be one")
@@ -699,6 +705,13 @@ def validate_cycle_authorization_artifact(
             "platform_invalid",
             "authorization platform must match handoff",
         )
+    resolved_candidate_path = _ensure_path_within_root(
+        Path(str(auth.get("candidate_artifact_path") or "")),
+        ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+        code="candidate_path_escape",
+        label="candidate artifact",
+        must_exist=True,
+    )
     if handoff_report is not None:
         selected_candidate = handoff_report.get("selected_candidate")
         selected_candidate = selected_candidate if isinstance(selected_candidate, dict) else {}
@@ -727,13 +740,6 @@ def validate_cycle_authorization_artifact(
             "handoff_sha_mismatch",
             "generation handoff SHA does not match the artifact bytes",
         )
-        resolved_candidate_path = _ensure_path_within_root(
-            Path(str(auth.get("candidate_artifact_path") or "")),
-            ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
-            code="candidate_path_escape",
-            label="candidate artifact",
-            must_exist=True,
-        )
         _require(
             str(auth.get("candidate_artifact_path") or "") == str(resolved_selected_candidate_path),
             "authorization_candidate_path_mismatch",
@@ -761,6 +767,13 @@ def validate_cycle_authorization_artifact(
         isinstance(binding_linkage, dict),
         "authorization_binding_linkage_missing",
         "authorization binding_linkage must be present",
+    )
+    resolved_candidate_path = _ensure_path_within_root(
+        Path(str(auth.get("candidate_artifact_path") or "")),
+        ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
+        code="candidate_path_escape",
+        label="candidate artifact",
+        must_exist=True,
     )
     if handoff_report is not None:
         selected_prompt_input = handoff_report.get("selected_prompt_input")

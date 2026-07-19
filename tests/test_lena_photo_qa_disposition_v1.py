@@ -17,7 +17,13 @@ if str(ROOT) not in sys.path:
 
 from pipeline.identity import lena_higgsfield_identity as identity
 from tests.fixtures.lena_retry_lineage import build_retry_lineage
+from tests.test_lena_bounded_live_cycle_v1 import _build_bundle as build_live_cycle_bundle
+from tests.test_lena_bounded_live_cycle_v1 import _patch_clock as patch_live_cycle_clock
+from tests.test_lena_bounded_live_cycle_v1 import _patch_roots as patch_live_cycle_roots
 from tools import lena_photo_qa_disposition_v1 as disposition
+from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+from tools.strategy import lena_build_generation_reconciliation_v1 as reconciliation_builder
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff
 from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
@@ -36,6 +42,20 @@ def _write_png(path: Path) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (1, 1), "white").save(path)
     return _sha(path)
+
+
+def _json_sha_without_keys(path: Path, excluded_keys: set[str]) -> str:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    for key in excluded_keys:
+        payload.pop(key, None)
+    return hashlib.sha256((json.dumps(payload, indent=2, ensure_ascii=True) + "\n").encode("utf-8")).hexdigest()
+
+
+def _json_sha_without_keys_payload(payload: dict, excluded_keys: set[str]) -> str:
+    value = json.loads(json.dumps(payload, indent=2, ensure_ascii=True))
+    for key in excluded_keys:
+        value.pop(key, None)
+    return hashlib.sha256((json.dumps(value, indent=2, ensure_ascii=True) + "\n").encode("utf-8")).hexdigest()
 
 
 def _all_pass() -> dict:
@@ -65,6 +85,7 @@ RETRY_IMAGE = ROOT / "pipeline" / "higgsfield_library" / "lena" / RETRY_DATE / f
 RETRY_IDENTITY = ROOT / "pipeline" / "higgsfield_debug" / RETRY_DATE / RETRY_SLOT / "identity_verification.json"
 REFERENCE_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
 MODEL_AUTHORITY = ROOT / "pipeline" / "identity" / "lena_visual_model_authority_v1.json"
+REFERENCE_IMAGE = ROOT / "pipeline" / "higgsfield_library" / "lena" / "2026-07-09" / "prompt_isolation_tests" / "readypack0709-pack004-08-wardrobe-test-c_seed.png"
 
 
 @pytest.fixture()
@@ -337,6 +358,463 @@ def _evaluate(harness: dict, observations: dict | None = None, **updates):
     return disposition.evaluate_photo_qa_disposition(**kwargs)
 
 
+def _production_dual_binding_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> dict[str, Path | dict | str]:
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_path = Path(bundle["handoff_path"])
+    auth_path = Path(bundle["auth_path"])
+    image_path = Path(bundle["image_path"])
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    prompt_source = json.loads(
+        (ROOT / "pipeline" / "strategy" / "lena" / "next_actions" / "2026-07-17" / "lena_next_live_image_handoff_2026-07-17.json").read_text(encoding="utf-8")
+    )
+    selected_prompt_text = str(prompt_source["structured_executor_inputs"]["selected_prompt_text"])
+    canonical_pose_text = "weight shifted onto one hip, stance easy and unforced"
+    canonical_expression = disposition.lena_prompt_brain._higgsfield_safe_expression_text(
+        "",
+        {
+            "label": "closed_mouth_smile_direct",
+            "text": "closed-mouth smile, soft direct eye contact, slight head tilt",
+        },
+    )
+    wardrobe_catalog = json.loads(
+        (ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json").read_text(encoding="utf-8")
+    )
+    wardrobe_prompt = next(item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050")
+    reference_authority_commit = disposition.subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+    provider_prompt_text = (
+        f"{selected_prompt_text} Pose: {canonical_pose_text}. "
+        f"Expression: {canonical_expression['text']}. Wardrobe: {wardrobe_prompt}"
+    )
+    provider_prompt_sha = hashlib.sha256(provider_prompt_text.encode("utf-8")).hexdigest()
+    auth["influencer_id"] = "lena"
+    auth["authority_commit"] = reference_authority_commit
+    date_str = str(auth["date"])
+    candidate_source = dict(bundle["candidate"])
+    candidate_source["authority_commit"] = reference_authority_commit
+    candidate_source.update({
+        "pose_body_language_id": "pose_p001",
+        "pose_body_language_label": "weight_shift_one_hip",
+        "pose": "weight_shift_one_hip",
+        "pose_text": canonical_pose_text,
+        "expression_text": canonical_expression["text"],
+        "expression_gaze_id": "exp_g001",
+        "expression_gaze_label": "closed_mouth_smile_direct",
+        "wardrobe_outfit_id": "wc_p050",
+        "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
+        "wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "visual_style": "fitted_top_and_jeans",
+        "image_format_detected": ".png",
+    })
+    candidate_source["prompt_sha256"] = provider_prompt_sha
+    candidate_path = Path(bundle["candidate_path"])
+    resolved_candidate_path = str(candidate_path.resolve())
+    authorities = selector.load_authorities()
+    recent = selector.load_recent_content()
+    prompt_candidates, prompt_meta = selector.build_prompt_candidates(date_str, str(candidate_source["authority_commit"])[:8])
+    rejected_candidates = []
+    candidate_body = dict(candidate_source)
+    candidate_file_core = selector._decision_core(
+        str(candidate_source["authority_commit"]),
+        date_str,
+        authorities,
+        candidate_source,
+        rejected_candidates,
+        recent,
+        prompt_meta,
+    )
+    candidate_file = dict(candidate_file_core)
+    candidate_file["generated_at_utc"] = "2026-07-19T00:00:00Z"
+    candidate_file["decision_fingerprint_sha256"] = hashlib.sha256(selector._canonical_bytes(candidate_file_core)).hexdigest()
+    _write_json(candidate_path, candidate_file)
+    candidate_sha = _sha(candidate_path)
+    handoff["repo_executor_path"] = "pipeline/higgsfield_lena_api_executor.py"
+    handoff["created_at"] = "2026-07-19T00:00:00Z"
+    handoff["influencer_id"] = "lena"
+    handoff["selected_candidate_sha256"] = candidate_sha
+    handoff["source_selected_candidate_artifact_path"] = resolved_candidate_path
+    handoff["source_selected_candidate_artifact_sha256"] = candidate_sha
+    selected_candidate = dict(candidate_body)
+    selected_candidate["influencer_id"] = "lena"
+    selected_candidate["artifact_path"] = resolved_candidate_path
+    selected_candidate["artifact_sha256"] = candidate_sha
+    selected_candidate["schema_version"] = "lena_pre_generation_candidate_gate_v1"
+    selected_candidate["candidate_status"] = "selected"
+    handoff["selected_candidate"] = selected_candidate
+    selected_prompt_input = dict(handoff["selected_prompt_input"])
+    selected_prompt_input["slot_id"] = str(handoff["selected_slot_id"])
+    selected_prompt_input["selected_candidate_artifact_path"] = resolved_candidate_path
+    selected_prompt_input["selected_candidate_artifact_sha256"] = candidate_sha
+    selected_prompt_input["prompt_text"] = provider_prompt_text
+    selected_prompt_input["selected_prompt_text"] = provider_prompt_text
+    selected_prompt_input["prompt_sha256"] = provider_prompt_sha
+    handoff["selected_prompt_input"] = selected_prompt_input
+    structured_executor_inputs = dict(handoff["structured_executor_inputs"])
+    structured_executor_inputs["slot_id"] = str(handoff["selected_slot_id"])
+    structured_executor_inputs["handoff_artifact_path"] = handoff_path.relative_to(tmp_path).as_posix()
+    structured_executor_inputs["selected_candidate_artifact_path"] = resolved_candidate_path
+    structured_executor_inputs["selected_candidate_artifact_sha256"] = candidate_sha
+    structured_executor_inputs["selected_prompt_text"] = provider_prompt_text
+    structured_executor_inputs["selected_prompt_sha256"] = provider_prompt_sha
+    structured_executor_inputs["soul_metadata"] = {
+        "name": "Lena",
+        "type": "Soul 2.0",
+        "custom_reference_id": str(auth["custom_reference_id"]),
+        "identity_is_prompt_instruction": False,
+    }
+    handoff["structured_executor_inputs"] = structured_executor_inputs
+    learning_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_post_outcome_learning_state_{date_str}.json"
+    recommendation_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_next_generation_step_{date_str}.json"
+    candidate_selection_binding = dict(handoff["candidate_selection_binding"])
+    candidate_selection_binding["selected_candidate_artifact_path"] = resolved_candidate_path
+    candidate_selection_binding["selected_candidate_artifact_sha256"] = candidate_sha
+    candidate_selection_binding["candidate_prompt_sha256"] = provider_prompt_sha
+    handoff["candidate_selection_binding"] = candidate_selection_binding
+    binding_linkage = dict(handoff["binding_linkage"])
+    binding_linkage["selected_candidate_artifact_path"] = resolved_candidate_path
+    binding_linkage["selected_candidate_artifact_sha256"] = candidate_sha
+    binding_linkage["recommendation_artifact_sha256"] = _sha(recommendation_path)
+    handoff["binding_linkage"] = binding_linkage
+    handoff["expected_handoff_artifact_path"] = handoff_path.relative_to(tmp_path).as_posix()
+    monkeypatch.setattr(reconciliation_builder, "ROOT", tmp_path)
+    monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
+    learning = json.loads(learning_path.read_text(encoding="utf-8"))
+    learning["learning_status"] = "current"
+    learning["learning_required_follow_up_action"] = "build_next_live_image_handoff"
+    _write_json(learning_path, learning)
+    recommendation = json.loads(recommendation_path.read_text(encoding="utf-8"))
+    recommendation["learning_status"] = "current"
+    _write_json(recommendation_path, recommendation)
+    binding_linkage["recommendation_artifact_sha256"] = _sha(recommendation_path)
+    reconciliation_path = tmp_path / "pipeline" / "strategy" / "lena" / "reconciliations" / date_str / "lena_generation_reconciliation_fixture.json"
+    reconciliation_report = {
+        "report_type": "lena_generation_reconciliation",
+        "schema_version": "lena_generation_reconciliation_v1",
+        "date": date_str,
+        "generated_at": "2026-07-19T00:00:00Z",
+        "source_revision": candidate_body["authority_commit"][:8],
+        "source_revision_commit": candidate_body["authority_commit"],
+        "source_artifacts": {
+            "learning": {
+                "source_artifact_path": str(learning_path.relative_to(tmp_path)).replace("\\", "/"),
+                "source_artifact_present": True,
+                "source_artifact_sha256": _sha(learning_path),
+                "source_report_type": learning["report_type"],
+                "source_schema_version": learning["version"],
+                "source_date": date_str,
+            },
+            "recommendation": {
+                "source_artifact_path": str(recommendation_path.relative_to(tmp_path)).replace("\\", "/"),
+                "source_artifact_present": True,
+                "source_artifact_sha256": _sha(recommendation_path),
+                "source_report_type": recommendation["report_type"],
+                "source_schema_version": recommendation["version"],
+                "source_date": date_str,
+            },
+            "selected_candidate": {
+                "source_artifact_path": str(candidate_path.relative_to(tmp_path)).replace("\\", "/"),
+                "source_artifact_present": True,
+                "source_artifact_sha256": candidate_sha,
+                "source_report_type": candidate_file["schema_version"],
+                "source_schema_version": candidate_file["schema_version"],
+                "source_date": date_str,
+            },
+        },
+        "learning_status": learning["learning_status"],
+        "recommendation_recipe_id": candidate_body["recipe_id"],
+        "recommendation_outfit_id": "wc_p059",
+        "recommendation_environment_id": "env_p001",
+        "recommendation_action_type": "build_next_live_image_handoff",
+        "recommendation_learning_signal_used": "queue_boosts",
+        "selected_candidate_id": candidate_body["candidate_id"],
+        "selected_candidate_recipe_id": candidate_body["recipe_id"],
+        "selected_candidate_slot_id": candidate_body["slot_id"],
+        "selected_candidate_hook_id": candidate_body["hook_id"],
+        "selected_candidate_prompt_sha256": candidate_body["prompt_sha256"],
+        "selected_candidate_authority_commit": candidate_body["authority_commit"],
+        "selected_candidate_schema_version": "lena_pre_generation_candidate_gate_v1",
+        "selected_candidate_status": "selected",
+        "ranking_evidence": {
+            "learning_status": learning["learning_status"],
+            "learning_required_follow_up_action": learning["learning_required_follow_up_action"],
+            "preferred_recipe_ids": [candidate_body["recipe_id"]],
+            "recommended_recipe_rank_index": 0,
+            "selected_candidate_recipe_rank_index": 0,
+            "recommended_recipe_is_preferred": True,
+            "selected_candidate_recipe_is_preferred": True,
+        },
+        "compatibility_evidence": {
+            "recipe_match": True,
+            "selected_candidate_status": "selected",
+            "selected_candidate_body_present": True,
+            "recommended_recipe_id": candidate_body["recipe_id"],
+            "recommended_outfit_id": "wc_p059",
+            "recommended_environment_id": "env_p001",
+            "selected_candidate_recipe_id": candidate_body["recipe_id"],
+            "selected_candidate_slot_id": candidate_body["slot_id"],
+            "selected_candidate_id": candidate_body["candidate_id"],
+            "selected_candidate_hook_id": candidate_body["hook_id"],
+            "selected_candidate_prompt_sha256": candidate_body["prompt_sha256"],
+            "selected_candidate_authority_commit": candidate_body["authority_commit"],
+            "selected_candidate_schema_version": "lena_pre_generation_candidate_gate_v1",
+            "recommendation_learning_signal_used": "queue_boosts",
+        },
+        "blocking_reasons": [],
+        "divergence_status": "aligned",
+        "resolution_policy": "selected_candidate_authoritative",
+        "reconciliation_status": "reconciled",
+        "operator_review_required": False,
+        "final_reconciled_candidate_id": candidate_body["candidate_id"],
+        "final_reconciled_candidate_recipe_id": candidate_body["recipe_id"],
+        "final_reconciled_candidate_slot_id": candidate_body["slot_id"],
+        "final_reconciled_candidate_hook_id": candidate_body["hook_id"],
+        "final_reconciled_candidate_prompt_sha256": candidate_body["prompt_sha256"],
+        "final_reconciled_candidate_artifact_path": str(candidate_path.relative_to(tmp_path)).replace("\\", "/"),
+        "final_reconciled_candidate_artifact_sha256": candidate_sha,
+        "exact_next_allowed_action": "build_next_live_image_handoff",
+        "next_allowed_action": {
+            "action": "build_next_live_image_handoff",
+            "status": "reconciled",
+        },
+        "dirty_workspace_dependency": False,
+        "shadow_mode_only": True,
+        "provider_call_performed": False,
+        "approval_consumed": False,
+        "claims_written": False,
+        "receipts_written": False,
+        "queue_mutated": False,
+        "publish_performed": False,
+    }
+    _write_json(reconciliation_path, reconciliation_report)
+    reconciliation_sha = _sha(reconciliation_path)
+    handoff["source_learning_artifact_path"] = str(learning_path.relative_to(tmp_path)).replace("\\", "/")
+    handoff["source_learning_artifact_sha256"] = _sha(learning_path)
+    handoff["source_recommendation_artifact_path"] = str(recommendation_path.relative_to(tmp_path)).replace("\\", "/")
+    handoff["source_recommendation_artifact_sha256"] = _sha(recommendation_path)
+    queue_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_autonomous_generation_queue_dryrun_{date_str}.json"
+    handoff["source_queue_dry_run_artifact_path"] = str(queue_path.relative_to(tmp_path)).replace("\\", "/")
+    handoff["source_queue_dry_run_artifact_sha256"] = _sha(queue_path)
+    handoff["source_reconciliation_artifact_path"] = str(reconciliation_path)
+    handoff["source_reconciliation_artifact_sha256"] = reconciliation_sha
+    handoff["prompt_sha256"] = provider_prompt_sha
+    handoff["prompt_text"] = provider_prompt_text
+    handoff["provider_execution_binding"]["provider_prompt_sha256"] = provider_prompt_sha
+    handoff["structured_executor_inputs"]["selected_prompt_text"] = provider_prompt_text
+    handoff["structured_executor_inputs"]["selected_prompt_sha256"] = provider_prompt_sha
+    reference_manifest_path = (
+        ROOT
+        / "pipeline"
+        / "higgsfield_debug"
+        / "2026-07-09"
+        / "prompt_isolation_tests"
+        / "readypack0709-pack004-08-wardrobe-test-c"
+        / "result_manifest.json"
+    )
+    reference_manifest = {
+        "provider": "higgsfield",
+        "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+        "provider_status": "completed",
+        "job_type": identity.EXPECTED_JOB_TYPE,
+        "custom_reference_id": str(auth["custom_reference_id"]),
+    }
+    _write_json(reference_manifest_path, reference_manifest)
+    request.addfinalizer(lambda: reference_manifest_path.unlink() if reference_manifest_path.exists() else None)
+    reference_authority_path = tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
+    reference_image_path = REFERENCE_IMAGE
+    reference_manifest_sha = _sha(reference_manifest_path)
+    reference_manifest_oid = "616f2d524153abbd3bb73fdcaf29530af83c0334"
+    synthetic_reference_authority = {
+        "schema_version": "lena_identity_reference_authority_v1",
+        "influencer_id": "lena",
+        "authority_id": "lena_visual_reference_authority_v1",
+        "authority_commit": reference_authority_commit,
+        "created_at_utc": "2026-07-19T00:00:00Z",
+        "reference_set_sha256": hashlib.sha256(
+            selector._canonical_bytes(
+                {
+                    "authority_id": "lena_visual_reference_authority_v1",
+                    "references": [
+                        {
+                            "path": REFERENCE_IMAGE.relative_to(ROOT).as_posix(),
+                            "sha256": _sha(REFERENCE_IMAGE),
+                        }
+                    ],
+                }
+            )
+        ).hexdigest(),
+        "references": [
+            {
+                "path": REFERENCE_IMAGE.relative_to(ROOT).as_posix(),
+                "sha256": _sha(REFERENCE_IMAGE),
+            }
+        ],
+        "reference_metadata": [
+            {
+                "role": "canonical_face_hair_and_full_body",
+                "format": "PNG",
+                "width": 1152,
+                "height": 2048,
+                "provider": "higgsfield",
+                "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+                "job_type": "text2image_soul_v2",
+                "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+                "provenance_manifest": "pipeline/higgsfield_debug/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c/result_manifest.json",
+                "provenance_manifest_sha256": reference_manifest_sha,
+                "provenance_manifest_git_blob_oid": reference_manifest_oid,
+                "authority_scope": "identity_continuity_not_style",
+                "authoritative_traits": [
+                    "face_continuity",
+                    "hair_continuity",
+                    "apparent_age",
+                    "skin_and_freckle_continuity",
+                    "body_silhouette_continuity",
+                    "overall_lena_identity_continuity",
+                ],
+                "non_authoritative_traits": [
+                    "night_lighting",
+                    "makeup",
+                    "wardrobe",
+                    "pose",
+                    "scene",
+                    "background",
+                    "glamour_intensity",
+                ],
+            }
+        ],
+    }
+    _write_json(reference_authority_path, synthetic_reference_authority)
+    reference_authority_bytes = reference_authority_path.read_bytes()
+    reference_image_bytes = reference_image_path.read_bytes()
+    reference_manifest_bytes = reference_manifest_path.read_bytes()
+    original_git_show_bytes = disposition._git_show_bytes
+    original_git_blob_oid = disposition._git_blob_oid
+
+    def synthetic_git_show_bytes(commit: str, path: Path) -> bytes:
+        resolved = Path(path).resolve()
+        if resolved == reference_authority_path.resolve():
+            return reference_authority_bytes
+        if resolved == reference_image_path.resolve():
+            return reference_image_bytes
+        if resolved == reference_manifest_path.resolve():
+            return reference_manifest_bytes
+        return original_git_show_bytes(commit, path)
+
+    def synthetic_git_blob_oid(commit: str, path: Path) -> str:
+        if Path(path).resolve() == reference_manifest_path.resolve():
+            return reference_manifest_oid
+        return original_git_blob_oid(commit, path)
+
+    monkeypatch.setattr(disposition, "_git_show_bytes", synthetic_git_show_bytes)
+    monkeypatch.setattr(disposition, "_git_blob_oid", synthetic_git_blob_oid)
+    _write_json(handoff_path, handoff)
+    handoff_sha = _sha(handoff_path)
+    auth["consumed"] = True
+    auth["authorization_consumed"] = True
+    auth["consumed_at_utc"] = "2026-07-19T00:00:00Z"
+    auth["authorization_state_before"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
+    auth["authorization_state_after"] = {"single_use": True, "consumed": True, "consumed_at_utc": "2026-07-19T00:00:00Z"}
+    auth["candidate_artifact_path"] = resolved_candidate_path
+    auth["candidate_artifact_sha256"] = candidate_sha
+    auth["prompt_sha256"] = provider_prompt_sha
+    auth["provider_execution_binding"]["provider_prompt_sha256"] = provider_prompt_sha
+    auth["generation_handoff_artifact_sha256"] = handoff_sha
+    auth.pop("authorization_artifact_sha256", None)
+    _write_json(auth_path, auth)
+    auth["authorization_artifact_sha256"] = standing_autonomy._sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
+    _write_json(auth_path, auth)
+    prompt_text = provider_prompt_text
+    provider_binding = dict(handoff["provider_execution_binding"])
+    date_str = str(auth["date"])
+    slot_id = str(auth["slot_id"])
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / date_str / slot_id / "result_manifest.json"
+    manifest = {
+        "report_type": "lena_higgsfield_result_manifest",
+        "schema_version": "v1",
+        "provider": "higgsfield",
+        "job_type": identity.EXPECTED_JOB_TYPE,
+        "date": date_str,
+        "slot_id": slot_id,
+        "lane": provider_binding["provider_lane"],
+        "prompt_sha256": provider_prompt_sha,
+        "image_prompt": prompt_text,
+        "pose_body_language_id": "pose_p001",
+        "pose_body_language_label": "weight_shift_one_hip",
+        "pose_text": canonical_pose_text,
+        "expression_text": canonical_expression["text"],
+        "expression_safe_fallback_used": False,
+        "expression_safe_fallback_reason": None,
+        "expression_scene_conflict_terms": [],
+        "expression_gaze_id": "exp_g001",
+        "expression_gaze_label": "closed_mouth_smile_direct",
+        "wardrobe_outfit_id": "wc_p050",
+        "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
+        "wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "custom_reference_id": str(auth["custom_reference_id"]),
+        "cli_soul_name": identity.EXPECTED_SOUL_NAME,
+        "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
+        "provider_job_id": "job-123",
+        "provider_status": "completed",
+        "saved_image_path": str(image_path),
+        "live_attempt_count": 1,
+        "retry_count": 0,
+        "image_format_detected": ".png",
+    }
+    _write_json(manifest_path, manifest)
+    evidence_path = identity.identity_verification_evidence_path(date_str, slot_id)
+    evidence = {
+        "schema_version": identity.SCHEMA_VERSION,
+        "verified_at_utc": "2026-07-19T00:00:00Z",
+        "provider": "higgsfield",
+        "date": date_str,
+        "slot_id": slot_id,
+        "provider_job_id": "job-123",
+        "provider_job_status": "completed",
+        "job_type": identity.EXPECTED_JOB_TYPE,
+        "custom_reference_id": str(auth["custom_reference_id"]),
+        "soul_name": identity.EXPECTED_SOUL_NAME,
+        "soul_type": identity.EXPECTED_SOUL_TYPE,
+        "prompt_sha256": candidate_body["prompt_sha256"],
+        "width": identity.EXPECTED_WIDTH,
+        "height": identity.EXPECTED_HEIGHT,
+        "local_image_path": str(image_path),
+        "local_image_sha256": _sha(image_path),
+        "local_image_sha256_provenance": "fixture local hash",
+        "verification_result": "pass",
+        "checks_passed": ["fixture"],
+    }
+    _write_json(evidence_path, evidence)
+    return {
+        "auth_path": auth_path,
+        "manifest_path": manifest_path,
+        "evidence_path": evidence_path,
+        "image_path": image_path,
+        "reference_authority_path": reference_authority_path,
+        "reference_authority_sha": _sha(reference_authority_path),
+        "reference_image_path": REFERENCE_IMAGE,
+        "reference_image_sha": _sha(REFERENCE_IMAGE),
+        "provider_lane": provider_binding["provider_lane"],
+        "provider_prompt_sha256": provider_binding["provider_prompt_sha256"],
+        "date": date_str,
+        "slot_id": slot_id,
+    }
+
+
 def _run_main(monkeypatch: pytest.MonkeyPatch, argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict]:
     monkeypatch.setattr(sys, "argv", ["lena_photo_qa_disposition_v1.py", *argv])
     exit_code = disposition.main()
@@ -429,6 +907,62 @@ def test_authorization_bound_manifest_uses_provider_binding(harness, tmp_path: P
 
     assert result["lane"] == "fit_check_mirror_getting_ready"
     assert result["prompt_sha256"] == provider_prompt_sha
+
+
+def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    bundle = _production_dual_binding_fixture(tmp_path, monkeypatch, request)
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=Path(bundle["auth_path"]),
+        manifest_path=Path(bundle["manifest_path"]),
+        image_path=Path(bundle["image_path"]),
+        identity_evidence_path=Path(bundle["evidence_path"]),
+        reference_specs=[(Path(bundle["reference_image_path"]), str(bundle["reference_image_sha"]))],
+        reference_authority_artifact=Path(bundle["reference_authority_path"]),
+        reference_authority_sha256=str(bundle["reference_authority_sha"]),
+        expected_image_sha256=_sha(Path(bundle["image_path"])),
+    )
+
+    assert result["qa_inputs"]["decision_kind"] == "authorization_bound_handoff"
+    assert result["provider_called"] is False
+    assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
+    assert result["generation_provenance"]["provider_execution_binding"]["provider_lane"] == bundle["provider_lane"]
+    assert result["generation_provenance"]["provider_job_id"] == "job-123"
+    assert result["generation_provenance"]["manifest_path"] == str(Path(bundle["manifest_path"]).resolve())
+    assert result["identity_reference_provenance"]["references"][0]["path"] == str(Path(bundle["reference_image_path"]).resolve())
+    assert result["reason_codes"] == ["visual_review_unavailable"]
+
+
+def test_consumed_authorization_with_invalid_linkage_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    bundle = _production_dual_binding_fixture(tmp_path, monkeypatch, request)
+    auth_path = Path(bundle["auth_path"])
+    auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    auth.pop("candidate_selection_binding", None)
+    auth.pop("authorization_artifact_sha256", None)
+    _write_json(auth_path, auth)
+    auth["authorization_artifact_sha256"] = standing_autonomy._sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
+    _write_json(auth_path, auth)
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        disposition.evaluate_photo_qa_disposition(
+            decision_path=auth_path,
+            manifest_path=Path(bundle["manifest_path"]),
+            image_path=Path(bundle["image_path"]),
+            identity_evidence_path=Path(bundle["evidence_path"]),
+            reference_specs=[(Path(bundle["reference_image_path"]), str(bundle["reference_image_sha"]))],
+            reference_authority_artifact=Path(bundle["reference_authority_path"]),
+            reference_authority_sha256=str(bundle["reference_authority_sha"]),
+            expected_image_sha256=_sha(Path(bundle["image_path"])),
+        )
+
+    assert exc_info.value.code == "authorization_candidate_selection_binding_missing"
 
 
 @pytest.mark.parametrize(
