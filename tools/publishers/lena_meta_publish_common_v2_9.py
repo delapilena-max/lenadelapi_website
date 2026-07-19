@@ -460,7 +460,9 @@ def _gate_resolve_path(raw: str) -> Path:
 
 
 def check_final_publish_approval(payload: dict) -> dict:
-    """Hard gate: verify FINAL_PUBLISH_APPROVED_BY_NICOLAS in asset sidecar.
+    """Hard gate: verify publish authorization in the asset sidecar.
+    The autonomous path uses standing-autonomy policy evidence; the legacy
+    human-review path remains accepted for historical artifacts only.
     Call before token preflight, R2, or any Graph API call. Fails closed.
     """
     asset_raw = payload.get("asset_path", "")
@@ -488,63 +490,100 @@ def check_final_publish_approval(payload: dict) -> dict:
             "reason": "gate_fail: publish_blocked_reason=" + str(blocked),
         }
 
-    gate = sidecar.get("FINAL_PUBLISH_APPROVED_BY_NICOLAS")
-    if not isinstance(gate, dict):
-        return {
-            "ok": False,
-            "reason": (
-                "gate_fail: FINAL_PUBLISH_APPROVED_BY_NICOLAS"
-                " missing from sidecar"
-            ),
-        }
-
     if sidecar.get("instagram_published") is True:
-        if gate.get("republish_override") is not True:
+        if sidecar.get("authorization_mode") != "standing_autonomy_policy":
+            gate = sidecar.get("FINAL_PUBLISH_APPROVED_BY_NICOLAS")
+            if not isinstance(gate, dict) or gate.get("republish_override") is not True:
+                return {
+                    "ok": False,
+                    "reason": (
+                        "gate_fail: instagram_published=true — set"
+                        " FINAL_PUBLISH_APPROVED_BY_NICOLAS.republish_override=true to republish"
+                    ),
+                }
+        elif sidecar.get("republish_override") is not True:
             return {
                 "ok": False,
                 "reason": (
-                    "gate_fail: instagram_published=true — set"
-                    " FINAL_PUBLISH_APPROVED_BY_NICOLAS"
-                    ".republish_override=true to republish"
+                    "gate_fail: instagram_published=true — set republish_override=true to republish"
                 ),
             }
 
     fails = []
 
-    if gate.get("approved") is not True:
-        fails.append("approved != true")
-    if gate.get("caption_visual_match_approved") is not True:
-        fails.append("caption_visual_match_approved != true")
-    objections = gate.get("known_visual_qa_objections")
-    if objections not in (None, []):
-        fails.append("known_visual_qa_objections not empty")
-    if gate.get("approved_by") != "Nicolas":
-        fails.append("approved_by != Nicolas")
-    if not gate.get("approved_at"):
-        fails.append("approved_at missing or empty")
-    if payload.get("caption", "") != gate.get("caption", ""):
-        fails.append("caption mismatch: payload vs gate")
-    gate_asset_raw = gate.get("asset_path", "")
-    if not gate_asset_raw:
-        fails.append("asset_path missing from gate")
-    elif _gate_resolve_path(gate_asset_raw) != asset_path:
-        fails.append("asset_path mismatch: payload vs gate")
-    payload_platform = payload.get("platform", "")
-    gate_platform = gate.get("target_platform", "")
-    if payload_platform != gate_platform:
-        fails.append(
-            "target_platform mismatch: payload="
-            + repr(payload_platform)
-            + " gate="
-            + repr(gate_platform)
-        )
+    if sidecar.get("authorization_mode") == "standing_autonomy_policy":
+        if sidecar.get("policy_id") in (None, ""):
+            fails.append("policy_id missing or empty")
+        if sidecar.get("policy_sha256") in (None, ""):
+            fails.append("policy_sha256 missing or empty")
+        if sidecar.get("cycle_id") in (None, ""):
+            fails.append("cycle_id missing or empty")
+        if sidecar.get("cycle_authorization_path") in (None, ""):
+            fails.append("cycle_authorization_path missing or empty")
+        if sidecar.get("cycle_authorization_sha256") in (None, ""):
+            fails.append("cycle_authorization_sha256 missing or empty")
+        if sidecar.get("qa_approved") is not True:
+            fails.append("qa_approved != true")
+        if sidecar.get("identity_verified") is not True:
+            fails.append("identity_verified != true")
+        if sidecar.get("duplicate_check_passed") is not True:
+            fails.append("duplicate_check_passed != true")
+        if sidecar.get("publish_authorized_by_policy") is not True:
+            fails.append("publish_authorized_by_policy != true")
+        if sidecar.get("human_per_cycle_approval_required") is not False:
+            fails.append("human_per_cycle_approval_required != false")
+        if sidecar.get("human_per_cycle_approval_present") is not False:
+            fails.append("human_per_cycle_approval_present != false")
+        if payload.get("caption", "") != sidecar.get("caption", ""):
+            fails.append("caption mismatch: payload vs policy sidecar")
+        if _gate_resolve_path(sidecar.get("asset_path", "")) != asset_path:
+            fails.append("asset_path mismatch: payload vs policy sidecar")
+        if payload.get("platform", "") != sidecar.get("target_platform", ""):
+            fails.append("target_platform mismatch: payload vs policy sidecar")
+    else:
+        gate = sidecar.get("FINAL_PUBLISH_APPROVED_BY_NICOLAS")
+        if not isinstance(gate, dict):
+            return {
+                "ok": False,
+                "reason": (
+                    "gate_fail: FINAL_PUBLISH_APPROVED_BY_NICOLAS"
+                    " missing from sidecar"
+                ),
+            }
+
+        if gate.get("approved") is not True:
+            fails.append("approved != true")
+        if gate.get("caption_visual_match_approved") is not True:
+            fails.append("caption_visual_match_approved != true")
+        objections = gate.get("known_visual_qa_objections")
+        if objections not in (None, []):
+            fails.append("known_visual_qa_objections not empty")
+        if gate.get("approved_by") != "Nicolas":
+            fails.append("approved_by != Nicolas")
+        if not gate.get("approved_at"):
+            fails.append("approved_at missing or empty")
+        if payload.get("caption", "") != gate.get("caption", ""):
+            fails.append("caption mismatch: payload vs gate")
+        gate_asset_raw = gate.get("asset_path", "")
+        if not gate_asset_raw:
+            fails.append("asset_path missing from gate")
+        elif _gate_resolve_path(gate_asset_raw) != asset_path:
+            fails.append("asset_path mismatch: payload vs gate")
+        payload_platform = payload.get("platform", "")
+        gate_platform = gate.get("target_platform", "")
+        if payload_platform != gate_platform:
+            fails.append(
+                "target_platform mismatch: payload="
+                + repr(payload_platform)
+                + " gate="
+                + repr(gate_platform)
+            )
 
     if fails:
         return {
             "ok": False,
             "reason": (
-                "gate_fail: FINAL_PUBLISH_APPROVED_BY_NICOLAS"
-                " field checks failed: "
+                "gate_fail: publish authorization checks failed: "
                 + "; ".join(fails)
             ),
         }

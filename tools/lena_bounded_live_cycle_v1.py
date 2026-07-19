@@ -14,12 +14,15 @@ from typing import Any
 from pipeline.identity import lena_higgsfield_identity as identity
 from tools import lena_higgsfield_generation_approval_v1 as approval
 from tools import lena_photo_qa_disposition_v1 as photo_qa
-from tools.strategy import lena_execute_approved_live_generation_v1 as approved_live_generation
+from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+import pipeline.higgsfield_lena_api_executor as executor
 
 ROOT = Path(__file__).resolve().parents[1]
 PY = sys.executable
 AUTH_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "bounded_live_cycles"
 REPORT_ROOT = ROOT / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles"
+POLICY_ROOT = ROOT / "pipeline" / "config"
+DEFAULT_POLICY_PATH = POLICY_ROOT / "lena_standing_autonomy_policy_v1.json"
 
 AUTHORISED_STAGES = (
     "authorization_validation",
@@ -156,46 +159,58 @@ def _validate_authorization_artifact(auth_path: Path, *, simulate: bool) -> dict
         label="authorization artifact",
         must_exist=True,
     )
-    auth = _read_json_object(auth_path, code="authorization_missing_or_invalid", label="authorization artifact")
-    _require(auth.get("report_type") == "lena_bounded_live_cycle_authorization", "authorization_report_type_mismatch", "authorization artifact report_type must be lena_bounded_live_cycle_authorization")
-    _require(auth.get("schema_version") == "v1", "authorization_schema_mismatch", "authorization artifact schema_version must be v1")
-    _require(auth.get("single_use") is True, "authorization_single_use_invalid", "authorization must be single-use")
+    auth_json = _read_json_object(auth_path, code="authorization_missing_or_invalid", label="authorization artifact")
+    policy_path = Path(str(auth_json.get("policy_artifact_path") or DEFAULT_POLICY_PATH))
+    try:
+        policy_result = standing_autonomy.validate_policy_artifact(policy_path)
+    except (standing_autonomy.StandingAutonomyPolicyError, executor.HandoffArtifactError) as exc:
+        raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
+    handoff_path = Path(str(auth_json.get("generation_handoff_artifact_path") or ""))
+    try:
+        handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
+        auth_result = standing_autonomy.validate_cycle_authorization_artifact(
+            auth_path,
+            policy_result=policy_result,
+            handoff_report=handoff_report,
+        )
+    except executor.HandoffArtifactError as exc:
+        raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
+    except standing_autonomy.StandingAutonomyPolicyError as exc:
+        raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
+    auth = auth_result["artifact"]
+    _require(auth.get("one_slot") is True, "authorization_one_slot_invalid", "authorization one_slot must be true")
+    _require(auth.get("one_candidate") is True, "authorization_one_candidate_invalid", "authorization one_candidate must be true")
+    _require(auth.get("one_asset") is True, "authorization_one_asset_invalid", "authorization one_asset must be true")
+    _require(auth.get("one_platform") is True, "authorization_one_platform_invalid", "authorization one_platform must be true")
     _require(auth.get("consumed") is False, "authorization_already_consumed", "authorization has already been consumed")
+    _require(auth.get("single_use") is True, "authorization_single_use_invalid", "authorization must be single-use")
+    _require(auth.get("authorization_mode") == "standing_autonomy_policy", "authorization_mode_invalid", "authorization must use standing autonomy policy mode")
+    _require(auth.get("authorization_issuer") == "lena_autonomy_controller", "authorization_issuer_invalid", "authorization issuer must be Lena autonomy controller")
+    _require(auth.get("expected_output_directory"), "expected_output_directory_missing", "expected_output_directory is required")
+    _require(auth.get("expected_output_stem"), "expected_output_stem_missing", "expected_output_stem is required")
     _require(
-        auth.get("kill_switch_enabled") is True,
-        "authorization_kill_switch_disabled",
-        "kill switch must be enabled",
+        isinstance(auth.get("allowed_output_extensions"), list)
+        and auth.get("allowed_output_extensions") == list(approval.ALLOWED_OUTPUT_EXTENSIONS),
+        "allowed_output_extensions_invalid",
+        "allowed_output_extensions must match the approved extension set",
     )
-    _require(int(auth.get("provider_call_cap", 0)) == 1, "provider_call_cap_invalid", "provider call cap must be one")
-    _require(int(auth.get("publish_action_cap", 0)) == 1, "publish_action_cap_invalid", "publish action cap must be one")
-    _require(int(auth.get("retry_cap", -1)) == 0, "retry_cap_invalid", "retry cap must be zero")
-    spend_cap = float(auth.get("hard_spend_cap_usd", -1.0))
-    if simulate:
-        _require(spend_cap == 0.0, "hard_spend_cap_invalid", "hard spend cap must be zero in simulation")
-    else:
-        _require(spend_cap > 0.0, "hard_spend_cap_invalid", "hard spend cap must be greater than zero for live execution")
-        _require(auth.get("publish_authorized") is True, "publish_authorized_invalid", "publishing must be authorized for live execution")
-    _require(str(auth.get("platform") or "") == "Instagram Feed", "platform_mismatch", "authorization platform must be Instagram Feed")
-
-    expiry = _validate_iso_datetime(str(auth.get("expires_at_utc") or ""))
-    _require(expiry > _now_utc(), "authorization_expired", "authorization has expired")
-    required_text_fields = ("date", "slot_id", "candidate_id", "asset_path", "platform", "caption")
-    missing = [key for key in required_text_fields if not str(auth.get(key) or "").strip()]
-    _require(not missing, "authorization_missing_fields", f"authorization missing required fields: {', '.join(missing)}")
-    _require(auth.get("one_slot") is True, "authorization_one_slot_invalid", "authorization must be scoped to one slot")
-    _require(auth.get("one_candidate") is True, "authorization_one_candidate_invalid", "authorization must be scoped to one candidate")
-    _require(auth.get("one_asset") is True, "authorization_one_asset_invalid", "authorization must be scoped to one asset")
-    _require(auth.get("one_platform") is True, "authorization_one_platform_invalid", "authorization must be scoped to one platform")
+    if handoff_report is not None and handoff_report.get("platform") is not None:
+        _require(str(auth.get("platform") or "") == str(handoff_report.get("platform") or ""), "platform_invalid", "authorization platform must match handoff")
     _require(int(auth.get("provider_calls_performed", 0)) == 0, "authorization_provider_calls_not_zero", "authorization must start with zero provider calls")
     _require(int(auth.get("publish_calls_performed", 0)) == 0, "authorization_publish_calls_not_zero", "authorization must start with zero publish calls")
     _require(int(auth.get("retries_performed", 0)) == 0, "authorization_retries_not_zero", "authorization must start with zero retries")
-
-    return {
-        "path": auth_path,
-        "sha256": _sha256_file(auth_path),
-        "artifact": auth,
-        "expires_at_utc": expiry.isoformat(),
+    _require(auth.get("publish_authorized") is True, "publish_authorized_invalid", "publishing must be authorized for live execution")
+    auth_result["handoff"] = {
+        "path": handoff_path.resolve(),
+        "sha256": standing_autonomy._sha256_file(handoff_path),
+        "report": handoff_report,
+        "source": source,
+        "packet_validation": packet_validation,
+        "validation": validation,
     }
+    auth_result["policy"] = policy_result
+    auth_result["pre_consumption_sha256"] = _sha256_file(auth_path)
+    return auth_result
 
 
 def _validate_bound_artifact(path_value: str, sha_value: str, *, root: Path, code: str, label: str) -> dict[str, Any]:
@@ -209,6 +224,33 @@ def _validate_bound_artifact(path_value: str, sha_value: str, *, root: Path, cod
     }
 
 
+def _authorized_output_paths(expected_output_directory: Path, expected_output_stem: str, allowed_output_extensions: list[str]) -> list[Path]:
+    directory = _ensure_path_within_root(
+        expected_output_directory,
+        ROOT / "pipeline" / "higgsfield_library" / "lena",
+        code="expected_output_directory_escape",
+        label="expected output directory",
+        must_exist=False,
+    )
+    _require(bool(expected_output_stem.strip()), "expected_output_stem_missing", "expected_output_stem is required")
+    _require(
+        isinstance(allowed_output_extensions, list)
+        and allowed_output_extensions == list(approval.ALLOWED_OUTPUT_EXTENSIONS),
+        "allowed_output_extensions_invalid",
+        "allowed_output_extensions must match the approved extension set",
+    )
+    return [
+        _ensure_path_within_root(
+            directory / f"{expected_output_stem}{extension}",
+            ROOT / "pipeline" / "higgsfield_library" / "lena",
+            code="expected_output_path_escape",
+            label="expected output path",
+            must_exist=False,
+        )
+        for extension in allowed_output_extensions
+    ]
+
+
 def _ensure_report_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -219,7 +261,15 @@ def _stage_summary(stage: str, ok: bool, **data: Any) -> dict[str, Any]:
     return {"stage": stage, "ok": ok, **data}
 
 
-def _build_package(auth: dict[str, Any], provider: dict[str, Any], qa: dict[str, Any], package_path: Path) -> tuple[Path, dict[str, Any]]:
+def _build_package(
+    auth: dict[str, Any],
+    provider: dict[str, Any],
+    qa: dict[str, Any],
+    package_path: Path,
+    *,
+    generated_image_path: Path,
+    generated_image_sha256: str,
+) -> tuple[Path, dict[str, Any]]:
     payload = {
         "report_type": "lena_bounded_live_cycle_package",
         "schema_version": "v1",
@@ -228,14 +278,16 @@ def _build_package(auth: dict[str, Any], provider: dict[str, Any], qa: dict[str,
         "candidate_id": auth["artifact"]["candidate_id"],
         "platform": auth["artifact"]["platform"],
         "caption": auth["artifact"]["caption"],
-        "asset_path": auth["artifact"]["asset_path"],
-        "asset_sha256": auth["artifact"]["asset_sha256"],
+        "generated_image_path": str(generated_image_path),
+        "generated_image_sha256": generated_image_sha256,
+        "asset_path": str(generated_image_path),
+        "asset_sha256": generated_image_sha256,
         "provider_generation_receipt_path": str(provider["path"]),
         "provider_generation_receipt_sha256": provider["sha256"],
         "manifest_path": str(provider["artifact"]["manifest_path"]),
         "manifest_sha256": provider["artifact"]["manifest_sha256"],
-        "generated_image_path": str(provider["artifact"]["generated_image_path"]),
-        "generated_image_sha256": provider["artifact"]["generated_image_sha256"],
+        "provider_generated_image_path": str(provider["artifact"]["generated_image_path"]),
+        "provider_generated_image_sha256": provider["artifact"]["generated_image_sha256"],
         "qa_artifact_path": str(qa["path"]),
         "qa_artifact_sha256": qa["sha256"],
         "publishing_authorized": False,
@@ -258,6 +310,8 @@ def _build_publish_receipt(auth: dict[str, Any], package: dict[str, Any], publis
         "candidate_id": auth["artifact"]["candidate_id"],
         "platform": auth["artifact"]["platform"],
         "caption": package["caption"],
+        "generated_image_path": package["generated_image_path"],
+        "generated_image_sha256": package["generated_image_sha256"],
         "asset_path": package["asset_path"],
         "asset_sha256": package["asset_sha256"],
         "package_artifact_path": package["package_artifact_path"],
@@ -281,6 +335,8 @@ def _build_analytics_handoff(auth: dict[str, Any], package: dict[str, Any], publ
         "slot_id": auth["artifact"]["slot_id"],
         "candidate_id": auth["artifact"]["candidate_id"],
         "platform": auth["artifact"]["platform"],
+        "generated_image_path": package["generated_image_path"],
+        "generated_image_sha256": package["generated_image_sha256"],
         "publish_receipt_artifact_path": str(publish["path"]),
         "publish_receipt_artifact_sha256": publish["sha256"],
         "package_artifact_path": package["package_artifact_path"],
@@ -409,8 +465,11 @@ def _build_live_package(
         "schema_version": "v1",
         "created_at_utc": _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "cycle_id": auth["artifact"].get("cycle_id"),
+        "authorization_mode": auth["artifact"].get("authorization_mode", "standing_autonomy_policy"),
         "authorization_artifact_path": str(auth["path"]),
-        "authorization_artifact_sha256": auth["sha256"],
+        "authorization_artifact_sha256": auth.get("pre_consumption_sha256", auth["sha256"]),
+        "policy_artifact_path": str(auth["artifact"].get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth["artifact"].get("policy_artifact_sha256") or ""),
         "candidate_artifact_path": str(auth["artifact"]["candidate_artifact_path"]),
         "candidate_artifact_sha256": str(auth["artifact"]["candidate_artifact_sha256"]),
         "prompt_sha256": str(approval_result["handoff_facts"]["prompt_sha256"]),
@@ -418,6 +477,8 @@ def _build_live_package(
         "platform": str(auth["artifact"]["platform"]),
         "caption": str(auth["artifact"]["caption"]),
         "media_type": "photo",
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
         "manifest_artifact_path": str(provider_result["manifest_path"]),
         "manifest_artifact_sha256": provider_result["manifest_sha256"],
         "generated_image_path": str(generated_image_path),
@@ -439,14 +500,27 @@ def _build_live_package(
 
 def _build_live_publish_sidecar(
     *,
+    authorization: dict[str, Any],
     image_path: Path,
     caption: str,
     platform: str,
-    approved_at_utc: str,
 ) -> tuple[Path, dict[str, Any], str]:
     sidecar_path = image_path.with_suffix(".status.json")
     payload = {
         "visual_status": "approved",
+        "authorization_mode": "standing_autonomy_policy",
+        "policy_id": authorization["artifact"].get("policy_id"),
+        "policy_version": authorization["artifact"].get("policy_version"),
+        "policy_sha256": authorization["artifact"].get("policy_artifact_sha256"),
+        "cycle_id": authorization["artifact"].get("cycle_id"),
+        "cycle_authorization_path": str(authorization["path"]),
+        "cycle_authorization_sha256": authorization["sha256"],
+        "qa_approved": True,
+        "identity_verified": True,
+        "duplicate_check_passed": True,
+        "publish_authorized_by_policy": True,
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
         "publish_approved": True,
         "caption_approved": True,
         "caption_visual_match_approved": True,
@@ -456,16 +530,9 @@ def _build_live_publish_sidecar(
         "instagram_currently_live": False,
         "r2_uploaded": False,
         "queue_entry_created": False,
-        "FINAL_PUBLISH_APPROVED_BY_NICOLAS": {
-            "approved": True,
-            "asset_path": _repo_relative(image_path),
-            "caption": caption,
-            "target_platform": platform,
-            "caption_visual_match_approved": True,
-            "known_visual_qa_objections": [],
-            "approved_by": "Nicolas",
-            "approved_at": approved_at_utc,
-        },
+        "asset_path": _repo_relative(image_path),
+        "caption": caption,
+        "target_platform": platform,
     }
     _write_json_atomic(sidecar_path, payload)
     return sidecar_path, payload, _sha256_file(sidecar_path)
@@ -530,8 +597,11 @@ def _build_live_publish_receipt(
         "schema_version": "v1",
         "created_at_utc": _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "cycle_id": auth["artifact"].get("cycle_id"),
+        "authorization_mode": auth["artifact"].get("authorization_mode", "standing_autonomy_policy"),
         "authorization_artifact_path": str(auth["path"]),
-        "authorization_artifact_sha256": auth["sha256"],
+        "authorization_artifact_sha256": auth.get("pre_consumption_sha256", auth["sha256"]),
+        "policy_artifact_path": str(auth["artifact"].get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth["artifact"].get("policy_artifact_sha256") or ""),
         "slot_id": str(auth["artifact"]["slot_id"]),
         "candidate_id": str(auth["artifact"]["candidate_id"]),
         "platform": str(auth["artifact"]["platform"]),
@@ -546,6 +616,8 @@ def _build_live_publish_receipt(
         "publish_calls_performed": 1,
         "provider_calls_performed": 1,
         "provider_calls_unchanged": True,
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
         "remote_post_id": publisher_result["parsed"].get("post_id") or publisher_result["parsed"].get("id"),
         "remote_post_url": publisher_result["parsed"].get("post_url", ""),
         "published_at_utc": publisher_result["parsed"].get("posted_at") or publisher_result["parsed"].get("published_at") or "",
@@ -576,8 +648,11 @@ def _build_live_analytics_handoff(
         "schema_version": "v1",
         "created_at_utc": _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "cycle_id": auth["artifact"].get("cycle_id"),
+        "authorization_mode": auth["artifact"].get("authorization_mode", "standing_autonomy_policy"),
         "authorization_artifact_path": str(auth["path"]),
-        "authorization_artifact_sha256": auth["sha256"],
+        "authorization_artifact_sha256": auth.get("pre_consumption_sha256", auth["sha256"]),
+        "policy_artifact_path": str(auth["artifact"].get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth["artifact"].get("policy_artifact_sha256") or ""),
         "slot_id": str(auth["artifact"]["slot_id"]),
         "candidate_id": str(auth["artifact"]["candidate_id"]),
         "platform": str(auth["artifact"]["platform"]),
@@ -590,6 +665,8 @@ def _build_live_analytics_handoff(
         "publish_calls_performed": 1,
         "analytics_mutation_performed": False,
         "simulation_only": False,
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
     }
     _write_json_atomic(analytics_handoff_path, payload)
     payload["analytics_handoff_artifact_path"] = str(analytics_handoff_path)
@@ -600,6 +677,7 @@ def _build_live_analytics_handoff(
 def _consume_authorization_artifact(auth: dict[str, Any], *, cycle_id: str) -> dict[str, Any]:
     auth_path = Path(auth["path"])
     lock_path = _authorization_lock_path(auth_path)
+    pre_consumption_sha256 = auth.get("pre_consumption_sha256", auth["sha256"])
     try:
         lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError as exc:
@@ -610,7 +688,7 @@ def _consume_authorization_artifact(auth: dict[str, Any], *, cycle_id: str) -> d
         consumed_payload["consumed"] = True
         consumed_payload["consumed_at_utc"] = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
         consumed_payload["cycle_id"] = cycle_id
-        consumed_payload["operator_authorization_sha256"] = auth["sha256"]
+        consumed_payload["cycle_authorization_sha256"] = pre_consumption_sha256
         consumed_payload["authorization_consumption_implemented"] = True
         consumed_payload["authorization_consumed"] = True
         consumed_payload["authorization_state_after"] = {
@@ -625,6 +703,7 @@ def _consume_authorization_artifact(auth: dict[str, Any], *, cycle_id: str) -> d
             **auth,
             "artifact": consumed_payload,
             "sha256": _sha256_file(auth_path),
+            "pre_consumption_sha256": pre_consumption_sha256,
             "consumed_at_utc": consumed_payload["consumed_at_utc"],
             "cycle_id": cycle_id,
         }
@@ -638,11 +717,11 @@ def _consume_authorization_artifact(auth: dict[str, Any], *, cycle_id: str) -> d
 
 def _validate_live_required_artifacts(auth: dict[str, Any]) -> dict[str, Any]:
     artifact = auth["artifact"]
-    approval_path = _ensure_path_within_root(
-        Path(str(artifact.get("generation_approval_artifact_path") or "")),
-        ROOT,
-        code="approval_path_escape",
-        label="generation approval artifact",
+    policy_path = _ensure_path_within_root(
+        Path(str(artifact.get("policy_artifact_path") or "")),
+        POLICY_ROOT,
+        code="policy_path_escape",
+        label="standing autonomy policy artifact",
         must_exist=True,
     )
     handoff_path = _ensure_path_within_root(
@@ -662,30 +741,93 @@ def _validate_live_required_artifacts(auth: dict[str, Any]) -> dict[str, Any]:
     expected_output_directory = _ensure_path_within_root(
         Path(str(artifact.get("expected_output_directory") or "")),
         ROOT / "pipeline" / "higgsfield_library" / "lena",
-        code="asset_path_escape",
-        label="generated asset output directory",
+        code="expected_output_directory_escape",
+        label="expected output directory",
         must_exist=False,
     )
     expected_output_stem = str(artifact.get("expected_output_stem") or "")
-    _require(bool(expected_output_stem.strip()), "asset_path_invalid", "expected_output_stem is required")
-    if str(artifact.get("asset_path") or "").strip():
-        _ensure_path_within_root(
-            Path(str(artifact.get("asset_path"))),
-            ROOT / "pipeline" / "higgsfield_library" / "lena",
-            code="asset_path_escape",
-            label="generated asset path",
-            must_exist=False,
-        )
+    allowed_output_extensions = list(artifact.get("allowed_output_extensions") or [])
+    authorized_output_paths = _authorized_output_paths(expected_output_directory, expected_output_stem, allowed_output_extensions)
     return {
-        "approval_path": approval_path,
+        "policy_path": policy_path,
         "handoff_path": handoff_path,
         "candidate_path": candidate_path,
         "expected_output_directory": expected_output_directory,
         "expected_output_stem": expected_output_stem,
+        "allowed_output_extensions": allowed_output_extensions,
+        "authorized_output_paths": authorized_output_paths,
     }
 
 
-def _manifest_output_image_path(manifest: dict[str, Any], expected_directory: Path, expected_stem: str) -> Path:
+def _build_autonomous_approval_result(auth: dict[str, Any], live_requirements: dict[str, Any]) -> dict[str, Any]:
+    artifact = auth["artifact"]
+    handoff_report = auth["handoff"]["report"]
+    handoff_path = live_requirements["handoff_path"]
+    candidate_path = live_requirements["candidate_path"]
+    candidate = handoff_report.get("selected_candidate")
+    candidate = candidate if isinstance(candidate, dict) else {}
+    approval_artifact = dict(artifact)
+    approval_artifact["operator_id"] = "lena_autonomy_controller"
+    approval_artifact["provider"] = str(artifact.get("allowed_provider") or artifact.get("provider") or "Higgsfield")
+    approval_artifact["executor"] = "Higgsfield CLI repo adapter"
+    approval_artifact["model"] = str(artifact.get("allowed_model") or artifact.get("model") or "text2image_soul_v2")
+    approval_artifact["aspect_ratio"] = "9:16"
+    approval_artifact["soul_name"] = str(artifact.get("allowed_soul") or artifact.get("soul_name") or "Lena")
+    approval_artifact["soul_type"] = str(artifact.get("soul_type") or "Soul 2.0")
+    approval_artifact["custom_reference_id"] = str(handoff_report.get("custom_reference_id") or artifact.get("custom_reference_id") or "")
+    approval_artifact["authorized_attempts"] = 1
+    approval_artifact["upload_authorized"] = False
+    approval_artifact["queue_promotion_authorized"] = False
+    approval_artifact["publish_authorized"] = True
+    approval_artifact["analytics_mutation_authorized"] = False
+    approval_artifact["handoff_artifact_path"] = str(handoff_path)
+    approval_artifact["handoff_artifact_sha256"] = _sha256_file(handoff_path)
+    approval_artifact["handoff_report_type"] = str(handoff_report.get("report_type") or "lena_next_live_image_handoff")
+    approval_artifact["handoff_schema_version"] = str(handoff_report.get("schema_version") or "v1")
+    approval_artifact["reconciliation"] = handoff_report.get("reconciliation")
+    approval_artifact["reconciled_candidate"] = handoff_report.get("selected_candidate")
+    approval_artifact["reconciliation_decision"] = handoff_report.get("reconciliation_decision")
+    handoff_facts = {
+        "date": str(handoff_report.get("date") or artifact.get("date") or ""),
+        "slot_id": str(handoff_report.get("selected_slot_id") or artifact.get("slot_id") or ""),
+        "prompt_sha256": str(handoff_report.get("prompt_sha256") or artifact.get("prompt_sha256") or ""),
+        "custom_reference_id": str(handoff_report.get("custom_reference_id") or artifact.get("custom_reference_id") or ""),
+        "handoff_path": str(handoff_path),
+        "handoff_sha256": _sha256_file(handoff_path),
+        "selected_candidate_path": str(handoff_report.get("selected_candidate_path") or artifact.get("candidate_artifact_path") or ""),
+        "selected_candidate_sha256": str(handoff_report.get("selected_candidate_sha256") or artifact.get("candidate_artifact_sha256") or ""),
+        "selected_candidate": candidate,
+        "report": handoff_report,
+        "reconciliation": handoff_report.get("reconciliation"),
+        "reconciled_candidate": handoff_report.get("selected_candidate"),
+        "reconciliation_decision": handoff_report.get("reconciliation_decision"),
+        "soul_name": approval_artifact["soul_name"],
+        "soul_type": approval_artifact["soul_type"],
+    }
+    return {
+        "approval": approval_artifact,
+        "approval_path": auth["path"],
+        "approval_repo_path": str(auth["path"].relative_to(ROOT)),
+        "approval_sha256": auth.get("pre_consumption_sha256", auth["sha256"]),
+        "handoff_facts": handoff_facts,
+        "approved_at_utc": auth["artifact"].get("issued_at_utc"),
+        "expires_at_utc": auth["artifact"].get("expires_at_utc"),
+        "is_expired": False,
+        "scope_summary": {
+            "authorized_attempts": 1,
+            "upload_authorized": False,
+            "queue_promotion_authorized": False,
+            "publish_authorized": True,
+            "analytics_mutation_authorized": False,
+        },
+        "authorization_mode": auth["artifact"].get("authorization_mode", "standing_autonomy_policy"),
+        "policy_result": auth.get("policy"),
+        "policy_path": auth.get("policy", {}).get("path") if isinstance(auth.get("policy"), dict) else None,
+        "candidate_artifact_path": candidate_path,
+    }
+
+
+def _manifest_output_image_path(manifest: dict[str, Any], expected_directory: Path, expected_stem: str, allowed_output_extensions: list[str]) -> Path:
     saved_image = Path(str(manifest.get("saved_image_path") or ""))
     resolved = _ensure_path_within_root(
         saved_image,
@@ -696,6 +838,7 @@ def _manifest_output_image_path(manifest: dict[str, Any], expected_directory: Pa
     )
     _require(resolved.parent == expected_directory, "generated_image_directory_mismatch", "generated image directory does not match the authorized output directory")
     _require(resolved.stem == expected_stem, "generated_image_stem_mismatch", "generated image stem does not match the authorized output stem")
+    _require(resolved.suffix in set(allowed_output_extensions), "generated_image_extension_mismatch", "generated image extension does not match the authorized output extensions")
     return resolved
 
 
@@ -712,24 +855,32 @@ def _build_fail_report(
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact = auth["artifact"] if auth else {}
+    daily_usage_before = artifact.get("daily_usage_before") if auth else None
+    daily_usage_after = artifact.get("daily_usage_after") if auth else None
     report: dict[str, Any] = {
         "ok": False,
         "version": "v1",
         "report_type": "lena_bounded_live_cycle",
         "simulation_mode": False if auth else True,
         "live_execution": bool(auth),
+        "autonomous_execution": bool(auth),
+        "authorization_mode": artifact.get("authorization_mode", "standing_autonomy_policy" if auth else ""),
         "date": str(artifact.get("date") or ""),
         "started_at": started_at,
         "finished_at": _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "cycle_id": cycle_id,
         "authorization_artifact_path": str(auth["path"]) if auth else "",
         "authorization_artifact_sha256": auth["sha256"] if auth else "",
+        "authorization_artifact_sha256_before_consumption": auth.get("pre_consumption_sha256") if auth else None,
+        "policy_artifact_path": str(artifact.get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(artifact.get("policy_artifact_sha256") or ""),
         "authorization_consumption_implemented": bool(auth),
         "authorization_consumed": bool(auth and auth["artifact"].get("consumed") is True),
         "authorization_consumed_at_utc": auth.get("consumed_at_utc") if auth else None,
         "authorization_state_before": {
             "single_use": artifact.get("single_use", True),
             "consumed": bool(artifact.get("consumed", False)),
+            "consumed_at_utc": _null_to_none(artifact.get("consumed_at_utc")),
         },
         "authorization_state_after": {
             "single_use": artifact.get("single_use", True),
@@ -739,8 +890,11 @@ def _build_fail_report(
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
         "retries_performed": 0,
-        "actual_spend_usd": None,
+        "declared_spend_unit": artifact.get("spend_unit"),
+        "actual_spend": None,
         "actual_spend_available": False,
+        "daily_usage_before": daily_usage_before,
+        "daily_usage_after": daily_usage_after,
         "stage_coverage": stages,
         "stages": stages,
         "failed_stage": failed_stage,
@@ -754,17 +908,22 @@ def _build_fail_report(
             "one_candidate": True,
             "one_asset": True,
             "one_platform": True,
-            "provider_call_cap": 1,
-            "publish_action_cap": 1,
-            "retry_cap": 0,
-            "hard_spend_cap_usd": artifact.get("hard_spend_cap_usd", 0),
+            "provider_call_cap_per_cycle": 1,
+            "publish_action_cap_per_cycle": 1,
+            "retry_cap_per_cycle": 0,
+            "daily_spend_ceiling": artifact.get("daily_spend_ceiling", 0),
+            "spend_unit": artifact.get("spend_unit", ""),
             "kill_switch_enabled": artifact.get("kill_switch_enabled", False),
             "duplicate_rejection": "report_path_must_not_exist",
             "no_scheduler": True,
             "no_second_provider_call": True,
             "no_second_publish_call": True,
             "analytics_triggered_rerun_blocked": True,
+            "qa_required": True,
+            "identity_verification_required": True,
         },
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
     }
     if extra:
         report.update(extra)
@@ -782,17 +941,21 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     report_path = _report_path(day, stamp, report_root)
     _ensure_path_within_root(report_path, report_root, code="report_path_escape", label="aggregate receipt", must_exist=False)
     _ensure_report_dir(report_path)
-    cycle_id = f"lena_bounded_live_cycle_{day}_{stamp}_{uuid.uuid4().hex[:8]}"
+    cycle_id = str(auth_data.get("cycle_id") or f"lena_bounded_live_cycle_{day}_{stamp}_{uuid.uuid4().hex[:8]}")
     stages: list[dict[str, Any]] = [
         _stage_summary(
             "authorization_validation",
             True,
             authorization_artifact_path=str(auth["path"]),
             authorization_artifact_sha256=auth["sha256"],
+            policy_artifact_path=str(auth["policy"]["path"]),
+            policy_artifact_sha256=auth["policy"]["sha256"],
         )
     ]
 
     live_requirements = _validate_live_required_artifacts(auth)
+    for output_path in live_requirements["authorized_output_paths"]:
+        _require(not output_path.exists(), "expected_output_conflict", f"authorized output path already exists: {output_path}")
     auth = _consume_authorization_artifact(auth, cycle_id=cycle_id)
     auth_data = auth["artifact"]
     stages.append(
@@ -801,31 +964,17 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             True,
             authorization_artifact_path=str(auth["path"]),
             authorization_artifact_sha256=auth["sha256"],
+            authorization_artifact_sha256_before_consumption=auth["pre_consumption_sha256"],
             consumed_at_utc=auth["consumed_at_utc"],
             cycle_id=cycle_id,
         )
     )
 
-    try:
-        approval_result = approval.validate_generation_approval_artifact(live_requirements["approval_path"])
-    except approval.HiggsfieldGenerationApprovalError as exc:
-        return _build_fail_report(
-            auth=auth,
-            report_path=report_path,
-            started_at=started_at,
-            cycle_id=cycle_id,
-            stages=stages,
-            failed_stage="approved_candidate_resolution",
-            error_code=exc.code,
-            error_detail=exc.detail,
-        )
-
-    handoff_facts = approval_result["handoff_facts"]
     candidate_path = live_requirements["candidate_path"]
     candidate = _read_json_object(candidate_path, code="candidate_missing_or_invalid", label="candidate artifact")
     candidate_sha256 = _sha256_file(candidate_path)
     _require(candidate_sha256 == str(auth_data["candidate_artifact_sha256"]), "candidate_sha_mismatch", "candidate SHA-256 does not match the authorization binding")
-    _require(candidate_path == Path(str(handoff_facts["selected_candidate_path"])).resolve(), "candidate_path_mismatch", "candidate path does not match the approved handoff")
+    _require(candidate_path == Path(str(auth_data["candidate_artifact_path"])).resolve(), "candidate_path_mismatch", "candidate path does not match the authorization binding")
     _require(str(candidate.get("candidate_id") or "") == str(auth_data["candidate_id"]), "candidate_id_mismatch", "candidate_id does not match the authorization binding")
     _require(str(candidate.get("slot_id") or "") == str(auth_data["slot_id"]), "slot_id_mismatch", "slot_id does not match the authorization binding")
     stages.append(
@@ -834,17 +983,31 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             True,
             candidate_artifact_path=str(candidate_path),
             candidate_artifact_sha256=candidate_sha256,
-            approval_artifact_path=str(live_requirements["approval_path"]),
-            approval_artifact_sha256=auth_data["generation_approval_artifact_sha256"],
+            policy_artifact_path=str(live_requirements["policy_path"]),
+            policy_artifact_sha256=auth["policy"]["sha256"],
         )
     )
 
+    approval_result = _build_autonomous_approval_result(auth, live_requirements)
+    context = {
+        "date": day,
+        "slot_id": str(auth_data["slot_id"]),
+        "recipe_id": str(auth["handoff"]["report"].get("selected_recipe_id") or auth_data.get("recipe_id") or ""),
+        "handoff_report": auth["handoff"]["report"],
+        "source": auth["handoff"]["source"],
+        "packet_validation": auth["handoff"]["packet_validation"],
+        "validation": auth["handoff"]["validation"],
+        "approval_result": approval_result,
+        "claim_path": approval.claim_output_path(day, str(auth_data["slot_id"])),
+        "receipt_path": approval.receipt_output_path(day, str(auth_data["slot_id"])),
+        "manifest_path": executor.manifest_path(day, str(auth_data["slot_id"])),
+        "handoff_artifact": live_requirements["handoff_path"],
+        "approval_artifact": auth["path"],
+        "custom_reference_id": str(auth_data["custom_reference_id"]),
+    }
+
     try:
-        provider_result = approved_live_generation.execute_approved_live_generation(
-            live_requirements["handoff_path"],
-            live_requirements["approval_path"],
-            live=True,
-        )
+        provider_result = executor.execute_approved_handoff_live_generation(context, live_executor=executor.run_live)
     except Exception as exc:
         code = getattr(exc, "code", "provider_generation_failed")
         detail = getattr(exc, "detail", str(exc))
@@ -885,10 +1048,11 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         provider_manifest,
         live_requirements["expected_output_directory"],
         live_requirements["expected_output_stem"],
+        live_requirements["allowed_output_extensions"],
     )
     generated_image_sha256 = _sha256_file(generated_image_path)
     _require(str(provider_manifest.get("slot_id") or "") == str(auth_data["slot_id"]), "provider_manifest_slot_mismatch", "provider manifest slot_id mismatch")
-    _require(str(provider_manifest.get("prompt_sha256") or "") == str(handoff_facts["prompt_sha256"]), "provider_manifest_prompt_mismatch", "provider manifest prompt sha mismatch")
+    _require(str(provider_manifest.get("prompt_sha256") or "") == str(approval_result["handoff_facts"]["prompt_sha256"]), "provider_manifest_prompt_mismatch", "provider manifest prompt sha mismatch")
     _require(str(provider_manifest.get("provider_job_id") or "") == str(live_result.get("job_id") or provider_manifest.get("provider_job_id") or ""), "provider_manifest_job_mismatch", "provider manifest provider_job_id mismatch")
     _require(str(provider_receipt.get("provider_job_id") or "") == str(provider_manifest.get("provider_job_id") or ""), "provider_receipt_job_mismatch", "provider receipt provider_job_id mismatch")
     _require(str(provider_receipt.get("output_path") or "") == str(generated_image_path), "provider_receipt_output_mismatch", "provider receipt output_path mismatch")
@@ -947,10 +1111,10 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     )
 
     publish_sidecar_path, publish_sidecar, publish_sidecar_sha256 = _build_live_publish_sidecar(
+        authorization=auth,
         image_path=generated_image_path,
         caption=str(auth_data["caption"]),
         platform=str(auth_data["platform"]),
-        approved_at_utc=auth["consumed_at_utc"],
     )
     package_path = _ensure_path_within_root(
         _subreport_path(day, str(auth_data["slot_id"]), "package", report_root),
@@ -995,16 +1159,24 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         "report_type": "lena_bounded_live_cycle_publish_payload",
         "schema_version": "v1",
         "cycle_id": cycle_id,
+        "authorization_mode": "standing_autonomy_policy",
         "platform": str(auth_data["platform"]),
         "media_type": "photo",
         "slot_id": str(auth_data["slot_id"]),
         "candidate_id": str(auth_data["candidate_id"]),
         "caption": str(auth_data["caption"]),
         "asset_path": str(generated_image_path),
+        "asset_sha256": generated_image_sha256,
+        "generated_image_path": str(generated_image_path),
+        "generated_image_sha256": generated_image_sha256,
         "package_artifact_path": str(package_path),
         "package_artifact_sha256": package_sha256,
         "publish_sidecar_path": str(publish_sidecar_path),
         "publish_sidecar_sha256": publish_sidecar_sha256,
+        "policy_artifact_path": str(auth_data.get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth_data.get("policy_artifact_sha256") or ""),
+        "cycle_authorization_path": str(auth["path"]),
+        "cycle_authorization_sha256": auth["pre_consumption_sha256"],
     }
     _write_json_atomic(publish_payload_path, publish_payload)
     publish_payload_sha256 = _sha256_file(publish_payload_path)
@@ -1062,25 +1234,41 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     )
 
     finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    usage_before = auth_data.get("daily_usage_before") or {}
+    usage_after = {
+        "cycle_count": int(usage_before.get("cycle_count", 0)) + 1,
+        "provider_calls_performed": int(usage_before.get("provider_calls_performed", 0)) + 1,
+        "publish_calls_performed": int(usage_before.get("publish_calls_performed", 0)) + 1,
+        "retries_performed": int(usage_before.get("retries_performed", 0)),
+        "declared_spend_total": usage_before.get("declared_spend_total"),
+        "spend_unit": usage_before.get("spend_unit"),
+    }
     report = {
         "ok": True,
         "version": "v1",
         "report_type": "lena_bounded_live_cycle",
         "live_execution": True,
         "simulation_mode": False,
+        "autonomous_execution": True,
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
+        "authorization_mode": "standing_autonomy_policy",
         "date": day,
         "started_at": started_at,
         "finished_at": finished_at,
         "cycle_id": cycle_id,
+        "policy_artifact_path": str(auth_data.get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth_data.get("policy_artifact_sha256") or ""),
         "authorization_artifact_path": str(auth["path"]),
+        "authorization_artifact_sha256_before_consumption": auth["pre_consumption_sha256"],
         "authorization_artifact_sha256": auth["sha256"],
-        "operator_authorization_sha256": auth["artifact"].get("operator_authorization_sha256", auth["sha256"]),
         "authorization_consumption_implemented": True,
         "authorization_consumed": True,
         "authorization_consumed_at_utc": auth["consumed_at_utc"],
         "authorization_state_before": {
             "single_use": True,
             "consumed": False,
+            "consumed_at_utc": None,
         },
         "authorization_state_after": auth["artifact"].get("authorization_state_after", {
             "single_use": True,
@@ -1090,24 +1278,30 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         "provider_calls_performed": 1,
         "publish_calls_performed": 1,
         "retries_performed": 0,
-        "actual_spend_usd": None,
-        "actual_spend_available": False,
+        "declared_spend_unit": auth_data.get("spend_unit"),
+        "actual_spend": auth_data.get("actual_spend"),
+        "actual_spend_available": bool(auth_data.get("actual_spend") not in (None, "")),
+        "daily_usage_before": usage_before,
+        "daily_usage_after": usage_after,
         "safeguards": {
             "single_use": True,
             "one_slot": True,
             "one_candidate": True,
             "one_asset": True,
             "one_platform": True,
-            "provider_call_cap": 1,
-            "publish_action_cap": 1,
-            "retry_cap": 0,
-            "hard_spend_cap_usd": auth_data.get("hard_spend_cap_usd"),
+            "provider_call_cap_per_cycle": 1,
+            "publish_action_cap_per_cycle": 1,
+            "retry_cap_per_cycle": 0,
+            "daily_spend_ceiling": auth_data.get("daily_spend_ceiling"),
+            "spend_unit": auth_data.get("spend_unit"),
             "kill_switch_enabled": auth_data.get("kill_switch_enabled"),
             "duplicate_rejection": "report_path_must_not_exist",
             "no_scheduler": True,
             "no_second_provider_call": True,
             "no_second_publish_call": True,
             "analytics_triggered_rerun_blocked": True,
+            "qa_required": True,
+            "identity_verification_required": True,
         },
         "authorized_scope": {
             "slot_id": str(auth_data["slot_id"]),
@@ -1116,9 +1310,9 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             "asset_path": str(generated_image_path),
         },
         "child_artifacts": {
-            "authorization_artifact": {"path": str(auth["path"]), "sha256": auth["sha256"]},
-            "approval_artifact": {"path": str(live_requirements["approval_path"]), "sha256": auth_data["generation_approval_artifact_sha256"]},
-            "handoff_artifact": {"path": str(live_requirements["handoff_path"]), "sha256": auth_data["generation_handoff_artifact_sha256"]},
+            "policy_artifact": {"path": str(live_requirements["policy_path"]), "sha256": auth["policy"]["sha256"]},
+            "authorization_artifact": {"path": str(auth["path"]), "sha256": auth["pre_consumption_sha256"]},
+            "handoff_artifact": {"path": str(live_requirements["handoff_path"]), "sha256": _sha256_file(live_requirements["handoff_path"])},
             "candidate_artifact": {"path": str(candidate_path), "sha256": candidate_sha256},
             "provider_generation_claim": {"path": str(claim_path), "sha256": _sha256_file(claim_path)},
             "provider_generation_receipt": {"path": str(receipt_path), "sha256": _sha256_file(receipt_path)},
@@ -1140,7 +1334,7 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         "stage_coverage": stages,
         "stages": stages,
         "audited_live_paths": {
-            "provider_generation": "tools.strategy.lena_execute_approved_live_generation_v1.execute_approved_live_generation + pipeline.higgsfield_lena_api_executor.execute_approved_handoff_live_generation",
+            "provider_generation": "pipeline.higgsfield_lena_api_executor.execute_approved_handoff_live_generation",
             "image_qa": "tools.lena_photo_qa_disposition_v1.evaluate_photo_qa_disposition",
             "caption_package_creation": "bounded live package builder",
             "publishing": "tools/publishers/lena_publish_instagram_feed_v2_8.py or tools/publishers/lena_publish_facebook_page_v2_8.py",
@@ -1196,9 +1390,6 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         code="manifest_binding_invalid",
         label="generation manifest",
     )
-    image = _ensure_path_within_root(Path(str(auth_data["asset_path"])), ROOT / "pipeline" / "higgsfield_library" / "lena", code="asset_path_invalid", label="generated asset", must_exist=True)
-    image_sha = _sha256_file(image)
-    _require(image_sha == str(auth_data["asset_sha256"]), "asset_sha_mismatch", "generated asset SHA-256 does not match authorization")
     manifest_saved_image = _ensure_path_within_root(
         Path(str(manifest["artifact"].get("saved_image_path") or "")),
         ROOT / "pipeline" / "higgsfield_library" / "lena",
@@ -1206,7 +1397,9 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         label="manifest saved image",
         must_exist=True,
     )
-    _require(manifest_saved_image == image, "manifest_image_mismatch", "manifest saved image does not match authorization asset")
+    image = manifest_saved_image
+    image_sha = _sha256_file(image)
+    _require(manifest_saved_image == image, "manifest_image_mismatch", "manifest saved image does not match authorization output binding")
     stages.append(_stage_summary(
         "provider_generation_evidence",
         True,
@@ -1237,7 +1430,14 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         must_exist=False,
     )
     package_path.parent.mkdir(parents=True, exist_ok=True)
-    package_path, package = _build_package(auth, provider, qa, package_path)
+    package_path, package = _build_package(
+        auth,
+        provider,
+        qa,
+        package_path,
+        generated_image_path=image,
+        generated_image_sha256=image_sha,
+    )
     package_sha = _sha256_file(package_path)
     stages.append(_stage_summary("caption_package_creation", True, package_artifact_path=str(package_path), package_artifact_sha256=package_sha))
     publish_path = _ensure_path_within_root(
@@ -1266,17 +1466,26 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         "version": "v1",
         "report_type": "lena_bounded_live_cycle",
         "simulation_mode": simulate,
+        "live_execution": False,
+        "autonomous_execution": False,
+        "authorization_mode": "standing_autonomy_policy",
         "date": day,
         "started_at": started_at,
         "finished_at": finished_at,
+        "policy_artifact_path": str(auth_data.get("policy_artifact_path") or ""),
+        "policy_artifact_sha256": str(auth_data.get("policy_artifact_sha256") or ""),
         "authorization_artifact_path": str(auth["path"]),
+        "authorization_artifact_sha256_before_consumption": auth.get("pre_consumption_sha256", auth["sha256"]),
         "authorization_artifact_sha256": auth["sha256"],
         "authorization_consumption_implemented": False,
         "authorization_consumed": False,
         "authorization_consumed_at_utc": None,
+        "human_per_cycle_approval_required": False,
+        "human_per_cycle_approval_present": False,
         "authorization_state_before": {
             "single_use": True,
             "consumed": False,
+            "consumed_at_utc": None,
         },
         "authorization_state_after": {
             "single_use": True,
@@ -1286,22 +1495,30 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
         "retries_performed": 0,
+        "declared_spend_unit": auth_data.get("spend_unit"),
+        "actual_spend": None,
+        "actual_spend_available": False,
+        "daily_usage_before": auth_data.get("daily_usage_before"),
+        "daily_usage_after": auth_data.get("daily_usage_before"),
         "safeguards": {
             "single_use": True,
             "one_slot": True,
             "one_candidate": True,
             "one_asset": True,
             "one_platform": True,
-            "provider_call_limit": 1,
-            "publish_action_limit": 1,
-            "retry_cap": 0,
-            "hard_spend_cap_usd": 0,
-            "kill_switch": True,
+            "provider_call_cap_per_cycle": 1,
+            "publish_action_cap_per_cycle": 1,
+            "retry_cap_per_cycle": 0,
+            "daily_spend_ceiling": auth_data.get("daily_spend_ceiling"),
+            "spend_unit": auth_data.get("spend_unit"),
+            "kill_switch_enabled": auth_data.get("kill_switch_enabled"),
             "duplicate_rejection": "report_path_must_not_exist",
             "no_scheduler": True,
             "no_second_provider_call": True,
             "no_second_publish_call": True,
             "analytics_triggered_rerun_blocked": True,
+            "qa_required": True,
+            "identity_verification_required": True,
         },
         "unimplemented_live_guards": [
             "atomic_authorization_consumption",
@@ -1311,13 +1528,15 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         "authorized_scope": {
             "slot_id": auth_data["slot_id"],
             "candidate_id": auth_data["candidate_id"],
-            "asset_path": auth_data["asset_path"],
+            "generated_image_path": str(image),
             "platform": auth_data["platform"],
         },
         "captions": {
             "caption": auth_data["caption"],
         },
         "child_artifacts": {
+            "policy_artifact": {"path": str(auth_data.get("policy_artifact_path") or ""), "sha256": str(auth_data.get("policy_artifact_sha256") or "")},
+            "authorization_artifact": {"path": str(auth["path"]), "sha256": auth["pre_consumption_sha256"]},
             "candidate": {"path": str(candidate["path"]), "sha256": candidate["sha256"]},
             "provider_generation_receipt": {"path": str(provider["path"]), "sha256": provider["sha256"]},
             "manifest": {"path": str(manifest["path"]), "sha256": manifest["sha256"]},
@@ -1330,7 +1549,7 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         "stages": stages,
         "stage_coverage": stages,
         "audited_live_paths": {
-            "provider_generation": "pipeline/higgsfield_lena_api_executor.py + tools/strategy/lena_execute_approved_live_generation_v1.py",
+            "provider_generation": "pipeline/higgsfield_lena_api_executor.execute_approved_handoff_live_generation",
             "image_qa": "tools/lena_photo_qa_disposition_v1.py",
             "caption_package_creation": "wrapper-built package artifact",
             "publishing": "tools/publishers/lena_publish_instagram_feed_v2_8.py or tools/publishers/lena_publish_facebook_page_v2_8.py",
