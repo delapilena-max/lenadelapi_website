@@ -165,7 +165,15 @@ def _validate_authorization_artifact(auth_path: Path, *, simulate: bool) -> dict
         policy_result = standing_autonomy.validate_policy_artifact(policy_path)
     except (standing_autonomy.StandingAutonomyPolicyError, executor.HandoffArtifactError) as exc:
         raise LenaBoundedLiveCycleError(exc.code, exc.detail) from exc
-    handoff_path = Path(str(auth_json.get("generation_handoff_artifact_path") or ""))
+    handoff_raw = str(auth_json.get("generation_handoff_artifact_path") or "").strip()
+    _require(handoff_raw, "handoff_artifact_path_missing", "generation_handoff_artifact_path is required")
+    handoff_path = _ensure_path_within_root(
+        Path(handoff_raw),
+        ROOT,
+        code="handoff_path_escape",
+        label="generation handoff artifact",
+        must_exist=True,
+    )
     try:
         handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
         auth_result = standing_autonomy.validate_cycle_authorization_artifact(
@@ -732,7 +740,9 @@ def _validate_live_required_artifacts(auth: dict[str, Any]) -> dict[str, Any]:
         must_exist=True,
     )
     handoff_path = _ensure_path_within_root(
-        Path(str(artifact.get("generation_handoff_artifact_path") or "")),
+        Path(
+            str(artifact.get("generation_handoff_artifact_path") or "")
+        ),
         ROOT,
         code="handoff_path_escape",
         label="generation handoff artifact",
@@ -800,6 +810,7 @@ def _build_autonomous_approval_result(auth: dict[str, Any], live_requirements: d
         "prompt_sha256": str(handoff_report.get("prompt_sha256") or artifact.get("prompt_sha256") or ""),
         "custom_reference_id": str(handoff_report.get("custom_reference_id") or artifact.get("custom_reference_id") or ""),
         "handoff_path": str(handoff_path),
+        "handoff_repo_path": _repo_relative(handoff_path),
         "handoff_sha256": _sha256_file(handoff_path),
         "selected_candidate_path": str(handoff_report.get("selected_candidate_path") or artifact.get("candidate_artifact_path") or ""),
         "selected_candidate_sha256": str(handoff_report.get("selected_candidate_sha256") or artifact.get("candidate_artifact_sha256") or ""),
