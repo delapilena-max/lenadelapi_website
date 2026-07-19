@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+import time
+
 import tools.lena_autopublish_approved_queue_v2_8 as autopublish
 import tools.lena_validate_approved_queue_autopublisher_v2_8 as validator
 import tools.publishers.lena_meta_publish_common_v2_9 as publish_common

@@ -154,8 +154,51 @@ def _validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     if policy.get("require_platform_receipts") is not True:
         raise AutopublishError("autonomous_policy_receipts_required_invalid", "platform receipts must be required")
     if policy.get("require_idempotent_post_log_sync") is not True:
-        raise AutopublishError("autonomous_policy_sync_required_invalid", "post-log sync must be required")
-    return {"path": policy_path, "sha256": _policy_sha256(policy_path), "artifact": policy, "authority_commit": current_commit}
+        raise AutopublishError(
+            "autonomous_policy_sync_required_invalid",
+            "post-log sync must be required",
+        )
+    allowed_pf = {
+        str(p) for p in policy.get("autonomous_queue_platforms", [])
+    }
+    if not allowed_pf:
+        raise AutopublishError(
+            "autonomous_policy_platforms_missing",
+            "autonomous_queue_platforms must be non-empty in the policy",
+        )
+    expires_raw = str(
+        policy.get("policy_expires_at_utc") or ""
+    ).strip()
+    if not expires_raw:
+        raise AutopublishError(
+            "autonomous_policy_expiry_missing",
+            "policy_expires_at_utc is required",
+        )
+    try:
+        _expiry = datetime.fromisoformat(
+            expires_raw.replace("Z", "+00:00")
+        )
+    except ValueError:
+        raise AutopublishError(
+            "autonomous_policy_expiry_malformed",
+            f"policy_expires_at_utc not valid ISO-8601: {expires_raw!r}",
+        )
+    if _expiry.tzinfo is None:
+        raise AutopublishError(
+            "autonomous_policy_expiry_malformed",
+            "policy_expires_at_utc must be timezone-aware UTC",
+        )
+    if _expiry <= _now_utc():
+        raise AutopublishError(
+            "autonomous_policy_expired",
+            f"policy has expired at {expires_raw}",
+        )
+    return {
+        "path": policy_path,
+        "sha256": _policy_sha256(policy_path),
+        "artifact": policy,
+        "authority_commit": current_commit,
+    }
 
 
 def _manifest_checks(manifest_path: Path = MANIFEST_PATH) -> dict[str, Any]:
@@ -212,12 +255,26 @@ def _write_queue(path: Path, rows: list[dict[str, str]]) -> None:
 
 def _parse_json_stdout(raw: str) -> dict | None:
     raw = (raw or "").strip()
-    if not raw or (not raw.startswith("{") and not raw.startswith("[")):
+    if not raw:
         return None
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return None
+    if raw.startswith("{") or raw.startswith("["):
+        try:
+            result = json.loads(raw)
+            return result if isinstance(result, dict) else None
+        except json.JSONDecodeError:
+            pass
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if line and (
+            line.startswith("{") or line.startswith("[")
+        ):
+            try:
+                result = json.loads(line)
+                return result if isinstance(result, dict) else None
+            except json.JSONDecodeError:
+                pass
+            break
+    return None
 
 
 def _connector_payload(row: dict[str, str]) -> dict[str, str]:
@@ -263,9 +320,25 @@ def _run_connector(row: dict[str, str], *, dry_run: bool = False) -> dict[str, A
     parsed = _parse_json_stdout(proc.stdout)
     data: dict[str, Any]
     if parsed is not None:
-        data = parsed if isinstance(parsed, dict) else {"ok": False, "raw": proc.stdout}
+        data = (
+            parsed if isinstance(parsed, dict)
+            else {"ok": False, "raw": proc.stdout}
+        )
+    elif proc.returncode == 0 and (proc.stdout or "").strip():
+        data = {
+            "ok": False,
+            "posted": False,
+            "ambiguous": True,
+            "reason": "connector_result_ambiguous",
+            "raw_stdout": proc.stdout[-500:],
+            "stderr": proc.stderr[-500:],
+        }
     else:
-        data = {"ok": False, "raw_stdout": proc.stdout[-1000:], "stderr": proc.stderr[-1000:]}
+        data = {
+            "ok": False,
+            "raw_stdout": proc.stdout[-1000:],
+            "stderr": proc.stderr[-1000:],
+        }
     data["returncode"] = proc.returncode
     data["connector"] = connector
     data["payload"] = str(payload_path)
@@ -477,26 +550,73 @@ def _slot_key_from_row(row: dict[str, str], slot_keyword: str) -> bool:
     return slot_keyword.lower() in (row.get("slot_id", "").lower())
 
 
-def _select_autonomous_slot_rows(rows: list[dict[str, str]], slot_keyword: str, policy: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
+def _select_autonomous_slot_rows(
+    rows: list[dict[str, str]],
+    slot_keyword: str,
+    policy: dict[str, Any],
+) -> tuple[str, list[dict[str, str]]]:
     keyword = (slot_keyword or "").strip().lower()
     if keyword not in AUTONOMOUS_SLOT_KEYWORDS:
-        raise AutopublishError("autonomous_slot_invalid", "slot_keyword must be morning, afternoon, or evening")
-    allowed_platforms = {str(item) for item in policy.get("autonomous_queue_platforms", [])}
-    matches = [row for row in rows if row.get("publish_state", "") != "posted" and _slot_key_from_row(row, keyword) and (not allowed_platforms or row.get("platform", "") in allowed_platforms)]
-    if not matches:
-        raise AutopublishError("autonomous_slot_missing", f"no eligible rows matched slot_keyword={keyword!r}")
-    slot_ids = {row.get("slot_id", "") for row in matches}
+        raise AutopublishError(
+            "autonomous_slot_invalid",
+            "slot_keyword must be morning, afternoon, or evening",
+        )
+    allowed_platforms = {
+        str(item) for item in policy.get("autonomous_queue_platforms", [])
+    }
+    all_slot = [
+        row for row in rows
+        if _slot_key_from_row(row, keyword)
+        and (
+            not allowed_platforms
+            or row.get("platform", "") in allowed_platforms
+        )
+    ]
+    if not all_slot:
+        raise AutopublishError(
+            "autonomous_slot_missing",
+            f"no rows found for slot_keyword={keyword!r}",
+        )
+    eligible = [
+        row for row in all_slot
+        if row.get("publish_state", "") != "posted"
+    ]
+    if not eligible:
+        raise AutopublishError(
+            "autonomous_slot_fully_posted",
+            f"all rows for slot_keyword={keyword!r} are already posted",
+        )
+    slot_ids = {row.get("slot_id", "") for row in eligible}
     if len(slot_ids) != 1:
-        raise AutopublishError("autonomous_multiple_slot_candidates", f"slot_keyword={keyword!r} matched more than one slot: {sorted(slot_ids)!r}")
-    return next(iter(slot_ids)), matches
+        raise AutopublishError(
+            "autonomous_multiple_slot_candidates",
+            (
+                f"slot_keyword={keyword!r} matched more than one slot:"
+                f" {sorted(slot_ids)!r}"
+            ),
+        )
+    return next(iter(slot_ids)), eligible
 
 
 def _claim_file_is_stale(claim: dict[str, Any], policy: dict[str, Any]) -> bool:
     try:
-        expiry = datetime.fromisoformat(str(claim.get("lease_expires_at_utc") or "").replace("Z", "+00:00"))
+        expiry = datetime.fromisoformat(
+            str(claim.get("lease_expires_at_utc") or "")
+            .replace("Z", "+00:00")
+        )
         return expiry <= _now_utc()
     except Exception:
         return True
+
+
+def _lock_file_is_stale(lock_path: Path, policy: dict[str, Any]) -> bool:
+    try:
+        mtime = lock_path.stat().st_mtime
+        lease = int(policy.get("queue_claim_lease_seconds", 1800))
+        age = _now_utc().timestamp() - mtime
+        return age > lease
+    except Exception:
+        return False
 
 
 def _acquire_slot_claim(day: str, slot_id: str, rows: list[dict[str, str]], policy: dict[str, Any], slot_keyword: str) -> tuple[Path, dict[str, Any]]:
@@ -511,12 +631,40 @@ def _acquire_slot_claim(day: str, slot_id: str, rows: list[dict[str, str]], poli
             claim_path.unlink()
         except OSError:
             pass
+    stale_lock_recovery: dict[str, Any] | None = None
+    if lock_path.exists() and not claim_path.exists():
+        if not _lock_file_is_stale(lock_path, policy):
+            raise AutopublishError(
+                "autonomous_lock_orphaned_fresh_manual_recovery_required",
+                (
+                    "orphaned lock file is fresh;"
+                    f" manual removal required: {lock_path}"
+                ),
+            )
+        try:
+            lock_path.unlink()
+            stale_lock_recovery = {
+                "recovered_stale_lock": True,
+                "lock_path": str(lock_path),
+            }
+        except OSError as exc:
+            raise AutopublishError(
+                "autonomous_lock_orphaned_removal_failed",
+                (
+                    "stale orphaned lock could not be removed:"
+                    f" {lock_path}: {exc}"
+                ),
+            ) from exc
     try:
         fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        raise AutopublishError("autonomous_queue_claim_active", f"slot already claimed: {slot_id}")
+        raise AutopublishError(
+            "autonomous_queue_claim_active",
+            f"slot already claimed: {slot_id}",
+        )
     try:
         os.close(fd)
+        _lease_secs = int(policy.get("queue_claim_lease_seconds", 1800))
         claim = {
             "report_type": "lena_approved_queue_autonomous_claim",
             "schema_version": "v1",
@@ -528,13 +676,16 @@ def _acquire_slot_claim(day: str, slot_id: str, rows: list[dict[str, str]], poli
             "claim_id": uuid.uuid4().hex,
             "state": "claimed",
             "claimed_at_utc": _iso_now(),
-            "lease_expires_at_utc": (_now_utc() + timedelta(seconds=int(policy.get("queue_claim_lease_seconds", 1800)))).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "lease_expires_at_utc": (
+                _now_utc() + timedelta(seconds=_lease_secs)
+            ).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             "policy_id": policy.get("policy_id"),
             "policy_sha256": policy.get("_policy_sha256", ""),
             "authority_commit": policy.get("authority_commit"),
             "queue_csv": _repo_relative(_queue_path(day)),
             "queue_csv_sha256": _sha256_file(_queue_path(day)),
             "row_count": len(rows),
+            "stale_lock_recovery": stale_lock_recovery,
         }
         _write_json_atomic(claim_path, claim)
         return claim_path, claim
@@ -606,6 +757,13 @@ def _apply_failed_row_update(row: dict[str, str], reason: str, max_attempts: int
         row["publish_state"] = "failed"
 
 
+def _apply_ambiguous_row_update(
+    row: dict[str, str], reason: str
+) -> None:
+    row["publish_state"] = "connector_ambiguous"
+    row["failure_reason"] = reason
+
+
 def _recover_from_existing_receipt(day: str, slot_id: str, row: dict[str, str], receipt_path: Path) -> dict[str, Any]:
     receipt = _read_json_object(receipt_path, code="autonomous_receipt_invalid", label="publish receipt")
     if not receipt.get("posted"):
@@ -626,10 +784,69 @@ def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run
 
     queue_path, rows = _load_queue(day)
     if not rows:
-        raise AutopublishError("approved_queue_missing", f"missing/empty queue: {queue_path}")
-    slot_id, slot_rows = _select_autonomous_slot_rows(rows, slot_keyword, policy)
+        raise AutopublishError(
+            "approved_queue_missing",
+            f"missing/empty queue: {queue_path}",
+        )
+    try:
+        q_mtime = datetime.fromtimestamp(
+            queue_path.stat().st_mtime, tz=timezone.utc
+        )
+        if q_mtime.date() < date.fromisoformat(day):
+            raise AutopublishError(
+                "approved_queue_stale",
+                (
+                    f"queue last modified {q_mtime.date().isoformat()},"
+                    f" expected {day}; run queue builder first"
+                ),
+            )
+    except AutopublishError:
+        raise
+    except Exception:
+        pass
+    try:
+        slot_id, slot_rows = _select_autonomous_slot_rows(
+            rows, slot_keyword, policy
+        )
+    except AutopublishError as exc:
+        if exc.code == "autonomous_slot_fully_posted":
+            return {
+                "ok": True,
+                "version": "v2.8.5",
+                "date": day,
+                "mode": "scheduled_autonomous",
+                "dry_run": dry_run,
+                "slot_keyword": slot_keyword,
+                "slot_id": "",
+                "queue_csv": str(queue_path),
+                "policy_path": str(policy_result["path"]),
+                "policy_sha256": policy_result["sha256"],
+                "publish_calls_performed": 0,
+                "provider_calls_performed": 0,
+                "queue_mutated": False,
+                "posted_count": 0,
+                "failed_count": 0,
+                "abandoned_count": 0,
+                "ambiguous_count": 0,
+                "processed": [],
+                "recovered_queue_ids": [],
+                "posted_queue_ids": [],
+                "slot_fully_posted": True,
+                "detail": exc.detail,
+            }
+        raise
     changed_rows = [dict(row) for row in rows]
-    slot_changed_rows = [row for row in changed_rows if row.get("slot_id", "") == slot_id]
+    _allowed_pf = {
+        str(p) for p in policy.get("autonomous_queue_platforms", [])
+    }
+    slot_changed_rows = [
+        row for row in changed_rows
+        if row.get("slot_id", "") == slot_id
+        and (
+            not _allowed_pf
+            or row.get("platform", "") in _allowed_pf
+        )
+    ]
     claim_path: Path | None = None
     claim: dict[str, Any] | None = None
     processed: list[dict[str, Any]] = []
@@ -664,10 +881,40 @@ def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run
                 _apply_posted_row_update(row, result)
                 posted_queue_ids.append(row.get("queue_id", ""))
                 processed.append({"queue_id": row.get("queue_id", ""), "platform": row.get("platform", ""), "slot_id": row.get("slot_id", ""), "result": {"ok": True, "posted": True, "receipt_path": str(receipt_path)}, "state_after": row.get("publish_state", "")})
+            elif result.get("ambiguous"):
+                _apply_ambiguous_row_update(
+                    row,
+                    str(result.get("reason", "connector_result_ambiguous")),
+                )
+                processed.append({
+                    "queue_id": row.get("queue_id", ""),
+                    "platform": row.get("platform", ""),
+                    "slot_id": row.get("slot_id", ""),
+                    "result": {
+                        "ok": False,
+                        "ambiguous": True,
+                        "reason": result.get("reason"),
+                    },
+                    "state_after": row.get("publish_state", ""),
+                })
             else:
-                reason = str(result.get("reason", "connector_failed_or_not_configured"))
-                _apply_failed_row_update(row, reason, int(policy.get("max_attempts_per_row", 3)))
-                processed.append({"queue_id": row.get("queue_id", ""), "platform": row.get("platform", ""), "slot_id": row.get("slot_id", ""), "result": {"ok": False, "reason": reason}, "state_after": row.get("publish_state", "")})
+                reason = str(
+                    result.get(
+                        "reason", "connector_failed_or_not_configured"
+                    )
+                )
+                _apply_failed_row_update(
+                    row,
+                    reason,
+                    int(policy.get("max_attempts_per_row", 3)),
+                )
+                processed.append({
+                    "queue_id": row.get("queue_id", ""),
+                    "platform": row.get("platform", ""),
+                    "slot_id": row.get("slot_id", ""),
+                    "result": {"ok": False, "reason": reason},
+                    "state_after": row.get("publish_state", ""),
+                })
 
         if not dry_run:
             _write_queue(queue_path, changed_rows)
@@ -680,7 +927,7 @@ def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run
 
         return {
             "ok": True,
-            "version": "v2.8.4",
+            "version": "v2.8.5",
             "date": day,
             "mode": "scheduled_autonomous",
             "dry_run": dry_run,
@@ -693,9 +940,22 @@ def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run
             "publish_calls_performed": publish_calls,
             "provider_calls_performed": 0,
             "queue_mutated": not dry_run,
-            "posted_count": sum(1 for item in processed if item["state_after"] == "posted"),
-            "failed_count": sum(1 for item in processed if item["state_after"] == "failed"),
-            "abandoned_count": sum(1 for item in processed if item["state_after"] == "abandoned"),
+            "posted_count": sum(
+                1 for item in processed
+                if item["state_after"] == "posted"
+            ),
+            "failed_count": sum(
+                1 for item in processed
+                if item["state_after"] == "failed"
+            ),
+            "abandoned_count": sum(
+                1 for item in processed
+                if item["state_after"] == "abandoned"
+            ),
+            "ambiguous_count": sum(
+                1 for item in processed
+                if item["state_after"] == "connector_ambiguous"
+            ),
             "processed": processed,
             "sync_report": sync_report,
             "recovered_queue_ids": recovered_queue_ids,
@@ -771,7 +1031,7 @@ def run_manual_publish(day: str, platforms: str, dry_run: bool, live: bool, ack_
 
     report = {
         "ok": True,
-        "version": "v2.8.4",
+        "version": "v2.8.5",
         "date": day,
         "dry_run": dry_run,
         "queue_mutated": not dry_run,
@@ -808,7 +1068,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.scheduled_autonomous and (args.live or args.ack_publish_risk):
-        print(json.dumps({"ok": False, "version": "v2.8.4", "error": "autonomous_mode_must_not_reuse_manual_live_flags"}, indent=2, ensure_ascii=False))
+        print(json.dumps({"ok": False, "version": "v2.8.5", "error": "autonomous_mode_must_not_reuse_manual_live_flags"}, indent=2, ensure_ascii=False))
         return 2
 
     try:
@@ -833,10 +1093,10 @@ def main() -> int:
                 feedback_queue_limit=args.feedback_queue_limit,
             )
     except AutopublishError as exc:
-        print(json.dumps({"ok": False, "version": "v2.8.4", "error": exc.code, "detail": exc.detail}, indent=2, ensure_ascii=False))
+        print(json.dumps({"ok": False, "version": "v2.8.5", "error": exc.code, "detail": exc.detail}, indent=2, ensure_ascii=False))
         return 1
     except Exception as exc:
-        print(json.dumps({"ok": False, "version": "v2.8.4", "error": "unexpected_error", "detail": str(exc)}, indent=2, ensure_ascii=False))
+        print(json.dumps({"ok": False, "version": "v2.8.5", "error": "unexpected_error", "detail": str(exc)}, indent=2, ensure_ascii=False))
         return 1
 
     print(json.dumps(report, indent=2, ensure_ascii=False))
