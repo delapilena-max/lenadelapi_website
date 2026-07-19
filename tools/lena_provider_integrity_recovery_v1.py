@@ -73,9 +73,8 @@ def _assert_no_prior_downstream_evidence(paths: dict[str, Path], contract: Recov
     qa_root = photo_qa.OUTPUT_ROOT / contract.date
     qa_matches = list(qa_root.glob(f"{contract.slot_id}__*_qa_disposition.json")) if qa_root.exists() else []
     legacy_qa = photo_qa.OUTPUT_ROOT / "presence_output_qa" / contract.date / contract.slot_id
-    cycle._require(not paths["identity"].exists(), "recovery_prior_qa_evidence", "identity verification evidence already exists")
     cycle._require(not qa_matches and not legacy_qa.exists(), "recovery_prior_qa_evidence", "QA evidence already exists")
-    for key in ("attestation", "package", "publish_payload", "publish_receipt", "analytics", "aggregate"):
+    for key in ("package", "publish_payload", "publish_receipt", "analytics", "aggregate"):
         cycle._require(not paths[key].exists(), f"recovery_prior_{key}_evidence", f"recovery {key} evidence already exists")
     cycle._require(not paths["image"].with_suffix(".status.json").exists(), "recovery_prior_publish_evidence", "publish sidecar already exists")
     day_root = report_root / contract.date
@@ -130,6 +129,7 @@ def run_recovery(
     evidence = _validate_recovery_evidence(contract, report_root)
     paths = evidence["paths"]
     authorization = evidence["authorization"]
+    reference_authority_path, reference_authority_sha, reference_specs = cycle._load_reference_specs()
     handoff_path = Path(str(authorization.get("generation_handoff_artifact_path") or ""))
     cycle._require(cycle._sha256_file(handoff_path) == str(authorization.get("generation_handoff_artifact_sha256") or ""), "recovery_handoff_sha_mismatch", "handoff SHA binding mismatch")
     handoff_report, source, packet_validation, validation = executor._validate_handoff_packet(handoff_path)
@@ -153,6 +153,16 @@ def run_recovery(
         "allowed_output_extensions": list(authorization.get("allowed_output_extensions") or []),
     }
     approval_result = cycle._build_autonomous_approval_result(auth, live_requirements)
+    _assert_no_prior_downstream_evidence(paths, contract, report_root)
+
+    identity_path, _, _ = cycle._build_local_identity_evidence(
+        date_str=contract.date,
+        slot_id=contract.slot_id,
+        manifest=evidence["manifest"],
+        image_path=paths["image"],
+        image_sha256=contract.image_sha256,
+        identity_evidence_path=paths["identity"],
+    )
     attestation = {
         "report_type": "lena_provider_integrity_recovery_attestation",
         "schema_version": "v1",
@@ -176,11 +186,17 @@ def run_recovery(
         "retries_performed": 0,
         "resume_from_stage": "image_qa",
     }
-    cycle._write_json_atomic(paths["attestation"], attestation)
+    attestation_cmp = dict(attestation)
+    attestation_cmp.pop("created_at_utc", None)
+    if paths["attestation"].exists():
+        existing_attestation = cycle._read_json_object(paths["attestation"], code="recovery_attestation_existing_invalid", label="recovery attestation")
+        existing_cmp = dict(existing_attestation)
+        existing_cmp.pop("created_at_utc", None)
+        cycle._require(existing_cmp == attestation_cmp, "recovery_attestation_already_exists", "conflicting recovery attestation already exists")
+        attestation = existing_attestation
+    else:
+        cycle._write_json_atomic(paths["attestation"], attestation)
     attestation_sha = cycle._sha256_file(paths["attestation"])
-
-    identity_path, _, _ = cycle._build_local_identity_evidence(date_str=contract.date, slot_id=contract.slot_id, manifest=evidence["manifest"], image_path=paths["image"], image_sha256=contract.image_sha256, identity_evidence_path=paths["identity"])
-    reference_authority_path, reference_authority_sha, reference_specs = cycle._load_reference_specs()
     qa_artifact = qa_evaluator(decision_path=candidate_path, manifest_path=paths["manifest"], image_path=paths["image"], identity_evidence_path=identity_path, reference_specs=reference_specs, reference_authority_artifact=reference_authority_path, reference_authority_sha256=reference_authority_sha, expected_image_sha256=contract.image_sha256)
     qa_path, qa_record, _ = qa_writer(qa_artifact)
     cycle._require(str(qa_record.get("disposition") or "") == "accept", "qa_rejected", "photo QA did not accept the generated image")

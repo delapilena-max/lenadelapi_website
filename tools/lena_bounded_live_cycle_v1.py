@@ -406,6 +406,24 @@ def _load_reference_specs() -> tuple[Path, str, list[tuple[Path, str]]]:
     return authority_path.resolve(), _sha256_file(authority_path), specs
 
 
+def _identity_evidence_reuse_fingerprint(evidence: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(evidence, dict):
+        raise LenaBoundedLiveCycleError("identity_evidence_existing_invalid", "identity evidence must be a JSON object")
+
+    def _normalize(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                str(key): _normalize(subvalue)
+                for key, subvalue in value.items()
+                if key not in {"verified_at_utc", "created_at_utc"}
+            }
+        if isinstance(value, list):
+            return [_normalize(item) for item in value]
+        return value
+
+    return _normalize(evidence)
+
+
 def _build_local_identity_evidence(
     *,
     date_str: str,
@@ -455,8 +473,8 @@ def _build_local_identity_evidence(
     )
     if identity_evidence_path.exists():
         existing = _read_json_object(identity_evidence_path, code="identity_evidence_existing_invalid", label="identity evidence")
-        if existing != evidence:
-            raise LenaBoundedLiveCycleError("identity_evidence_already_exists", f"conflicting identity evidence already exists: {identity_evidence_path}")
+        if _identity_evidence_reuse_fingerprint(existing) != _identity_evidence_reuse_fingerprint(evidence):
+            raise LenaBoundedLiveCycleError("recovery_identity_evidence_mismatch", f"existing identity evidence is not reusable: {identity_evidence_path}")
         return identity_evidence_path, existing, False
     _write_json_atomic(identity_evidence_path, evidence)
     return identity_evidence_path, evidence, True
