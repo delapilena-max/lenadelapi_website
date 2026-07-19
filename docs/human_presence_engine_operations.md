@@ -32,6 +32,15 @@ python tools/lena_run_hpe_controlled_proof_v1.py \
 
 The command can also accept `--candidate-input` when the operator already has a selected-candidate decision artifact.
 
+PR4b now documents the safer two-stage authority handoff:
+
+1. Run the pre-generation candidate gate with `--required-recipe-id hcr_012`.
+2. Pass the resulting candidate artifact explicitly to the controlled-proof runner with `--candidate-input <candidate-report-path>`.
+
+Do not rely on bare `--controlled-proof` candidate selection. A bare controlled-proof invocation was observed to select a non-controlled candidate before explicit candidate binding, so the explicit candidate artifact is required for PR4b-style controlled proof. This preserves exact candidate, recipe, scene, and authority binding.
+
+The runner remains provider-free under `--dry-run`, publishing remains unauthorized, and reusing an existing output path is expected to fail closed with `artifact_already_exists`.
+
 Expected outputs:
 
 - selected-candidate evidence;
