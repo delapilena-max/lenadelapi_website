@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,7 @@ AUTH_REPORT_TYPE = "lena_standing_autonomy_cycle_authorization"
 AUTH_SCHEMA_VERSION = "v1"
 AUTHORIZATION_MODE = "standing_autonomy_policy"
 AUTHORIZATION_ISSUER = "lena_autonomy_controller"
+AUTHORIZATION_TTL = timedelta(minutes=30)
 
 
 class StandingAutonomyPolicyError(RuntimeError):
@@ -196,11 +197,14 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     _require(policy.get("qa_required") is True, "policy_qa_required_invalid", "qa_required must be true")
     _require(policy.get("identity_verification_required") is True, "policy_identity_required_invalid", "identity_verification_required must be true")
     _require(policy.get("analytics_triggered_regeneration_disabled") is True, "policy_analytics_regeneration_invalid", "analytics_triggered_regeneration_disabled must be true")
+    current_utc = _now_utc()
     effective_at = _validate_iso_datetime(str(policy.get("effective_at_utc") or ""), code="policy_effective_at_invalid", label="effective_at_utc")
+    _require(effective_at <= current_utc, "policy_effective_at_future_invalid", "effective_at_utc must not be in the future")
     expires_raw = policy.get("expires_at_utc")
     expires_at = None
     if expires_raw not in (None, ""):
         expires_at = _validate_iso_datetime(str(expires_raw), code="policy_expires_at_invalid", label="expires_at_utc")
+        _require(expires_at > current_utc, "policy_expired", "expires_at_utc must be after current UTC time")
         _require(expires_at > effective_at, "policy_expiry_order_invalid", "expires_at_utc must be after effective_at_utc")
     return {
         "path": policy_path.resolve(),
@@ -209,6 +213,16 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
         "effective_at_utc": effective_at.isoformat(),
         "expires_at_utc": expires_at.isoformat() if expires_at else None,
     }
+
+
+def _cycle_authorization_expires_at(policy_result: dict[str, Any]) -> str:
+    current_utc = _now_utc().replace(microsecond=0)
+    expiry = current_utc + AUTHORIZATION_TTL
+    policy_expiry = policy_result.get("expires_at_utc")
+    if policy_expiry:
+        policy_expiry_dt = _validate_iso_datetime(str(policy_expiry), code="policy_expires_at_invalid", label="expires_at_utc")
+        expiry = min(expiry, policy_expiry_dt)
+    return expiry.isoformat().replace("+00:00", "Z")
 
 
 def collect_daily_usage(report_root: Path, day: str) -> dict[str, Any]:
@@ -453,7 +467,7 @@ def issue_cycle_authorization(
             "policy_sha256_binding": policy_result["sha256"],
             "cycle_id": f"lena_standing_autonomy_cycle_{day}_{slot_id}_{uuid.uuid4().hex[:8]}",
             "issued_at_utc": _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-            "expires_at_utc": (policy_result["expires_at_utc"] or _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")),
+            "expires_at_utc": _cycle_authorization_expires_at(policy_result),
             "authorization_consumption_implemented": True,
             "authorization_consumed": False,
             "human_per_cycle_approval_required": False,
