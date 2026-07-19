@@ -854,6 +854,32 @@ def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: P
     assert sidecar["human_per_cycle_approval_present"] is False
 
 
+def test_post_provider_validation_failure_writes_complete_aggregate_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    state["provider_manifest_overrides"] = {"saved_image_sha256": "0" * 64}
+
+    report = _run_cycle(bundle, simulate=False, report_root=tmp_path / "reports")
+
+    assert report["ok"] is False
+    assert report["failed_stage"] == "provider_generation_validation"
+    assert report["failure"]["code"] == "provider_manifest_image_sha_mismatch"
+    assert report["provider_calls_performed"] == 1
+    assert report["provider_job_id"] == "job-123"
+    assert report["generated_image_path"] == str(Path(bundle["image_path"]).resolve())
+    assert report["generated_image_sha256"] == _sha(Path(bundle["image_path"]))
+    assert report["publish_calls_performed"] == 0
+    assert report["retries_performed"] == 0
+    assert state["provider_calls"] == 1
+    assert state["qa_calls"] == 0
+    assert state["publish_calls"] == 0
+    for label in ("claim", "receipt", "manifest", "generated_image"):
+        assert report["provider_generation_evidence"][label]["path"]
+        assert report["provider_generation_evidence"][label]["sha256"]
+
+
 @pytest.mark.parametrize("nested_candidate", [False, True], ids=["flat", "nested"])
 def test_live_candidate_artifact_shape_normalization_validates_both_candidate_shapes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nested_candidate: bool

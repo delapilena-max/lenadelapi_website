@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
 
@@ -309,6 +310,8 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
         assert date_str == DATE
         assert slot_id == SLOT_ID
         assert custom_reference_id == CUSTOM_REFERENCE_ID
+        saved_image_path.parent.mkdir(parents=True, exist_ok=True)
+        saved_image_path.write_bytes(b"generated-image-bytes")
         return {
             "job_id": "job-123",
             "status": "processing",
@@ -328,6 +331,7 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
         *,
         claim_repo_path: str | None = None,
         receipt_repo_path: str | None = None,
+        saved_image_sha256: str | None = None,
     ) -> dict[str, object]:
         return {
             "date": date_str,
@@ -336,6 +340,7 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
             "image_format_detected": live_result.get("image_format_detected") if live_result else None,
             "claim_repo_path": claim_repo_path,
             "receipt_repo_path": receipt_repo_path,
+            "saved_image_sha256": saved_image_sha256,
         }
 
     monkeypatch.setattr(executor, "build_manifest", fake_build_manifest)
@@ -377,6 +382,11 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     assert claim_path.is_file()
     assert receipt_path.is_file()
     assert manifest_path.is_file()
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert receipt["generated_image_sha256"] == hashlib.sha256(saved_image_path.read_bytes()).hexdigest()
+    assert receipt["manifest_sha256"] == hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    assert manifest["saved_image_sha256"] == receipt["generated_image_sha256"]
     assert wrapper.report_path(DATE, SLOT_ID).is_file()
     assert json.loads(wrapper.report_path(DATE, SLOT_ID).read_text(encoding="utf-8")) == report
 

@@ -893,6 +893,8 @@ def build_generation_execution_receipt_record(
     output_path: str | None = None,
     image_format_detected: str | None = None,
     actual_manifest_path: str | None = None,
+    generated_image_sha256: str | None = None,
+    manifest_sha256: str | None = None,
     receipt_written_at: datetime | None = None,
 ) -> dict[str, Any]:
     approval = approval_result["approval"]
@@ -925,6 +927,8 @@ def build_generation_execution_receipt_record(
         "image_format_detected": image_format_detected,
         "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
         "actual_manifest_path": actual_manifest_path,
+        "generated_image_sha256": generated_image_sha256,
+        "manifest_sha256": manifest_sha256,
         "operator_id": approval["operator_id"],
         "provider": approval["provider"],
         "executor": approval["executor"],
