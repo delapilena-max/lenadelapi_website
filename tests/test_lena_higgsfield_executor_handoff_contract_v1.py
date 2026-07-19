@@ -1452,18 +1452,25 @@ def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
 ) -> None:
     packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     approval_path = _build_approval_fixture(packet_path)
-    monkeypatch.setattr(
-        executor,
-        "run_live",
-        lambda *args, **kwargs: {
+    saved_image_path = tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"
+
+    def fake_run_live(*args, **kwargs):
+        saved_image_path.parent.mkdir(parents=True, exist_ok=True)
+        saved_image_path.write_bytes(b"generated-image-bytes")
+        return {
             "job_id": "job-123",
             "status": "completed",
             "result_urls": ["https://example.com/final.png"],
-            "saved_image_path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
+            "saved_image_path": str(saved_image_path),
             "image_format_detected": ".png",
             "subprocess_start_attempted": True,
             "provider_submission_may_have_occurred": True,
-        },
+        }
+
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        fake_run_live,
     )
     monkeypatch.setattr(
         sys, "argv",

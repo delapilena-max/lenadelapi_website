@@ -860,6 +860,95 @@ def _manifest_output_image_path(manifest: dict[str, Any], expected_directory: Pa
     return resolved
 
 
+def _artifact_evidence(path_value: Any) -> dict[str, Any] | None:
+    if not path_value:
+        return None
+    path = Path(str(path_value)).resolve(strict=False)
+    evidence: dict[str, Any] = {"path": str(path), "sha256": None}
+    if path.is_file():
+        evidence["sha256"] = _sha256_file(path)
+    return evidence
+
+
+def _provider_failure_evidence(provider_result: dict[str, Any]) -> dict[str, Any]:
+    live_result = provider_result.get("live_result") if isinstance(provider_result.get("live_result"), dict) else {}
+    claim = _artifact_evidence(provider_result.get("claim_path"))
+    receipt = _artifact_evidence(provider_result.get("receipt_path"))
+    manifest = _artifact_evidence(provider_result.get("manifest_path"))
+    image_path_value = live_result.get("saved_image_path")
+    if not image_path_value and manifest and Path(manifest["path"]).is_file():
+        try:
+            image_path_value = _read_json_object(Path(manifest["path"]), code="provider_manifest_missing_or_invalid", label="provider generation manifest").get("saved_image_path")
+        except LenaBoundedLiveCycleError:
+            image_path_value = None
+    image = _artifact_evidence(image_path_value)
+    provider_job_id = live_result.get("job_id")
+    if not provider_job_id and receipt and Path(receipt["path"]).is_file():
+        try:
+            provider_job_id = _read_json_object(Path(receipt["path"]), code="provider_receipt_missing_or_invalid", label="provider generation receipt").get("provider_job_id")
+        except LenaBoundedLiveCycleError:
+            provider_job_id = None
+    return {
+        "provider_calls_performed": 1,
+        "publish_calls_performed": 0,
+        "retries_performed": 0,
+        "provider_job_id": provider_job_id,
+        "generated_image_path": image["path"] if image else None,
+        "generated_image_sha256": image["sha256"] if image else None,
+        "provider_generation_evidence": {
+            "claim": claim,
+            "receipt": receipt,
+            "manifest": manifest,
+            "generated_image": image,
+        },
+    }
+
+
+def _validate_completed_provider_result(
+    provider_result: dict[str, Any],
+    *,
+    live_requirements: dict[str, Any],
+    approval_result: dict[str, Any],
+    auth_data: dict[str, Any],
+) -> dict[str, Any]:
+    claim_path = Path(str(provider_result["claim_path"]))
+    receipt_path = Path(str(provider_result["receipt_path"]))
+    manifest_path = Path(str(provider_result["manifest_path"]))
+    live_result = provider_result["live_result"] or {}
+    provider_manifest = _read_json_object(manifest_path, code="provider_manifest_missing_or_invalid", label="provider generation manifest")
+    provider_claim = _read_json_object(claim_path, code="provider_claim_missing_or_invalid", label="provider generation claim")
+    provider_receipt = _read_json_object(receipt_path, code="provider_receipt_missing_or_invalid", label="provider generation receipt")
+    generated_image_path = _manifest_output_image_path(
+        provider_manifest,
+        live_requirements["expected_output_directory"],
+        live_requirements["expected_output_stem"],
+        live_requirements["allowed_output_extensions"],
+    )
+    generated_image_sha256 = _sha256_file(generated_image_path)
+    manifest_sha256 = _sha256_file(manifest_path)
+    _require(str(provider_manifest.get("slot_id") or "") == str(auth_data["slot_id"]), "provider_manifest_slot_mismatch", "provider manifest slot_id mismatch")
+    _require(str(provider_manifest.get("prompt_sha256") or "") == str(approval_result["handoff_facts"]["prompt_sha256"]), "provider_manifest_prompt_mismatch", "provider manifest prompt sha mismatch")
+    _require(str(provider_manifest.get("provider_job_id") or "") == str(live_result.get("job_id") or provider_manifest.get("provider_job_id") or ""), "provider_manifest_job_mismatch", "provider manifest provider_job_id mismatch")
+    _require(str(provider_receipt.get("provider_job_id") or "") == str(provider_manifest.get("provider_job_id") or ""), "provider_receipt_job_mismatch", "provider receipt provider_job_id mismatch")
+    _require(str(provider_receipt.get("output_path") or "") == str(generated_image_path), "provider_receipt_output_mismatch", "provider receipt output_path mismatch")
+    _require(str(provider_receipt.get("generated_image_sha256") or "") == generated_image_sha256, "provider_receipt_image_sha_mismatch", "provider receipt generated image sha mismatch")
+    _require(str(provider_receipt.get("manifest_sha256") or "") == manifest_sha256, "provider_receipt_manifest_sha_mismatch", "provider receipt manifest sha mismatch")
+    _require(str(provider_manifest.get("saved_image_path") or "") == str(generated_image_path), "provider_manifest_image_mismatch", "provider manifest saved image mismatch")
+    _require(str(provider_manifest.get("saved_image_sha256") or "") == generated_image_sha256, "provider_manifest_image_sha_mismatch", "provider manifest image sha mismatch")
+    return {
+        "claim_path": claim_path,
+        "receipt_path": receipt_path,
+        "manifest_path": manifest_path,
+        "live_result": live_result,
+        "provider_manifest": provider_manifest,
+        "provider_claim": provider_claim,
+        "provider_receipt": provider_receipt,
+        "generated_image_path": generated_image_path,
+        "generated_image_sha256": generated_image_sha256,
+        "manifest_sha256": manifest_sha256,
+    }
+
+
 def _build_fail_report(
     *,
     auth: dict[str, Any] | None,
@@ -1056,29 +1145,34 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             },
         )
 
-    claim_path = Path(str(provider_result["claim_path"]))
-    receipt_path = Path(str(provider_result["receipt_path"]))
-    manifest_path = Path(str(provider_result["manifest_path"]))
-    live_result = provider_result["live_result"] or {}
-    provider_manifest = _read_json_object(manifest_path, code="provider_manifest_missing_or_invalid", label="provider generation manifest")
-    provider_claim = _read_json_object(claim_path, code="provider_claim_missing_or_invalid", label="provider generation claim")
-    provider_receipt = _read_json_object(receipt_path, code="provider_receipt_missing_or_invalid", label="provider generation receipt")
-    generated_image_path = _manifest_output_image_path(
-        provider_manifest,
-        live_requirements["expected_output_directory"],
-        live_requirements["expected_output_stem"],
-        live_requirements["allowed_output_extensions"],
-    )
-    generated_image_sha256 = _sha256_file(generated_image_path)
-    _require(str(provider_manifest.get("slot_id") or "") == str(auth_data["slot_id"]), "provider_manifest_slot_mismatch", "provider manifest slot_id mismatch")
-    _require(str(provider_manifest.get("prompt_sha256") or "") == str(approval_result["handoff_facts"]["prompt_sha256"]), "provider_manifest_prompt_mismatch", "provider manifest prompt sha mismatch")
-    _require(str(provider_manifest.get("provider_job_id") or "") == str(live_result.get("job_id") or provider_manifest.get("provider_job_id") or ""), "provider_manifest_job_mismatch", "provider manifest provider_job_id mismatch")
-    _require(str(provider_receipt.get("provider_job_id") or "") == str(provider_manifest.get("provider_job_id") or ""), "provider_receipt_job_mismatch", "provider receipt provider_job_id mismatch")
-    _require(str(provider_receipt.get("output_path") or "") == str(generated_image_path), "provider_receipt_output_mismatch", "provider receipt output_path mismatch")
-    _require(str(provider_receipt.get("generated_image_sha256") or "") == generated_image_sha256, "provider_receipt_image_sha_mismatch", "provider receipt generated image sha mismatch")
-    _require(str(provider_receipt.get("manifest_sha256") or "") == _sha256_file(manifest_path), "provider_receipt_manifest_sha_mismatch", "provider receipt manifest sha mismatch")
-    _require(str(provider_manifest.get("saved_image_path") or "") == str(generated_image_path), "provider_manifest_image_mismatch", "provider manifest saved image mismatch")
-    _require(str(provider_manifest.get("saved_image_sha256") or generated_image_sha256) == generated_image_sha256, "provider_manifest_image_sha_mismatch", "provider manifest image sha mismatch")
+    try:
+        validated_provider = _validate_completed_provider_result(
+            provider_result,
+            live_requirements=live_requirements,
+            approval_result=approval_result,
+            auth_data=auth_data,
+        )
+    except LenaBoundedLiveCycleError as exc:
+        return _build_fail_report(
+            auth=auth,
+            report_path=report_path,
+            started_at=started_at,
+            cycle_id=cycle_id,
+            stages=stages,
+            failed_stage="provider_generation_validation",
+            error_code=exc.code,
+            error_detail=exc.detail,
+            extra=_provider_failure_evidence(provider_result),
+        )
+    claim_path = validated_provider["claim_path"]
+    receipt_path = validated_provider["receipt_path"]
+    manifest_path = validated_provider["manifest_path"]
+    live_result = validated_provider["live_result"]
+    provider_manifest = validated_provider["provider_manifest"]
+    provider_claim = validated_provider["provider_claim"]
+    provider_receipt = validated_provider["provider_receipt"]
+    generated_image_path = validated_provider["generated_image_path"]
+    generated_image_sha256 = validated_provider["generated_image_sha256"]
     stages.append(
         _stage_summary(
             "provider_generation",

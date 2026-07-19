@@ -84,6 +84,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -611,6 +612,8 @@ def _write_generation_execution_receipt(
     output_path: str | None,
     image_format_detected: str | None,
     actual_manifest_path: str | None,
+    generated_image_sha256: str | None = None,
+    manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
     from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
         build_generation_execution_receipt_record,
@@ -633,6 +636,8 @@ def _write_generation_execution_receipt(
         output_path=output_path,
         image_format_detected=image_format_detected,
         actual_manifest_path=actual_manifest_path,
+        generated_image_sha256=generated_image_sha256,
+        manifest_sha256=manifest_sha256,
     )
     write_generation_execution_receipt_atomic(path, record)
     return {
@@ -767,6 +772,24 @@ def execute_approved_handoff_live_generation(
     result["provider_call_performed"] = bool(live_result.get("provider_submission_may_have_occurred"))
     result["generation_performed"] = bool(live_result.get("saved_image_path"))
 
+    saved_image_path = Path(str(live_result.get("saved_image_path") or "")).resolve()
+    generated_image_sha256 = _sha256_file(saved_image_path)
+    from tools.lena_higgsfield_generation_approval_v1 import receipt_output_path  # noqa: E402
+
+    expected_receipt_path = receipt_output_path(date_str, slot_id)
+    manifest = build_manifest(
+        date_str,
+        slot_id,
+        source,
+        resolved_custom_reference_id,
+        live_result,
+        claim_repo_path=claim_info["claim_repo_path"],
+        receipt_repo_path=_repo_relative_path(expected_receipt_path),
+        saved_image_sha256=generated_image_sha256,
+    )
+    manifest_path_obj = Path(manifest_repo_path)
+    _write_manifest_atomic(manifest_path_obj, manifest)
+    manifest_sha256 = _sha256_file(manifest_path_obj)
     receipt_info = _write_generation_execution_receipt(
         claim_path,
         approval_result,
@@ -777,22 +800,12 @@ def execute_approved_handoff_live_generation(
         provider_submission_may_have_occurred=result["provider_submission_may_have_occurred"],
         provider_job_id=live_result.get("job_id"),
         provider_status=live_result.get("status"),
-        output_path=live_result.get("saved_image_path"),
+        output_path=str(saved_image_path),
         image_format_detected=live_result.get("image_format_detected"),
-        actual_manifest_path=_repo_relative_path(Path(manifest_repo_path)),
+        actual_manifest_path=_repo_relative_path(manifest_path_obj),
+        generated_image_sha256=generated_image_sha256,
+        manifest_sha256=manifest_sha256,
     )
-    manifest = build_manifest(
-        date_str,
-        slot_id,
-        source,
-        resolved_custom_reference_id,
-        live_result,
-        claim_repo_path=claim_info["claim_repo_path"],
-        receipt_repo_path=receipt_info["receipt_repo_path"],
-    )
-    manifest_path_obj = Path(manifest_repo_path)
-    manifest_path_obj.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path_obj.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
     result.update(
         {
@@ -1277,6 +1290,7 @@ def build_manifest(
     *,
     claim_repo_path: str | None = None,
     receipt_repo_path: str | None = None,
+    saved_image_sha256: str | None = None,
 ) -> dict:
     image = source["image"]
     prompt = image["image_prompt"]
@@ -1342,6 +1356,7 @@ def build_manifest(
                 "result_urls_sanitized": [_sanitize_url(u) for u in live_result.get("result_urls", [])],
                 "result_url_count": len(live_result.get("result_urls", [])),
                 "saved_image_path": live_result.get("saved_image_path"),
+                "saved_image_sha256": saved_image_sha256,
                 "image_format_detected": live_result.get("image_format_detected"),
             }
         )
@@ -1355,6 +1370,19 @@ def build_manifest(
         manifest["retry_execution_contract"] = retry_contract
 
     return manifest
+
+
+def _write_manifest_atomic(path: Path, manifest: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise HandoffArtifactError("generation_manifest_already_exists", f"refusing to overwrite existing manifest: {path}")
+    temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        temp_path.replace(path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
 
 
 def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str, dict, Path]:
