@@ -2,7 +2,7 @@
   "schema_version": "lena_identity_reference_authority_v1",
   "influencer_id": "lena",
   "authority_id": "lena_visual_reference_authority_v1",
-  "authority_commit": "2dd04f2b1c187af47ad29e4bd816752e04dcba7d",
+  "authority_commit": "3576ddbe087ec988a3ed54e2a8fb32dca017d93d",
   "created_at_utc": "2026-07-14T01:17:32Z",
   "reference_set_sha256": "f75b124c7738ee858375bfd45bd46ad5427e29b0e10ac819f289af648627b3d8",
   "references": [
