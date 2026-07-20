@@ -868,6 +868,71 @@ def test_qa_fail_surfaces_retry_reference_without_executing_retry(
     assert report["side_effect_flags"]["dirty_workspace_dependency"] is False
 
 
+def test_blocked_human_visual_review_waits_without_retry_or_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def qa_runner(**kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": qa_disposition.SCHEMA_VERSION,
+            "influencer_id": "lena",
+            "generated_at_utc": "2026-07-15T12:05:00Z",
+            "authority_commit": "b" * 40,
+            "decision_artifact_path": str(fixture["decision_path"].resolve()),
+            "decision_fingerprint_sha256": "c" * 64,
+            "candidate_id": f"{SLOT_ID}::hcr_011::cbn_fixture",
+            "slot_id": SLOT_ID,
+            "lane": "synthetic lane",
+            "recipe_id": RECIPE_ID,
+            "hook_id": "cbn_fixture",
+            "prompt_sha256": PROMPT_SHA,
+            "image_path": str(fixture["image_path"].resolve()),
+            "image_sha256": _sha(fixture["image_path"]),
+            "generation_provenance": {
+                "date": DATE,
+                "manifest_path": approval.repo_relative_path(fixture["manifest_path"]),
+            },
+            "identity_reference_provenance": {},
+            "qa_inputs": {},
+            "qa_checks": {},
+            "reason_codes": ["human_visual_review_required"],
+            "disposition": "blocked",
+            "retry_eligible": False,
+            "hard_stop_reason": None,
+            "confidence": "low",
+            "reviewer_type": "local_validation_only",
+            "visual_judgment_source": {},
+            "provider_called": False,
+            "side_effects_performed": [],
+            "exact_next_allowed_action": "human_visual_review_required",
+        }
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=qa_runner,
+    )
+
+    assert report["qa_lifecycle_status"] == "awaiting_human_visual_review"
+    assert report["qa_status"] == "blocked"
+    assert report["retry_recommended"] is False
+    assert report["retry_decision_artifact"] == ""
+    assert report["retry_handoff_artifact"] == ""
+    assert report["next_allowed_action"] == "human_visual_review_required"
+    assert report["publish_authorized"] is False
+    assert report["publish_performed"] is False
+    assert report["queue_mutated"] is False
+    assert report["side_effect_flags"]["qa_run"] is True
+    assert report["side_effect_flags"]["retry_executed"] is False
+
+
 def test_hpe_authority_invariance_matrix_stays_stable_across_semantic_states(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

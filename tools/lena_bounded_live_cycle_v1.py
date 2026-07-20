@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from pipeline.identity import lena_higgsfield_identity_evidence as local_identity_evidence
 from tools import lena_higgsfield_generation_approval_v1 as approval
 from tools import lena_photo_qa_disposition_v1 as photo_qa
 from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
@@ -281,6 +282,27 @@ def _stage_summary(stage: str, ok: bool, **data: Any) -> dict[str, Any]:
     return {"stage": stage, "ok": ok, **data}
 
 
+def _qa_requires_human_visual_review(qa_artifact: dict[str, Any]) -> bool:
+    reason_codes = qa_artifact.get("reason_codes")
+    if isinstance(reason_codes, list) and "human_visual_review_required" in reason_codes:
+        return True
+    for field_name in ("exact_next_allowed_action", "next_allowed_action", "hard_stop_reason", "reason"):
+        if str(qa_artifact.get(field_name) or "") == "human_visual_review_required":
+            return True
+    return False
+
+
+def _qa_terminal_state(qa_artifact: dict[str, Any]) -> str:
+    qa_status = str(qa_artifact.get("disposition") or qa_artifact.get("overall") or qa_artifact.get("status") or "").lower()
+    if qa_status == "accept":
+        return "accepted"
+    if qa_status == "blocked" and _qa_requires_human_visual_review(qa_artifact):
+        return "awaiting_human_visual_review"
+    if qa_status in {"hard_stop", "fail", "rejected", "blocked"}:
+        return "failed"
+    return "failed"
+
+
 def _build_package(
     auth: dict[str, Any],
     provider: dict[str, Any],
@@ -438,51 +460,18 @@ def _build_local_identity_evidence(
     image_sha256: str,
     identity_evidence_path: Path,
 ) -> tuple[Path, dict[str, Any], bool]:
-    def _json_safe(value: Any) -> Any:
-        if isinstance(value, dict):
-            return {str(key): _json_safe(subvalue) for key, subvalue in value.items()}
-        if isinstance(value, list):
-            return [_json_safe(item) for item in value]
-        if isinstance(value, datetime):
-            return value.replace(microsecond=0).isoformat()
-        if isinstance(value, Path):
-            return str(value)
-        return value
-
-    verified = {
-        "provider": "higgsfield",
-        "slot_id": slot_id,
-        "provider_job_id": str(manifest.get("provider_job_id") or ""),
-        "provider_job_status": str(manifest.get("provider_status") or ""),
-        "job_type": str(manifest.get("job_type") or ""),
-        "custom_reference_id": str(manifest.get("custom_reference_id") or ""),
-        "soul_name": str(manifest.get("cli_soul_name") or ""),
-        "soul_type": str(manifest.get("cli_soul_type") or ""),
-        "prompt_sha256": str(manifest.get("prompt_sha256") or ""),
-        "width": int(manifest.get("width") or 0),
-        "height": int(manifest.get("height") or 0),
-        "local_image_path": str(image_path),
-        "local_image_sha256": image_sha256,
-        "local_image_sha256_provenance": "captured locally from the generated image file during bounded live QA",
-        "checks_passed": [
-            "manifest_provided_local_identity_fields",
-            "local_image_sha256_captured_not_verified_against_provider_bytes",
-        ],
-    }
-    evidence = identity.build_identity_verification_evidence(date_str, verified)
-    evidence = json.loads(
-        json.dumps(
-            evidence,
-            default=lambda obj: obj.replace(microsecond=0).isoformat() if isinstance(obj, datetime) else str(obj),
+    try:
+        return local_identity_evidence.build_local_identity_evidence(
+            date_str=date_str,
+            slot_id=slot_id,
+            manifest=manifest,
+            image_path=image_path,
+            image_sha256=image_sha256,
+            identity_evidence_path=identity_evidence_path,
         )
-    )
-    if identity_evidence_path.exists():
-        existing = _read_json_object(identity_evidence_path, code="identity_evidence_existing_invalid", label="identity evidence")
-        if _identity_evidence_reuse_fingerprint(existing) != _identity_evidence_reuse_fingerprint(evidence):
-            raise LenaBoundedLiveCycleError("recovery_identity_evidence_mismatch", f"existing identity evidence is not reusable: {identity_evidence_path}")
-        return identity_evidence_path, existing, False
-    _write_json_atomic(identity_evidence_path, evidence)
-    return identity_evidence_path, evidence, True
+    except local_identity_evidence.LenaIdentityEvidenceError as exc:
+        code = "recovery_identity_evidence_mismatch" if exc.code == "identity_evidence_already_exists" else exc.code
+        raise LenaBoundedLiveCycleError(code, exc.detail) from exc
 
 
 def _build_live_package(
@@ -1230,7 +1219,52 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         expected_image_sha256=generated_image_sha256,
     )
     qa_path, qa_written_artifact, _qa_written = photo_qa.write_disposition_artifact(qa_artifact)
-    _require(str(qa_written_artifact.get("disposition") or "") == "accept", "qa_rejected", "photo QA did not accept the generated image")
+    qa_terminal_state = _qa_terminal_state(qa_written_artifact)
+    if qa_terminal_state == "awaiting_human_visual_review":
+        finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        report = {
+            "ok": True,
+            "version": "v1",
+            "report_type": "lena_bounded_live_cycle",
+            "live_execution": True,
+            "simulation_mode": False,
+            "autonomous_execution": True,
+            "date": day,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "authorization_artifact_path": str(auth["path"]),
+            "authorization_artifact_sha256_before_consumption": auth["pre_consumption_sha256"],
+            "authorization_artifact_sha256": auth["sha256"],
+            "authorization_consumption_implemented": True,
+            "authorization_consumed": True,
+            "authorization_consumed_at_utc": auth["consumed_at_utc"],
+            "provider_calls_performed": 1,
+            "publish_calls_performed": 0,
+            "retries_performed": 0,
+            "qa_lifecycle_status": "awaiting_human_visual_review",
+            "next_allowed_action": "human_visual_review_required",
+            "publish_authorized": False,
+            "publish_performed": False,
+            "queue_mutated": False,
+            "retry_executed": False,
+            "child_artifacts": {
+                "authorization_artifact": {"path": str(auth["path"]), "sha256": auth["pre_consumption_sha256"]},
+                "candidate_artifact": {"path": str(candidate_path), "sha256": candidate_sha256},
+                "provider_generation_claim": {"path": str(claim_path), "sha256": _sha256_file(claim_path)},
+                "provider_generation_receipt": {"path": str(receipt_path), "sha256": _sha256_file(receipt_path)},
+                "provider_generation_manifest": {"path": str(manifest_path), "sha256": _sha256_file(manifest_path)},
+                "generated_asset": {"path": str(generated_image_path), "sha256": generated_image_sha256},
+                "identity_evidence": {"path": str(identity_evidence_path), "sha256": _sha256_file(identity_evidence_path)},
+                "qa_artifact": {"path": str(qa_path), "sha256": _sha256_file(qa_path)},
+            },
+            "qa_artifact": qa_written_artifact,
+            "stage_coverage": stages,
+            "stages": stages,
+        }
+        _write_json_atomic(report_path, report)
+        report["report_path"] = str(report_path)
+        return report
+    _require(qa_terminal_state == "accepted", "qa_rejected", "photo QA did not accept the generated image")
     _require(str(qa_written_artifact.get("overall") or "pass") in {"pass", "approved"}, "qa_overall_invalid", "photo QA artifact did not pass overall")
     stages.append(
         _stage_summary(
@@ -1552,8 +1586,12 @@ def run_cycle(auth_artifact: Path, *, simulate: bool = True, report_root: Path =
         label="QA artifact",
     )
     qa_artifact = qa["artifact"]
-    qa_status = str(qa_artifact.get("disposition") or qa_artifact.get("overall") or qa_artifact.get("status") or "").lower()
-    _require(qa_status not in {"hard_stop", "fail", "rejected"}, "qa_failure", "QA artifact indicates failure")
+    qa_terminal_state = _qa_terminal_state(qa_artifact)
+    _require(
+        qa_terminal_state in {"accepted", "awaiting_human_visual_review"},
+        "qa_failure",
+        "QA artifact indicates failure",
+    )
     stages.append(_stage_summary("image_qa", True, qa_artifact_path=str(qa["path"]), qa_artifact_sha256=qa["sha256"]))
     package_path = _ensure_path_within_root(
         _subreport_path(day, str(auth_data["slot_id"]), "package", report_root),

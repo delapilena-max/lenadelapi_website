@@ -53,7 +53,7 @@ def _write_auth_json(path: Path, payload: dict) -> Path:
 
 def _write_image(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", (64, 64), "white").save(path)
+    Image.new("RGB", (1152, 2048), "white").save(path)
     return path
 
 
@@ -712,11 +712,11 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
             "provider_status": "completed",
             "custom_reference_id": CUSTOM_REFERENCE_ID,
             "cli_soul_name": "Lena",
-            "cli_soul_type": "Soul 2.0",
+            "cli_soul_type": "soul_2",
             "saved_image_path": str(image_path),
             "saved_image_sha256": _sha(image_path),
-            "width": 64,
-            "height": 64,
+            "width": 1152,
+            "height": 2048,
         }
         manifest.update(state["provider_manifest_overrides"])  # type: ignore[arg-type]
         _write_json(manifest_path, manifest)
@@ -793,6 +793,8 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
             "provider_job_id": "job-123",
             "image_sha256": _sha(bundle["image_path"]),
             "generation_provenance": {"date": DATE},
+            "reason_codes": state.get("qa_reason_codes", []),
+            "exact_next_allowed_action": state.get("qa_exact_next_allowed_action", "existing_downstream_qa_and_human_review_gates_only"),
             "production_scoring": {
                 "styling_sexy_platform_safe": {
                     "status": "pass" if state["qa_disposition"] == "accept" else "fail",
@@ -1240,6 +1242,33 @@ def test_live_failure_keeps_authorization_consumed(tmp_path: Path, monkeypatch: 
     assert int(state["provider_calls"]) == (0 if stage == "provider" else 1)
     assert int(state["publish_calls"]) == (1 if stage == "publish" else 0)
     assert int(state["qa_calls"]) == (1 if stage in {"qa", "publish"} else 0)
+
+
+def test_live_blocked_human_visual_review_stops_without_publish_or_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    state["qa_disposition"] = "blocked"
+    state["qa_overall"] = "blocked"
+    state["qa_reason_codes"] = ["human_visual_review_required"]
+    state["qa_exact_next_allowed_action"] = "human_visual_review_required"
+
+    report = _run_cycle(bundle, simulate=False, report_root=tmp_path / "reports")
+
+    assert report["ok"] is True
+    assert report["qa_lifecycle_status"] == "awaiting_human_visual_review"
+    assert report["next_allowed_action"] == "human_visual_review_required"
+    assert report["publish_authorized"] is False
+    assert report["publish_performed"] is False
+    assert report["queue_mutated"] is False
+    assert report["retry_executed"] is False
+    assert int(state["provider_calls"]) == 1
+    assert int(state["qa_calls"]) == 1
+    assert int(state["publish_calls"]) == 0
+    assert json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))["consumed"] is True
 
 
 @pytest.mark.parametrize(
