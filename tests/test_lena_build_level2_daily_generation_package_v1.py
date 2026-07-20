@@ -373,9 +373,9 @@ def test_build_package_writes_durable_json_with_all_sections(tmp_path: Path, mon
     assert report["approval_boundary_state"]["status"] == "approved"
     assert report["qa_disposition_state"]["status"] == "ready"
     assert report["retry_recommendation_state"]["status"] == "not_needed"
-    assert report["autonomy_ladder_status"]["publish_freeze_active"] is True
-    assert report["autonomy_ladder_status"]["level_3_state"] == "frozen_real_mode"
-    assert report["autonomy_ladder_status"]["level_3_disabled_by_publish_freeze"] is True
+    assert report["autonomy_ladder_status"]["publish_freeze_active"] is False
+    assert report["autonomy_ladder_status"]["level_3_state"] == "active"
+    assert report["autonomy_ladder_status"]["level_3_disabled_by_publish_freeze"] is False
     assert report["autonomy_ladder_status"]["level_4_state"] == "future_only"
     assert report["autonomy_ladder_status"]["level_5_state"] == "future_only"
     assert report["final_operator_report"]["status"] == "ready_for_operator_review"
