@@ -8,6 +8,33 @@ NODE = ROOT / "pipeline" / "influencer_nodes" / "lena"
 LOCAL_CONFIG = NODE / "meta_publisher_config_v2_9.local.json"
 EXAMPLE_CONFIG = NODE / "meta_publisher_config_v2_9.example.json"
 ENV_MAP_FILE = NODE / "meta_env_key_map_v2_9_1.json"
+ENV_ROOT_KEYS = ("LENA_AUTOPUBLISH_PRODUCTION_ROOT", "CONTENT_BOT_ROOT")
+
+
+def _resolve_root(root: Path | None = None) -> Path:
+    if root is not None:
+        return Path(root).expanduser().resolve()
+    for env_key in ENV_ROOT_KEYS:
+        raw = os.environ.get(env_key, "").strip()
+        if raw:
+            return Path(raw).expanduser().resolve()
+    return ROOT
+
+
+def _node_root(root: Path | None = None) -> Path:
+    return _resolve_root(root) / "pipeline" / "influencer_nodes" / "lena"
+
+
+def _local_config_path(root: Path | None = None) -> Path:
+    return _node_root(root) / "meta_publisher_config_v2_9.local.json"
+
+
+def _example_config_path(root: Path | None = None) -> Path:
+    return _node_root(root) / "meta_publisher_config_v2_9.example.json"
+
+
+def _env_map_path(root: Path | None = None) -> Path:
+    return _node_root(root) / "meta_env_key_map_v2_9_1.json"
 
 class MetaConnectorError(Exception):
     pass
@@ -35,15 +62,15 @@ def parse_dotenv(path: Path) -> dict:
             out[k] = v
     return out
 
-def _load_env_for_r2() -> None:
+def _load_env_for_r2(root: Path | None = None) -> None:
     """Best-effort: populate os.environ with .env values so R2_* vars are visible."""
-    for k, v in parse_dotenv(ROOT / ".env").items():
+    for k, v in parse_dotenv(_resolve_root(root) / ".env").items():
         if not os.environ.get(k):
             os.environ[k] = v
 
 
-def _r2_is_configured() -> bool:
-    _load_env_for_r2()
+def _r2_is_configured(root: Path | None = None) -> bool:
+    _load_env_for_r2(root)
     return all(os.environ.get(k) for k in (
         "R2_ACCOUNT_ID", "R2_BUCKET_NAME",
         "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE_URL",
@@ -63,20 +90,25 @@ def _try_r2_upload(src: Path, key: str) -> dict | None:
         return None
 
 
-def load_env_map() -> dict:
-    if ENV_MAP_FILE.exists():
-        return json.loads(ENV_MAP_FILE.read_text(encoding="utf-8-sig"))
-    return {"env_file_candidates": [str(ROOT / ".env")], "key_map": {}, "defaults": {}}
+def load_env_map(root: Path | None = None) -> dict:
+    env_map_file = _env_map_path(root)
+    if env_map_file.exists():
+        return json.loads(env_map_file.read_text(encoding="utf-8-sig"))
+    return {
+        "env_file_candidates": [str(_resolve_root(root) / ".env")],
+        "key_map": {},
+        "defaults": {},
+    }
 
-def discover_dotenv_values() -> dict:
-    spec = load_env_map()
+def discover_dotenv_values(root: Path | None = None) -> dict:
+    spec = load_env_map(root)
     found = {}
     sources = []
     env_values = dict(os.environ)
     for candidate in spec.get("env_file_candidates", []):
         p = Path(candidate)
         if not p.is_absolute():
-            p = ROOT / candidate
+            p = _resolve_root(root) / candidate
         vals = parse_dotenv(p)
         if vals:
             sources.append(str(p))
@@ -92,21 +124,24 @@ def discover_dotenv_values() -> dict:
         found.setdefault(k, v)
     return {"values": found, "sources": sources}
 
-def load_config() -> dict:
+def load_config(root: Path | None = None) -> dict:
+    base_root = _resolve_root(root)
+    local_config = _local_config_path(base_root)
+    example_config = _example_config_path(base_root)
     cfg = {}
-    if EXAMPLE_CONFIG.exists():
+    if example_config.exists():
         try:
-            cfg.update(json.loads(EXAMPLE_CONFIG.read_text(encoding="utf-8-sig")))
+            cfg.update(json.loads(example_config.read_text(encoding="utf-8-sig")))
         except Exception:
             pass
-    if LOCAL_CONFIG.exists():
+    if local_config.exists():
         try:
-            local = json.loads(LOCAL_CONFIG.read_text(encoding="utf-8-sig"))
+            local = json.loads(local_config.read_text(encoding="utf-8-sig"))
             cfg.update({k: v for k, v in local.items() if v not in ("", None)})
         except Exception:
             pass
 
-    discovered = discover_dotenv_values()
+    discovered = discover_dotenv_values(base_root)
     # .env fills blanks/placeholders only; explicit local config wins.
     for k, v in discovered["values"].items():
         if k.startswith("_"):
@@ -142,15 +177,15 @@ def token_for_platform(cfg: dict, platform: str) -> str:
         return cfg["instagram_access_token"]
     return cfg.get("page_access_token", "")
 
-def config_status(test_api: bool = False) -> dict:
-    cfg = load_config()
-    discovered = discover_dotenv_values()
+def config_status(test_api: bool = False, root: Path | None = None) -> dict:
+    cfg = load_config(root)
+    discovered = discover_dotenv_values(root)
     def check(key, secret=False):
         val = str(cfg.get(key, "") or "")
         placeholder = "PASTE_" in val or "YOUR_PUBLIC_MEDIA_HOST" in val
         return {"ok": bool(val) and not placeholder, "value": redact(val) if secret else val}
 
-    r2_ok    = _r2_is_configured()
+    r2_ok    = _r2_is_configured(root)
     mode     = _auth_mode(cfg)
     checks = {
         "instagram_access_token": check("instagram_access_token", True),
@@ -161,7 +196,7 @@ def config_status(test_api: bool = False) -> dict:
         "media_public_base_url": check("media_public_base_url", False),
         "media_public_local_dir": check("media_public_local_dir", False),
         "r2_configured": {"ok": r2_ok, "note": "R2 env vars present — R2 upload active" if r2_ok else "R2 env vars not set"},
-        "local_config_exists": {"ok": LOCAL_CONFIG.exists(), "path": str(LOCAL_CONFIG)},
+        "local_config_exists": {"ok": _local_config_path(root).exists(), "path": str(_local_config_path(root))},
         "dotenv_sources": {"ok": bool(discovered.get("sources")), "sources": discovered.get("sources", [])}
     }
 
@@ -183,7 +218,7 @@ def config_status(test_api: bool = False) -> dict:
     return {
         "ok": instagram_ready or facebook_ready,
         "version": "v2.9.1",
-        "config_path": str(LOCAL_CONFIG),
+        "config_path": str(_local_config_path(root)),
         "checks": checks,
         "readiness": {
             "auth_mode":       mode,
@@ -227,9 +262,9 @@ def preflight_token(cfg: dict, platform: str = "") -> dict:
         return {"ok": False, "reason": "preflight_error", "detail": raw}
 
 
-def validate_config_for(platform: str, media_type: str) -> dict:
-    status = config_status(False)
-    cfg = load_config()
+def validate_config_for(platform: str, media_type: str, root: Path | None = None) -> dict:
+    status = config_status(False, root=root)
+    cfg = load_config(root)
     if platform.startswith("Instagram"):
         if not cfg.get("instagram_business_account_id"):
             return {"ok": False, "reason": "missing_instagram_business_account_id", "status": status}
@@ -243,7 +278,7 @@ def validate_config_for(platform: str, media_type: str) -> dict:
     else:
         return {"ok": False, "reason": "unsupported_meta_platform", "status": status}
     if not cfg.get("media_public_base_url") or "YOUR_PUBLIC_MEDIA_HOST" in str(cfg.get("media_public_base_url")):
-        if not _r2_is_configured():
+        if not _r2_is_configured(root):
             return {"ok": False, "reason": "missing_public_media_base_url_and_r2_not_configured", "status": status}
     return {"ok": True, "config": cfg}
 

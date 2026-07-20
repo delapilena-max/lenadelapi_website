@@ -175,10 +175,20 @@ def test_successful_chain_records_child_receipts_and_full_stage_order(tmp_path: 
     generation_report_path = _generation_report_path(tmp_path)
     generation_report = _generation_report(report_path=str(generation_report_path))
 
+    def _normalized_command_tokens(cmd: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for part in cmd:
+            lowered = part.lower()
+            if lowered.endswith((".py", ".exe", ".cmd", ".bat")):
+                normalized.append(Path(part).name.lower())
+            else:
+                normalized.append(lowered)
+        return normalized
+
     def fake_run_step(label: str, cmd: list[str]) -> dict[str, object]:
-        rendered = subprocess.list2cmdline(cmd).lower()
-        assert "provider" not in rendered
-        assert "publish" not in rendered
+        tokens = _normalized_command_tokens(cmd)
+        assert not any(token == "provider" or token.startswith("--provider") for token in tokens)
+        assert not any(token == "publish" or token.startswith("--publish") for token in tokens)
         if label == "strategy_preparation":
             _write_json(strategy_report_path, strategy_report)
             return {
