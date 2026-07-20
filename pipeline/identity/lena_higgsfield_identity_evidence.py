@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from PIL import Image, UnidentifiedImageError
 
 from pipeline.identity import lena_higgsfield_identity as identity
 
@@ -23,6 +26,34 @@ def sha256_file(path: Path) -> str:
 
 def identity_evidence_path(date_str: str, slot_id: str) -> Path:
     return identity.identity_verification_evidence_path(date_str, slot_id)
+
+
+def _require(condition: bool, code: str, detail: str) -> None:
+    if not condition:
+        raise LenaIdentityEvidenceError(code, detail)
+
+
+def _required_string(manifest: dict[str, Any], field_name: str) -> str:
+    value = manifest.get(field_name)
+    if not isinstance(value, str) or not value:
+        raise LenaIdentityEvidenceError(
+            f"manifest_{field_name}_missing",
+            f"manifest {field_name!r} must be a non-empty string",
+        )
+    return value
+
+
+def _inspect_image_dimensions(path: Path) -> tuple[int, int]:
+    try:
+        with Image.open(path) as image:
+            width, height = image.size
+            image.verify()
+    except (OSError, UnidentifiedImageError) as exc:
+        raise LenaIdentityEvidenceError(
+            "generated_image_invalid",
+            f"generated image bytes could not be inspected: {path}: {exc}",
+        ) from exc
+    return int(width), int(height)
 
 
 def _json_safe(value: Any) -> Any:
@@ -119,6 +150,52 @@ def build_local_identity_evidence(
         raise LenaIdentityEvidenceError("generated_image_sha_mismatch", "generated image SHA-256 changed before identity evidence write")
     if not isinstance(manifest, dict):
         raise LenaIdentityEvidenceError("manifest_invalid", "manifest must be a JSON object")
+
+    provider = _required_string(manifest, "provider")
+    _require(provider == "higgsfield", "manifest_provider_mismatch", "manifest provider must be exactly 'higgsfield'")
+    manifest_date = _required_string(manifest, "date")
+    _require(manifest_date == date_str, "manifest_date_mismatch", "manifest date does not match requested date")
+    manifest_slot_id = _required_string(manifest, "slot_id")
+    _require(manifest_slot_id == slot_id, "manifest_slot_id_mismatch", "manifest slot_id does not match requested slot")
+    provider_status = _required_string(manifest, "provider_status")
+    _require(provider_status == identity.EXPECTED_JOB_STATUS, "manifest_provider_status_mismatch", "manifest provider_status must be exactly 'completed'")
+    provider_job_id = _required_string(manifest, "provider_job_id")
+    job_type = _required_string(manifest, "job_type")
+    _require(job_type == identity.EXPECTED_JOB_TYPE, "manifest_job_type_mismatch", "manifest job_type does not match the approved Higgsfield job type")
+    custom_reference_id = _required_string(manifest, "custom_reference_id")
+    _require(
+        custom_reference_id in identity.APPROVED_CUSTOM_REFERENCE_IDS,
+        "identity_custom_reference_id_invalid",
+        "manifest custom_reference_id is not an approved Lena reference id",
+    )
+    soul_name = _required_string(manifest, "cli_soul_name")
+    _require(soul_name == identity.EXPECTED_SOUL_NAME, "manifest_cli_soul_name_mismatch", "manifest cli_soul_name must be exactly 'Lena'")
+    soul_type = _required_string(manifest, "cli_soul_type")
+    _require(soul_type == identity.EXPECTED_SOUL_TYPE, "manifest_cli_soul_type_mismatch", "manifest cli_soul_type must be exactly 'soul_2'")
+    prompt_sha256 = _required_string(manifest, "prompt_sha256")
+    _require(
+        re.fullmatch(r"[0-9a-f]{64}", prompt_sha256) is not None,
+        "manifest_prompt_sha256_invalid",
+        "manifest prompt_sha256 must be a lowercase SHA-256 hex digest",
+    )
+    manifest_image_path = Path(_required_string(manifest, "saved_image_path"))
+    _require(
+        manifest_image_path.resolve() == image_path,
+        "manifest_saved_image_path_mismatch",
+        "manifest saved_image_path does not resolve to the generated image being verified",
+    )
+    manifest_image_sha256 = _required_string(manifest, "saved_image_sha256")
+    _require(
+        manifest_image_sha256 == image_sha256,
+        "manifest_saved_image_sha256_mismatch",
+        "manifest saved_image_sha256 does not match the generated image SHA-256",
+    )
+    width, height = _inspect_image_dimensions(image_path)
+    _require(
+        width == identity.EXPECTED_WIDTH and height == identity.EXPECTED_HEIGHT,
+        "generated_image_dimensions_mismatch",
+        f"generated image dimensions {width}x{height} do not match approved Higgsfield dimensions {identity.EXPECTED_WIDTH}x{identity.EXPECTED_HEIGHT}",
+    )
     if reference_authority_artifact is not None:
         _validate_authority_references(
             reference_authority_artifact=Path(reference_authority_artifact),
@@ -126,25 +203,19 @@ def build_local_identity_evidence(
             identity_references=list(identity_references or []),
         )
 
-    custom_reference_id = str(manifest.get("custom_reference_id") or "")
-    if custom_reference_id not in identity.APPROVED_CUSTOM_REFERENCE_IDS:
-        raise LenaIdentityEvidenceError(
-            "identity_custom_reference_id_invalid",
-            "manifest custom_reference_id is not an approved Lena reference id",
-        )
     evidence_path = Path(identity_evidence_path) if identity_evidence_path is not None else identity.identity_verification_evidence_path(date_str, slot_id)
     verified = {
-        "provider": "higgsfield",
-        "slot_id": slot_id,
-        "provider_job_id": str(manifest.get("provider_job_id") or ""),
-        "provider_job_status": str(manifest.get("provider_status") or manifest.get("provider_job_status") or ""),
-        "job_type": str(manifest.get("job_type") or identity.EXPECTED_JOB_TYPE),
+        "provider": provider,
+        "slot_id": manifest_slot_id,
+        "provider_job_id": provider_job_id,
+        "provider_job_status": provider_status,
+        "job_type": job_type,
         "custom_reference_id": custom_reference_id,
-        "soul_name": str(manifest.get("soul_name") or identity.EXPECTED_SOUL_NAME),
-        "soul_type": str(manifest.get("soul_type") or identity.EXPECTED_SOUL_TYPE),
-        "prompt_sha256": str(manifest.get("prompt_sha256") or ""),
-        "width": int(manifest.get("width") or identity.EXPECTED_WIDTH),
-        "height": int(manifest.get("height") or identity.EXPECTED_HEIGHT),
+        "soul_name": soul_name,
+        "soul_type": soul_type,
+        "prompt_sha256": prompt_sha256,
+        "width": width,
+        "height": height,
         "local_image_path": str(image_path),
         "local_image_sha256": image_sha256,
         "local_image_sha256_provenance": (
@@ -155,7 +226,9 @@ def build_local_identity_evidence(
             "provider_success_manifest_present",
             "generated_image_exists",
             "local_image_sha256_matches",
+            "manifest_saved_image_sha256_matches",
             "approved_custom_reference_id",
+            "actual_image_dimensions_match",
         ],
     }
     evidence = _json_safe(identity.build_identity_verification_evidence(date_str, verified))

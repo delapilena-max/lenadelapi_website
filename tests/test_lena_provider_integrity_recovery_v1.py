@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from pipeline.identity import lena_higgsfield_identity as identity
 from tools import lena_bounded_live_cycle_v1 as cycle
@@ -31,6 +32,11 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _write_image(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1152, 2048), "white").save(path)
+
+
 def _build_recovery_bundle(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -51,8 +57,7 @@ def _build_recovery_bundle(
     handoff_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / DATE / "handoff.json"
     candidate_path = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE / "candidate.json"
     policy_path = tmp_path / "pipeline" / "config" / "lena_standing_autonomy_policy_v1.json"
-    image_path.parent.mkdir(parents=True, exist_ok=True)
-    image_path.write_bytes(b"immutable-production-image")
+    _write_image(image_path)
     _write_json(candidate_path, {"candidate_id": "candidate-1", "slot_id": SLOT})
     _write_json(handoff_path, {"report_type": "lena_next_live_image_handoff", "schema_version": "v1", "date": DATE, "selected_slot_id": SLOT, "selected_candidate": {"candidate_id": "candidate-1"}, "prompt_sha256": "b" * 64, "custom_reference_id": CUSTOM_REFERENCE_ID})
     _write_json(policy_path, {"report_type": "policy"})
@@ -62,7 +67,7 @@ def _build_recovery_bundle(
     _write_json(auth_path, authorization)
     claim = {"report_type": "lena_higgsfield_generation_claim", "schema_version": "v1", "approval_artifact_sha256": ORIGINAL_AUTH_SHA, "authorized_attempts": 1, "consumed_attempt_number": 1, "date": DATE, "slot_id": SLOT}
     _write_json(claim_path, claim)
-    manifest = {"provider": "higgsfield", "date": DATE, "slot_id": SLOT, "provider_job_id": JOB, "provider_status": "completed", "live_attempt_count": 1, "retry_count": 0, "prompt_sha256": "b" * 64, "saved_image_path": str(image_path), "image_format_detected": ".png", "custom_reference_id": CUSTOM_REFERENCE_ID, "cli_soul_name": "Lena", "cli_soul_type": "Soul 2.0"}
+    manifest = {"provider": "higgsfield", "date": DATE, "slot_id": SLOT, "provider_job_id": JOB, "provider_status": "completed", "job_type": "text2image_soul_v2", "live_attempt_count": 1, "retry_count": 0, "prompt_sha256": "b" * 64, "saved_image_path": str(image_path), "saved_image_sha256": _sha(image_path), "image_format_detected": ".png", "custom_reference_id": CUSTOM_REFERENCE_ID, "cli_soul_name": "Lena", "cli_soul_type": "soul_2"}
     _write_json(manifest_path, manifest)
     receipt = {"report_type": "lena_higgsfield_generation_execution_receipt", "schema_version": "v1", "outcome": "success", "provider_submission_may_have_occurred": True, "claim_artifact_sha256": _sha(claim_path), "provider_job_id": JOB, "output_path": str(image_path), "actual_manifest_path": (Path("pipeline/higgsfield_debug") / DATE / SLOT / "result_manifest.json").as_posix()}
     _write_json(receipt_path, receipt)
