@@ -199,6 +199,7 @@ def _selected_candidate_payload() -> dict:
             "recipe_id": SELECTED_RECIPE_ID,
             "hook_id": "cbn_004",
             "prompt_sha256": prompt_sha,
+            "pose_body_language_id": "pose_p018",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
         },
         "decision_fingerprint_sha256": "5" * 64,
