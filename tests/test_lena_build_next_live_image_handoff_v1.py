@@ -9,6 +9,7 @@ import pytest
 
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+from tests.fixtures import lena_pose_provenance as pose_fixture
 
 
 DATE = "2026-07-13"
@@ -22,7 +23,7 @@ LIVE_COMMAND = f"{HANDOFF_COMMAND} --live"
 PROMPT_INPUT_PATH = f"pipeline/strategy/lena/content_packets/{DATE}/lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
 SELECTED_CANDIDATE_PATH = f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
-PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+PROMPT_TEXT = pose_fixture.canonical_prompt()
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -185,6 +186,8 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, slot_id: str = SLOT_
             "recipe_id": recipe_id,
             "hook_id": "cbn_004",
             "prompt_sha256": prompt_sha,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
         },
         "decision_fingerprint_sha256": "5" * 64,
@@ -291,6 +294,12 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(handoff, "CONTENT_PACKETS", tmp_path / "pipeline" / "strategy" / "lena" / "content_packets")
     monkeypatch.setattr(handoff, "PRE_GENERATION_CANDIDATES", tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates")
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
+    monkeypatch.setattr(handoff.pose_provenance, "build_candidate_pose_provenance", pose_fixture.candidate_pose_provenance)
+    monkeypatch.setattr(
+        handoff.packet_builder,
+        "rebuild_packet_from_authoritative_sources",
+        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+    )
 
 
 def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -492,8 +501,12 @@ def test_explicit_dual_binding_allows_provider_prompt_family_split(tmp_path: Pat
     assert report["candidate_selection_binding"]["source_prompt_family"] == "prompt_library_candidate"
     assert report["provider_execution_binding"]["source_prompt_family"] == "compact_provider_prompt"
     assert report["candidate_selection_binding"]["candidate_prompt_sha256"] == report["selected_candidate"]["prompt_sha256"]
-    assert report["provider_execution_binding"]["provider_prompt_sha256"] == "f" * 64
-    assert report["selected_candidate"]["prompt_sha256"] != report["selected_prompt_input"]["prompt_sha256"]
+    assert report["provider_execution_binding"]["provider_prompt_sha256"] == hashlib.sha256(
+        report["selected_prompt_input"]["prompt_text"].encode("utf-8")
+    ).hexdigest()
+    assert report["candidate_selection_binding"]["pose_provenance_fingerprint_sha256"] == (
+        report["provider_execution_binding"]["pose_provenance_fingerprint_sha256"]
+    )
     assert report["binding_linkage"]["prompt_family_relationship"].startswith("candidate prompt family and provider prompt family are intentionally distinct")
 
 

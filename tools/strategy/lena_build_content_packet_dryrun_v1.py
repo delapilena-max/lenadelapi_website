@@ -26,6 +26,7 @@ from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
     max_production_style_override_len,
 )
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 
 RECIPE_BANK = os.path.join(
     ROOT, "pipeline", "prompt_banks", "lena",
@@ -315,14 +316,21 @@ def build_hpe_subject_presence(recipe) -> str:
     return HPE_SUBJECT_PRESENCE_COMPACT
 
 
-def build_structured_prompt_sections(recipe):
+def build_structured_prompt_sections(recipe, pose_binding=None):
+    bound_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
+    )
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
     fashion = clean_fragment(recipe.get("fashion_accessories", ""))
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
     subject = clean_fragment(" ".join(subject_parts))
     subject_presence = build_hpe_subject_presence(recipe)
-    action = clean_fragment(recipe.get("subject_pose", ""))
+    action = clean_fragment(
+        bound_pose["pose_text"] if bound_pose is not None else recipe.get("subject_pose", "")
+    )
     environment_note = recipe.get("scene_logic_contract", {}).get(
         "environment_realism_notes", ""
     )
@@ -348,8 +356,8 @@ def build_structured_prompt_sections(recipe):
     ]
 
 
-def build_structured_kling_prompt(recipe, max_chars=2499):
-    sections = build_structured_prompt_sections(recipe)
+def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):
+    sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
     built = []
     current = ""
 
@@ -633,8 +641,12 @@ def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
     return hook, reason
 
 
-def build_compact_kling_prompt(recipe, max_chars=2499):
-    structured = build_structured_kling_prompt(recipe, max_chars=max_chars)
+def build_compact_kling_prompt(recipe, max_chars=2499, pose_binding=None):
+    structured = build_structured_kling_prompt(
+        recipe,
+        max_chars=max_chars,
+        pose_binding=pose_binding,
+    )
     if structured:
         return structured
 
@@ -744,6 +756,7 @@ def build_packet(
     run_date,
     prompt_budget=None,
     expansion_matrix=None,
+    pose_binding=None,
 ):
     recipe_id = recipe["id"]
     packet_id = f"cpkt_{run_date.replace('-', '')}_{recipe_id}"
@@ -756,9 +769,18 @@ def build_packet(
             prompt_budget = 1780 if environment_id else 1940
         elif not outfit_id:
             prompt_budget = compute_style_bank_prompt_budget()
-    kling_prompt = build_compact_kling_prompt(
-        recipe, max_chars=prompt_budget
+    bound_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
     )
+    kling_prompt = build_compact_kling_prompt(
+        recipe,
+        max_chars=prompt_budget,
+        pose_binding=bound_pose,
+    )
+    if bound_pose is not None:
+        pose_provenance.require_pose_bound_prompt(kling_prompt, bound_pose)
     provider_prompt_blocked_terms = check_packet_blocked_terms(kling_prompt)
     provider_prompt_contract = {
         "surface_status": "quarantined_provider_neutral_dry_run_packet",
@@ -772,6 +794,10 @@ def build_packet(
         "blocked_terms_found": provider_prompt_blocked_terms,
         "outfit_controlled": bool(outfit_id),
         "environment_controlled": bool(environment_id),
+        "pose_binding_status": "bound" if bound_pose is not None else "unbound",
+        "pose_authority_source": (
+            pose_provenance.AUTHORITY_SOURCE if bound_pose is not None else "selected_candidate_required"
+        ),
     }
     provider_prompt_sha256 = hashlib.sha256(
         kling_prompt.encode("utf-8")
@@ -849,6 +875,8 @@ def build_packet(
             "human_reason": recipe.get("human_reason", ""),
             "style_lighting": recipe.get("style_lighting", ""),
             "subject_pose": recipe.get("subject_pose", ""),
+            "subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+            "provider_action_pose": bound_pose["pose_text"] if bound_pose is not None else "",
             "fashion_accessories": recipe.get("fashion_accessories", ""),
             "setting_background": recipe.get("setting_background", ""),
             "technical_keywords": recipe.get("technical_keywords", ""),
@@ -885,11 +913,19 @@ def build_packet(
         "safe_expansion_lanes": expansion_matrix or [],
         "realism_iteration_plan": realism_iteration_plan,
         "provider_prompt_contract": provider_prompt_contract,
+        "generation_pose_contract": {
+            "status": "bound" if bound_pose is not None else "unbound_until_selected_candidate_handoff",
+            "authority_source": (
+                pose_provenance.AUTHORITY_SOURCE if bound_pose is not None else "selected_candidate_required"
+            ),
+            "recipe_subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+        },
+        "pose_provenance": bound_pose,
         "safety_flags": {},
     }
 
 
-def rebuild_packet_from_authoritative_sources(packet):
+def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
     recipe_bank = load_json(RECIPE_BANK)
     hook_bank = load_json(HOOK_BANK)
     wardrobe_catalog = load_json(WARDROBE_CATALOG)
@@ -945,6 +981,9 @@ def rebuild_packet_from_authoritative_sources(packet):
             f"[ABORT] Hook '{packet['strong_hook_id']}' not found."
         )
 
+    effective_pose_binding = pose_binding
+    if effective_pose_binding is None and packet.get("pose_provenance") is not None:
+        effective_pose_binding = packet["pose_provenance"]
     return build_packet(
         recipe,
         hook,
@@ -952,6 +991,7 @@ def rebuild_packet_from_authoritative_sources(packet):
         packet["generated_date"],
         prompt_budget=prompt_budget_override,
         expansion_matrix=expansion_matrix,
+        pose_binding=effective_pose_binding,
     )
 
 
@@ -1025,6 +1065,27 @@ def validate_packet(packet, output_path):
         errors.append(
             f"blocked packet terms present: {provider_prompt_contract.get('blocked_terms_found', [])}"
         )
+
+    pose_contract = packet.get("generation_pose_contract", {})
+    flags["recipe_subject_pose_non_authoritative"] = (
+        isinstance(pose_contract, dict)
+        and pose_contract.get("recipe_subject_pose_semantics")
+        == pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS
+    )
+    if not flags["recipe_subject_pose_non_authoritative"]:
+        errors.append("recipe subject_pose must be explicitly non-authoritative")
+    if pose_contract.get("status") == "bound":
+        try:
+            pose_provenance.require_pose_bound_prompt(
+                str(packet.get("compact_provider_prompt_preview") or ""),
+                packet.get("pose_provenance"),
+            )
+            flags["provider_action_pose_bound"] = True
+        except pose_provenance.PoseProvenanceError as exc:
+            flags["provider_action_pose_bound"] = False
+            errors.append(f"{exc.code}: {exc.detail}")
+    else:
+        flags["provider_action_pose_bound"] = False
 
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
     flags["kling_prompt_under_2500"] = kling_len < 2500

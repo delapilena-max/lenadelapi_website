@@ -12,6 +12,7 @@ import pytest
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tools.lena_higgsfield_generation_approval_v1 import (
     APPROVAL_TTL_MINUTES,
     CANONICAL_OPERATOR_ID,
@@ -31,9 +32,8 @@ from tools.lena_higgsfield_generation_approval_v1 import (
 
 DATE = "2026-07-14"
 SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
-PROMPT_SHA = hashlib.sha256(
-    b"Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
-).hexdigest()
+PROMPT_TEXT = pose_fixture.canonical_prompt()
+PROMPT_SHA = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
 CANDIDATE_ARTIFACT_SHA = hashlib.sha256(b"synthetic-candidate-artifact-bytes").hexdigest()
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
@@ -54,6 +54,16 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates",
     )
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        handoff_builder.packet_builder,
+        "rebuild_packet_from_authoritative_sources",
+        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+    )
 
 
 def _handoff_repo_path() -> str:
@@ -78,6 +88,8 @@ def _selected_candidate_payload() -> dict:
             "recipe_id": "hcr_011",
             "hook_id": "cbn_004",
             "prompt_sha256": PROMPT_SHA,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
         },
         "decision_fingerprint_sha256": "c" * 64,
@@ -205,7 +217,7 @@ def _valid_handoff_report(tmp_path: Path) -> dict:
             }
         ],
     }
-    prompt_text = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+    prompt_text = PROMPT_TEXT
     prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
     packet = {
         "report_type": "lena_content_packet_dryrun",

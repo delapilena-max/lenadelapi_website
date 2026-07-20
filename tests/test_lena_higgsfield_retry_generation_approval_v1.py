@@ -14,6 +14,7 @@ import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval
 import tools.lena_record_higgsfield_retry_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tools.lena_higgsfield_retry_generation_approval_v1 import (
     APPROVAL_TTL_MINUTES,
     HiggsfieldRetryGenerationApprovalError,
@@ -46,6 +47,7 @@ SELECTED_CANDIDATE_REPO_PATH = Path(
 def _selected_candidate_payload() -> dict:
     return {
         "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "authority_commit": "a" * 40,
         "candidate_status": "selected",
         "generated_at_utc": "2026-07-14T12:00:00+00:00",
         "candidate": {
@@ -53,6 +55,8 @@ def _selected_candidate_payload() -> dict:
             "slot_id": ORIGINAL_SLOT,
             "recipe_id": "hcr_011",
             "prompt_sha256": PROMPT_SHA,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
     }
 
@@ -84,6 +88,11 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
     monkeypatch.setattr(record_tool, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        retry_mod.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -113,6 +122,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+    pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
 
     learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
@@ -294,7 +304,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "prompt_sha256": PROMPT_SHA,
             "schema_version": "lena_pre_generation_candidate_gate_v1",
             "candidate_status": "selected",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
+        "pose_provenance": pose_binding,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -302,6 +315,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "prompt_text": ORIGINAL_PROMPT,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
+            "pose_provenance": pose_binding,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -324,6 +338,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_prompt_text": ORIGINAL_PROMPT,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
+            "pose_provenance": pose_binding,
         },
     }
     _write_json(handoff_path, handoff_report)

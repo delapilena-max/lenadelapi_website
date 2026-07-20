@@ -13,6 +13,7 @@ from tools import lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_mod
+from tests.fixtures import lena_pose_provenance as pose_fixture
 
 
 DATE = "2026-07-14"
@@ -27,7 +28,8 @@ ORIGINAL_PROMPT = packet_builder.rebuild_packet_from_authoritative_sources(
         "wardrobe_outfit_id": "wc_p020",
         "environment_id": "env_v008",
         "hook_selection_reason": "mirror fitcheck",
-    }
+    },
+    pose_binding=pose_fixture.static_pose_provenance(),
 )["compact_provider_prompt_preview"]
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
@@ -38,6 +40,7 @@ SELECTED_CANDIDATE_REPO_PATH = Path(
 def _selected_candidate_payload() -> dict:
     return {
         "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "authority_commit": "a" * 40,
         "candidate_status": "selected",
         "generated_at_utc": "2026-07-14T12:00:00+00:00",
         "candidate": {
@@ -45,6 +48,8 @@ def _selected_candidate_payload() -> dict:
             "slot_id": ORIGINAL_SLOT,
             "recipe_id": "hcr_011",
             "prompt_sha256": PROMPT_SHA,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
     }
 
@@ -69,6 +74,11 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         tmp_path / "pipeline" / "strategy" / "lena" / "retry_handoffs",
     )
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        retry_mod.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -101,6 +111,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+    pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
 
     learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
@@ -282,7 +293,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "prompt_sha256": PROMPT_SHA,
             "schema_version": "lena_pre_generation_candidate_gate_v1",
             "candidate_status": "selected",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
+        "pose_provenance": pose_binding,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -290,6 +304,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "prompt_text": ORIGINAL_PROMPT,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -312,6 +327,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_prompt_text": ORIGINAL_PROMPT,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -394,9 +410,10 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact["retry_prompt_sha256"] == hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     assert "Mirror-selfie phone visibility is acceptable" not in prompt
     assert "No foreground phone, visible device screens, or direct posed full-torso portrait." in prompt
-    assert "Chest-up or waist-up only." in prompt
+    assert "chest-up or waist-up framing only" in prompt
     assert "Hips, thighs, and the dress hemline never appear" in prompt
-    assert "actively checking or adjusting one gold hoop earring" in prompt
+    assert f"[Action]: {pose_fixture.POSE_TEXT}" in prompt
+    assert "actively checking or adjusting one gold hoop earring" not in prompt
     assert "must read as a real getting-ready vanity moment" in prompt
     assert "No fake freckles or poreless/plastic skin." in prompt
     assert "slightly fuller is okay, not a hard gate" in prompt
@@ -404,9 +421,9 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact["retry_prompt_budget"] == 2499
     assert artifact["retry_prompt_length"] == len(prompt)
     assert artifact["retry_prompt_headroom"] == 2499 - len(prompt)
-    assert 30 <= artifact["retry_prompt_headroom"] < 70
+    assert artifact["retry_prompt_headroom"] >= 70
     assert artifact["retry_prompt_headroom_policy"] == {"hard_block_below": 30, "warning_below": 70}
-    assert artifact["retry_prompt_headroom_status"] == "warning"
+    assert artifact["retry_prompt_headroom_status"] == "ready"
 
 
 def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
@@ -451,6 +468,8 @@ def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     assert retry_mod.HAIR_CROWN_CONSTRAINT in validated["retry_prompt_text"]
     assert validated["retry_constraints"]["only_hair_crown_defect_may_change"] is True
     assert validated["retry_constraints"]["preserve"] == retry_mod.HAIR_CROWN_PRESERVES
+    assert validated["pose_provenance"] == handoff["pose_provenance"]
+    assert f"[Action]: {handoff['pose_provenance']['pose_text']}" in validated["retry_prompt_text"]
 
 
 @pytest.mark.parametrize(
@@ -566,6 +585,8 @@ def test_executor_accepts_new_retry_handoff_artifact_in_dry_run(
         write_artifact=True,
     )
     artifact_path = Path(report["retry_handoff_artifact_path"])
+    retry_artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    bound_pose = retry_artifact["pose_provenance"]
 
     def fake_validate_handoff_packet(path: Path):
         source = {
@@ -577,6 +598,10 @@ def test_executor_accepts_new_retry_handoff_artifact_in_dry_run(
                 "slot_id": ORIGINAL_SLOT,
                 "lane": "fit_check_mirror_getting_ready",
                 "image_prompt": ORIGINAL_PROMPT,
+                "pose_body_language_id": bound_pose["pose_body_language_id"],
+                "pose_body_language_label": bound_pose["pose_body_language_label"],
+                "pose_text": bound_pose["pose_text"],
+                "pose_provenance": bound_pose,
             },
         }
         return ({}, source, {}, {"ok": True, "prompt_matches_expected": None, "hard_exclude_reasons": [], "all_reasons": []})

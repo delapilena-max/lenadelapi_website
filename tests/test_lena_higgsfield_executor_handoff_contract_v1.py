@@ -12,10 +12,12 @@ import pytest
 import pipeline.higgsfield_lena_api_executor as executor
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval_mod
+import tools.lena_photo_qa_disposition_v1 as disposition_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 
 
@@ -25,7 +27,7 @@ SLOT_ID = f"higgsfield-20260713-{RECIPE_ID}-photo"
 HANDOFF_NAME = f"lena_next_live_image_handoff_{DATE}.json"
 EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
 HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact pipeline/strategy/lena/next_actions/{DATE}/{HANDOFF_NAME}"
-PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+PROMPT_TEXT = pose_fixture.canonical_prompt()
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
 
 
@@ -68,6 +70,16 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         retry_approval_mod,
         "DEFAULT_APPROVAL_ROOT",
         tmp_root / "pipeline" / "approvals" / "lena" / "generation",
+    )
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        handoff_builder.packet_builder,
+        "rebuild_packet_from_authoritative_sources",
+        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
     )
 
 
@@ -212,6 +224,8 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
             "recipe_id": recipe_id,
             "hook_id": "cbn_004",
             "prompt_sha256": prompt_sha,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
         },
         "decision_fingerprint_sha256": "5" * 64,
@@ -221,7 +235,8 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
     }
 
 
-def _source_from_prompt(prompt_text: str = PROMPT_TEXT) -> dict:
+def _source_from_prompt(prompt_text: str = PROMPT_TEXT, pose_binding: dict | None = None) -> dict:
+    pose_binding = pose_binding or pose_fixture.static_pose_provenance()
     return {
         "resolver": "content_packet_dryrun",
         "slot_prefix": RECIPE_ID,
@@ -231,9 +246,15 @@ def _source_from_prompt(prompt_text: str = PROMPT_TEXT) -> dict:
             "slot_id": SLOT_ID,
             "lane": "parking_garage_flash",
             "wardrobe_outfit_id": "wc_p059",
+            "wardrobe_outfit_name": "fixture outfit",
+            "wardrobe_silhouette_class": "beautiful_trouble",
             "environment_id": "env_p001",
-            "pose_body_language_id": None,
-            "pose_body_language_label": "leaning against the elevator wall before heading up",
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "pose_text": pose_binding["pose_text"],
+            "pose_provenance": pose_binding,
+            "expression_gaze_id": "exp_fixture",
+            "expression_gaze_label": "calm expression",
             "effective_wardrobe_silhouette_class": "beautiful_trouble",
             "soul_name": "Lena",
             "soul_version": "Soul 2.0",
@@ -255,7 +276,7 @@ def _source_from_prompt(prompt_text: str = PROMPT_TEXT) -> dict:
                 "pose_scene_match_pass": True,
                 "pose_scene_mismatch_terms_found": [],
                 "low_hook_terms_found": [],
-                "final_expression_text": "",
+                "final_expression_text": "calm expression",
                 "expression_safe_fallback_used": False,
                 "expression_safe_fallback_reason": "",
                 "expression_scene_gaze_conflict_terms_found": [],
@@ -353,7 +374,10 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
+        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
+            pose_fixture.bind_packet(packet_report, pose_binding=expected_pose_provenance),
+            _source_from_prompt(prompt_text, expected_pose_provenance),
+        ),
     )
 
     packet = handoff_builder.build_handoff(DATE, str(reconciliation_path.relative_to(tmp_root).as_posix()))
@@ -391,6 +415,61 @@ def test_handoff_dry_run_accepts_valid_packet_and_emits_expected_contract(
     assert "live_execution_authorized: False" in stdout
 
 
+def test_candidate_to_handoff_to_manifest_to_qa_preserves_pose_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handoff_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
+    report, source, _, _ = executor._validate_handoff_packet(handoff_path)
+    bound_pose = report["pose_provenance"]
+    image_path = tmp_path / "generated.png"
+    image_path.write_bytes(b"synthetic-png-fixture")
+    manifest = executor.build_manifest(
+        DATE,
+        SLOT_ID,
+        source,
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        {
+            "job_id": "job-pose-provenance",
+            "status": "completed",
+            "result_urls": [],
+            "saved_image_path": str(image_path.resolve()),
+        },
+    )
+    manifest["image_format_detected"] = ".png"
+    manifest_path = tmp_path / "result_manifest.json"
+    _write_json(manifest_path, manifest)
+
+    candidate = {
+        "slot_id": SLOT_ID,
+        "lane": source["image"]["lane"],
+        "prompt_sha256": manifest["prompt_sha256"],
+        "pose_body_language_id": bound_pose["pose_body_language_id"],
+        "pose": bound_pose["pose_body_language_label"],
+        "wardrobe_outfit_id": source["image"]["wardrobe_outfit_id"],
+        "visual_style": source["image"]["effective_wardrobe_silhouette_class"],
+    }
+    decision = {"as_of_date": DATE, "authority_commit": "a" * 40}
+    monkeypatch.setattr(disposition_mod, "_validate_manifest_bank_context", lambda *_args: None)
+    validated = disposition_mod._validate_manifest(
+        manifest_path,
+        decision,
+        candidate,
+        {"path": str(image_path.resolve()), "format": "PNG"},
+        "authorization_bound_handoff",
+        provider_binding={
+            "provider_lane": source["image"]["lane"],
+            "provider_prompt_sha256": manifest["prompt_sha256"],
+            "slot_id": SLOT_ID,
+        },
+    )
+
+    assert report["selected_prompt_input"]["pose_provenance"] == bound_pose
+    assert source["image"]["pose_provenance"] == bound_pose
+    assert validated["pose_provenance"] == bound_pose
+    assert validated["pose_body_language_id"] == bound_pose["pose_body_language_id"]
+
+
 def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_prompt_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -399,9 +478,14 @@ def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_p
     original_rebuild = executor._rebuild_packet_prompt_source
     seen: dict[str, str | None] = {}
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None):
+    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None, *, expected_pose_provenance=None):
         seen["slot_id_override"] = slot_id_override
-        rebuilt_packet, source = original_rebuild(packet_path)
+        rebuilt_packet, source = original_rebuild(
+            packet_path,
+            slot_id_override,
+            candidate_path,
+            expected_pose_provenance=expected_pose_provenance,
+        )
         if isinstance(slot_id_override, str) and slot_id_override.strip():
             source["image"]["slot_id"] = slot_id_override
         return rebuilt_packet, source
@@ -431,8 +515,13 @@ def test_validate_handoff_packet_rejects_rebuilt_source_slot_mismatch(
     packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     original_rebuild = executor._rebuild_packet_prompt_source
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None):
-        rebuilt_packet, source = original_rebuild(packet_path)
+    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None, *, expected_pose_provenance=None):
+        rebuilt_packet, source = original_rebuild(
+            packet_path,
+            slot_id_override,
+            candidate_path,
+            expected_pose_provenance=expected_pose_provenance,
+        )
         source["image"]["slot_id"] = "unrelated-slot"
         return rebuilt_packet, source
 
@@ -851,7 +940,7 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None: (
+        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
             copy.deepcopy(packet_report), copy.deepcopy(source)
         ),
     )
@@ -904,8 +993,8 @@ def test_prompt_drift_rejects_before_provider_access(
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None: (
-            copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")
+        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
+            copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift", expected_pose_provenance)
         ),
     )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
@@ -1033,6 +1122,8 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
             "recipe_id": "hcr_011",
             "hook_id": "cbn_004",
             "prompt_sha256": original_prompt_sha,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {retry_date} --slot-id {original_slot}",
         },
         "decision_fingerprint_sha256": "7" * 64,
@@ -1043,6 +1134,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
     selected_candidate_path = tmp_root / selected_candidate_repo_path
     _write_json(selected_candidate_path, selected_candidate_payload)
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
+    pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_root)
     handoff_report = {
             "report_type": "lena_next_live_image_handoff",
             "schema_version": "v1",
@@ -1076,7 +1168,10 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "prompt_sha256": selected_candidate_payload["candidate"]["prompt_sha256"],
                 "schema_version": selected_candidate_payload["schema_version"],
                 "candidate_status": selected_candidate_payload["candidate_status"],
+                "pose_body_language_id": pose_fixture.POSE_ID,
+                "pose_body_language_label": pose_fixture.POSE_LABEL,
             },
+            "pose_provenance": pose_binding,
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_prompt_input": {
@@ -1084,6 +1179,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "prompt_text": original_prompt,
                 "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
+                "pose_provenance": pose_binding,
             },
             "structured_executor_inputs": {
                 "provider": "higgsfield",
@@ -1098,6 +1194,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "handoff_artifact_path": handoff_repo_path.as_posix(),
                 "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
+                "pose_provenance": pose_binding,
                 "soul_metadata": {
                     "name": "Lena",
                     "type": "Soul 2.0",
@@ -1338,8 +1435,10 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "lane": "fit_check_mirror_getting_ready",
                 "wardrobe_outfit_id": "wc_p020",
                 "environment_id": "env_v008",
-                "pose_body_language_id": None,
-                "pose_body_language_label": "getting ready at the mirror",
+                "pose_body_language_id": pose_binding["pose_body_language_id"],
+                "pose_body_language_label": pose_binding["pose_body_language_label"],
+                "pose_text": pose_binding["pose_text"],
+                "pose_provenance": pose_binding,
                 "effective_wardrobe_silhouette_class": "beautiful_trouble",
                 "soul_name": "Lena",
                 "soul_version": "Soul 2.0",
@@ -1912,10 +2011,12 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
 
     candidate_path = tmp_path / "lena_pre_generation_candidate_test.json"
     _write_json(candidate_path, {
+        "authority_commit": "a" * 40,
+        "candidate_status": "selected",
         "candidate": {
             "candidate_id": "test-cand-provenance-001",
-            "pose_body_language_id": "pose_p018",
-            "pose": "leaning against the elevator wall before heading up",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose": pose_fixture.POSE_LABEL,
             "expression_gaze_id": "expr_soft_direct",
             "expression_gaze_label": "soft direct gaze",
         }
@@ -1927,7 +2028,13 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     monkeypatch.setattr(
         packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda _r: {"compact_provider_prompt_preview": PROMPT_TEXT},
+        lambda _r, pose_binding=None: pose_fixture.bind_packet(_r, pose_binding=pose_binding),
+    )
+    expected_pose = pose_fixture.static_pose_provenance()
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_pose_provenance",
+        lambda _path, root=None: expected_pose,
     )
     fake_wf_entry = {
         "outfit_id": "wc_p050",
@@ -1940,10 +2047,15 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     )
     monkeypatch.setattr(prompt_brain, "catalog_outfit_silhouette_class", lambda _e: "jeans_based")
 
-    _, source = executor._rebuild_packet_prompt_source(packet_path, "test-slot-001", candidate_path)
+    _, source = executor._rebuild_packet_prompt_source(
+        packet_path,
+        "test-slot-001",
+        candidate_path,
+        expected_pose_provenance=expected_pose,
+    )
     img = source["image"]
 
-    assert img["pose_body_language_id"] == "pose_p018", (
+    assert img["pose_body_language_id"] == pose_fixture.POSE_ID, (
         "pose_body_language_id must be populated from candidate artifact"
     )
     assert img["wardrobe_outfit_name"] == "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans", (

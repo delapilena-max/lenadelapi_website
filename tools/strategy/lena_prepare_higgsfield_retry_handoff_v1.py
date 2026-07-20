@@ -17,6 +17,7 @@ if str(ROOT) not in os.sys.path:
 
 from tools import lena_higgsfield_generation_approval_v1 as approval_contract  # noqa: E402
 from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as readiness_audit  # noqa: E402
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
 SCHEMA_VERSION = "lena_higgsfield_retry_handoff_v1"
 REPORT_TYPE = "lena_higgsfield_retry_handoff"
@@ -47,7 +48,8 @@ RETRY_ENVIRONMENT_TEXT = (
 
 RETRY_CINEMATOGRAPHY_TEXT = (
     "85mm or 50mm portrait compression, chest-up or waist-up framing only, natural skin detail, shallow depth of "
-    "field, blue-hour ambient with warm lamp fill, candid apartment realism, non-studio."
+    "field, blue-hour ambient with warm lamp fill, candid apartment realism, non-studio. Hips, thighs, and the dress "
+    "hemline never appear. No foreground phone, visible device screens, or direct posed full-torso portrait."
 )
 
 RETRY_TECHNICAL_APPEND = (
@@ -213,7 +215,6 @@ def _replace_sections(prompt_text: str) -> str:
             "prompt_section_mismatch",
             "original prompt must contain the expected Subject, optional Subject Presence, Action, Environment, Cinematography, Lighting/Style, and Technical sections",
         )
-    sections["[Action]:"] = RETRY_ACTION_TEXT
     sections["[Environment]:"] = RETRY_ENVIRONMENT_TEXT
     sections["[Cinematography]:"] = RETRY_CINEMATOGRAPHY_TEXT
     sections["[Technical]:"] = sections["[Technical]:"] + RETRY_TECHNICAL_APPEND
@@ -337,6 +338,18 @@ def build_retry_handoff(
         "handoff_prompt_sha_mismatch",
         "handoff selected prompt text does not match its recorded prompt sha",
     )
+    try:
+        bound_pose = pose_provenance.validate_pose_provenance(handoff_report.get("pose_provenance"))
+        candidate_path = approval_contract.resolve_repo_path(
+            bound_pose["selected_candidate_artifact_path"],
+            code="pose_candidate_path_missing",
+            label="pose selected candidate artifact path",
+        )
+        derived_pose = pose_provenance.build_candidate_pose_provenance(candidate_path, root=ROOT)
+        pose_provenance.require_pose_bound_prompt(original_prompt, bound_pose)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
+    _require(derived_pose == bound_pose, "pose_provenance_mismatch", "source handoff pose provenance no longer matches its candidate authority")
     prompt_budget = int(packet_report.get("compact_provider_prompt_budget") or 0)
     _require(prompt_budget > 0, "packet_prompt_budget_missing", "selected prompt packet must record a positive compact_provider_prompt_budget")
     receipt, output_path, manifest, manifest_path, receipt_path, image_sha = _validate_execution_receipt(
@@ -365,7 +378,7 @@ def build_retry_handoff(
             "framing": "chest_up_or_waist_up_only",
             "exclude_regions": ["hips", "thighs", "dress_hemline"],
             "mirror_edge_required": True,
-            "required_action": "actively_adjusting_one_earring",
+            "required_action": bound_pose["pose_text"],
             "vanity_composition_required": True,
             "visible_device_screens_forbidden": True,
             "foreground_phone_forbidden": True,
@@ -376,9 +389,13 @@ def build_retry_handoff(
         }
         prompt_mutation = {
             "mode": "section_rewrite_preserving_subject_and_lighting_identity",
-            "replaced_sections": ["Action", "Environment", "Cinematography", "Technical"],
-            "preserved_sections": ["Subject", "Lighting/Style"],
+            "replaced_sections": ["Environment", "Cinematography", "Technical"],
+            "preserved_sections": ["Subject", "Action", "Lighting/Style"],
         }
+    try:
+        pose_provenance.require_pose_bound_prompt(retry_prompt, bound_pose)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     if hair_retry:
         soul = soul_record or resolve_current_lena_soul()
         _require(soul.get("name") == "Lena", "soul_name_mismatch", "retry Soul name must be Lena")
@@ -428,6 +445,8 @@ def build_retry_handoff(
         "source_output_image_path": str(output_path),
         "source_output_image_sha256": image_sha,
         "source_original_prompt_sha256": handoff_facts["prompt_sha256"],
+        "pose_provenance": bound_pose,
+        "pose_provenance_fingerprint_sha256": bound_pose["pose_provenance_fingerprint_sha256"],
         "source_provider_job_evidence": {
             "provider_job_id": receipt.get("provider_job_id"),
             "provider_status": receipt.get("provider_status"),
@@ -526,6 +545,17 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         artifact.get("source_original_prompt_sha256") == handoff_facts["prompt_sha256"],
         "original_prompt_sha_mismatch",
         "source_original_prompt_sha256 does not match the source handoff prompt sha",
+    )
+    try:
+        bound_pose = pose_provenance.validate_pose_provenance(artifact.get("pose_provenance"))
+        source_pose = pose_provenance.validate_pose_provenance(handoff_facts["report"].get("pose_provenance"))
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
+    _require(bound_pose == source_pose, "pose_provenance_mismatch", "retry handoff pose provenance differs from the source handoff")
+    _require(
+        artifact.get("pose_provenance_fingerprint_sha256") == bound_pose["pose_provenance_fingerprint_sha256"],
+        "pose_provenance_fingerprint_mismatch",
+        "retry pose fingerprint does not match the bound pose provenance",
     )
     if artifact.get("reason_code") == "hair_crown_forelock_artifact":
         soul = artifact.get("retry_soul_binding")
@@ -650,6 +680,10 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
             prompt_budget,
         )
     _require(retry_prompt == expected_prompt, "retry_prompt_mutation_invalid", "retry_prompt_text does not match the canonical retry mutation")
+    try:
+        pose_provenance.require_pose_bound_prompt(retry_prompt, bound_pose)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
     return artifact
 
