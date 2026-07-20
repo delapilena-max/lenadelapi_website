@@ -785,18 +785,33 @@ def validate_cycle_authorization_artifact(
             "authorization_provider_execution_path_mismatch",
             "authorization provider_execution_binding path does not match handoff",
         )
+        # Resolve handoff prompt SHA from the current schema, with legacy fallback.
+        # Prefer selected_prompt_input.prompt_sha256 (primary).
+        # Cross-check against structured_executor_inputs.selected_prompt_sha256 when both present.
+        # Legacy top-level prompt_sha256 accepted only for backward compatibility.
+        _nested_primary_sha = str(selected_prompt_input.get("prompt_sha256") or "")
+        _nested_cross_sha = str(structured.get("selected_prompt_sha256") or "")
+        _legacy_top_sha = str(handoff_report.get("prompt_sha256") or "")
+        if _nested_primary_sha and _nested_cross_sha:
+            _require(
+                _nested_primary_sha == _nested_cross_sha,
+                "authorization_provider_execution_prompt_sha_mismatch",
+                (
+                    "handoff selected_prompt_input.prompt_sha256 and"
+                    " structured_executor_inputs.selected_prompt_sha256 disagree"
+                ),
+            )
+        _resolved_handoff_prompt_sha = _nested_primary_sha or _nested_cross_sha or _legacy_top_sha
         _require(
-            provider_execution_binding.get("provider_prompt_sha256") == str(selected_prompt_input.get("prompt_sha256") or ""),
+            bool(_resolved_handoff_prompt_sha),
             "authorization_provider_execution_prompt_sha_mismatch",
-            "authorization provider_execution_binding prompt SHA does not match handoff",
+            (
+                "handoff prompt SHA not found in selected_prompt_input,"
+                " structured_executor_inputs, or top-level"
+            ),
         )
         _require(
-            provider_execution_binding.get("provider_prompt_sha256") == str(structured.get("selected_prompt_sha256") or ""),
-            "authorization_provider_execution_prompt_sha_mismatch",
-            "authorization provider_execution_binding prompt SHA does not match handoff",
-        )
-        _require(
-            _normalized_repo_path_text(str(handoff_report.get("prompt_sha256") or "")) == str(provider_execution_binding.get("provider_prompt_sha256") or ""),
+            provider_execution_binding.get("provider_prompt_sha256") == _resolved_handoff_prompt_sha,
             "authorization_provider_execution_prompt_sha_mismatch",
             "authorization provider_execution_binding prompt SHA does not match handoff",
         )
