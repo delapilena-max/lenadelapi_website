@@ -40,8 +40,21 @@ def test_dry_run_cycle_runs_strategy_then_analytics_and_records_safeguards(
 
     calls: list[tuple[str, list[str]]] = []
 
+    def _normalized_command_tokens(cmd: list[str]) -> list[str]:
+        normalized: list[str] = []
+        for part in cmd:
+            lowered = part.lower()
+            if lowered.endswith((".py", ".exe", ".cmd", ".bat")):
+                normalized.append(Path(part).name.lower())
+            else:
+                normalized.append(lowered)
+        return normalized
+
     def fake_run_step(label: str, cmd: list[str]) -> dict:
         calls.append((label, cmd))
+        tokens = _normalized_command_tokens(cmd)
+        assert not any(token == "provider" or token.startswith("--provider") for token in tokens)
+        assert not any(token == "publish" or token.startswith("--publish") for token in tokens)
         if label == "strategy_autonomy_run_dry_run":
             return {
                 "label": label,
@@ -89,8 +102,9 @@ def test_dry_run_cycle_runs_strategy_then_analytics_and_records_safeguards(
     analytics_cmd = calls[1][1]
     assert analytics_cmd == [cycle.PY, str(cycle.ANALYTICS_SYNC)]
     assert "--apply" not in analytics_cmd
-    assert "publish" not in " ".join(analytics_cmd).lower()
-    assert "provider" not in " ".join(analytics_cmd).lower()
+    analytics_tokens = _normalized_command_tokens(analytics_cmd)
+    assert not any(token == "provider" or token.startswith("--provider") for token in analytics_tokens)
+    assert not any(token == "publish" or token.startswith("--publish") for token in analytics_tokens)
 
     report_path = reports_root / DATE / "lena_strategy_analytics_dry_run_cycle_2026-07-18_010203.json"
     report = json.loads(report_path.read_text(encoding="utf-8"))

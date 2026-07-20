@@ -64,12 +64,21 @@ def main() -> int:
         ok = path.exists()
         text = path.read_text(encoding="utf-8", errors="ignore") if ok else ""
         report["batch_gates"][batch] = {
-            "ok": ok and "pause" not in text.lower() and "--scheduled-autonomous" in text and "--slot-keyword" in text,
+            "ok": ok
+            and "pause" not in text.lower()
+            and "--scheduled-autonomous" in text
+            and "--slot-keyword" in text
+            and "lenadelapi_website_hpe2" not in text.lower()
+            and ("LENA_AUTOPUBLISH_PRODUCTION_ROOT" in text or "CONTENT_BOT_ROOT" in text)
+            and ("LENA_AUTOPUBLISH_PYTHON_EXE" in text or "CONTENT_BOT_PYTHON_EXE" in text),
             "path": str(path),
             "has_pause": "pause" in text.lower(),
             "has_scheduled_autonomous": "--scheduled-autonomous" in text,
             "has_slot_keyword": "--slot-keyword" in text,
             "has_manual_live_flags": "--i-understand-this-can-publish" in text,
+            "has_hardcoded_temp_root": "lenadelapi_website_hpe2" in text.lower(),
+            "has_root_env_contract": "LENA_AUTOPUBLISH_PRODUCTION_ROOT" in text or "CONTENT_BOT_ROOT" in text,
+            "has_python_env_contract": "LENA_AUTOPUBLISH_PYTHON_EXE" in text or "CONTENT_BOT_PYTHON_EXE" in text,
         }
         report["ok"] = report["ok"] and report["batch_gates"][batch]["ok"]
 

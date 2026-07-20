@@ -289,8 +289,18 @@ def test_validator_accepts_disabled_contract_and_scheduler_wrappers(tmp_path: Pa
                 [
                     "@echo off",
                     "setlocal",
-                    'set "ROOT=C:\\projects\\ai\\content_bot\\lenadelapi_website_hpe2"',
-                    'set "PYTHON_EXE=C:\\Python314\\python.exe"',
+                    'set "ROOT=%LENA_AUTOPUBLISH_PRODUCTION_ROOT%"',
+                    'if not defined ROOT set "ROOT=%CONTENT_BOT_ROOT%"',
+                    'if not defined ROOT (',
+                    '  echo Missing production root environment variable: LENA_AUTOPUBLISH_PRODUCTION_ROOT or CONTENT_BOT_ROOT',
+                    "  exit /b 1",
+                    ")",
+                    'set "PYTHON_EXE=%LENA_AUTOPUBLISH_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE set "PYTHON_EXE=%CONTENT_BOT_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE (',
+                    '  echo Missing Python interpreter environment variable: LENA_AUTOPUBLISH_PYTHON_EXE or CONTENT_BOT_PYTHON_EXE',
+                    "  exit /b 1",
+                    ")",
                     'cd /d "%ROOT%"',
                     f'"%PYTHON_EXE%" ".\\tools\\lena_autopublish_approved_queue_v2_8.py" --scheduled-autonomous --slot-keyword {slot} --limit 1',
                     "endlocal",
@@ -314,7 +324,9 @@ def test_checked_in_scheduler_wrappers_are_scheduler_safe() -> None:
         assert "--scheduled-autonomous" in text
         assert f"--slot-keyword {slot}" in text
         assert "--i-understand-this-can-publish" not in text
-        assert "C:\\Python314\\python.exe" in text
+        assert "lenadelapi_website_hpe2" not in text.lower()
+        assert "LENA_AUTOPUBLISH_PRODUCTION_ROOT" in text or "CONTENT_BOT_ROOT" in text
+        assert "LENA_AUTOPUBLISH_PYTHON_EXE" in text or "CONTENT_BOT_PYTHON_EXE" in text
 
 
 def test_scheduled_autonomous_policy_disabled_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
