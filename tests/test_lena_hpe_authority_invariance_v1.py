@@ -100,7 +100,7 @@ def _install_approval_monkeypatch(monkeypatch: pytest.MonkeyPatch, paths: dict[s
             "claim_written_at_utc": "2026-07-17T00:00:00Z",
         }
 
-    def build_receipt(*_args: object, **_kwargs: object) -> dict[str, object]:
+    def build_receipt(*_args: object, **kwargs: object) -> dict[str, object]:
         return {
             "report_type": approval.RECEIPT_REPORT_TYPE,
             "schema_version": approval.RECEIPT_SCHEMA_VERSION,
@@ -114,6 +114,8 @@ def _install_approval_monkeypatch(monkeypatch: pytest.MonkeyPatch, paths: dict[s
             "output_path": str(paths["image"].resolve()),
             "image_format_detected": "png",
             "actual_manifest_path": paths["manifest"].resolve().as_posix(),
+            "generated_image_sha256": kwargs.get("generated_image_sha256"),
+            "manifest_sha256": kwargs.get("manifest_sha256"),
         }
 
     monkeypatch.setattr(approval, "build_generation_claim_record", build_claim)
@@ -198,9 +200,11 @@ def test_lifecycle_control_outcomes_remain_identical_across_injected_hpe_statuse
     _write_json(paths["account"], _accounting_report(paths))
     _write_json(paths["decision"], decision)
     _write_json(paths["approval"], {"report_type": approval.APPROVAL_REPORT_TYPE, "schema_version": approval.APPROVAL_SCHEMA_VERSION, "approval_type": approval.APPROVAL_TYPE, "operator_id": approval.CANONICAL_OPERATOR_ID, "approved_at_utc": "2026-07-17T00:00:00Z", "expires_at_utc": "2026-07-17T00:30:00Z", "handoff_artifact_path": "x", "handoff_artifact_sha256": "a" * 64, "handoff_report_type": approval.HANDOFF_REPORT_TYPE, "handoff_schema_version": approval.HANDOFF_SCHEMA_VERSION, "date": "2026-07-17", "slot_id": "slot", "prompt_sha256": "a" * 64, "provider": approval.APPROVAL_PROVIDER, "executor": approval.APPROVAL_EXECUTOR, "model": approval.MODEL, "aspect_ratio": approval.ASPECT_RATIO, "soul_name": approval.SOUL_NAME, "soul_type": approval.SOUL_TYPE, "custom_reference_id": "ref", "confirmation_statement": approval.confirmation_phrase("slot"), "reconciliation": {}, "reconciled_candidate": {}, "reconciliation_decision": {}, "credits_may_be_spent_acknowledged": True, "authorized_attempts": 1, "upload_authorized": False, "queue_promotion_authorized": False, "publish_authorized": False, "analytics_mutation_authorized": False, "immutability": "immutable_once_written", "authorization_identity_mode": "procedural_local_authorization_record_only"})
-    _write_json(paths["manifest"], {"provider": "higgsfield", "date": "2026-07-17", "slot_id": "slot", "provider_status": "completed", "saved_image_path": str(paths["image"].resolve()), "generation_claim_artifact_path": paths["claim"].resolve().as_posix(), "generation_execution_receipt_path": paths["receipt"].resolve().as_posix(), "provider_job_id": "job", "image_format_detected": "png"})
+    image_sha256 = approval.sha256_file(paths["image"])
+    _write_json(paths["manifest"], {"provider": "higgsfield", "date": "2026-07-17", "slot_id": "slot", "provider_status": "completed", "saved_image_path": str(paths["image"].resolve()), "saved_image_sha256": image_sha256, "generation_claim_artifact_path": paths["claim"].resolve().as_posix(), "generation_execution_receipt_path": paths["receipt"].resolve().as_posix(), "provider_job_id": "job", "image_format_detected": "png"})
+    manifest_sha256 = approval.sha256_file(paths["manifest"])
     _write_json(paths["claim"], {"report_type": approval.CLAIM_REPORT_TYPE, "schema_version": approval.CLAIM_SCHEMA_VERSION, "claim_type": approval.CLAIM_TYPE, "date": "2026-07-17", "slot_id": "slot", "approved_at_utc": "2026-07-17T00:00:00Z", "claim_written_at_utc": "2026-07-17T00:00:00Z"})
-    _write_json(paths["receipt"], {"report_type": approval.RECEIPT_REPORT_TYPE, "schema_version": approval.RECEIPT_SCHEMA_VERSION, "receipt_type": approval.RECEIPT_TYPE, "date": "2026-07-17", "slot_id": "slot", "approved_at_utc": "2026-07-17T00:00:00Z", "receipt_written_at_utc": "2026-07-17T00:00:00Z", "provider_job_id": "job", "provider_status": "completed", "output_path": str(paths["image"].resolve()), "image_format_detected": "png", "actual_manifest_path": paths["manifest"].resolve().as_posix()})
+    _write_json(paths["receipt"], {"report_type": approval.RECEIPT_REPORT_TYPE, "schema_version": approval.RECEIPT_SCHEMA_VERSION, "receipt_type": approval.RECEIPT_TYPE, "date": "2026-07-17", "slot_id": "slot", "approved_at_utc": "2026-07-17T00:00:00Z", "receipt_written_at_utc": "2026-07-17T00:00:00Z", "provider_job_id": "job", "provider_status": "completed", "output_path": str(paths["image"].resolve()), "image_format_detected": "png", "actual_manifest_path": paths["manifest"].resolve().as_posix(), "generated_image_sha256": image_sha256, "manifest_sha256": manifest_sha256})
     approval_result = approval.validate_generation_approval_artifact(paths["approval"], require_not_expired=False)
 
     baseline: dict[str, object] | None = None

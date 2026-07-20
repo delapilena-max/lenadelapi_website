@@ -134,6 +134,7 @@ def _build_fixture(tmp_path: Path) -> dict[str, object]:
     image_path = tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"
     image_path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
+    image_sha256 = _sha(image_path)
 
     manifest = {
         "provider": "higgsfield",
@@ -141,12 +142,14 @@ def _build_fixture(tmp_path: Path) -> dict[str, object]:
         "slot_id": SLOT_ID,
         "provider_status": "completed",
         "saved_image_path": str(image_path),
+        "saved_image_sha256": image_sha256,
         "generation_claim_artifact_path": approval.repo_relative_path(claim_path),
         "generation_execution_receipt_path": approval.repo_relative_path(receipt_path),
         "provider_job_id": "job-123",
         "image_format_detected": ".png",
     }
     _write_json(manifest_path, manifest)
+    manifest_sha256 = _sha(manifest_path)
 
     receipt = approval.build_generation_execution_receipt_record(
         claim_path,
@@ -159,6 +162,8 @@ def _build_fixture(tmp_path: Path) -> dict[str, object]:
         output_path=str(image_path),
         image_format_detected=".png",
         actual_manifest_path=approval.repo_relative_path(manifest_path),
+        generated_image_sha256=image_sha256,
+        manifest_sha256=manifest_sha256,
     )
     approval.write_generation_execution_receipt_atomic(receipt_path, receipt)
 
@@ -429,6 +434,128 @@ def test_missing_claim_or_receipt_linkage_fails_closed(tmp_path: Path, monkeypat
             qa_runner=qa_runner,
         )
     assert excinfo.value.code == "generation_receipt_binding_mismatch"
+    assert called["value"] is False
+
+
+def test_valid_receipt_hashes_delegate_to_qa_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
+
+    called = {"value": False}
+
+    def qa_runner(**_kwargs: object) -> dict[str, object]:
+        called["value"] = True
+        return _photo_qa_accept_runner(fixture)(**_kwargs)
+
+    wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=qa_runner,
+    )
+
+    assert receipt["generated_image_sha256"] == _sha(fixture["image_path"])
+    assert receipt["manifest_sha256"] == _sha(fixture["manifest_path"])
+    assert called["value"] is True
+
+
+def test_wrong_receipt_generated_image_sha_fails_before_qa_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
+    receipt["generated_image_sha256"] = "0" * 64
+    _write_json(fixture["receipt_path"], receipt)
+
+    called = {"value": False}
+
+    def qa_runner(**_kwargs: object) -> dict[str, object]:
+        called["value"] = True
+        raise AssertionError("qa runner should not be called when receipt image hash is wrong")
+
+    with pytest.raises(wrapper.GeneratedAssetQaLifecycleError) as excinfo:
+        wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=qa_runner,
+        )
+
+    assert excinfo.value.code == "generation_receipt_binding_mismatch"
+    assert "generated_image_sha256" in excinfo.value.detail
+    assert called["value"] is False
+
+
+def test_wrong_receipt_manifest_sha_fails_before_qa_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
+    receipt["manifest_sha256"] = "0" * 64
+    _write_json(fixture["receipt_path"], receipt)
+
+    called = {"value": False}
+
+    def qa_runner(**_kwargs: object) -> dict[str, object]:
+        called["value"] = True
+        raise AssertionError("qa runner should not be called when receipt manifest hash is wrong")
+
+    with pytest.raises(wrapper.GeneratedAssetQaLifecycleError) as excinfo:
+        wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=qa_runner,
+        )
+
+    assert excinfo.value.code == "generation_receipt_binding_mismatch"
+    assert "manifest_sha256" in excinfo.value.detail
+    assert called["value"] is False
+
+
+def test_manifest_saved_image_sha_mismatch_fails_before_qa_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+    manifest = json.loads(fixture["manifest_path"].read_text(encoding="utf-8"))
+    manifest["saved_image_sha256"] = "0" * 64
+    _write_json(fixture["manifest_path"], manifest)
+
+    called = {"value": False}
+
+    def qa_runner(**_kwargs: object) -> dict[str, object]:
+        called["value"] = True
+        raise AssertionError("qa runner should not be called when manifest image hash is wrong")
+
+    with pytest.raises(wrapper.GeneratedAssetQaLifecycleError) as excinfo:
+        wrapper.evaluate_generated_asset_qa_lifecycle(
+            live_generation_accounting_artifact=fixture["accounting_path"],
+            decision_artifact=fixture["decision_path"],
+            identity_reference_authority_artifact=fixture["reference_authority_path"],
+            identity_reference_authority_sha256="e" * 64,
+            identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+            identity_evidence_artifact=fixture["evidence_path"],
+            qa_runner=qa_runner,
+        )
+
+    assert excinfo.value.code == "executor_result_manifest_image_sha_mismatch"
     assert called["value"] is False
 
 
