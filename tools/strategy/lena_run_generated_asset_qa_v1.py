@@ -27,6 +27,7 @@ LIFECYCLE_SCHEMA_VERSION = "v1"
 ACCOUNTING_RE = re.compile(
     r"^lena_live_generation_accounting_(?P<date>\d{4}-\d{2}-\d{2})_(?P<slot_id>.+)\.json$"
 )
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class GeneratedAssetQaLifecycleError(RuntimeError):
@@ -202,6 +203,7 @@ def _validate_claim_and_receipt(
     accounting_report: dict[str, Any],
     approval_result: dict[str, Any],
     manifest_path: Path,
+    image_path: Path,
     claim_path: Path,
     receipt_path: Path,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -221,17 +223,38 @@ def _validate_claim_and_receipt(
             f"generation claim artifact field {key!r} does not match the approval lineage",
         )
 
+    manifest = _read_json_object(
+        manifest_path,
+        code="executor_result_manifest_missing_or_invalid",
+        label="executor result manifest",
+    )
+    expected_generated_image_sha256 = _sha256_file(image_path)
+    manifest_saved_image_sha256 = str(manifest.get("saved_image_sha256") or "").strip()
+    _require(
+        SHA256_RE.fullmatch(manifest_saved_image_sha256) is not None,
+        "executor_result_manifest_saved_image_sha_missing_or_invalid",
+        "manifest saved_image_sha256 must be a valid SHA-256",
+    )
+    _require(
+        manifest_saved_image_sha256 == expected_generated_image_sha256,
+        "executor_result_manifest_image_sha_mismatch",
+        "manifest saved_image_sha256 does not match the generated image bytes",
+    )
+    expected_manifest_sha256 = _sha256_file(manifest_path)
+
     expected_receipt = approval.build_generation_execution_receipt_record(
         claim_path,
         approval_result,
         outcome="success",
         subprocess_start_attempted=bool(accounting_report.get("subprocess_start_attempted")),
         provider_submission_may_have_occurred=bool(accounting_report.get("provider_submission_may_have_occurred")),
-        provider_job_id=str(_read_json_object(manifest_path, code="executor_result_manifest_missing_or_invalid", label="executor result manifest").get("provider_job_id") or ""),
-        provider_status=str(_read_json_object(manifest_path, code="executor_result_manifest_missing_or_invalid", label="executor result manifest").get("provider_status") or ""),
-        output_path=str(_read_json_object(manifest_path, code="executor_result_manifest_missing_or_invalid", label="executor result manifest").get("saved_image_path") or ""),
-        image_format_detected=str(_read_json_object(manifest_path, code="executor_result_manifest_missing_or_invalid", label="executor result manifest").get("image_format_detected") or ""),
+        provider_job_id=str(manifest.get("provider_job_id") or ""),
+        provider_status=str(manifest.get("provider_status") or ""),
+        output_path=str(manifest.get("saved_image_path") or ""),
+        image_format_detected=str(manifest.get("image_format_detected") or ""),
         actual_manifest_path=repo_relative_path(manifest_path),
+        generated_image_sha256=expected_generated_image_sha256,
+        manifest_sha256=expected_manifest_sha256,
     )
     expected_receipt = dict(expected_receipt)
     expected_receipt.pop("receipt_written_at_utc", None)
@@ -440,6 +463,7 @@ def evaluate_generated_asset_qa_lifecycle(
         accounting_report=accounting_report,
         approval_result=approval_result,
         manifest_path=manifest_path,
+        image_path=image_path,
         claim_path=claim_path,
         receipt_path=receipt_path,
     )
