@@ -409,6 +409,88 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact["retry_prompt_headroom_status"] == "warning"
 
 
+def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
+    packet["compact_provider_prompt_budget"] = 4096
+    seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
+    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
+    handoff["selected_prompt_input_artifact_sha256"] = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
+    seeded["handoff_path"].write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["handoff_artifact_sha256"] = hashlib.sha256(seeded["handoff_path"].read_bytes()).hexdigest()
+    seeded["receipt_path"].write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    current_soul = {
+        "id": "e45ec580-a6db-4063-a9b2-f9163856daae",
+        "name": "Lena",
+        "type": "soul_2",
+        "status": "completed",
+    }
+
+    path, artifact = retry_mod.build_retry_handoff(
+        handoff_artifact=seeded["handoff_path"],
+        execution_receipt=seeded["receipt_path"],
+        output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+        reason_code="hair_crown_forelock_artifact",
+        soul_record=current_soul,
+    )
+    retry_mod.write_retry_handoff_artifact(path, artifact)
+    validated = retry_mod.validate_retry_handoff_artifact(path)
+
+    assert validated["retry_purpose"] == "hair_crown_forelock_contract_repair"
+    assert validated["reason_code"] == "hair_crown_forelock_artifact"
+    assert validated["custom_reference_id"] == current_soul["id"]
+    assert validated["soul_name"] == "Lena"
+    assert validated["soul_type"] == "soul_2"
+    assert validated["retry_soul_binding"] == current_soul
+    assert validated["historical_custom_reference_id"] == CUSTOM_REFERENCE_ID
+    assert retry_mod.HAIR_CROWN_CONSTRAINT in validated["retry_prompt_text"]
+    assert validated["retry_constraints"]["only_hair_crown_defect_may_change"] is True
+    assert validated["retry_constraints"]["preserve"] == retry_mod.HAIR_CROWN_PRESERVES
+
+
+@pytest.mark.parametrize(
+    ("records", "code"),
+    [
+        ([], "soul_resolution_ambiguous"),
+        ([{"id": "x", "name": "Lena", "type": "soul_2", "status": "processing"}], "soul_resolution_ambiguous"),
+        ([{"id": "x", "name": "Other", "type": "soul_2", "status": "completed"}], "soul_resolution_ambiguous"),
+        ([{"id": "x", "name": "Lena", "type": "soul_1", "status": "completed"}], "soul_resolution_ambiguous"),
+        (
+            [
+                {"id": "x", "name": "Lena", "type": "soul_2", "status": "completed"},
+                {"id": "y", "name": "Lena", "type": "soul_2", "status": "completed"},
+            ],
+            "soul_resolution_ambiguous",
+        ),
+    ],
+)
+def test_current_soul_resolution_fails_closed(records: list[dict], code: str) -> None:
+    class Completed:
+        returncode = 0
+        stdout = json.dumps(records)
+        stderr = ""
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.resolve_current_lena_soul(cli_runner=lambda *args, **kwargs: Completed())
+    assert excinfo.value.code == code
+
+
+def test_current_soul_resolution_accepts_single_completed_lena_soul_2() -> None:
+    expected = {"id": "e45ec580-a6db-4063-a9b2-f9163856daae", "name": "Lena", "type": "soul_2", "status": "completed"}
+
+    class Completed:
+        returncode = 0
+        stdout = json.dumps([expected])
+        stderr = ""
+
+    assert retry_mod.resolve_current_lena_soul(cli_runner=lambda *args, **kwargs: Completed()) == expected
+
+
 def test_retry_handoff_fails_closed_on_receipt_prompt_mismatch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_roots(tmp_path, monkeypatch)
     seeded = _seed_bound_retry_source(tmp_path)

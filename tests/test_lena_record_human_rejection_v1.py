@@ -126,6 +126,65 @@ def test_valid_rejection_and_retry_plan_are_bound_and_plan_only(bound_source: di
     assert not retry_path.exists()
 
 
+def test_hair_crown_rejection_accepts_only_allowlisted_blocked_provenance(bound_source: dict) -> None:
+    source = copy.deepcopy(bound_source["source"])
+    source["disposition"] = "blocked"
+    source["reviewer_type"] = "local_validation_only"
+    source["provider_called"] = False
+    source["reason_codes"] = ["human_visual_review_required"]
+    source["exact_next_allowed_action"] = "human_visual_review_required"
+    source["hard_stop_reason"] = "generation_manifest_defect"
+    source["qa_inputs"] = {
+        "missing_immutable_provenance": [
+            "expression_gaze_id",
+            "expression_gaze_label",
+            "expression_text",
+        ]
+    }
+    _write_json(bound_source["disposition"], source)
+    bound_source["disposition_sha"] = hashlib.sha256(bound_source["disposition"].read_bytes()).hexdigest()
+
+    rejection, retry, _, _ = record.build_rejection_and_retry_plan(
+        date_str=bound_source["date"],
+        slot_id=bound_source["slot"],
+        image_sha=bound_source["image_sha"],
+        disposition_path=bound_source["disposition"],
+        disposition_sha=bound_source["disposition_sha"],
+        publish_packet_path=bound_source["publish_packet"],
+        queue_draft_path=bound_source["queue_draft"],
+        reason=record.CORRECTION_CONTRACTS[record.HAIR_CROWN_REASON_CODE]["operator_reason"],
+        reason_code=record.HAIR_CROWN_REASON_CODE,
+        output_root=bound_source["output"],
+    )
+
+    assert rejection["reason_code"] == "hair_crown_forelock_artifact"
+    assert rejection["mutation_type"] == "correct_hair_crown_forelock"
+    assert rejection["correction_scope"] == "hair_only"
+    assert rejection["deterministic_qa_status"] == "blocked"
+    assert rejection["deterministic_qa_blocker"] == "generation_manifest_defect"
+    assert retry["missing_immutable_provenance"] == [
+        "expression_gaze_id",
+        "expression_gaze_label",
+        "expression_text",
+    ]
+
+
+def test_unknown_hair_reason_fails_closed(bound_source: dict) -> None:
+    with pytest.raises(record.RejectionError, match="unknown rejection reason code"):
+        record.build_rejection_and_retry_plan(
+            date_str=bound_source["date"],
+            slot_id=bound_source["slot"],
+            image_sha=bound_source["image_sha"],
+            disposition_path=bound_source["disposition"],
+            disposition_sha=bound_source["disposition_sha"],
+            publish_packet_path=bound_source["publish_packet"],
+            queue_draft_path=bound_source["queue_draft"],
+            reason="Hair crown contains an unwanted raised forelock or vertical tuft",
+            reason_code="freeform_hair_fix",
+            output_root=bound_source["output"],
+        )
+
+
 def test_duplicate_rejection_collision_fails_closed(bound_source: dict) -> None:
     rejection, _, rejection_path, _ = _build(bound_source)
     _write_json(rejection_path, rejection)

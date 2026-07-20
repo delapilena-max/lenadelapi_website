@@ -32,6 +32,30 @@ BACKGROUND_IDENTITY_CONSTRAINT = (
     "Any background people must be fully blurred, obscured, turned away, or cropped so they never read "
     "as a second Lena-like identity, and any visible background identity must be clearly distinct from Lena."
 )
+HAIR_CROWN_CONSTRAINT = (
+    "Lena's hair has realistic natural root direction and lies smoothly across the crown with a low, "
+    "relaxed top silhouette and normal soft volume. No raised forelock, no vertical crown tuft, no "
+    "rooster-like crest, no exaggerated crown lift, and no isolated upward-pointing clump of hair."
+)
+HAIR_CROWN_PRESERVES = [
+    "face and Lena identity",
+    "apparent age",
+    "skin and freckles",
+    "body and proportions",
+    "hair color",
+    "hair length",
+    "general hair texture",
+    "wardrobe",
+    "environment",
+    "scene",
+    "pose",
+    "expression",
+    "gaze",
+    "framing",
+    "camera treatment",
+    "lighting",
+    "composition",
+]
 DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "retry_decisions"
 RETRY_EXECUTION_CONTRACT_SCHEMA_VERSION = "lena_retry_execution_contract_v1"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -102,10 +126,27 @@ def retry_decision_artifact_path(
     return output_root / date_str / f"{retry_slot_id}__{original_decision_fingerprint[:12]}_retry_decision.json"
 
 
-def _mutate_prompt_for_retry(original_prompt: str) -> str:
-    if BACKGROUND_IDENTITY_CONSTRAINT in original_prompt:
-        raise RetryDecisionError("prompt_already_mutated", "original prompt already contains the retry background-identity constraint")
-    return f"{original_prompt} {BACKGROUND_IDENTITY_CONSTRAINT}"
+def _constraint_for_mutation(mutation_type: str) -> str:
+    if mutation_type == "prevent_duplicated_background_identity":
+        return BACKGROUND_IDENTITY_CONSTRAINT
+    if mutation_type == "correct_hair_crown_forelock":
+        return HAIR_CROWN_CONSTRAINT
+    raise RetryDecisionError("unknown_retry_mutation_type", f"unknown retry mutation type: {mutation_type!r}")
+
+
+def _preserves_for_mutation(mutation_type: str) -> list[str]:
+    if mutation_type == "prevent_duplicated_background_identity":
+        return ["concept", "wardrobe", "pose", "expression", "hook", "composition"]
+    if mutation_type == "correct_hair_crown_forelock":
+        return list(HAIR_CROWN_PRESERVES)
+    raise RetryDecisionError("unknown_retry_mutation_type", f"unknown retry mutation type: {mutation_type!r}")
+
+
+def _mutate_prompt_for_retry(original_prompt: str, mutation_type: str = MUTATION_REASON) -> str:
+    constraint = _constraint_for_mutation(mutation_type)
+    if constraint in original_prompt:
+        raise RetryDecisionError("prompt_already_mutated", "original prompt already contains the retry correction constraint")
+    return f"{original_prompt} {constraint}"
 
 
 def _validate_original_decision_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
@@ -193,8 +234,16 @@ def _validate_correction_artifact(correction_artifact_path: Path) -> tuple[dict[
         raise RetryDecisionError("invalid_retry_cap", "superseded retry plan retry attempt/cap must remain exactly 1/1")
     if invalid_retry.get("action") != "plan_only_no_provider_call":
         raise RetryDecisionError("invalid_retry_action", "superseded retry plan action must remain plan_only_no_provider_call")
-    if invalid_retry.get("next_attempt_instruction") != rejection_record.NEXT_ATTEMPT:
+    contract = rejection_record.correction_contract_for_reason(
+        str(rejection.get("operator_reason") or ""),
+        str(rejection.get("reason_code") or "") or None,
+    )
+    if invalid_retry.get("next_attempt_instruction") != contract["next_attempt_instruction"]:
         raise RetryDecisionError("invalid_retry_instruction", "superseded retry plan next_attempt_instruction is invalid")
+    if invalid_retry.get("mutation_type") != contract["mutation_type"]:
+        raise RetryDecisionError("invalid_retry_mutation_type", "superseded retry plan mutation_type is invalid")
+    if invalid_retry.get("correction_scope") != contract["correction_scope"]:
+        raise RetryDecisionError("invalid_retry_correction_scope", "superseded retry plan correction_scope is invalid")
     if invalid_retry.get("human_rejection_artifact_path") != str(valid_rejection_path):
         raise RetryDecisionError("invalid_retry_binding", "superseded retry plan does not bind the same rejection artifact path")
     embedded_rejection_sha = _require_sha256(
@@ -224,8 +273,12 @@ def _validate_correction_artifact(correction_artifact_path: Path) -> tuple[dict[
 def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[Path, dict[str, Any]]:
     correction_path = correction_artifact_path.resolve()
     correction, rejection, invalid_retry, original_decision, manifest, candidate, original_prompt = _validate_correction_artifact(correction_path)
+    contract = rejection_record.correction_contract_for_reason(
+        str(rejection.get("operator_reason") or ""),
+        str(rejection.get("reason_code") or "") or None,
+    )
     retry_slot_id = _retry_slot_id(candidate["slot_id"])
-    retry_prompt = _mutate_prompt_for_retry(original_prompt)
+    retry_prompt = _mutate_prompt_for_retry(original_prompt, contract["mutation_type"])
     retry_prompt_sha = hashlib.sha256(retry_prompt.encode("utf-8")).hexdigest()
     path = retry_decision_artifact_path(
         str(original_decision["as_of_date"]),
@@ -264,6 +317,12 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         },
         "source_original_image_path": correction["original_image_path"],
         "source_original_image_sha256": correction["original_image_sha256"],
+        "reason_code": contract["reason_code"],
+        "mutation_type": contract["mutation_type"],
+        "correction_scope": contract["correction_scope"],
+        "deterministic_qa_status": contract["deterministic_qa_status_required"],
+        "deterministic_qa_blocker": contract["deterministic_qa_blocker"],
+        "missing_immutable_provenance": list(contract["missing_immutable_provenance"]),
         "source_qa_disposition_artifact_path": rejection["qa_disposition_artifact_path"],
         "source_qa_disposition_artifact_sha256": rejection["qa_disposition_artifact_sha256"],
         "source_publish_packet_path": rejection["publish_packet_path"],
@@ -285,16 +344,9 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         "retry_prompt_sha256": retry_prompt_sha,
         "prompt_mutation": {
             "mode": "scene_constraint_only",
-            "reason": MUTATION_REASON,
-            "added_constraint": BACKGROUND_IDENTITY_CONSTRAINT,
-            "preserves": [
-                "concept",
-                "wardrobe",
-                "pose",
-                "expression",
-                "hook",
-                "composition",
-            ],
+            "reason": contract["mutation_type"],
+            "added_constraint": _constraint_for_mutation(contract["mutation_type"]),
+            "preserves": _preserves_for_mutation(contract["mutation_type"]),
         },
         "retry_prompt_text": retry_prompt,
         "final_action": FINAL_ACTION,
@@ -332,7 +384,9 @@ def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
         "retry_slot_id": artifact["retry_slot_id"],
         "original_prompt_sha256": artifact["original_prompt_sha256"],
         "retry_prompt_sha256": artifact["retry_prompt_sha256"],
-        "background_identity_constraint": artifact["prompt_mutation"]["added_constraint"],
+        "mutation_type": artifact["mutation_type"],
+        "correction_scope": artifact["correction_scope"],
+        "added_constraint": artifact["prompt_mutation"]["added_constraint"],
         "source_original_decision_fingerprint_sha256": artifact["source_original_decision_fingerprint_sha256"],
         "source_original_manifest_path": artifact["source_original_manifest_path"],
         "source_original_manifest_sha256": artifact["source_original_manifest_sha256"],
@@ -391,13 +445,15 @@ def _validate_retry_decision_artifact(path: Path) -> dict[str, Any]:
         raise RetryDecisionError("unexpected_provider_state", "retry decision provider state must remain false/false")
     if artifact.get("generation_performed") is not False or artifact.get("side_effects_performed") != []:
         raise RetryDecisionError("unexpected_side_effects", "retry decision must not record generation or any side effects")
-    if artifact.get("prompt_mutation", {}).get("reason") != MUTATION_REASON:
+    mutation_type = str(artifact.get("mutation_type") or "")
+    if artifact.get("prompt_mutation", {}).get("reason") != mutation_type:
         raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt mutation reason is invalid")
+    expected_constraint = _constraint_for_mutation(mutation_type)
     retry_prompt = str(artifact.get("retry_prompt_text") or "")
-    if not retry_prompt or BACKGROUND_IDENTITY_CONSTRAINT not in retry_prompt:
-        raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text is missing the required background-identity constraint")
-    if retry_prompt.count(BACKGROUND_IDENTITY_CONSTRAINT) != 1:
-        raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text must contain the required background-identity constraint exactly once")
+    if not retry_prompt or expected_constraint not in retry_prompt:
+        raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text is missing the required correction constraint")
+    if retry_prompt.count(expected_constraint) != 1:
+        raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text must contain the required correction constraint exactly once")
     if artifact.get("retry_prompt_sha256") != hashlib.sha256(retry_prompt.encode("utf-8")).hexdigest():
         raise RetryDecisionError("prompt_sha_mismatch", "retry decision retry_prompt_sha256 does not match the stored retry prompt bytes")
     if artifact.get("retry_slot_id") != _retry_slot_id(str(artifact.get("original_slot_id") or "")):
@@ -415,7 +471,7 @@ def _validate_retry_decision_artifact(path: Path) -> dict[str, Any]:
         raise RetryDecisionError("decision_binding_mismatch", "retry decision does not bind the original decision fingerprint exactly")
     if artifact.get("original_prompt_sha256") != candidate.get("prompt_sha256"):
         raise RetryDecisionError("prompt_sha_mismatch", "retry decision does not preserve the original prompt SHA exactly")
-    expected_prompt = _mutate_prompt_for_retry(original_prompt)
+    expected_prompt = _mutate_prompt_for_retry(original_prompt, mutation_type)
     if retry_prompt != expected_prompt:
         raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text does not match the canonical retry mutation")
     if artifact.get("source_valid_human_rejection_artifact_path") != correction.get("valid_human_rejection_artifact_path"):

@@ -1060,6 +1060,54 @@ def test_blocked_human_visual_review_waits_without_retry_or_publish(
     assert report["side_effect_flags"]["retry_executed"] is False
 
 
+def test_unbound_photo_qa_binding_error_is_not_masked_or_written(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    fixture = _build_fixture(tmp_path)
+    monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
+
+    def qa_runner(**kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": qa_disposition.SCHEMA_VERSION,
+            "influencer_id": "lena",
+            "disposition": "blocked",
+            "reason_codes": ["provenance_mismatch"],
+            "hard_stop_reason": "generation_manifest_defect",
+            "provider_called": False,
+            "side_effects_performed": [],
+            "exact_next_allowed_action": "review_generated_asset",
+            "qa_inputs": {
+                "binding_error": "manifest is missing required generation provenance: pose_body_language_id",
+            },
+        }
+
+    def fail_writer(*args: object, **kwargs: object) -> None:
+        raise AssertionError("unbound QA artifacts must not be passed to the disposition writer")
+
+    monkeypatch.setattr(qa_disposition, "write_disposition_artifact", fail_writer)
+
+    report = wrapper.evaluate_generated_asset_qa_lifecycle(
+        live_generation_accounting_artifact=fixture["accounting_path"],
+        decision_artifact=fixture["decision_path"],
+        identity_reference_authority_artifact=fixture["reference_authority_path"],
+        identity_reference_authority_sha256="e" * 64,
+        identity_references=[(fixture["reference_path"], fixture["reference_sha"])],
+        identity_evidence_artifact=fixture["evidence_path"],
+        qa_runner=qa_runner,
+    )
+
+    assert report["qa_lifecycle_status"] == "qa_lifecycle_blocked_unbound"
+    assert report["blocking_reasons"] == ["qa_binding_error"]
+    assert report["qa_disposition_artifact"] is None
+    assert report["qa_inputs"]["binding_error"] == "manifest is missing required generation provenance: pose_body_language_id"
+    assert report["provider_call_performed"] is False
+    assert report["generation_performed"] is False
+    assert report["side_effect_flags"]["retry_executed"] is False
+    assert wrapper.report_path(DATE, SLOT_ID, wrapper.NEXT_ACTIONS).exists() is False
+
+
 def test_hpe_authority_invariance_matrix_stays_stable_across_semantic_states(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

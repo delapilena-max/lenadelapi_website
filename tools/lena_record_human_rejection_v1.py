@@ -29,6 +29,36 @@ NEXT_ATTEMPT = (
 MAX_RETRIES = 1
 DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "asset_review" / "lena"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+BACKGROUND_IDENTITY_REASON_CODE = "background_identity_duplication"
+HAIR_CROWN_REASON_CODE = "hair_crown_forelock_artifact"
+CORRECTION_CONTRACTS: dict[str, dict[str, Any]] = {
+    BACKGROUND_IDENTITY_REASON_CODE: {
+        "reason_code": BACKGROUND_IDENTITY_REASON_CODE,
+        "operator_reason": EXACT_REASON,
+        "classification": CLASSIFICATION,
+        "mutation_type": "prevent_duplicated_background_identity",
+        "correction_scope": "background_identity_only",
+        "next_attempt_instruction": NEXT_ATTEMPT,
+        "deterministic_qa_status_required": "accept",
+        "deterministic_qa_blocker": None,
+        "missing_immutable_provenance": [],
+    },
+    HAIR_CROWN_REASON_CODE: {
+        "reason_code": HAIR_CROWN_REASON_CODE,
+        "operator_reason": "Hair crown contains an unwanted raised forelock or vertical tuft",
+        "classification": "visual_artifact_human_rejection",
+        "mutation_type": "correct_hair_crown_forelock",
+        "correction_scope": "hair_only",
+        "next_attempt_instruction": "same concept with only the crown/forelock hair artifact corrected",
+        "deterministic_qa_status_required": "blocked",
+        "deterministic_qa_blocker": "generation_manifest_defect",
+        "missing_immutable_provenance": [
+            "expression_gaze_id",
+            "expression_gaze_label",
+            "expression_text",
+        ],
+    },
+}
 
 
 class RejectionError(RuntimeError):
@@ -78,6 +108,26 @@ def _load_repo_json(path: Path, label: str) -> dict[str, Any]:
     return _read_object(_contained_file(str(path), label), label)
 
 
+def correction_contract_for_reason(reason: str, reason_code: str | None = None) -> dict[str, Any]:
+    if reason_code is None:
+        matches = [
+            contract
+            for contract in CORRECTION_CONTRACTS.values()
+            if contract["operator_reason"] == reason
+        ]
+        if len(matches) != 1:
+            raise RejectionError("operator reason does not match any allowlisted correction contract")
+        return matches[0]
+    contract = CORRECTION_CONTRACTS.get(reason_code)
+    if contract is None:
+        raise RejectionError(f"unknown rejection reason code: {reason_code!r}")
+    if reason != contract["operator_reason"]:
+        raise RejectionError(
+            f"operator reason must exactly equal {contract['operator_reason']!r} for reason_code {reason_code!r}"
+        )
+    return contract
+
+
 def rejection_artifact_path(date_str: str, slot_id: str, image_sha: str, output_root: Path = DEFAULT_OUTPUT_ROOT) -> Path:
     return output_root / date_str / f"{slot_id}__{image_sha}_human_rejection.json"
 
@@ -91,7 +141,8 @@ def retry_plan_correction_artifact_path(date_str: str, slot_id: str, image_sha: 
 
 
 def _validate_source(
-    date_str: str, slot_id: str, image_sha: str, disposition_path: Path, disposition_sha: str
+    date_str: str, slot_id: str, image_sha: str, disposition_path: Path, disposition_sha: str,
+    contract: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], Path, Path]:
     if not SHA256_RE.fullmatch(image_sha):
         raise RejectionError("image_sha256 must be exactly 64 lowercase hexadecimal characters")
@@ -106,17 +157,33 @@ def _validate_source(
         "influencer_id": "lena",
         "slot_id": slot_id,
         "image_sha256": image_sha,
-        "disposition": "accept",
-        "reviewer_type": "bounded_visual_provider",
-        "provider_called": True,
-        "reason_codes": [],
         "side_effects_performed": [],
-        "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
     }
     mismatches = [key for key, value in exact.items() if source.get(key) != value]
     provenance = source.get("generation_provenance")
     if mismatches or not isinstance(provenance, dict) or provenance.get("date") != date_str:
-        raise RejectionError("QA disposition is not an accepted, fully bound artifact for the requested date/slot/image")
+        raise RejectionError("QA disposition is not a fully bound artifact for the requested date/slot/image")
+    if contract["deterministic_qa_status_required"] == "accept":
+        accepted = {
+            "disposition": "accept",
+            "reviewer_type": "bounded_visual_provider",
+            "provider_called": True,
+            "reason_codes": [],
+            "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
+        }
+        if [key for key, value in accepted.items() if source.get(key) != value]:
+            raise RejectionError("QA disposition is not an accepted, fully bound artifact for the requested date/slot/image")
+    else:
+        if source.get("disposition") != contract["deterministic_qa_status_required"]:
+            raise RejectionError("QA disposition status does not match the correction contract")
+        if source.get("hard_stop_reason") != contract["deterministic_qa_blocker"]:
+            raise RejectionError("QA disposition blocker does not match the correction contract")
+        qa_inputs = source.get("qa_inputs")
+        if not isinstance(qa_inputs, dict):
+            raise RejectionError("QA disposition qa_inputs must record the blocked provenance context")
+        missing = qa_inputs.get("missing_immutable_provenance")
+        if missing != contract["missing_immutable_provenance"]:
+            raise RejectionError("QA disposition missing immutable provenance does not match the correction contract")
 
     image_path = _contained_file(source.get("image_path"), "generated image")
     if _sha256_file(image_path) != image_sha:
@@ -127,12 +194,14 @@ def _validate_source(
     if not SHA256_RE.fullmatch(str(manifest_sha)) or _sha256_file(manifest_path) != manifest_sha:
         raise RejectionError("result manifest SHA-256 does not match the disposition binding")
 
+    decision, candidate = disposition._validate_decision(decision_path)
+    image = disposition._inspect_image(image_path, generated=True)
     try:
-        decision, candidate = disposition._validate_decision(decision_path)
-        image = disposition._inspect_image(image_path, generated=True)
         manifest = disposition._validate_manifest(manifest_path, decision, candidate, image)
     except disposition.BoundaryError as exc:
-        raise RejectionError(f"source provenance validation failed: {exc.code}: {exc.detail}") from exc
+        if contract["deterministic_qa_status_required"] != "blocked":
+            raise RejectionError(f"source provenance validation failed: {exc.code}: {exc.detail}") from exc
+        manifest = _read_object(manifest_path, "result manifest")
     decision_fingerprint = source.get("decision_fingerprint_sha256")
     if (
         decision.get("as_of_date") != date_str
@@ -236,6 +305,7 @@ def _compose_retry_plan(
     manifest: dict[str, Any],
     rejection_path: Path,
     rejection_sha: str,
+    contract: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema_version": RETRY_SCHEMA_VERSION,
@@ -246,7 +316,13 @@ def _compose_retry_plan(
         "retry_attempt": retry_attempt,
         "retry_cap": MAX_RETRIES,
         "same_concept": True,
-        "next_attempt_instruction": NEXT_ATTEMPT,
+        "next_attempt_instruction": contract["next_attempt_instruction"],
+        "reason_code": contract["reason_code"],
+        "mutation_type": contract["mutation_type"],
+        "correction_scope": contract["correction_scope"],
+        "deterministic_qa_status": contract["deterministic_qa_status_required"],
+        "deterministic_qa_blocker": contract["deterministic_qa_blocker"],
+        "missing_immutable_provenance": list(contract["missing_immutable_provenance"]),
         "original_decision_artifact_path": str(decision_path),
         "original_decision_artifact_sha256": _sha256_file(decision_path),
         "decision_fingerprint_sha256": decision_fingerprint,
@@ -277,12 +353,11 @@ def _compose_retry_plan(
 def build_rejection_and_retry_plan(
     *, date_str: str, slot_id: str, image_sha: str, disposition_path: Path,
     disposition_sha: str, publish_packet_path: Path, queue_draft_path: Path,
-    reason: str, output_root: Path = DEFAULT_OUTPUT_ROOT,
+    reason: str, reason_code: str | None = None, output_root: Path = DEFAULT_OUTPUT_ROOT,
 ) -> tuple[dict[str, Any], dict[str, Any], Path, Path]:
-    if reason != EXACT_REASON:
-        raise RejectionError(f"operator reason must exactly equal {EXACT_REASON!r}")
+    contract = correction_contract_for_reason(reason, reason_code)
     source, decision, manifest, decision_path, manifest_path = _validate_source(
-        date_str, slot_id, image_sha, disposition_path.resolve(), disposition_sha
+        date_str, slot_id, image_sha, disposition_path.resolve(), disposition_sha, contract
     )
     publish_packet_path, publish_packet_sha, queue_draft_path, queue_draft_sha = _validate_publish_packet_and_queue_draft(
         date_str=date_str,
@@ -320,7 +395,13 @@ def build_rejection_and_retry_plan(
         "decision_artifact_path": str(decision_path),
         "decision_fingerprint_sha256": source["decision_fingerprint_sha256"],
         "operator_reason": reason,
-        "classification": CLASSIFICATION,
+        "reason_code": contract["reason_code"],
+        "classification": contract["classification"],
+        "mutation_type": contract["mutation_type"],
+        "correction_scope": contract["correction_scope"],
+        "deterministic_qa_status": contract["deterministic_qa_status_required"],
+        "deterministic_qa_blocker": contract["deterministic_qa_blocker"],
+        "missing_immutable_provenance": list(contract["missing_immutable_provenance"]),
         "retryable": True,
         "retry_attempt": prior_count + 1,
         "retry_cap": MAX_RETRIES,
@@ -345,6 +426,7 @@ def build_rejection_and_retry_plan(
         manifest=manifest,
         rejection_path=rejection_path,
         rejection_sha=rejection_sha,
+        contract=contract,
     )
     return rejection, retry, rejection_path, retry_path
 
@@ -381,8 +463,12 @@ def build_retry_plan_sha_correction(
     except rejection_gate.HumanRejectionGateError as exc:
         raise RejectionError(f"existing rejection artifact is not valid for retry-plan recovery: {exc}") from exc
 
+    contract = correction_contract_for_reason(
+        str(rejection.get("operator_reason") or ""),
+        str(rejection.get("reason_code") or "") or None,
+    )
     source, decision, manifest, decision_path, manifest_path = _validate_source(
-        date_str, slot_id, image_sha, qa_path, str(rejection["qa_disposition_artifact_sha256"])
+        date_str, slot_id, image_sha, qa_path, str(rejection["qa_disposition_artifact_sha256"]), contract
     )
     publish_packet_path, publish_packet_sha, queue_draft_path, queue_draft_sha = _validate_publish_packet_and_queue_draft(
         date_str=date_str,
@@ -433,6 +519,7 @@ def build_retry_plan_sha_correction(
         manifest=manifest,
         rejection_path=rejection_artifact_path,
         rejection_sha=actual_rejection_sha,
+        contract=contract,
     )
     normalized_retry = dict(invalid_retry)
     normalized_retry["human_rejection_artifact_sha256"] = actual_rejection_sha
@@ -458,7 +545,13 @@ def build_retry_plan_sha_correction(
         "retry_attempt": 1,
         "retry_cap": 1,
         "same_concept": True,
-        "next_attempt_instruction": NEXT_ATTEMPT,
+        "next_attempt_instruction": contract["next_attempt_instruction"],
+        "reason_code": contract["reason_code"],
+        "mutation_type": contract["mutation_type"],
+        "correction_scope": contract["correction_scope"],
+        "deterministic_qa_status": contract["deterministic_qa_status_required"],
+        "deterministic_qa_blocker": contract["deterministic_qa_blocker"],
+        "missing_immutable_provenance": list(contract["missing_immutable_provenance"]),
         "original_decision_artifact_path": str(decision_path),
         "original_decision_artifact_sha256": _sha256_file(decision_path),
         "decision_fingerprint_sha256": source["decision_fingerprint_sha256"],
@@ -522,6 +615,7 @@ def main() -> int:
     parser.add_argument("--publish-packet", type=Path)
     parser.add_argument("--queue-draft", type=Path)
     parser.add_argument("--reason")
+    parser.add_argument("--reason-code")
     parser.add_argument("--recover-existing-retry-plan-sha-mismatch", action="store_true")
     parser.add_argument("--existing-rejection-artifact", type=Path)
     parser.add_argument("--existing-invalid-retry-plan", type=Path)
@@ -563,7 +657,7 @@ def main() -> int:
                 date_str=args.date, slot_id=args.slot, image_sha=args.image_sha256,
                 disposition_path=args.qa_disposition, disposition_sha=args.qa_disposition_sha256,
                 publish_packet_path=args.publish_packet, queue_draft_path=args.queue_draft,
-                reason=args.reason,
+                reason=args.reason, reason_code=args.reason_code,
             )
             if args.write_artifacts:
                 _write_pair(rejection, retry, rejection_path, retry_path)
