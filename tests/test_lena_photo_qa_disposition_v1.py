@@ -1911,6 +1911,54 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         disposition._validate_references([(reference, ref_sha)], authority_path, hashlib.sha256(bad_bytes).hexdigest(), "a" * 40)
 
 
+def test_real_visual_reference_authority_bundle_is_anchored_in_current_lineage() -> None:
+    authority_path = REFERENCE_AUTHORITY
+    authority_sha = _sha(authority_path)
+    authority = json.loads(authority_path.read_text(encoding="utf-8"))
+    current_head = disposition.subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+
+    assert disposition._git_is_ancestor(str(authority["authority_commit"]), current_head)
+    references, reference_set_sha, authority_binding = disposition._validate_references(
+        [(Path(item["path"]), str(item["sha256"])) for item in authority["references"]],
+        authority_path,
+        authority_sha,
+        current_head,
+    )
+
+    assert reference_set_sha == authority["reference_set_sha256"]
+    assert authority_binding["authority_commit"] == authority["authority_commit"]
+    assert references[0]["authority_relative_path"] == authority["references"][0]["path"]
+
+
+def test_real_visual_reference_authority_bundle_rejects_stale_or_forged_commit(tmp_path: Path) -> None:
+    authority = json.loads(REFERENCE_AUTHORITY.read_text(encoding="utf-8"))
+    authority["authority_commit"] = "b" * 40
+    forged_path = tmp_path / "lena_visual_reference_authority_v1.json"
+    _write_json(forged_path, authority)
+
+    current_head = disposition.subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+        text=True,
+    ).stdout.strip()
+
+    with pytest.raises(disposition.BoundaryError, match="ancestor"):
+        disposition._validate_references(
+            [(Path(item["path"]), str(item["sha256"])) for item in authority["references"]],
+            forged_path,
+            _sha(forged_path),
+            current_head,
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
