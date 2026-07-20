@@ -539,7 +539,11 @@ def _resolve_generation_binding_context(
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     report_type = artifact.get("report_type")
     if report_type == standing_autonomy.AUTH_REPORT_TYPE:
-        auth = standing_autonomy.validate_cycle_authorization_artifact(decision_path, allow_consumed=True)
+        auth = standing_autonomy.validate_cycle_authorization_artifact(
+            decision_path,
+            allow_consumed=True,
+            require_not_expired=False,
+        )
         handoff_facts = approval.inspect_handoff_artifact(
             Path(str(auth["artifact"]["generation_handoff_artifact_path"]))
         )
@@ -548,6 +552,7 @@ def _resolve_generation_binding_context(
             decision_path,
             handoff_report=handoff_facts["report"],
             allow_consumed=True,
+            require_not_expired=False,
         )
         return decision, candidate, "authorization_bound_handoff", handoff_facts
     decision, candidate, decision_kind = _validate_decision(decision_path)

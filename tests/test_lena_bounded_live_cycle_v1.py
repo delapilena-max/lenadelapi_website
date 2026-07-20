@@ -1099,7 +1099,13 @@ def test_policy_validation_blocks_authorization_issue(tmp_path: Path, monkeypatc
         (lambda auth: auth.__setitem__("one_candidate", False), "authorization_one_candidate_invalid"),
         (lambda auth: auth.__setitem__("one_asset", False), "authorization_one_asset_invalid"),
         (lambda auth: auth.__setitem__("one_platform", False), "authorization_one_platform_invalid"),
-        (lambda auth: auth.__setitem__("expires_at_utc", "2020-07-18T00:00:00Z"), "authorization_expired"),
+        (
+            lambda auth: (
+                auth.__setitem__("issued_at_utc", "2020-07-18T00:00:00Z"),
+                auth.__setitem__("expires_at_utc", "2020-07-18T00:30:00Z"),
+            ),
+            "authorization_expired",
+        ),
         (lambda auth: auth.__setitem__("provider_call_cap_per_cycle", 2), "provider_call_cap_invalid"),
         (lambda auth: auth.__setitem__("publish_action_cap_per_cycle", 2), "publish_action_cap_invalid"),
         (lambda auth: auth.__setitem__("retry_cap_per_cycle", 1), "retry_cap_invalid"),
