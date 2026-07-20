@@ -428,7 +428,12 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     _require_handoff(packet_report.get("caption_draft") == report.get("selected_prompt_input", {}).get("caption_seed"), "handoff_caption_seed_mismatch", f"{handoff_path} selected prompt input caption seed mismatch")
     _require_handoff(report.get("selected_prompt_input", {}).get("exact_proposed_dry_run_command") == expected_dry, "handoff_candidate_command_mismatch", f"{handoff_path} selected prompt input dry-run command mismatch")
 
-    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path, slot_id)
+    _cand_rel = (
+        (report.get("selected_prompt_input") or {}).get("selected_candidate_artifact_path")
+        or ""
+    )
+    _cand_path = _resolve_repo_path(_cand_rel) if _cand_rel else None
+    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path, slot_id, _cand_path)
     image = source.get("image", {})
     prompt = image.get("image_prompt")
     _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
@@ -1066,10 +1071,15 @@ def load_content_packet_report(path: Path, expected_date: str) -> dict[str, Any]
 def _rebuild_packet_prompt_source(
     packet_path: Path,
     slot_id_override: str | None = None,
+    candidate_path: "Path | None" = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    from pipeline.prompting.lena_prompt_brain import catalog_outfit_silhouette_class  # noqa: E402
     from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
 
-    packet_report = load_content_packet_report(packet_path, str(json.loads(packet_path.read_text(encoding="utf-8")).get("generated_date", "")).strip())
+    packet_report = load_content_packet_report(
+        packet_path,
+        str(json.loads(packet_path.read_text(encoding="utf-8")).get("generated_date", "")).strip(),
+    )
     rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(packet_report)
     prompt = str(rebuilt_packet.get("compact_provider_prompt_preview", "")).strip()
     _require_handoff(
@@ -1082,6 +1092,43 @@ def _rebuild_packet_prompt_source(
         if isinstance(slot_id_override, str) and slot_id_override.strip()
         else f"higgsfield-{packet_report['generated_date'].replace('-', '')}-{packet_report['recipe_id']}-photo"
     )
+
+    # Load candidate provenance fields from the pre-generation candidate artifact.
+    pose_body_language_id: Any = None
+    expression_gaze_id: Any = None
+    expression_gaze_label: Any = None
+    if candidate_path is not None and candidate_path.is_file():
+        try:
+            cand_data = json.loads(candidate_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise HandoffArtifactError(
+                "handoff_candidate_unreadable",
+                f"candidate artifact unreadable: {candidate_path}: {exc}",
+            ) from exc
+        cand = cand_data.get("candidate") or {}
+        pose_body_language_id = cand.get("pose_body_language_id")
+        expression_gaze_id = cand.get("expression_gaze_id")
+        expression_gaze_label = cand.get("expression_gaze_label")
+        _require_handoff(
+            pose_body_language_id,
+            "handoff_candidate_pose_missing",
+            f"candidate artifact {candidate_path} is missing required pose_body_language_id",
+        )
+
+    # Derive wardrobe name and silhouette class from the catalog.
+    wardrobe_outfit_id = packet_report.get("wardrobe_outfit_id")
+    wardrobe_outfit_name: Any = None
+    wardrobe_silhouette_class: Any = None
+    if wardrobe_outfit_id:
+        try:
+            wf_catalog = packet_builder.load_json(packet_builder.WARDROBE_CATALOG)
+            wf_entry = packet_builder.select_wardrobe_entry(wf_catalog, wardrobe_outfit_id, False, [])
+            if wf_entry:
+                wardrobe_outfit_name = wf_entry.get("name")
+                wardrobe_silhouette_class = catalog_outfit_silhouette_class(wf_entry)
+        except Exception:
+            pass
+
     source = {
         "resolver": "content_packet_dryrun",
         "slot_prefix": packet_report["recipe_id"],
@@ -1090,16 +1137,26 @@ def _rebuild_packet_prompt_source(
         "image": {
             "slot_id": slot_id,
             "lane": packet_report.get("scene_type", ""),
-            "wardrobe_outfit_id": packet_report.get("wardrobe_outfit_id"),
+            "wardrobe_outfit_id": wardrobe_outfit_id,
+            "wardrobe_outfit_name": wardrobe_outfit_name,
+            "wardrobe_silhouette_class": wardrobe_silhouette_class,
             "environment_id": packet_report.get("environment_id"),
-            "pose_body_language_id": None,
-            "pose_body_language_label": packet_report.get("high_caliber_source_sections", {}).get("subject_pose", ""),
-            "effective_wardrobe_silhouette_class": packet_report.get("content_pillar", ""),
+            "pose_body_language_id": pose_body_language_id,
+            "pose_body_language_label": (
+                packet_report.get("high_caliber_source_sections", {}).get("subject_pose", "")
+            ),
+            "expression_gaze_id": expression_gaze_id,
+            "expression_gaze_label": expression_gaze_label,
+            "effective_wardrobe_silhouette_class": wardrobe_silhouette_class,
             "soul_name": CONFIRMED_LENA_SOUL_NAME,
             "soul_version": CONFIRMED_LENA_SOUL_TYPE,
             "soul_selection_mode": "provider_config_not_prompt_text",
-            "camera_text": packet_report.get("high_caliber_source_sections", {}).get("technical_keywords", ""),
-            "lighting_text": packet_report.get("high_caliber_source_sections", {}).get("style_lighting", ""),
+            "camera_text": (
+                packet_report.get("high_caliber_source_sections", {}).get("technical_keywords", "")
+            ),
+            "lighting_text": (
+                packet_report.get("high_caliber_source_sections", {}).get("style_lighting", "")
+            ),
             "negative_prompt_enabled": False,
             "image_prompt": prompt,
             "validation": {
