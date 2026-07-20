@@ -17,7 +17,7 @@
   "level_3_authority": {
     "policy_id": "lena_approved_queue_auto_publisher_policy_v2_8",
     "policy_path": "pipeline/influencer_nodes/lena/approved_queue_auto_publisher_policy_v2_8.json",
-    "policy_sha256": "660027f63d2b82a1da32a3fe401ab7a48d8efcf83e2a4336b1f6cf31f4eb1ef4",
+    "policy_sha256": "46dd7f946090d4d3efedad5c9901f4a9d77cd3b6963b88cc0b3a4a76c23c76b4",
     "policy_version": "v2.8.0",
     "repository_name": "delapilena-max/lenadelapi_website",
     "authority_version": "main",

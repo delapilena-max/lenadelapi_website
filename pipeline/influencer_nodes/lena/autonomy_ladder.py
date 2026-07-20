@@ -117,6 +117,11 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_normalized_text_file(path: Path) -> str:
+    text = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def _validate_level_three_authority(binding: dict[str, Any]) -> dict[str, Any]:
     _require(isinstance(binding, dict), "contract_invalid", "level 3 authority must be a JSON object")
     policy_path_raw = binding.get("policy_path")
@@ -132,7 +137,7 @@ def _validate_level_three_authority(binding: dict[str, Any]) -> dict[str, Any]:
 
     expected_sha = binding.get("policy_sha256")
     _require(isinstance(expected_sha, str) and expected_sha.strip(), "contract_invalid", "level 3 authority must define policy_sha256")
-    actual_sha = _sha256_file(policy_path)
+    actual_sha = _sha256_normalized_text_file(policy_path)
     _require(expected_sha.lower() == actual_sha.lower(), "level_3_policy_unauthorized", "level 3 authority policy_sha256 must match the bound policy artifact")
 
     _require(policy.get("policy_id") == LEVEL_3_POLICY_ID, "level_3_policy_unauthorized", "level 3 authority policy_id must match the approved queue publisher policy")

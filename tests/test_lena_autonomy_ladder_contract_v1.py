@@ -14,6 +14,10 @@ def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def _normalized_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
 def _level(levels: list[dict], number: int) -> dict:
     return next(level for level in levels if level["level"] == number)
 
@@ -100,7 +104,7 @@ def test_levels_three_four_and_five_keep_posting_controlled_or_disabled() -> Non
     assert payload["level_3_authority"]["policy_id"] == "lena_approved_queue_auto_publisher_policy_v2_8"
     assert payload["level_3_authority"]["policy_path"] == "pipeline/influencer_nodes/lena/approved_queue_auto_publisher_policy_v2_8.json"
     assert payload["level_3_authority"]["authority_version"] == "main"
-    assert payload["level_3_authority"]["policy_sha256"] == hashlib.sha256(POLICY.read_bytes()).hexdigest()
+    assert payload["level_3_authority"]["policy_sha256"] == _normalized_sha256(POLICY)
     assert level3["future_placeholder"] is False
     assert level3["disabled_by_publish_freeze"] is False
     assert "disabled_reason" not in level3

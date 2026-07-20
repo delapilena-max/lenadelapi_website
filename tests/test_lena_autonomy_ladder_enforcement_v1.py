@@ -28,6 +28,10 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
 
 
+def _normalized_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode("utf-8")).hexdigest()
+
+
 def _fake_handoff_facts() -> dict:
     return {
         "report": {
@@ -132,7 +136,7 @@ def _released_policy_payload(
 
 
 def _released_contract_payload(*, policy_path: Path, policy_payload: dict[str, object]) -> dict[str, object]:
-    policy_sha256 = hashlib.sha256(policy_path.read_bytes()).hexdigest()
+    policy_sha256 = _normalized_sha256(policy_path)
     return {
         "version": "v1.0.0",
         "schema_version": "lena_autonomy_ladder_v1",
