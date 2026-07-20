@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -268,8 +269,25 @@ def _base_rows(tmp_path: Path, policy_sha: str) -> list[dict]:
     ]
 
 
-def _patch_git_commit(monkeypatch: pytest.MonkeyPatch, commit: str) -> None:
-    monkeypatch.setattr(autopublish.subprocess, "check_output", lambda *args, **kwargs: commit)
+def _patch_git_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    commit: str,
+    *,
+    ancestors: set[tuple[str, str]] | None = None,
+) -> None:
+    ancestor_pairs = set(ancestors or {(commit, commit)})
+
+    def fake_check_output(cmd, *args, **kwargs):
+        if list(cmd[:3]) == ["git", "rev-parse", "HEAD"]:
+            return commit
+        if list(cmd[:3]) == ["git", "merge-base", "--is-ancestor"]:
+            pair = (cmd[3], cmd[4])
+            if pair in ancestor_pairs:
+                return ""
+            raise subprocess.CalledProcessError(returncode=1, cmd=cmd, output="", stderr="")
+        raise AssertionError(f"unexpected git command: {cmd}")
+
+    monkeypatch.setattr(autopublish.subprocess, "check_output", fake_check_output)
 
 
 def test_validator_accepts_disabled_contract_and_scheduler_wrappers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -351,6 +369,20 @@ def test_scheduled_autonomous_stale_policy_fails_closed(tmp_path: Path, monkeypa
     with pytest.raises(autopublish.AutopublishError) as excinfo:
         autopublish.run_scheduled_autonomous(day="2026-07-19", slot_keyword="morning", limit=1, dry_run=False, policy_path=policy_path)
     assert excinfo.value.code == "autonomous_policy_stale"
+
+
+def test_scheduled_autonomous_enabled_policy_accepts_ancestor_authority(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True, authority_commit="a" * 40)
+    _manifest(tmp_path)
+    rows = _base_rows(tmp_path, _sha(policy_path))
+    _queue_rows(tmp_path, rows=rows)
+    _patch_git_commit(monkeypatch, "b" * 40, ancestors={("a" * 40, "b" * 40)})
+    report = autopublish.run_scheduled_autonomous(day="2026-07-19", slot_keyword="morning", limit=1, dry_run=True, policy_path=policy_path)
+    assert report["ok"] is True
+    assert report["dry_run"] is True
+    assert report["publish_calls_performed"] == 0
+    assert report["provider_calls_performed"] == 0
 
 
 def test_scheduled_autonomous_dry_run_makes_zero_calls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

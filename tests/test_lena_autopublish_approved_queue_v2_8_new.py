@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import subprocess
 import time
 from pathlib import Path
 
@@ -360,11 +361,25 @@ def _base_rows(tmp_path: Path, policy_sha: str) -> list[dict]:
     ]
 
 
-def _patch_git_commit(monkeypatch: pytest.MonkeyPatch, commit: str) -> None:
-    monkeypatch.setattr(
-        autopublish.subprocess, "check_output",
-        lambda *args, **kwargs: commit,
-    )
+def _patch_git_commit(
+    monkeypatch: pytest.MonkeyPatch,
+    commit: str,
+    *,
+    ancestors: set[tuple[str, str]] | None = None,
+) -> None:
+    ancestor_pairs = set(ancestors or {(commit, commit)})
+
+    def fake_check_output(cmd, *args, **kwargs):
+        if list(cmd[:3]) == ["git", "rev-parse", "HEAD"]:
+            return commit
+        if list(cmd[:3]) == ["git", "merge-base", "--is-ancestor"]:
+            pair = (cmd[3], cmd[4])
+            if pair in ancestor_pairs:
+                return ""
+            raise subprocess.CalledProcessError(returncode=1, cmd=cmd, output="", stderr="")
+        raise AssertionError(f"unexpected git command: {cmd}")
+
+    monkeypatch.setattr(autopublish.subprocess, "check_output", fake_check_output)
 
 
 # ── Fix 1: platform filter ────────────────────────────────────────────────────

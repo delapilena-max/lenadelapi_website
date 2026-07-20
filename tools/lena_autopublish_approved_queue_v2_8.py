@@ -106,6 +106,24 @@ def _policy_sha256(policy_path: Path) -> str:
     return _sha256_file(policy_path)
 
 
+def _is_git_ancestor(repo_root: Path, ancestor_commit: str, descendant_commit: str) -> bool:
+    try:
+        subprocess.check_output(
+            [
+                "git",
+                "merge-base",
+                "--is-ancestor",
+                ancestor_commit,
+                descendant_commit,
+            ],
+            cwd=str(repo_root),
+            text=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     policy_path = policy_path.resolve()
     policy = load_policy(policy_path)
@@ -132,7 +150,10 @@ def _validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
         current_commit = ""
     if not current_commit:
         raise AutopublishError("autonomous_policy_repository_commit_unavailable", "unable to read current repository commit")
-    if str(policy.get("authority_commit") or "").strip() != current_commit:
+    authority_commit = str(policy.get("authority_commit") or "").strip()
+    if not authority_commit:
+        raise AutopublishError("autonomous_policy_authority_commit_missing", "authority_commit is required")
+    if not _is_git_ancestor(ROOT, authority_commit, current_commit):
         raise AutopublishError("autonomous_policy_stale", "autonomous policy does not match current repository authority")
     approved_slots = {str(item).strip().lower() for item in policy.get("approved_slots", []) if str(item).strip()}
     if approved_slots != AUTONOMOUS_SLOT_KEYWORDS:
