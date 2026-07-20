@@ -1,51 +1,86 @@
-﻿# Next Session Start
+# Next Session Start
 
-Current main merge SHA: `10f1b67d40a0932acfe5730afadc29217f21b775`
+## Current repository state
 
-Latest merged PR: `#76 - HPE PR4a: closure verification and runtime evidence`
+Current `origin/main` merge SHA: `064b8e3db51c8dbd726cf1156a747dae1f23b7ea`
 
-Current HPE status: `PR4A MERGED - CONTROLLED-PROOF EXECUTION AND LATER CLOSURE EVIDENCE REMAIN`
+Latest merged PR: `#101 - Add bounded autonomous approved-queue publishing`
 
-Current aggregate closure status: `not_verified`
+Current open work item: draft PR `#102 - Add autonomous publishing go-live readiness gate`
 
-Read first:
-- [HPE status](docs/human_presence_engine_status.md)
-- [HPE architecture note](pipeline/change_notes/lena_human_presence_engine_v1_architecture.md)
+PR #102 branch: `codex/lena-autopublish-go-live-readiness-v1`
 
-Start-of-session checks:
-- verify `origin/main` still contains merge commit `10f1b67d40a0932acfe5730afadc29217f21b775`
-- verify the working tree is clean
-- verify no newer HPE PR has already landed
-- verify PR4a tests are green before PR4b work begins
-- keep the standing no-paid-call and default-off rules in force
+PR #102 pre-handoff head: `c793ccaeb5d6ef2f62c55ab9b0ff5010c18c182b`
 
-Canonical PR4a verifier expectation:
-- fail-closed expected-commit check
-- clean-authority verification enabled
-- result remains `not_verified` until later artifacts exist
+PR #102 base: `064b8e3db51c8dbd726cf1156a747dae1f23b7ea`
 
-Next work item:
-- PR4b only: controlled-proof operationalization and real provider-free evidence run
+## Where we are
 
-Do not:
-- implement PR4b through PR4d in this session
-- change runtime code unless the next task explicitly requires it
-- make provider calls
-- generate media
-- publish
-- alter approvals, retries, reconciliation, or queue state
-- merge anything
+- The bounded autonomous approved-queue publisher is merged on `main`.
+- The agentic, policy-bound core remains intact.
+- Autonomous publishing remains disabled by checked-in policy.
+- No scheduler jobs are enabled.
+- No provider calls or publish calls occurred in PR #101 or PR #102 development.
+- PR #102 removes temporary-worktree and hardcoded-interpreter bindings from the three Windows slot wrappers.
+- PR #102 adds a root-explicit, cross-platform, provider-free and publish-free readiness gate.
+- PR #102 makes Meta configuration inspection root-aware and tightens wrapper validation.
+- PR #102 does not redesign the system, enable autonomy, install scheduling, verify live credentials, or publish.
 
-Sequence after PR4b:
-1. PR4b: operationalize and execute the existing provider-free controlled-proof tool; produce and independently validate the first real controlled-proof artifact
-2. PR4c: controlled live semantic proof receipt; ordinary-lane proof; paid call only with explicit human authorization; no publishing
-3. PR4d: final operator documentation; human evidence-review recording; final closure declaration guard
-4. Post-merge closure confirmation: final CI confirmation; independent verifier run; only then permit `HPE_COMPLETE`
+## PR #102 scope before this handoff update
 
-Advisory cleanup:
-- `build_closure_report_from_proof` is dead, fail-closed compatibility code
-- its removal or explicit deprecation labeling is a later cleanup
-- it is not a blocker for PR4b
+- 10 changed files
+- `1234 insertions(+), 42 deletions(-)`
+- readiness tests: `4 passed`
+- affected slice: `21 passed, 1 skipped`
+- full suite: `985 passed, 4 skipped`
+- `compileall`: passed
+- `git diff --check`: passed
+- GitHub `build`: passed
+- GitHub `main_ci_check`: passed
 
+This handoff-file update adds `next_session_start.md` to the PR, so re-check the final changed-file count, diff stat, head SHA, and CI before changing PR state.
 
+## HPE status
 
+- The provider-free controlled-proof operation was completed and documented in merged PR #100.
+- Later HPE closure conditions remain intentionally unverified.
+- Current aggregate HPE closure status remains `not_verified`.
+- Do not reopen or expand HPE work unless explicitly requested.
+
+## Start-of-session checks
+
+1. Fetch `origin`.
+2. Verify `origin/main` is still at or ahead of `064b8e3db51c8dbd726cf1156a747dae1f23b7ea`.
+3. Verify PR #102 is still open and based on `main`.
+4. Verify the PR head contains only the readiness slice plus this handoff update.
+5. Verify the worktree is clean and the local branch matches the remote branch.
+6. Verify `build` and `main_ci_check` are green on the final PR head.
+7. Verify no new review comments, requested changes, or concurrent commits appeared.
+8. Verify autonomous policy remains disabled.
+
+## Next action
+
+Finish PR #102 only:
+
+1. Reconfirm the final file list and diff stat after this handoff update.
+2. Re-run only checks required because this markdown file changed; do not invent new implementation work.
+3. If the final head is clean, CI is green, and no review blockers exist, mark PR #102 ready for review.
+4. Merge PR #102 using the exact expected head SHA after the final merge gate passes.
+5. After merge, confirm `origin/main`, policy-disabled status, and zero provider/publish calls.
+
+## Do not
+
+- add features or redesign architecture
+- create another readiness or hardening PR
+- enable autonomous publishing
+- install or enable scheduler jobs
+- perform live credential verification
+- make network, provider, image-generation, or publish calls
+- modify queue, claim, receipt, post-log, approval, or retry state
+- reopen completed HPE work
+- alter PR #64
+- broaden PR #102 beyond its current readiness scope
+
+## Finish line
+
+PR #102 is complete when its current readiness changes and this handoff update are merged to `main` with green checks. No additional engineering phase is implied by this file.
