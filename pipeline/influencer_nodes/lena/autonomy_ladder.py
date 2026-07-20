@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +11,12 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 CONTRACT_PATH = ROOT / "pipeline" / "influencer_nodes" / "lena" / "autonomy_ladder_v1.json"
 LEVELS = (0, 1, 2, 3, 4, 5)
+LEVEL_3_POLICY_ID = "lena_approved_queue_auto_publisher_policy_v2_8"
+LEVEL_3_POLICY_VERSION = "v2.8.0"
+LEVEL_3_POLICY_PATH = Path("pipeline/influencer_nodes/lena/approved_queue_auto_publisher_policy_v2_8.json")
+LEVEL_3_APPROVED_SLOTS = ("morning", "afternoon", "evening")
+LEVEL_3_APPROVED_PLATFORMS = ("Facebook Page", "Instagram Feed")
+LEVEL_3_REQUIRED_LIVE_FLAGS = ("--i-understand-this-can-publish", "--live")
 
 
 class AutonomyLadderError(RuntimeError):
@@ -66,6 +75,134 @@ def _require(condition: bool, code: str, detail: str) -> None:
         raise AutonomyLadderError(code, detail)
 
 
+def _resolve_repo_relative_path(raw: str) -> Path:
+    path = Path(str(raw).replace("\\", "/").strip())
+    _require(bool(str(path).strip()), "contract_invalid", "level 3 authority must define a policy_path")
+    resolved = path if path.is_absolute() else (ROOT / path)
+    try:
+        resolved = resolved.resolve(strict=False)
+    except OSError as exc:
+        raise AutonomyLadderError("contract_invalid", f"level 3 authority policy_path is not resolvable: {raw!r}: {exc}") from exc
+    try:
+        resolved.relative_to(ROOT)
+    except ValueError as exc:
+        raise AutonomyLadderError("contract_invalid", f"level 3 authority policy_path must stay within the repository root: {raw!r}") from exc
+    return resolved
+
+
+def _is_git_ancestor(repo_root: Path, ancestor_commit: str, descendant_commit: str) -> bool:
+    try:
+        process = subprocess.Popen(
+            ["git", "merge-base", "--is-ancestor", ancestor_commit, descendant_commit],
+            cwd=str(repo_root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        _stdout, _stderr = process.communicate()
+        return process.returncode == 0
+    except Exception:
+        return False
+
+
+def _policy_required_set(values: list[Any] | tuple[Any, ...] | set[Any]) -> set[str]:
+    return {str(value).strip() for value in values if str(value).strip()}
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sha256_normalized_text_file(path: Path) -> str:
+    text = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _validate_level_three_authority(binding: dict[str, Any]) -> dict[str, Any]:
+    _require(isinstance(binding, dict), "contract_invalid", "level 3 authority must be a JSON object")
+    policy_path_raw = binding.get("policy_path")
+    _require(isinstance(policy_path_raw, str) and policy_path_raw.strip(), "contract_invalid", "level 3 authority must define policy_path")
+    policy_path = _resolve_repo_relative_path(policy_path_raw)
+    _require(policy_path.is_file(), "level_3_policy_missing", f"level 3 authority policy does not exist: {policy_path}")
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise AutonomyLadderError("level_3_policy_malformed", f"level 3 authority policy is not valid JSON: {policy_path}: {exc}") from exc
+    if not isinstance(policy, dict):
+        raise AutonomyLadderError("level_3_policy_malformed", f"level 3 authority policy must be a JSON object: {policy_path}")
+
+    expected_sha = binding.get("policy_sha256")
+    _require(isinstance(expected_sha, str) and expected_sha.strip(), "contract_invalid", "level 3 authority must define policy_sha256")
+    actual_sha = _sha256_normalized_text_file(policy_path)
+    _require(expected_sha.lower() == actual_sha.lower(), "level_3_policy_unauthorized", "level 3 authority policy_sha256 must match the bound policy artifact")
+
+    _require(policy.get("policy_id") == LEVEL_3_POLICY_ID, "level_3_policy_unauthorized", "level 3 authority policy_id must match the approved queue publisher policy")
+    _require(policy.get("policy_version") == LEVEL_3_POLICY_VERSION, "level_3_policy_unauthorized", "level 3 authority policy_version must remain v2.8.0")
+    _require(policy.get("repository_name") == "delapilena-max/lenadelapi_website", "level_3_policy_unauthorized", "level 3 authority policy must bind the Lena repository")
+    _require(policy.get("autonomous_mode") == "scheduled_autonomous", "level_3_policy_unauthorized", "level 3 authority policy must describe the scheduled autonomous mode")
+    _require(policy.get("autonomous_enabled") is True, "level_3_policy_disabled", "level 3 authority policy must be enabled")
+    _require(policy.get("autonomous_enabled_by_default") is False, "level_3_policy_unauthorized", "level 3 authority policy must remain disabled by default")
+    _require(policy.get("autonomous_policy_state") == "enabled", "level_3_policy_unauthorized", "level 3 authority policy state must be enabled")
+    _require(policy.get("manual_live_mode_unchanged") is True, "level_3_policy_unauthorized", "manual-live behavior must remain unchanged")
+    _require(policy.get("autonomous_mode_requires_distinct_policy_gate") is True, "level_3_policy_unauthorized", "scheduled autonomous mode must require a distinct policy gate")
+    _require(policy.get("require_queue_build_before_first_publish_slot") is True, "level_3_policy_unauthorized", "queue build must be required before the first publish slot")
+    _require(policy.get("require_clean_export_revalidation") is True, "level_3_policy_unauthorized", "clean-export revalidation must be required")
+    _require(policy.get("require_atomic_queue_claim") is True, "level_3_policy_unauthorized", "atomic queue claim must be required")
+    _require(policy.get("require_platform_receipts") is True, "level_3_policy_unauthorized", "platform receipts must be required")
+    _require(policy.get("require_idempotent_post_log_sync") is True, "level_3_policy_unauthorized", "idempotent post-log sync must be required")
+    _require(policy.get("allow_replies") is False, "level_3_policy_unauthorized", "replies must remain disabled")
+    _require(policy.get("allow_dms") is False, "level_3_policy_unauthorized", "DMs must remain disabled")
+    _require(policy.get("allow_outreach") is False, "level_3_policy_unauthorized", "outreach must remain disabled")
+    _require(_policy_required_set(policy.get("approved_slots", [])) == set(LEVEL_3_APPROVED_SLOTS), "level_3_policy_unauthorized", "approved_slots must be morning, afternoon, and evening")
+    _require(int(policy.get("hard_item_limit_per_invocation", 0)) == 1, "level_3_policy_unauthorized", "hard_item_limit_per_invocation must be one")
+    _require(int(policy.get("queue_claim_lease_seconds", 0)) > 0, "level_3_policy_unauthorized", "queue_claim_lease_seconds must be positive")
+    _require(int(policy.get("max_attempts_per_row", 0)) > 0, "level_3_policy_unauthorized", "max_attempts_per_row must be positive")
+    _require(_policy_required_set(policy.get("autonomous_queue_platforms", [])) == set(LEVEL_3_APPROVED_PLATFORMS), "level_3_policy_unauthorized", "autonomous_queue_platforms must remain Instagram Feed and Facebook Page only")
+    _require(policy.get("live_posting_requires_explicit_flags") is True, "level_3_policy_unauthorized", "live posting must require explicit flags")
+    _require(_policy_required_set(policy.get("required_live_flags", [])) == set(LEVEL_3_REQUIRED_LIVE_FLAGS), "level_3_policy_unauthorized", "required live flags must remain --live and --i-understand-this-can-publish")
+
+    expires_raw = str(policy.get("policy_expires_at_utc") or "").strip()
+    _require(bool(expires_raw), "level_3_policy_expiry_missing", "level 3 authority policy_expires_at_utc is required")
+    try:
+        expiry = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise AutonomyLadderError("level_3_policy_expiry_malformed", f"level 3 authority policy_expires_at_utc is not valid ISO-8601 UTC: {expires_raw!r}: {exc}") from exc
+    if expiry.tzinfo is None:
+        raise AutonomyLadderError("level_3_policy_expiry_malformed", "level 3 authority policy_expires_at_utc must be timezone-aware UTC")
+    if expiry.astimezone(timezone.utc) <= datetime.now(timezone.utc):
+        raise AutonomyLadderError("level_3_policy_expired", f"level 3 authority policy has expired at {expires_raw}")
+
+    authority_version = str(binding.get("authority_version") or "").strip()
+    _require(authority_version == "main", "level_3_policy_unauthorized", "level 3 authority must remain bound to authority_version=main")
+    authority_commit = str(binding.get("authority_commit") or "").strip()
+    _require(bool(authority_commit), "level_3_policy_unauthorized", "level 3 authority must define authority_commit")
+    _require(str(policy.get("authority_commit") or "").strip() == authority_commit, "level_3_policy_unauthorized", "level 3 authority commit must match the approved policy artifact")
+    _require(_is_git_ancestor(ROOT, authority_commit, _git_head(ROOT)), "level_3_policy_stale", "level 3 authority policy commit must be an ancestor of the current repository head")
+
+    return policy
+
+
+def _git_head(repo_root: Path) -> str:
+    try:
+        process = subprocess.Popen(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(repo_root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        stdout, _stderr = process.communicate()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, ["git", "rev-parse", "HEAD"], output=stdout)
+        return stdout.strip()
+    except Exception as exc:
+        raise AutonomyLadderError("contract_invalid", f"unable to read repository head for level 3 policy validation: {repo_root}") from exc
+
+
 def _validate_level(level: dict[str, Any], number: int) -> None:
     _require(level.get("level") == number, "contract_invalid", f"level {number} is malformed")
     _require(isinstance(level.get("name"), str) and level["name"].strip(), "contract_invalid", f"level {number} must have a name")
@@ -87,7 +224,7 @@ def _validate_contract(payload: dict[str, Any]) -> None:
 
     publish_freeze = payload.get("publish_freeze")
     _require(isinstance(publish_freeze, dict), "contract_invalid", "publish_freeze must be a JSON object")
-    _require(publish_freeze.get("active") is True, "contract_invalid", "publish_freeze must remain active")
+    _require(isinstance(publish_freeze.get("active"), bool), "contract_invalid", "publish_freeze active flag must be boolean")
     _require(isinstance(publish_freeze.get("scope"), str) and publish_freeze["scope"].strip(), "contract_invalid", "publish_freeze scope is missing")
     _require(isinstance(publish_freeze.get("frozen_surfaces"), list), "contract_invalid", "publish_freeze frozen_surfaces must be a list")
 
@@ -121,11 +258,28 @@ def _validate_contract(payload: dict[str, Any]) -> None:
         _require(level.get("status") == "active", "contract_invalid", f"level {number} must remain active")
 
     level3 = by_number[3]
-    _require(level3.get("enabled") is False, "contract_invalid", "level 3 must remain disabled while publish freeze is active")
-    _require(level3.get("status") == "frozen_real_mode", "contract_invalid", "level 3 must remain a frozen real mode")
-    _require(level3.get("future_placeholder") is False, "contract_invalid", "level 3 must not be a future placeholder")
-    _require(level3.get("disabled_by_publish_freeze") is True, "contract_invalid", "level 3 must be disabled by publish freeze")
-    _require(level3.get("disabled_reason") == "publish_freeze_active", "contract_invalid", "level 3 disable reason must remain publish_freeze_active")
+    if publish_freeze.get("active") is True:
+        _require(level3.get("enabled") is False, "contract_invalid", "level 3 must remain disabled while publish freeze is active")
+        _require(level3.get("status") == "frozen_real_mode", "contract_invalid", "level 3 must remain a frozen real mode")
+        _require(level3.get("future_placeholder") is False, "contract_invalid", "level 3 must not be a future placeholder")
+        _require(level3.get("disabled_by_publish_freeze") is True, "contract_invalid", "level 3 must be disabled by publish freeze")
+        _require(level3.get("disabled_reason") == "publish_freeze_active", "contract_invalid", "level 3 disable reason must remain publish_freeze_active")
+    else:
+        _require(level3.get("enabled") is True, "contract_invalid", "level 3 must be enabled when publish freeze is lifted")
+        _require(level3.get("status") == "active", "contract_invalid", "level 3 must be active when publish freeze is lifted")
+        _require(level3.get("future_placeholder") is False, "contract_invalid", "level 3 must not be a future placeholder")
+        _require(level3.get("disabled_by_publish_freeze") is False, "contract_invalid", "level 3 must no longer be disabled by publish freeze")
+        _require(not str(level3.get("disabled_reason", "")).strip(), "contract_invalid", "level 3 disable reason must be removed when publish freeze is lifted")
+        binding = payload.get("level_3_authority")
+        policy = _validate_level_three_authority(binding)
+        _require(isinstance(binding, dict), "contract_invalid", "level 3 must define a level_3_authority binding")
+        _require(binding.get("policy_id") == policy.get("policy_id"), "contract_invalid", "level 3 authority policy_id must match the policy artifact")
+        _require(binding.get("policy_version") == policy.get("policy_version"), "contract_invalid", "level 3 authority policy_version must match the policy artifact")
+        _require(
+            binding.get("policy_path") == LEVEL_3_POLICY_PATH.as_posix(),
+            "contract_invalid",
+            "level 3 authority policy_path must be repository-relative and normalized",
+        )
 
     for number in (4, 5):
         level = by_number[number]
@@ -142,6 +296,8 @@ def load_contract() -> dict[str, Any]:
 def contract_summary(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     contract = payload if payload is not None else load_contract()
     levels = contract.get("levels", [])
+    level_3 = next((level for level in levels if isinstance(level, dict) and level.get("level") == 3), {})
+    level_3_authority = contract.get("level_3_authority", {}) if isinstance(contract.get("level_3_authority", {}), dict) else {}
     active_levels = [
         int(level.get("level"))
         for level in levels
@@ -153,9 +309,10 @@ def contract_summary(payload: dict[str, Any] | None = None) -> dict[str, Any]:
         "schema_version": contract.get("schema_version"),
         "publish_freeze_active": bool(contract.get("publish_freeze", {}).get("active")),
         "active_levels": active_levels,
-        "level_3_disabled_by_publish_freeze": bool(
-            next((level for level in levels if isinstance(level, dict) and level.get("level") == 3), {}).get("disabled_by_publish_freeze")
-        ),
+        "level_3_enabled": bool(level_3.get("enabled")),
+        "level_3_disabled_by_publish_freeze": bool(level_3.get("disabled_by_publish_freeze")),
+        "level_3_authority_policy_id": level_3_authority.get("policy_id", ""),
+        "level_3_authority_policy_path": level_3_authority.get("policy_path", ""),
     }
 
 

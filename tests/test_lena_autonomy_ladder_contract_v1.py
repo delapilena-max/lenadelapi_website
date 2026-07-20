@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / "pipeline" / "influencer_nodes" / "lena" / "autonomy_ladder_v1.json"
+POLICY = ROOT / "pipeline" / "influencer_nodes" / "lena" / "approved_queue_auto_publisher_policy_v2_8.json"
 
 
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def _normalized_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
 def _level(levels: list[dict], number: int) -> dict:
@@ -23,8 +29,8 @@ def test_ladder_contract_parses_and_defines_six_levels() -> None:
     assert payload["schema_version"] == "lena_autonomy_ladder_v1"
     assert payload["node_name"] == "Lena"
     assert payload["node_role"] == "Node 1 of the autonomous media engine"
-    assert payload["publish_freeze"]["active"] is True
-    assert "publish paths remain frozen" in payload["publish_freeze"]["scope"]
+    assert payload["publish_freeze"]["active"] is False
+    assert "approved autonomous publishing policy" in payload["publish_freeze"]["scope"]
     assert len(payload["levels"]) == 6
     assert [level["level"] for level in payload["levels"]] == [0, 1, 2, 3, 4, 5]
 
@@ -95,14 +101,19 @@ def test_levels_three_four_and_five_keep_posting_controlled_or_disabled() -> Non
     level4 = _level(payload["levels"], 4)
     level5 = _level(payload["levels"], 5)
 
+    assert payload["level_3_authority"]["policy_id"] == "lena_approved_queue_auto_publisher_policy_v2_8"
+    assert payload["level_3_authority"]["policy_path"] == "pipeline/influencer_nodes/lena/approved_queue_auto_publisher_policy_v2_8.json"
+    assert payload["level_3_authority"]["authority_version"] == "main"
+    assert payload["level_3_authority"]["policy_sha256"] == _normalized_sha256(POLICY)
     assert level3["future_placeholder"] is False
-    assert level3["disabled_by_publish_freeze"] is True
-    assert level3["disabled_reason"] == "publish_freeze_active"
+    assert level3["disabled_by_publish_freeze"] is False
+    assert "disabled_reason" not in level3
     assert "human-approved posting preparation" in level3["allowed_actions"]
     assert "connector dispatch after explicit human approval" in level3["allowed_actions"]
     assert "autonomous posting" in set(level3["forbidden_actions"])
-    assert level3["enabled"] is False
-    assert level3["status"] == "frozen_real_mode"
+    assert level3["enabled"] is True
+    assert level3["status"] == "active"
+    assert level3["name"] == "bounded_autonomous_posting"
     assert level3["required_artifacts"] == [
         "publish packet",
         "approved queue item",
@@ -115,6 +126,7 @@ def test_levels_three_four_and_five_keep_posting_controlled_or_disabled() -> Non
         "per_item_or_batch_approval_required": True,
         "separate_from_generation_approval": True,
     }
+    assert level3["failure_handling"][0] == "require approved autonomous policy binding before autonomous publishing"
     assert level3["failure_handling"][-1] == "never infer posting approval from generation approval"
 
     for level in (level4, level5):
