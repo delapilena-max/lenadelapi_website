@@ -381,7 +381,7 @@ def evaluate_generated_asset_qa_lifecycle(
         autonomy_ladder.assert_allowed(
             "lena_run_generated_asset_qa_v1",
             level=2,
-            action="QA disposition orchestration",
+            action="QA disposition",
         )
     except autonomy_ladder.AutonomyLadderError as exc:
         raise GeneratedAssetQaLifecycleError(exc.code, exc.detail) from exc
