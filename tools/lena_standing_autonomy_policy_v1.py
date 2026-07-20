@@ -626,6 +626,7 @@ def validate_cycle_authorization_artifact(
     policy_result: dict[str, Any] | None = None,
     handoff_report: dict[str, Any] | None = None,
     allow_consumed: bool = False,
+    require_not_expired: bool = True,
 ) -> dict[str, Any]:
     auth_path = _ensure_path_within_root(
         auth_path,
@@ -689,8 +690,13 @@ def validate_cycle_authorization_artifact(
     _require(str(auth.get("cycle_id") or "").strip(), "cycle_id_missing", "cycle_id is required")
     _require(str(auth.get("date") or "").strip(), "date_missing", "date is required")
     _require(str(auth.get("slot_id") or "").strip(), "slot_id_missing", "slot_id is required")
+    issued_at = _validate_iso_datetime(str(auth.get("issued_at_utc") or ""), code="authorization_issued_at_invalid", label="issued_at_utc")
     expiry = _validate_iso_datetime(str(auth.get("expires_at_utc") or ""), code="authorization_expiry_invalid", label="expires_at_utc")
-    _require(expiry > _now_utc(), "authorization_expired", "authorization has expired")
+    _require(expiry > issued_at, "authorization_expiry_order_invalid", "expires_at_utc must be after issued_at_utc")
+    if require_not_expired:
+        _require(expiry > _now_utc(), "authorization_expired", "authorization has expired")
+    else:
+        _require(allow_consumed is True, "authorization_historical_mode_invalid", "historical expiry bypass requires allow_consumed=True")
     expected_output_directory = _ensure_path_within_root(
         Path(str(auth.get("expected_output_directory") or "")),
         ROOT / "pipeline" / "higgsfield_library" / "lena",
