@@ -142,6 +142,7 @@ HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.10"
 DEFAULT_LENA_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 CONFIRMED_LENA_SOUL_NAME = "Lena"
 CONFIRMED_LENA_SOUL_TYPE = "Soul 2.0"
+CONFIRMED_LENA_CLI_SOUL_TYPE = "soul_2"
 
 # Exact count_per_pack used to generate the accepted 2026-07-09 readiness
 # pack (library_prefix="readypack0709", packs=12, count_per_pack=10). This
@@ -1109,11 +1110,24 @@ def _rebuild_packet_prompt_source(
         pose_body_language_id = cand.get("pose_body_language_id")
         expression_gaze_id = cand.get("expression_gaze_id")
         expression_gaze_label = cand.get("expression_gaze_label")
+        pose_body_language_label = cand.get("pose_body_language_label") or cand.get("pose")
         _require_handoff(
             pose_body_language_id,
             "handoff_candidate_pose_missing",
             f"candidate artifact {candidate_path} is missing required pose_body_language_id",
         )
+        _require_handoff(
+            pose_body_language_label,
+            "handoff_candidate_pose_label_missing",
+            f"candidate artifact {candidate_path} is missing required pose label",
+        )
+        _require_handoff(
+            expression_gaze_id and expression_gaze_label,
+            "handoff_candidate_expression_missing",
+            f"candidate artifact {candidate_path} is missing required expression_gaze provenance",
+        )
+    else:
+        pose_body_language_label = None
 
     # Derive wardrobe name and silhouette class from the catalog.
     wardrobe_outfit_id = packet_report.get("wardrobe_outfit_id")
@@ -1142,9 +1156,7 @@ def _rebuild_packet_prompt_source(
             "wardrobe_silhouette_class": wardrobe_silhouette_class,
             "environment_id": packet_report.get("environment_id"),
             "pose_body_language_id": pose_body_language_id,
-            "pose_body_language_label": (
-                packet_report.get("high_caliber_source_sections", {}).get("subject_pose", "")
-            ),
+            "pose_body_language_label": pose_body_language_label,
             "expression_gaze_id": expression_gaze_id,
             "expression_gaze_label": expression_gaze_label,
             "effective_wardrobe_silhouette_class": wardrobe_silhouette_class,
@@ -1365,7 +1377,7 @@ def build_manifest(
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "custom_reference_id": custom_reference_id,
         "cli_soul_name": CONFIRMED_LENA_SOUL_NAME,
-        "cli_soul_type": CONFIRMED_LENA_SOUL_TYPE,
+        "cli_soul_type": CONFIRMED_LENA_CLI_SOUL_TYPE,
         "aspect_ratio": HIGGSFIELD_ASPECT_RATIO,
         "prompt_sha256": hashlib.sha256(prompt_bytes).hexdigest(),
         "prompt_length": len(prompt),
@@ -1726,6 +1738,17 @@ def main() -> int:
         try:
             report, source, packet_validation, validation = _validate_handoff_packet(args.handoff_artifact)
         except HandoffArtifactError as exc:
+            if live and args.approval_artifact is None and exc.code in {
+                "handoff_candidate_pose_missing",
+                "handoff_candidate_pose_label_missing",
+                "handoff_candidate_expression_missing",
+            }:
+                print(
+                    "[ABORT] --live with --handoff-artifact requires a valid "
+                    "--approval-artifact. The handoff remains review-only and is never "
+                    "rewritten into live authorization."
+                )
+                return 1
             print(f"[ABORT] {exc.code}: {exc.detail}")
             return 1
         except reconciliation_contract.ReconciliationContractError as exc:

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,8 @@ from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as read
 SCHEMA_VERSION = "lena_higgsfield_retry_handoff_v1"
 REPORT_TYPE = "lena_higgsfield_retry_handoff"
 RETRY_PURPOSE = "framing_mirror_vanity_contract_repair"
+BACKGROUND_RETRY_PURPOSE = RETRY_PURPOSE
+HAIR_CROWN_RETRY_PURPOSE = "hair_crown_forelock_contract_repair"
 FINAL_ACTION = "prepare_higgsfield_retry_handoff_dry_run_for_review"
 DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "retry_handoffs"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -51,6 +54,30 @@ RETRY_TECHNICAL_APPEND = (
     " Keep the successful face, skin, red dress neckline, and clean anatomy. No fake freckles or poreless/plastic "
     "skin. Keep established Lena identity/body authority; slightly fuller is okay, not a hard gate."
 )
+HAIR_CROWN_CONSTRAINT = (
+    "Lena's hair has realistic natural root direction and lies smoothly across the crown with a low, "
+    "relaxed top silhouette and normal soft volume. No raised forelock, no vertical crown tuft, no "
+    "rooster-like crest, no exaggerated crown lift, and no isolated upward-pointing clump of hair."
+)
+HAIR_CROWN_PRESERVES = [
+    "face and Lena identity",
+    "apparent age",
+    "skin and freckles",
+    "body and proportions",
+    "hair color",
+    "hair length",
+    "general hair texture",
+    "wardrobe",
+    "environment",
+    "scene",
+    "pose",
+    "expression",
+    "gaze",
+    "framing",
+    "camera treatment",
+    "lighting",
+    "composition",
+]
 
 
 class RetryHandoffError(RuntimeError):
@@ -113,6 +140,41 @@ def _retry_slot_id(original_slot_id: str) -> str:
     if not match:
         raise RetryHandoffError("slot_invalid", f"original slot_id does not end with -photo/-video: {original_slot_id}")
     return f"{match.group('prefix')}-retry01-{match.group('media_type')}"
+
+
+def resolve_current_lena_soul(cli_runner=subprocess.run) -> dict[str, str]:
+    completed = cli_runner(
+        ["higgsfield", "soul-id", "list", "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RetryHandoffError("soul_resolution_failed", str(completed.stderr or completed.stdout or "").strip())
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RetryHandoffError("soul_resolution_malformed", "higgsfield soul-id list did not return JSON") from exc
+    if not isinstance(payload, list):
+        raise RetryHandoffError("soul_resolution_malformed", "higgsfield soul-id list JSON must be a list")
+    matches = [
+        item for item in payload
+        if isinstance(item, dict)
+        and item.get("name") == "Lena"
+        and item.get("type") == "soul_2"
+        and item.get("status") == "completed"
+        and isinstance(item.get("id"), str)
+        and item["id"].strip()
+    ]
+    if len(matches) != 1:
+        raise RetryHandoffError("soul_resolution_ambiguous", f"expected exactly one completed Lena/soul_2 match, got {len(matches)}")
+    item = matches[0]
+    return {
+        "id": item["id"],
+        "name": item["name"],
+        "type": item["type"],
+        "status": item["status"],
+    }
 
 
 def retry_handoff_artifact_path(
@@ -243,11 +305,21 @@ def _build_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, 
     return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
 
 
+def _build_hair_crown_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, str]:
+    if HAIR_CROWN_CONSTRAINT in original_prompt:
+        raise RetryHandoffError("retry_prompt_already_mutated", "original prompt already contains the hair-crown correction")
+    retry_prompt = f"{original_prompt} {HAIR_CROWN_CONSTRAINT}"
+    _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
+    return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
+
+
 def build_retry_handoff(
     *,
     handoff_artifact: Path,
     execution_receipt: Path,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
+    reason_code: str | None = None,
+    soul_record: dict[str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     handoff_facts = approval_contract.inspect_handoff_artifact(handoff_artifact)
     handoff_report = handoff_facts["report"]
@@ -271,7 +343,57 @@ def build_retry_handoff(
         execution_receipt.resolve(),
         handoff_facts,
     )
-    retry_prompt, retry_prompt_sha = _build_retry_prompt(original_prompt, prompt_budget)
+    hair_retry = reason_code == "hair_crown_forelock_artifact"
+    if hair_retry:
+        retry_prompt, retry_prompt_sha = _build_hair_crown_retry_prompt(original_prompt, prompt_budget)
+        retry_purpose = HAIR_CROWN_RETRY_PURPOSE
+        retry_constraints = {
+            "correction_scope": "hair_only",
+            "added_constraint": HAIR_CROWN_CONSTRAINT,
+            "preserve": list(HAIR_CROWN_PRESERVES),
+            "only_hair_crown_defect_may_change": True,
+        }
+        prompt_mutation = {
+            "mode": "append_allowlisted_hair_crown_constraint",
+            "mutation_type": "correct_hair_crown_forelock",
+            "preserved_fields": list(HAIR_CROWN_PRESERVES),
+        }
+    else:
+        retry_prompt, retry_prompt_sha = _build_retry_prompt(original_prompt, prompt_budget)
+        retry_purpose = BACKGROUND_RETRY_PURPOSE
+        retry_constraints = {
+            "framing": "chest_up_or_waist_up_only",
+            "exclude_regions": ["hips", "thighs", "dress_hemline"],
+            "mirror_edge_required": True,
+            "required_action": "actively_adjusting_one_earring",
+            "vanity_composition_required": True,
+            "visible_device_screens_forbidden": True,
+            "foreground_phone_forbidden": True,
+            "direct_full_torso_portrait_forbidden": True,
+            "preserve_face_skin_dress_lighting_anatomy": True,
+            "body_thickness_hard_gate": False,
+            "mild_fullness_preference": True,
+        }
+        prompt_mutation = {
+            "mode": "section_rewrite_preserving_subject_and_lighting_identity",
+            "replaced_sections": ["Action", "Environment", "Cinematography", "Technical"],
+            "preserved_sections": ["Subject", "Lighting/Style"],
+        }
+    if hair_retry:
+        soul = soul_record or resolve_current_lena_soul()
+        _require(soul.get("name") == "Lena", "soul_name_mismatch", "retry Soul name must be Lena")
+        _require(soul.get("type") == "soul_2", "soul_type_mismatch", "retry Soul type must be soul_2")
+        _require(soul.get("status") == "completed", "soul_status_mismatch", "retry Soul status must be completed")
+        _require(bool(str(soul.get("id") or "").strip()), "soul_id_missing", "retry Soul id is required")
+        custom_reference_id = soul["id"]
+        soul_name = soul["name"]
+        soul_type = soul["type"]
+        retry_soul_binding: dict[str, str] | None = dict(soul)
+    else:
+        custom_reference_id = handoff_facts["custom_reference_id"]
+        soul_name = str(handoff_report.get("structured_executor_inputs", {}).get("soul_metadata", {}).get("name") or "Lena")
+        soul_type = str(handoff_report.get("structured_executor_inputs", {}).get("soul_metadata", {}).get("type") or "")
+        retry_soul_binding = None
     retry_prompt_length = len(retry_prompt)
     retry_prompt_headroom = prompt_budget - retry_prompt_length
     _require(
@@ -293,7 +415,8 @@ def build_retry_handoff(
         "retry_slot_id": retry_slot_id,
         "retry_attempt": 1,
         "retry_cap": 1,
-        "retry_purpose": RETRY_PURPOSE,
+        "retry_purpose": retry_purpose,
+        "reason_code": reason_code or "background_identity_duplication",
         "source_handoff_artifact_path": handoff_facts["handoff_repo_path"],
         "source_handoff_artifact_sha256": handoff_facts["handoff_sha256"],
         "source_selected_prompt_input_artifact_path": repo_relative_path(packet_path),
@@ -315,27 +438,13 @@ def build_retry_handoff(
         "executor": approval_contract.APPROVAL_EXECUTOR,
         "model": approval_contract.MODEL,
         "aspect_ratio": approval_contract.ASPECT_RATIO,
-        "custom_reference_id": handoff_facts["custom_reference_id"],
-        "soul_name": handoff_facts["soul_name"],
-        "soul_type": handoff_facts["soul_type"],
-        "retry_constraints": {
-            "framing": "chest_up_or_waist_up_only",
-            "exclude_regions": ["hips", "thighs", "dress_hemline"],
-            "mirror_edge_required": True,
-            "required_action": "actively_adjusting_one_earring",
-            "vanity_composition_required": True,
-            "visible_device_screens_forbidden": True,
-            "foreground_phone_forbidden": True,
-            "direct_full_torso_portrait_forbidden": True,
-            "preserve_face_skin_dress_lighting_anatomy": True,
-            "body_thickness_hard_gate": False,
-            "mild_fullness_preference": True,
-        },
-        "prompt_mutation": {
-            "mode": "section_rewrite_preserving_subject_and_lighting_identity",
-            "replaced_sections": ["Action", "Environment", "Cinematography", "Technical"],
-            "preserved_sections": ["Subject", "Lighting/Style"],
-        },
+        "custom_reference_id": custom_reference_id,
+        "soul_name": soul_name,
+        "soul_type": soul_type,
+        "retry_soul_binding": retry_soul_binding,
+        "historical_custom_reference_id": handoff_facts["custom_reference_id"],
+        "retry_constraints": retry_constraints,
+        "prompt_mutation": prompt_mutation,
         "retry_prompt_text": retry_prompt,
         "retry_prompt_sha256": retry_prompt_sha,
         "retry_prompt_budget": prompt_budget,
@@ -375,7 +484,11 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
     _require(artifact.get("schema_version") == SCHEMA_VERSION, "wrong_schema_version", f"artifact schema_version must be {SCHEMA_VERSION!r}")
     _require(artifact.get("influencer_id") == "lena", "wrong_influencer", "artifact influencer_id must be 'lena'")
     _require(artifact.get("retry_attempt") == 1 and artifact.get("retry_cap") == 1, "retry_cap_invalid", "retry handoff retry attempt/cap must remain exactly 1/1")
-    _require(artifact.get("retry_purpose") == RETRY_PURPOSE, "retry_purpose_invalid", "retry_purpose is invalid")
+    _require(
+        artifact.get("retry_purpose") in {BACKGROUND_RETRY_PURPOSE, HAIR_CROWN_RETRY_PURPOSE},
+        "retry_purpose_invalid",
+        "retry_purpose is invalid",
+    )
     _require(artifact.get("final_action") == FINAL_ACTION, "final_action_invalid", "final_action is invalid")
     _require(artifact.get("provider_authorized") is False, "provider_authorized_invalid", "provider_authorized must remain false")
     _require(artifact.get("provider_called") is False, "provider_called_invalid", "provider_called must remain false")
@@ -414,10 +527,21 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         "original_prompt_sha_mismatch",
         "source_original_prompt_sha256 does not match the source handoff prompt sha",
     )
+    if artifact.get("reason_code") == "hair_crown_forelock_artifact":
+        soul = artifact.get("retry_soul_binding")
+        _require(isinstance(soul, dict), "retry_soul_binding_missing", "hair retry handoff must carry retry_soul_binding")
+        _require(soul.get("name") == "Lena", "soul_name_mismatch", "retry Soul name must be Lena")
+        _require(soul.get("type") == "soul_2", "soul_type_mismatch", "retry Soul type must be soul_2")
+        _require(soul.get("status") == "completed", "soul_status_mismatch", "retry Soul status must be completed")
+        _require(artifact.get("custom_reference_id") == soul.get("id"), "custom_reference_id_mismatch", "retry handoff custom_reference_id must match retry Soul id")
+        _require(artifact.get("soul_name") == soul.get("name"), "soul_name_mismatch", "retry handoff soul_name must match retry Soul binding")
+        _require(artifact.get("soul_type") == soul.get("type"), "soul_type_mismatch", "retry handoff soul_type must match retry Soul binding")
+    else:
+        _require(artifact.get("custom_reference_id") == handoff_facts["custom_reference_id"], "custom_reference_id_mismatch", "background retry handoff must preserve the source reference id")
     _require(
-        artifact.get("custom_reference_id") == handoff_facts["custom_reference_id"],
-        "custom_reference_id_mismatch",
-        "retry handoff custom_reference_id does not match the source handoff",
+        artifact.get("historical_custom_reference_id") == handoff_facts["custom_reference_id"],
+        "historical_reference_mismatch",
+        "retry handoff historical_custom_reference_id must preserve the source handoff reference",
     )
     _require(artifact.get("provider") == approval_contract.APPROVAL_PROVIDER, "provider_mismatch", "retry handoff provider is invalid")
     _require(artifact.get("executor") == approval_contract.APPROVAL_EXECUTOR, "executor_mismatch", "retry handoff executor is invalid")
@@ -515,10 +639,16 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         "retry_prompt_headroom_too_low",
         f"retry prompt headroom {retry_prompt_headroom} is below the hard block threshold {readiness_audit.PAYLOAD_HEADROOM_HARD_BLOCK_BELOW}",
     )
-    expected_prompt, _ = _build_retry_prompt(
-        str(handoff_facts["report"].get("structured_executor_inputs", {}).get("selected_prompt_text") or ""),
-        prompt_budget,
-    )
+    if artifact.get("reason_code") == "hair_crown_forelock_artifact":
+        expected_prompt, _ = _build_hair_crown_retry_prompt(
+            str(handoff_facts["report"].get("structured_executor_inputs", {}).get("selected_prompt_text") or ""),
+            prompt_budget,
+        )
+    else:
+        expected_prompt, _ = _build_retry_prompt(
+            str(handoff_facts["report"].get("structured_executor_inputs", {}).get("selected_prompt_text") or ""),
+            prompt_budget,
+        )
     _require(retry_prompt == expected_prompt, "retry_prompt_mutation_invalid", "retry_prompt_text does not match the canonical retry mutation")
     _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
     return artifact
@@ -548,11 +678,15 @@ def evaluate_retry_handoff(
     execution_receipt: Path,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     write_artifact: bool = False,
+    reason_code: str | None = None,
+    soul_record: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     path, artifact = build_retry_handoff(
         handoff_artifact=handoff_artifact,
         execution_receipt=execution_receipt,
         output_root=output_root,
+        reason_code=reason_code,
+        soul_record=soul_record,
     )
     state = "ready_for_executor_dry_run"
     if write_artifact:
@@ -599,6 +733,7 @@ def main() -> int:
     parser.add_argument("--execution-receipt", required=True, type=Path)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--write-artifact", action="store_true")
+    parser.add_argument("--reason-code")
     args = parser.parse_args()
     try:
         report = evaluate_retry_handoff(
@@ -606,6 +741,7 @@ def main() -> int:
             execution_receipt=args.execution_receipt,
             output_root=args.output_root,
             write_artifact=args.write_artifact,
+            reason_code=args.reason_code,
         )
     except RetryHandoffError as exc:
         print(json.dumps(_blocked_report(args.handoff_artifact, exc), sort_keys=True))

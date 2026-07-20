@@ -486,6 +486,62 @@ def evaluate_generated_asset_qa_lifecycle(
         reference_authority_sha256=identity_reference_authority_sha256,
         expected_image_sha256=_sha256_file(image_path),
     )
+    qa_inputs = qa_artifact.get("qa_inputs")
+    if isinstance(qa_inputs, dict) and qa_inputs.get("binding_error"):
+        return {
+            "report_type": LIFECYCLE_REPORT_TYPE,
+            "schema_version": LIFECYCLE_SCHEMA_VERSION,
+            "date": date_str,
+            "slot_id": slot_id,
+            "recipe_id": recipe_id,
+            "generated_at": iso_now(),
+            "qa_lifecycle_status": "qa_lifecycle_blocked_unbound",
+            "blocking_reasons": ["qa_binding_error"],
+            "live_generation_accounting_artifact": repo_relative_path(accounting_path),
+            "executor_result_manifest": repo_relative_path(manifest_path),
+            "generated_output_paths": {
+                "saved_image_path": repo_relative_path(image_path),
+                "manifest_path": repo_relative_path(manifest_path),
+            },
+            "generation_claim_artifact": repo_relative_path(claim_path),
+            "generation_receipt_artifact": repo_relative_path(receipt_path),
+            "qa_disposition_artifact": None,
+            "qa_inputs": {"binding_error": qa_inputs["binding_error"]},
+            "qa_status": str(qa_artifact.get("disposition") or "blocked"),
+            "retry_recommended": False,
+            "retry_decision_artifact": "",
+            "retry_handoff_artifact": "",
+            "publish_authorized": False,
+            "publish_performed": False,
+            "queue_mutated": False,
+            "next_allowed_action": str(qa_artifact.get("exact_next_allowed_action") or "review_generated_asset"),
+            "dirty_workspace_dependency": False,
+            "provider_call_performed": False,
+            "generation_performed": False,
+            "side_effect_flags": {
+                "provider_call_performed": False,
+                "generation_performed": False,
+                "qa_run": True,
+                "retry_executed": False,
+                "retry_handoff_written": False,
+                "publish_performed": False,
+                "queue_mutated": False,
+                "claims_written": False,
+                "receipts_written": False,
+                "approval_consumed": False,
+                "dirty_workspace_dependency": False,
+            },
+            "source_artifacts": {
+                "live_generation_accounting": _source_record(accounting_path, report_type=accounting_report.get("report_type"), schema_version=accounting_report.get("schema_version")),
+                "approval": _source_record(approval_artifact, report_type=approval_result.get("approval", {}).get("report_type"), schema_version=approval_result.get("approval", {}).get("schema_version")),
+                "executor_result_manifest": _source_record(manifest_path),
+                "generated_image": _source_record(image_path),
+                "generation_claim": _source_record(claim_path),
+                "generation_receipt": _source_record(receipt_path),
+            },
+            "linked_claim_artifact": actual_claim,
+            "linked_receipt_artifact": actual_receipt,
+        }
 
     qa_path, qa_written_artifact, _qa_was_written = qa_disposition.write_disposition_artifact(qa_artifact, output_root=qa_output_root)
     qa_status = str(qa_written_artifact.get("disposition") or qa_artifact.get("disposition") or "blocked")

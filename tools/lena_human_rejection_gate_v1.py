@@ -88,10 +88,21 @@ def _validate_artifact(
         raise HumanRejectionGateError("human rejection artifact date/slot binding does not match this item")
     if artifact.get("image_sha256") != image_sha:
         raise HumanRejectionGateError("human rejection artifact image_sha256 does not match the current media bytes")
-    if artifact.get("operator_reason") != EXACT_REASON:
-        raise HumanRejectionGateError("human rejection artifact operator_reason does not match the exact required reason")
-    if artifact.get("classification") != CLASSIFICATION:
+    from tools import lena_record_human_rejection_v1 as rejection_record  # noqa: E402
+
+    try:
+        contract = rejection_record.correction_contract_for_reason(
+            str(artifact.get("operator_reason") or ""),
+            str(artifact.get("reason_code") or "") or None,
+        )
+    except rejection_record.RejectionError as exc:
+        raise HumanRejectionGateError(f"human rejection artifact correction contract is invalid: {exc}") from exc
+    if artifact.get("classification") != contract["classification"]:
         raise HumanRejectionGateError("human rejection artifact classification is invalid")
+    if artifact.get("mutation_type") != contract["mutation_type"]:
+        raise HumanRejectionGateError("human rejection artifact mutation_type is invalid")
+    if artifact.get("correction_scope") != contract["correction_scope"]:
+        raise HumanRejectionGateError("human rejection artifact correction_scope is invalid")
     if artifact.get("retryable") is not True:
         raise HumanRejectionGateError("human rejection artifact retryable must be true")
     if artifact.get("retry_attempt") != 1 or artifact.get("retry_cap") != 1:
@@ -121,14 +132,25 @@ def _validate_artifact(
         raise HumanRejectionGateError("QA disposition image_path does not match the current media path")
     if qa.get("image_sha256") != image_sha:
         raise HumanRejectionGateError("QA disposition image_sha256 does not match the current media bytes")
-    if qa.get("disposition") != "accept":
-        raise HumanRejectionGateError("QA disposition is not accepted")
-    if qa.get("reviewer_type") != "bounded_visual_provider" or qa.get("provider_called") is not True:
-        raise HumanRejectionGateError("QA disposition reviewer/provider state is invalid")
-    if qa.get("reason_codes") != [] or qa.get("side_effects_performed") != []:
-        raise HumanRejectionGateError("QA disposition reason_codes/side_effects_performed must both be empty lists")
-    if qa.get("exact_next_allowed_action") != "existing_downstream_qa_and_human_review_gates_only":
-        raise HumanRejectionGateError("QA disposition next allowed action is invalid")
+    if contract["deterministic_qa_status_required"] == "accept":
+        if qa.get("disposition") != "accept":
+            raise HumanRejectionGateError("QA disposition is not accepted")
+        if qa.get("reviewer_type") != "bounded_visual_provider" or qa.get("provider_called") is not True:
+            raise HumanRejectionGateError("QA disposition reviewer/provider state is invalid")
+        if qa.get("reason_codes") != [] or qa.get("side_effects_performed") != []:
+            raise HumanRejectionGateError("QA disposition reason_codes/side_effects_performed must both be empty lists")
+        if qa.get("exact_next_allowed_action") != "existing_downstream_qa_and_human_review_gates_only":
+            raise HumanRejectionGateError("QA disposition next allowed action is invalid")
+    else:
+        if qa.get("disposition") != contract["deterministic_qa_status_required"]:
+            raise HumanRejectionGateError("QA disposition status does not match the correction contract")
+        if qa.get("hard_stop_reason") != contract["deterministic_qa_blocker"]:
+            raise HumanRejectionGateError("QA disposition blocker does not match the correction contract")
+        qa_inputs = qa.get("qa_inputs")
+        if not isinstance(qa_inputs, dict):
+            raise HumanRejectionGateError("QA disposition qa_inputs must record blocked provenance context")
+        if qa_inputs.get("missing_immutable_provenance") != contract["missing_immutable_provenance"]:
+            raise HumanRejectionGateError("QA disposition missing immutable provenance does not match the correction contract")
 
     decision_path = Path(str(qa.get("decision_artifact_path") or "")).resolve()
     _require_exact_path(artifact.get("decision_artifact_path"), decision_path, "decision_artifact_path")

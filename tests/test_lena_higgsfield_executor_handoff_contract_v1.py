@@ -1915,6 +1915,9 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
         "candidate": {
             "candidate_id": "test-cand-provenance-001",
             "pose_body_language_id": "pose_p018",
+            "pose": "leaning against the elevator wall before heading up",
+            "expression_gaze_id": "expr_soft_direct",
+            "expression_gaze_label": "soft direct gaze",
         }
     })
 
