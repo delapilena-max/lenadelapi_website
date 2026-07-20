@@ -73,3 +73,131 @@ def test_validate_cycle_authorization_artifact_accepts_consumed_in_read_only_mod
     assert result["artifact"]["authorization_consumed"] is True
     assert result["artifact"]["provider_execution_binding"]["provider_prompt_sha256"] == result["artifact"]["prompt_sha256"]
     assert result["artifact"]["candidate_selection_binding"]["candidate_id"] == result["artifact"]["candidate_selection_binding"]["candidate_id"]
+
+
+# ---------------------------------------------------------------------------
+# Focused tests for prompt-SHA resolution (validator seam fix)
+# ---------------------------------------------------------------------------
+
+WRONG_SHA = "a" * 64
+
+
+def _load_handoff(bundle: dict) -> dict:
+    import json as _json
+    return _json.loads(
+        (bundle["handoff_path"]).read_text(encoding="utf-8")
+    )
+
+
+def test_prompt_sha_resolution_current_nested_schema_accepted(
+    tmp_path: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both nested SHAs present and agreeing, no top-level prompt_sha256 → passes."""
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_report = _load_handoff(bundle)
+    # Remove top-level prompt_sha256 to simulate production handoff schema.
+    handoff_report.pop("prompt_sha256", None)
+    # Both nested locations remain: selected_prompt_input.prompt_sha256 and
+    # structured_executor_inputs.selected_prompt_sha256 both equal PROMPT_SHA.
+    assert handoff_report["selected_prompt_input"]["prompt_sha256"]
+    assert handoff_report["structured_executor_inputs"]["selected_prompt_sha256"]
+
+    result = standing_autonomy.validate_cycle_authorization_artifact(
+        Path(bundle["auth_path"]),
+        handoff_report=handoff_report,
+    )
+
+    assert result["artifact"] is not None
+
+
+def test_prompt_sha_resolution_nested_sha_disagreement_fails_closed(
+    tmp_path: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both nested SHAs present but disagreeing → fails closed."""
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_report = _load_handoff(bundle)
+    handoff_report.pop("prompt_sha256", None)
+    # Inject disagreement: nested cross-check has a different value.
+    handoff_report["structured_executor_inputs"]["selected_prompt_sha256"] = WRONG_SHA
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.validate_cycle_authorization_artifact(
+            Path(bundle["auth_path"]),
+            handoff_report=handoff_report,
+        )
+
+    assert exc_info.value.code == "authorization_provider_execution_prompt_sha_mismatch"
+
+
+def test_prompt_sha_resolution_provider_binding_mismatch_fails_closed(
+    tmp_path: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both nested SHAs agree with each other but not with auth provider binding → fails closed."""
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_report = _load_handoff(bundle)
+    # Keep top-level so selected_prompt_sha_value resolves to the auth's own
+    # prompt_sha256 (avoids authorization_prompt_sha_mismatch).
+    # Set both nested SHAs to WRONG_SHA so they agree but mismatch provider binding.
+    handoff_report["selected_prompt_input"]["prompt_sha256"] = WRONG_SHA
+    handoff_report["structured_executor_inputs"]["selected_prompt_sha256"] = WRONG_SHA
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.validate_cycle_authorization_artifact(
+            Path(bundle["auth_path"]),
+            handoff_report=handoff_report,
+        )
+
+    assert exc_info.value.code == "authorization_provider_execution_prompt_sha_mismatch"
+
+
+def test_prompt_sha_resolution_legacy_top_level_accepted(
+    tmp_path: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No nested SHAs, only legacy top-level prompt_sha256 → passes."""
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_report = _load_handoff(bundle)
+    # Remove both nested locations; legacy top-level remains.
+    handoff_report["selected_prompt_input"].pop("prompt_sha256", None)
+    handoff_report["structured_executor_inputs"].pop("selected_prompt_sha256", None)
+    assert "prompt_sha256" in handoff_report
+
+    result = standing_autonomy.validate_cycle_authorization_artifact(
+        Path(bundle["auth_path"]),
+        handoff_report=handoff_report,
+    )
+
+    assert result["artifact"] is not None
+
+
+def test_prompt_sha_resolution_missing_everywhere_fails_closed(
+    tmp_path: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No prompt SHA in nested or top-level locations → fails closed."""
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    handoff_report = _load_handoff(bundle)
+    handoff_report.pop("prompt_sha256", None)
+    handoff_report["selected_prompt_input"].pop("prompt_sha256", None)
+    handoff_report["structured_executor_inputs"].pop("selected_prompt_sha256", None)
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.validate_cycle_authorization_artifact(
+            Path(bundle["auth_path"]),
+            handoff_report=handoff_report,
+        )
+
+    assert exc_info.value.code == "authorization_provider_execution_prompt_sha_mismatch"
