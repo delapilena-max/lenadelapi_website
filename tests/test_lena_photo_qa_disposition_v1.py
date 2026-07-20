@@ -615,7 +615,7 @@ def _production_dual_binding_fixture(
     handoff["structured_executor_inputs"]["selected_prompt_sha256"] = provider_prompt_sha
     reference_image_source_path = tmp_path / "lena_dual_binding_reference.png"
     Image.new("RGB", (64, 64), "gray").save(reference_image_source_path)
-    reference_image_path = ROOT / "tests" / "fixtures" / "lena_dual_binding_reference.png"
+    reference_image_path = ROOT / ".tmp_lena_dual_binding" / "tests" / "fixtures" / "lena_dual_binding_reference.png"
     reference_image_path.parent.mkdir(parents=True, exist_ok=True)
     reference_image_path.write_bytes(reference_image_source_path.read_bytes())
     request.addfinalizer(lambda: reference_image_source_path.unlink() if reference_image_source_path.exists() else None)
@@ -629,6 +629,7 @@ def _production_dual_binding_fixture(
         / "readypack0709-pack004-08-wardrobe-test-c"
         / "result_manifest.json"
     )
+    reference_manifest_rel = reference_manifest_path.relative_to(ROOT).as_posix()
     reference_authority_path = tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
     reference_manifest = {
         "provider": "higgsfield",
@@ -639,8 +640,13 @@ def _production_dual_binding_fixture(
     }
     reference_manifest_bytes = json.dumps(reference_manifest, indent=2, ensure_ascii=True).encode("utf-8")
     reference_manifest_sha = hashlib.sha256(reference_manifest_bytes).hexdigest()
+    original_reference_manifest_bytes = reference_manifest_path.read_bytes() if reference_manifest_path.exists() else None
     _write_json(reference_manifest_path, reference_manifest)
-    request.addfinalizer(lambda: reference_manifest_path.unlink() if reference_manifest_path.exists() else None)
+    request.addfinalizer(
+        lambda: reference_manifest_path.write_bytes(original_reference_manifest_bytes)
+        if original_reference_manifest_bytes is not None
+        else reference_manifest_path.unlink()
+    )
     reference_manifest_oid = "616f2d524153abbd3bb73fdcaf29530af83c0334"
     synthetic_reference_authority = {
         "schema_version": "lena_identity_reference_authority_v1",
@@ -677,7 +683,7 @@ def _production_dual_binding_fixture(
                 "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
                 "job_type": "text2image_soul_v2",
                 "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-                "provenance_manifest": reference_manifest_path.relative_to(ROOT).as_posix(),
+                "provenance_manifest": reference_manifest_rel,
                 "provenance_manifest_sha256": reference_manifest_sha,
                 "provenance_manifest_git_blob_oid": reference_manifest_oid,
                 "authority_scope": "identity_continuity_not_style",
@@ -1913,7 +1919,6 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
 
 def test_real_visual_reference_authority_bundle_is_anchored_in_current_lineage() -> None:
     authority_path = REFERENCE_AUTHORITY
-    authority_sha = _sha(authority_path)
     authority = json.loads(authority_path.read_text(encoding="utf-8"))
     current_head = disposition.subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -1922,6 +1927,7 @@ def test_real_visual_reference_authority_bundle_is_anchored_in_current_lineage()
         check=True,
         text=True,
     ).stdout.strip()
+    authority_sha = hashlib.sha256(disposition._git_show_bytes(current_head, authority_path)).hexdigest()
 
     assert disposition._git_is_ancestor(str(authority["authority_commit"]), current_head)
     references, reference_set_sha, authority_binding = disposition._validate_references(
@@ -1937,26 +1943,99 @@ def test_real_visual_reference_authority_bundle_is_anchored_in_current_lineage()
 
 
 def test_real_visual_reference_authority_bundle_rejects_stale_or_forged_commit(tmp_path: Path) -> None:
-    authority = json.loads(REFERENCE_AUTHORITY.read_text(encoding="utf-8"))
-    authority["authority_commit"] = "b" * 40
-    forged_path = tmp_path / "lena_visual_reference_authority_v1.json"
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(disposition, "ROOT", repo_root)
+
+    reference = repo_root / "refs" / "lena.png"
+    reference.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (32, 32), "gray").save(reference)
+    ref_sha = _sha(reference)
+    manifest = repo_root / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "provider": "higgsfield",
+                "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+                "provider_status": "completed",
+                "job_type": "text2image_soul_v2",
+                "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+            }
+        ),
+        encoding="utf-8",
+    )
+    authority = {
+        "schema_version": disposition.REFERENCE_AUTHORITY_SCHEMA_VERSION,
+        "influencer_id": "lena",
+        "authority_id": "committed_lena_reference_set_v1",
+        "authority_commit": "b" * 40,
+        "created_at_utc": "2026-07-19T00:00:00Z",
+        "reference_set_sha256": hashlib.sha256(
+            selector._canonical_bytes(
+                {
+                    "authority_id": "committed_lena_reference_set_v1",
+                    "references": [{"path": "refs/lena.png", "sha256": ref_sha}],
+                }
+            )
+        ).hexdigest(),
+        "references": [{"path": "refs/lena.png", "sha256": ref_sha}],
+        "reference_metadata": [
+            {
+                "role": "canonical_face_hair_and_full_body",
+                "format": "PNG",
+                "width": 1152,
+                "height": 2048,
+                "provider": "higgsfield",
+                "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
+                "job_type": "text2image_soul_v2",
+                "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+                "provenance_manifest": "manifest.json",
+                "provenance_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                "provenance_manifest_git_blob_oid": "b" * 40,
+                "authority_scope": "identity_continuity_not_style",
+                "authoritative_traits": [
+                    "face_continuity",
+                    "hair_continuity",
+                    "apparent_age",
+                    "skin_and_freckle_continuity",
+                    "body_silhouette_continuity",
+                    "overall_lena_identity_continuity",
+                ],
+                "non_authoritative_traits": [
+                    "night_lighting",
+                    "makeup",
+                    "wardrobe",
+                    "pose",
+                    "scene",
+                    "background",
+                    "glamour_intensity",
+                ],
+            }
+        ],
+    }
+    forged_path = repo_root / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
+    forged_path.parent.mkdir(parents=True, exist_ok=True)
     _write_json(forged_path, authority)
 
-    current_head = disposition.subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=ROOT,
-        capture_output=True,
-        check=True,
-        text=True,
-    ).stdout.strip()
+    monkeypatch.setattr(
+        disposition,
+        "_git_show_bytes",
+        lambda commit, path: forged_path.read_bytes() if Path(path).resolve() == forged_path.resolve() else reference.read_bytes(),
+    )
+    monkeypatch.setattr(disposition, "_git_blob_oid", lambda *args: "b" * 40)
+    monkeypatch.setattr(disposition, "_require_crlf_lf_equivalent", lambda *args: None)
 
-    with pytest.raises(disposition.BoundaryError, match="ancestor"):
-        disposition._validate_references(
-            [(Path(item["path"]), str(item["sha256"])) for item in authority["references"]],
-            forged_path,
-            _sha(forged_path),
-            current_head,
-        )
+    try:
+        with pytest.raises(disposition.BoundaryError, match="ancestor"):
+            disposition._validate_references(
+                [(Path(item["path"]), str(item["sha256"])) for item in authority["references"]],
+                forged_path,
+                _sha(forged_path),
+                "a" * 40,
+            )
+    finally:
+        monkeypatch.undo()
 
 
 @pytest.mark.parametrize(
