@@ -325,6 +325,13 @@ def _completed_human_presence_output_qa_state(artifact_path: Path, artifact: dic
     }
 
 
+def _requires_human_visual_review(qa_artifact: dict[str, Any]) -> bool:
+    reason_codes = qa_artifact.get("reason_codes")
+    if isinstance(reason_codes, list) and "human_visual_review_required" in reason_codes:
+        return True
+    return str(qa_artifact.get("exact_next_allowed_action") or "") == "human_visual_review_required"
+
+
 def _resolve_human_presence_output_qa_plan_state(decision_report: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     evidence = decision_report.get("evidence")
     if evidence is None:
@@ -494,6 +501,9 @@ def evaluate_generated_asset_qa_lifecycle(
     if qa_status == "accept":
         qa_lifecycle_status = "qa_lifecycle_passed"
         next_allowed_action = "await_publish_authorization"
+    elif qa_status == "blocked" and _requires_human_visual_review(qa_written_artifact):
+        qa_lifecycle_status = "awaiting_human_visual_review"
+        next_allowed_action = "human_visual_review_required"
     elif retry_recommended:
         qa_lifecycle_status = "qa_lifecycle_retry_review_required"
         next_allowed_action = "retry_review_required"

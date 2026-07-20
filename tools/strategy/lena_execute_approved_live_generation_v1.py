@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pipeline.higgsfield_lena_api_executor as executor
+from pipeline.identity import lena_higgsfield_identity_evidence as local_identity_evidence
 from tools import lena_higgsfield_generation_approval_v1 as approval
 
 
@@ -64,6 +65,99 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
         if temp_path.exists():
             temp_path.unlink()
         raise
+
+
+def _read_json_object(path: Path, *, code: str, label: str) -> dict[str, Any]:
+    if not path.is_file():
+        raise LiveGenerationAccountingError(code, f"{label} is missing: {path}")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise LiveGenerationAccountingError(code, f"{label} is not valid JSON: {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise LiveGenerationAccountingError(code, f"{label} must be a JSON object: {path}")
+    return value
+
+
+def _load_reference_specs() -> tuple[Path, str, list[tuple[Path, str]]]:
+    authority_path = ROOT / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
+    authority = _read_json_object(
+        authority_path,
+        code="reference_authority_missing_or_invalid",
+        label="reference authority artifact",
+    )
+    refs = authority.get("references")
+    if not isinstance(refs, list) or not refs:
+        raise LiveGenerationAccountingError("reference_authority_invalid", "reference authority must contain at least one reference")
+    specs: list[tuple[Path, str]] = []
+    for item in refs:
+        if not isinstance(item, dict):
+            continue
+        ref_path = item.get("path")
+        ref_sha = item.get("sha256")
+        if ref_path and ref_sha:
+            path = Path(str(ref_path))
+            if not path.is_absolute():
+                path = ROOT / path
+            resolved = path.resolve()
+            try:
+                resolved.relative_to(ROOT)
+            except ValueError as exc:
+                raise LiveGenerationAccountingError(
+                    "reference_path_escape",
+                    f"reference authority path escapes repository root: {ref_path}",
+                ) from exc
+            specs.append((resolved, str(ref_sha)))
+    if not specs:
+        raise LiveGenerationAccountingError("reference_authority_invalid", "reference authority did not contain usable reference specs")
+    return authority_path.resolve(), local_identity_evidence.sha256_file(authority_path), specs
+
+
+def _build_identity_evidence_after_success(
+    *,
+    context: dict[str, Any],
+    execution_result: dict[str, Any],
+) -> tuple[Path, dict[str, Any], str]:
+    manifest_path = Path(execution_result["manifest_path"]) if execution_result.get("manifest_path") else context["manifest_path"]
+    live_result = execution_result.get("live_result") or {}
+    image_path = Path(str(live_result.get("saved_image_path") or ""))
+    claim_path = Path(context["claim_path"])
+    receipt_path = Path(context["receipt_path"])
+    for path, code, label in (
+        (image_path, "generated_image_missing", "generated image"),
+        (manifest_path, "executor_result_manifest_missing", "executor result manifest"),
+        (claim_path, "generation_claim_missing", "generation claim"),
+        (receipt_path, "generation_receipt_missing", "generation receipt"),
+    ):
+        if not path.is_file():
+            raise LiveGenerationAccountingError(code, f"{label} is missing before identity evidence write: {path}")
+
+    manifest = _read_json_object(
+        manifest_path,
+        code="executor_result_manifest_missing_or_invalid",
+        label="executor result manifest",
+    )
+    authority_path, authority_sha, reference_specs = _load_reference_specs()
+    try:
+        evidence_path, evidence, _written = local_identity_evidence.build_local_identity_evidence(
+            date_str=str(context["date"]),
+            slot_id=str(context["slot_id"]),
+            manifest=manifest,
+            image_path=image_path,
+            image_sha256=local_identity_evidence.sha256_file(image_path),
+            identity_evidence_path=ROOT
+            / "pipeline"
+            / "higgsfield_debug"
+            / str(context["date"])
+            / str(context["slot_id"])
+            / "identity_verification.json",
+            reference_authority_artifact=authority_path,
+            reference_authority_sha256=authority_sha,
+            identity_references=reference_specs,
+        )
+    except local_identity_evidence.LenaIdentityEvidenceError as exc:
+        raise LiveGenerationAccountingError(exc.code, exc.detail) from exc
+    return evidence_path, evidence, local_identity_evidence.sha256_file(evidence_path)
 
 
 def load_execution_context(
@@ -204,6 +298,12 @@ def execute_approved_live_generation(
         custom_reference_id=custom_reference_id,
         live_executor=live_executor or executor.run_live,
     )
+    identity_evidence_result: tuple[Path, dict[str, Any], str] | None = None
+    if execution_result.get("ok"):
+        identity_evidence_result = _build_identity_evidence_after_success(
+            context=context,
+            execution_result=execution_result,
+        )
     report = _base_report(
         context=context,
         live=True,
@@ -211,6 +311,12 @@ def execute_approved_live_generation(
         claim_written=bool(execution_result.get("claim_written")),
         receipt_written=bool(execution_result.get("receipt_written")),
     )
+    if identity_evidence_result is not None:
+        identity_evidence_path, _identity_evidence, identity_evidence_sha = identity_evidence_result
+        report["identity_evidence_artifact"] = repo_relative_path(identity_evidence_path)
+        report["identity_evidence_artifact_sha256"] = identity_evidence_sha
+        report["generated_output_paths"]["identity_evidence_path"] = repo_relative_path(identity_evidence_path)
+        report["side_effect_flags"]["identity_evidence_written"] = True
     _write_json_atomic(report_path(context["date"], context["slot_id"]), report)
     return report
 

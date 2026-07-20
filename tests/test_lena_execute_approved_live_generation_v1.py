@@ -296,6 +296,26 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
     claim_path = approval.claim_output_path(DATE, SLOT_ID)
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
+    reference_path = tmp_path / "refs" / "lena_reference.png"
+    _touch(reference_path, "reference-bytes\n")
+    _touch(
+        tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json",
+        json.dumps(
+            {
+                "schema_version": "lena_identity_reference_authority_v1",
+                "authority_id": "lena_visual_reference_authority_v1",
+                "references": [
+                    {
+                        "path": wrapper.repo_relative_path(reference_path),
+                        "sha256": hashlib.sha256(reference_path.read_bytes()).hexdigest(),
+                    }
+                ],
+            },
+            indent=2,
+            ensure_ascii=True,
+        )
+        + "\n",
+    )
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
         ctx = _context_loader(tmp_path)
@@ -341,6 +361,15 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
             "claim_repo_path": claim_repo_path,
             "receipt_repo_path": receipt_repo_path,
             "saved_image_sha256": saved_image_sha256,
+            "provider_status": "completed",
+            "provider_job_id": live_result.get("job_id") if live_result else None,
+            "job_type": "text2image_soul_v2",
+            "custom_reference_id": custom_reference_id,
+            "soul_name": "Lena",
+            "soul_type": "soul_2",
+            "prompt_sha256": "b" * 64,
+            "width": 1152,
+            "height": 2048,
         }
 
     monkeypatch.setattr(executor, "build_manifest", fake_build_manifest)
@@ -369,8 +398,12 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     assert report["executor_result_manifest"] == wrapper.repo_relative_path(manifest_path)
     assert report["generated_output_paths"]["saved_image_path"] == wrapper.repo_relative_path(saved_image_path)
     assert report["generated_output_paths"]["manifest_path"] == wrapper.repo_relative_path(manifest_path)
+    assert report["identity_evidence_artifact"].endswith("identity_verification.json")
+    assert len(report["identity_evidence_artifact_sha256"]) == 64
+    assert report["generated_output_paths"]["identity_evidence_path"] == report["identity_evidence_artifact"]
     assert report["side_effect_flags"]["provider_call_performed"] is True
     assert report["side_effect_flags"]["generation_performed"] is True
+    assert report["side_effect_flags"]["identity_evidence_written"] is True
     assert report["side_effect_flags"]["approval_consumed"] is True
     assert report["side_effect_flags"]["claims_written"] is True
     assert report["side_effect_flags"]["receipts_written"] is True
@@ -382,11 +415,16 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     assert claim_path.is_file()
     assert receipt_path.is_file()
     assert manifest_path.is_file()
+    identity_evidence_path = tmp_path / report["identity_evidence_artifact"]
+    assert identity_evidence_path.is_file()
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    identity_evidence = json.loads(identity_evidence_path.read_text(encoding="utf-8"))
     assert receipt["generated_image_sha256"] == hashlib.sha256(saved_image_path.read_bytes()).hexdigest()
     assert receipt["manifest_sha256"] == hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     assert manifest["saved_image_sha256"] == receipt["generated_image_sha256"]
+    assert identity_evidence["local_image_sha256"] == receipt["generated_image_sha256"]
+    assert identity_evidence["custom_reference_id"] == CUSTOM_REFERENCE_ID
     assert wrapper.report_path(DATE, SLOT_ID).is_file()
     assert json.loads(wrapper.report_path(DATE, SLOT_ID).read_text(encoding="utf-8")) == report
 
@@ -446,6 +484,86 @@ def test_failure_before_provider_submission_is_accounted(
     assert claim_path.is_file()
     assert receipt_path.is_file()
     assert wrapper.report_path(DATE, SLOT_ID).is_file()
+
+
+def test_success_without_reference_authority_does_not_write_accounting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_layout(monkeypatch, tmp_path)
+    handoff_path = _touch(tmp_path / "handoff.json")
+    approval_path = _touch(tmp_path / "approval.json")
+
+    saved_image_path = tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
+    claim_path = approval.claim_output_path(DATE, SLOT_ID)
+    receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
+
+    def fake_context_loader(*_args: object) -> dict[str, object]:
+        ctx = _context_loader(tmp_path)
+        ctx["claim_path"] = claim_path
+        ctx["receipt_path"] = receipt_path
+        ctx["manifest_path"] = manifest_path
+        ctx["approval_artifact"] = approval_path
+        ctx["handoff_artifact"] = handoff_path
+        return ctx
+
+    def fake_run_live(date_str: str, slot_id: str, source: dict[str, object], custom_reference_id: str) -> dict[str, object]:
+        saved_image_path.parent.mkdir(parents=True, exist_ok=True)
+        saved_image_path.write_bytes(b"generated-image-bytes")
+        return {
+            "job_id": "job-123",
+            "status": "processing",
+            "result_urls": ["https://example.invalid/result.png"],
+            "saved_image_path": str(saved_image_path),
+            "image_format_detected": ".png",
+            "subprocess_start_attempted": True,
+            "provider_submission_may_have_occurred": True,
+        }
+
+    def fake_build_manifest(
+        date_str: str,
+        slot_id: str,
+        source: dict[str, object],
+        custom_reference_id: str,
+        live_result: dict[str, object] | None,
+        *,
+        claim_repo_path: str | None = None,
+        receipt_repo_path: str | None = None,
+        saved_image_sha256: str | None = None,
+    ) -> dict[str, object]:
+        return {
+            "date": date_str,
+            "slot_id": slot_id,
+            "saved_image_path": live_result.get("saved_image_path") if live_result else None,
+            "image_format_detected": live_result.get("image_format_detected") if live_result else None,
+            "claim_repo_path": claim_repo_path,
+            "receipt_repo_path": receipt_repo_path,
+            "saved_image_sha256": saved_image_sha256,
+            "provider_status": "completed",
+            "provider_job_id": live_result.get("job_id") if live_result else None,
+            "job_type": "text2image_soul_v2",
+            "custom_reference_id": custom_reference_id,
+            "soul_name": "Lena",
+            "soul_type": "soul_2",
+            "prompt_sha256": "b" * 64,
+            "width": 1152,
+            "height": 2048,
+        }
+
+    monkeypatch.setattr(executor, "build_manifest", fake_build_manifest)
+
+    with pytest.raises(wrapper.LiveGenerationAccountingError) as excinfo:
+        wrapper.execute_approved_live_generation(
+            handoff_path,
+            approval_path,
+            live=True,
+            live_executor=fake_run_live,
+            context_loader=fake_context_loader,
+        )
+
+    assert excinfo.value.code == "reference_authority_missing_or_invalid"
+    assert not wrapper.report_path(DATE, SLOT_ID).exists()
+    assert not (tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "identity_verification.json").exists()
 
 
 def test_failure_after_provider_submission_is_accounted(
