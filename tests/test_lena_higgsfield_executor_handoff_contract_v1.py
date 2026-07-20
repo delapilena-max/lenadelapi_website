@@ -353,7 +353,7 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
+        lambda _path, _slot_id_override=None, _candidate_path=None: (copy.deepcopy(packet_report), _source_from_prompt(prompt_text)),
     )
 
     packet = handoff_builder.build_handoff(DATE, str(reconciliation_path.relative_to(tmp_root).as_posix()))
@@ -399,7 +399,7 @@ def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_p
     original_rebuild = executor._rebuild_packet_prompt_source
     seen: dict[str, str | None] = {}
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None):
+    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None):
         seen["slot_id_override"] = slot_id_override
         rebuilt_packet, source = original_rebuild(packet_path)
         if isinstance(slot_id_override, str) and slot_id_override.strip():
@@ -431,7 +431,7 @@ def test_validate_handoff_packet_rejects_rebuilt_source_slot_mismatch(
     packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     original_rebuild = executor._rebuild_packet_prompt_source
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None):
+    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None):
         rebuilt_packet, source = original_rebuild(packet_path)
         source["image"]["slot_id"] = "unrelated-slot"
         return rebuilt_packet, source
@@ -851,7 +851,9 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path: (copy.deepcopy(packet_report), copy.deepcopy(source)),
+        lambda _path, _slot_id_override=None, _candidate_path=None: (
+            copy.deepcopy(packet_report), copy.deepcopy(source)
+        ),
     )
 
     with pytest.raises(executor.HandoffArtifactError) as excinfo:
@@ -902,7 +904,9 @@ def test_prompt_drift_rejects_before_provider_access(
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None: (copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")),
+        lambda _path, _slot_id_override=None, _candidate_path=None: (
+            copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift")
+        ),
     )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
 
@@ -1891,3 +1895,63 @@ def test_retry_receipt_prevents_second_attempt_even_without_claim(
 
     assert executor.main() == 1
     assert "retry_generation_already_consumed" in capsys.readouterr().out
+
+
+def test_rebuild_packet_prompt_source_populates_candidate_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_rebuild_packet_prompt_source must copy pose/expression from the candidate artifact
+    and derive wardrobe name/silhouette from the catalog — not hardcode nulls."""
+    import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
+    import pipeline.prompting.lena_prompt_brain as prompt_brain
+
+    packet_report = {**_content_packet_payload(), "wardrobe_outfit_id": "wc_p050"}
+    packet_path = tmp_path / "lena_content_packet_dryrun_test.json"
+    _write_json(packet_path, packet_report)
+
+    candidate_path = tmp_path / "lena_pre_generation_candidate_test.json"
+    _write_json(candidate_path, {
+        "candidate": {
+            "candidate_id": "test-cand-provenance-001",
+            "pose_body_language_id": "pose_p018",
+        }
+    })
+
+    monkeypatch.setattr(
+        executor, "load_content_packet_report", lambda _p, _d: packet_report
+    )
+    monkeypatch.setattr(
+        packet_builder,
+        "rebuild_packet_from_authoritative_sources",
+        lambda _r: {"compact_provider_prompt_preview": PROMPT_TEXT},
+    )
+    fake_wf_entry = {
+        "outfit_id": "wc_p050",
+        "name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
+        "style_lane": "jeans_based",
+    }
+    monkeypatch.setattr(packet_builder, "load_json", lambda _p: [fake_wf_entry])
+    monkeypatch.setattr(
+        packet_builder, "select_wardrobe_entry", lambda _c, _id, *_a: fake_wf_entry
+    )
+    monkeypatch.setattr(prompt_brain, "catalog_outfit_silhouette_class", lambda _e: "jeans_based")
+
+    _, source = executor._rebuild_packet_prompt_source(packet_path, "test-slot-001", candidate_path)
+    img = source["image"]
+
+    assert img["pose_body_language_id"] == "pose_p018", (
+        "pose_body_language_id must be populated from candidate artifact"
+    )
+    assert img["wardrobe_outfit_name"] == "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans", (
+        "wardrobe_outfit_name must be derived from catalog entry"
+    )
+    assert img["wardrobe_silhouette_class"] == "jeans_based", (
+        "wardrobe_silhouette_class must be derived from catalog_outfit_silhouette_class"
+    )
+    assert img["effective_wardrobe_silhouette_class"] == img["wardrobe_silhouette_class"], (
+        "effective_wardrobe_silhouette_class must equal wardrobe_silhouette_class, not content_pillar"
+    )
+    assert img["effective_wardrobe_silhouette_class"] != packet_report.get("content_pillar"), (
+        "effective_wardrobe_silhouette_class must not be the content_pillar string"
+    )
