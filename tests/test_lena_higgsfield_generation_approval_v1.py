@@ -489,6 +489,79 @@ def test_inspect_rejects_stale_recorded_prompt_sha(
     assert excinfo.value.code == "handoff_prompt_text_sha_mismatch"
 
 
+@pytest.mark.parametrize(
+    ("block", "expected_code"),
+    [
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+        ),
+        ("binding_linkage", "handoff_binding_linkage_missing"),
+    ],
+)
+@pytest.mark.parametrize("shape", ["missing", "null", "non_object", "empty"])
+def test_inspect_rejects_missing_or_placeholder_authority_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    expected_code: str,
+    shape: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    report = _valid_handoff_report(tmp_path)
+    if shape == "missing":
+        report.pop(block)
+    elif shape == "null":
+        report[block] = None
+    elif shape == "non_object":
+        report[block] = "not-an-authority-object"
+    else:
+        report[block] = {}
+    handoff_path = _write_handoff(tmp_path, report)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == expected_code
+
+
+@pytest.mark.parametrize(
+    ("block", "expected_code"),
+    [
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+        ),
+        ("binding_linkage", "handoff_binding_linkage_missing"),
+    ],
+)
+def test_approval_record_builder_does_not_coerce_missing_authority_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    expected_code: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    handoff_facts = inspect_handoff_artifact(handoff_path)
+    handoff_facts.pop(block)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        build_generation_approval_record(
+            handoff_facts,
+            operator_id=CANONICAL_OPERATOR_ID,
+            confirmation=confirmation_phrase(SLOT_ID),
+        )
+    assert excinfo.value.code == expected_code
+
+
 @pytest.mark.parametrize("authority", ["pose", "expression"])
 def test_inspect_rejects_candidate_derived_provider_authority_mismatch(
     tmp_path: Path,

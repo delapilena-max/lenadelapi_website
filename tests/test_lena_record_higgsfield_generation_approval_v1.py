@@ -12,6 +12,7 @@ import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_record_higgsfield_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 from tests.fixtures import lena_pose_provenance as pose_fixture
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 
 DATE = "2026-07-14"
@@ -57,6 +58,7 @@ def _selected_candidate_sha() -> str:
 
 
 def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    approval_fixture._patch_root(tmp_path, monkeypatch)
     monkeypatch.setattr(approval_mod, "ROOT", tmp_path)
     monkeypatch.setattr(
         approval_mod, "DEFAULT_APPROVAL_ROOT",
@@ -86,7 +88,7 @@ def _handoff_repo_path() -> str:
     return f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
 
 
-def _valid_handoff_report(*, prompt_sha: str) -> dict:
+def _incomplete_legacy_handoff_report(*, prompt_sha: str) -> dict:
     handoff_repo_path = _handoff_repo_path()
     selected_candidate_repo_path = _selected_candidate_repo_path()
     selected_candidate_sha = _selected_candidate_sha()
@@ -181,7 +183,7 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
     }
 
 
-def _write_handoff(tmp_path: Path, *, prompt_sha: str = PROMPT_SHA) -> Path:
+def _write_incomplete_legacy_handoff(tmp_path: Path, *, prompt_sha: str = PROMPT_SHA) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path = tmp_path / _selected_candidate_repo_path()
@@ -329,7 +331,7 @@ def _write_handoff(tmp_path: Path, *, prompt_sha: str = PROMPT_SHA) -> Path:
         "blocking_reasons": [],
     }
     _write_json(reconciliation_path, reconciliation_report)
-    handoff_report = _valid_handoff_report(prompt_sha=prompt_sha)
+    handoff_report = _incomplete_legacy_handoff_report(prompt_sha=prompt_sha)
     handoff_report["source_learning_artifact_path"] = learning_repo_path.as_posix()
     handoff_report["source_learning_artifact_sha256"] = hashlib.sha256(learning_path.read_bytes()).hexdigest()
     handoff_report["source_recommendation_artifact_path"] = recommendation_repo_path.as_posix()
@@ -353,7 +355,7 @@ def test_recording_succeeds_and_writes_expected_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -379,11 +381,55 @@ def test_recording_succeeds_and_writes_expected_file(
     assert stdout["files_written_this_run"] == [str(expected_path)]
 
 
+@pytest.mark.parametrize(
+    ("block", "expected_code"),
+    [
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+        ),
+        ("binding_linkage", "handoff_binding_linkage_missing"),
+    ],
+)
+def test_recording_rejects_missing_authority_before_approval_issuance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    block: str,
+    expected_code: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff.pop(block)
+    handoff_path.write_text(json.dumps(handoff, indent=2), encoding="utf-8")
+
+    code = _run(
+        monkeypatch,
+        "--handoff-artifact",
+        str(handoff_path),
+        "--operator-id",
+        "nicolas",
+        "--confirm",
+        confirmation_phrase(SLOT_ID),
+    )
+
+    assert code == 1
+    stdout = json.loads(capsys.readouterr().out)
+    assert stdout["error_code"] == expected_code
+    assert stdout["files_written_this_run"] == []
+    assert not approval_mod.approval_output_path(DATE, SLOT_ID).exists()
+
+
 def test_recording_refuses_wrong_operator(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -405,7 +451,7 @@ def test_recording_refuses_wrong_confirmation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -444,7 +490,7 @@ def test_recording_refuses_overwrite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     first_code = _run(
         monkeypatch,
@@ -470,7 +516,7 @@ def test_recording_aborts_cleanly_on_missing_reconciliation_artifact(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
     reconciliation_path = tmp_path / "pipeline" / "strategy" / "lena" / "reconciliations" / DATE / "lena_generation_reconciliation_fixture.json"
     reconciliation_path.unlink()
 

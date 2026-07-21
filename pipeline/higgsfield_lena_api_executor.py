@@ -393,6 +393,8 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     queue_loaded_path, queue_report = load_queue_report(date_str)
     packet_report = load_content_packet_report(packet_path, date_str)
     from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
+        HiggsfieldGenerationApprovalError,
+        require_authority_blocks,
         validate_selected_candidate_binding,
     )
 
@@ -423,6 +425,10 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         "selected_candidate_recommendation_mismatch",
         f"{handoff_path} selected prompt input recipe mismatch",
     )
+    try:
+        require_authority_blocks(report)
+    except HiggsfieldGenerationApprovalError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
     from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
     try:

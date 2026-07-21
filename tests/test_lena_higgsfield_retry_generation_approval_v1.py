@@ -54,6 +54,7 @@ def _selected_candidate_payload() -> dict:
         "candidate": {
             "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
             "slot_id": ORIGINAL_SLOT,
+            "lane": "fixture_candidate_lane",
             "recipe_id": "hcr_011",
             "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
@@ -148,6 +149,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
         "recipe_id": "hcr_011",
+        "scene_type": "fixture_provider_lane",
+        "wardrobe_outfit_id": "wc_p059",
+        "environment_id": "env_p001",
         "compact_provider_prompt_preview": ORIGINAL_PROMPT,
         "compact_provider_prompt_sha256": PROMPT_SHA,
         "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
@@ -155,8 +159,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     }
     _write_json(packet_path, packet_report)
     packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    selected_candidate_payload = _selected_candidate_payload()
     selected_candidate_path.parent.mkdir(parents=True, exist_ok=True)
-    selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
+    selected_candidate_path.write_text(json.dumps(selected_candidate_payload, indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
     expression_binding = pose_fixture.candidate_expression_provenance(selected_candidate_path, root=tmp_path)
@@ -306,6 +311,79 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "blocking_reasons": [],
     }
     _write_json(reconciliation_path, reconciliation_report)
+    selected_candidate_body = selected_candidate_payload["candidate"]
+    candidate_selection_binding = {
+        "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+        "selected_candidate_artifact_sha256": selected_sha256,
+        "candidate_id": selected_candidate_body["candidate_id"],
+        "slot_id": selected_candidate_body["slot_id"],
+        "recipe_id": selected_candidate_body["recipe_id"],
+        "candidate_prompt_sha256": selected_candidate_body["prompt_sha256"],
+        "candidate_lane": selected_candidate_body["lane"],
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_body_language_label": pose_binding["pose_body_language_label"],
+        "pose_provenance_fingerprint_sha256": pose_binding[
+            "pose_provenance_fingerprint_sha256"
+        ],
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_provenance_fingerprint_sha256": expression_binding[
+            "expression_provenance_fingerprint_sha256"
+        ],
+        "source_prompt_family": "prompt_library_candidate",
+    }
+    provider_execution_binding = {
+        "content_packet_artifact_path": packet_repo_path.as_posix(),
+        "content_packet_artifact_sha256": packet_sha,
+        "recipe_id": "hcr_011",
+        "slot_id": ORIGINAL_SLOT,
+        "provider_prompt_sha256": PROMPT_SHA,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "pose_provenance_fingerprint_sha256": pose_binding[
+            "pose_provenance_fingerprint_sha256"
+        ],
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_provenance_fingerprint_sha256": expression_binding[
+            "expression_provenance_fingerprint_sha256"
+        ],
+        "provider_lane": packet_report["scene_type"],
+        "source_prompt_family": "compact_provider_prompt",
+        "provider": "higgsfield",
+        "model": "text2image_soul_v2",
+    }
+    binding_linkage = {
+        "recommendation_artifact_path": recommendation_repo_path.as_posix(),
+        "recommendation_artifact_sha256": recommendation_sha256,
+        "queue_artifact_path": queue_repo_path.as_posix(),
+        "queue_artifact_sha256": hashlib.sha256(queue_path.read_bytes()).hexdigest(),
+        "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+        "selected_candidate_artifact_sha256": selected_sha256,
+        "content_packet_artifact_path": packet_repo_path.as_posix(),
+        "content_packet_artifact_sha256": packet_sha,
+        "recipe_id": "hcr_011",
+        "slot_id": ORIGINAL_SLOT,
+        "candidate_id": selected_candidate_body["candidate_id"],
+        "outfit_id": packet_report["wardrobe_outfit_id"],
+        "environment_id": packet_report["environment_id"],
+        "candidate_lane": selected_candidate_body["lane"],
+        "provider_lane": packet_report["scene_type"],
+        "candidate_prompt_family": "prompt_library_candidate",
+        "provider_prompt_family": "compact_provider_prompt",
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_provenance_fingerprint_sha256": pose_binding[
+            "pose_provenance_fingerprint_sha256"
+        ],
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_provenance_fingerprint_sha256": expression_binding[
+            "expression_provenance_fingerprint_sha256"
+        ],
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
+        "prompt_family_relationship": (
+            "candidate prompt family and provider prompt family are intentionally "
+            "distinct for the same recipe/slot chain"
+        ),
+    }
     handoff_report = {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -354,6 +432,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "expression_gaze_id": pose_fixture.EXPRESSION_ID,
             "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
         },
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "expression_provenance": expression_binding,
@@ -363,6 +444,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "selected_prompt_input": {
             "prompt_sha256": PROMPT_SHA,
             "prompt_text": ORIGINAL_PROMPT,
+            "lane": packet_report["scene_type"],
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
@@ -517,6 +599,37 @@ def test_valid_retry_approval_round_trip(tmp_path: Path, monkeypatch: pytest.Mon
     assert result["scope_summary"]["publish_authorized"] is False
     assert result["scope_summary"]["scheduling_authorized"] is False
     assert result["scope_summary"]["analytics_mutation_authorized"] is False
+
+
+@pytest.mark.parametrize(
+    ("block", "expected_code"),
+    [
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+        ),
+        ("binding_linkage", "handoff_binding_linkage_missing"),
+    ],
+)
+def test_retry_approval_rejects_source_handoff_missing_authority_block(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    expected_code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
+    handoff.pop(block)
+    _write_json(seeded["handoff_path"], handoff)
+
+    with pytest.raises(canonical_approval.HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_retry_handoff_artifact(seeded["retry_handoff_path"])
+    assert excinfo.value.code == expected_code
 
 
 @pytest.mark.parametrize(

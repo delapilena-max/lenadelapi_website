@@ -66,6 +66,54 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
     approval_repo_path = f"pipeline/approvals/lena/generation/{DATE}/{SLOT_ID}_higgsfield_generation_approval.json"
     handoff_repo_path = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
     approval_path = tmp_path / approval_repo_path
+    candidate_selection_binding = {
+        "selected_candidate_artifact_path": (
+            f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/"
+            "lena_pre_generation_candidate_selected.json"
+        ),
+        "selected_candidate_artifact_sha256": "b" * 64,
+        "candidate_id": f"{SLOT_ID}::{RECIPE_ID}::fixture",
+        "slot_id": SLOT_ID,
+        "recipe_id": RECIPE_ID,
+        "candidate_prompt_sha256": PROMPT_SHA,
+        "candidate_lane": "fixture_lane",
+        "source_prompt_family": "prompt_library_candidate",
+    }
+    provider_execution_binding = {
+        "content_packet_artifact_path": (
+            f"pipeline/strategy/lena/content_packets/{DATE}/"
+            f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+        ),
+        "content_packet_artifact_sha256": "c" * 64,
+        "recipe_id": RECIPE_ID,
+        "slot_id": SLOT_ID,
+        "provider_prompt_sha256": PROMPT_SHA,
+        "provider_lane": "fixture_lane",
+        "source_prompt_family": "compact_provider_prompt",
+        "provider": "higgsfield",
+        "model": "text2image_soul_v2",
+    }
+    binding_linkage = {
+        "selected_candidate_artifact_path": candidate_selection_binding[
+            "selected_candidate_artifact_path"
+        ],
+        "selected_candidate_artifact_sha256": candidate_selection_binding[
+            "selected_candidate_artifact_sha256"
+        ],
+        "content_packet_artifact_path": provider_execution_binding[
+            "content_packet_artifact_path"
+        ],
+        "content_packet_artifact_sha256": provider_execution_binding[
+            "content_packet_artifact_sha256"
+        ],
+        "recipe_id": RECIPE_ID,
+        "slot_id": SLOT_ID,
+        "candidate_id": candidate_selection_binding["candidate_id"],
+        "candidate_lane": "fixture_lane",
+        "provider_lane": "fixture_lane",
+        "candidate_prompt_family": "prompt_library_candidate",
+        "provider_prompt_family": "compact_provider_prompt",
+    }
     approval_record = {
         "report_type": approval.APPROVAL_REPORT_TYPE,
         "schema_version": approval.APPROVAL_SCHEMA_VERSION,
@@ -80,6 +128,9 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
         "date": DATE,
         "slot_id": SLOT_ID,
         "prompt_sha256": PROMPT_SHA,
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "provider": approval.APPROVAL_PROVIDER,
         "executor": approval.APPROVAL_EXECUTOR,
         "model": approval.MODEL,
@@ -107,6 +158,9 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
             "handoff_repo_path": handoff_repo_path,
             "handoff_sha256": "a" * 64,
             "prompt_sha256": PROMPT_SHA,
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
             "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
             "soul_name": approval.SOUL_NAME,
             "soul_type": approval.SOUL_TYPE,

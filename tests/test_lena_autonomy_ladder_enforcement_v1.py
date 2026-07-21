@@ -33,6 +33,15 @@ def _normalized_sha256(path: Path) -> str:
 
 
 def _fake_handoff_facts() -> dict:
+    slot_id = "higgsfield-20260713-hcr_006-photo"
+    candidate_path = (
+        "pipeline/strategy/lena/pre_generation_candidates/2026-07-13/"
+        "lena_pre_generation_candidate_selected.json"
+    )
+    packet_path = (
+        "pipeline/strategy/lena/content_packets/2026-07-13/"
+        "lena_content_packet_dryrun_2026-07-13_hcr_006.json"
+    )
     return {
         "report": {
             "report_type": "lena_next_live_image_handoff",
@@ -41,8 +50,38 @@ def _fake_handoff_facts() -> dict:
         "handoff_repo_path": "pipeline/strategy/lena/next_actions/2026-07-13/lena_next_live_image_handoff_2026-07-13.json",
         "handoff_sha256": "a" * 64,
         "date": "2026-07-13",
-        "slot_id": "higgsfield-20260713-hcr_006-photo",
+        "slot_id": slot_id,
         "prompt_sha256": "b" * 64,
+        "candidate_selection_binding": {
+            "selected_candidate_artifact_path": candidate_path,
+            "selected_candidate_artifact_sha256": "c" * 64,
+            "candidate_id": f"{slot_id}::hcr_006::fixture",
+            "slot_id": slot_id,
+            "recipe_id": "hcr_006",
+            "candidate_prompt_sha256": "b" * 64,
+            "source_prompt_family": "prompt_library_candidate",
+        },
+        "provider_execution_binding": {
+            "content_packet_artifact_path": packet_path,
+            "content_packet_artifact_sha256": "d" * 64,
+            "recipe_id": "hcr_006",
+            "slot_id": slot_id,
+            "provider_prompt_sha256": "b" * 64,
+            "source_prompt_family": "compact_provider_prompt",
+            "provider": "higgsfield",
+            "model": "text2image_soul_v2",
+        },
+        "binding_linkage": {
+            "selected_candidate_artifact_path": candidate_path,
+            "selected_candidate_artifact_sha256": "c" * 64,
+            "content_packet_artifact_path": packet_path,
+            "content_packet_artifact_sha256": "d" * 64,
+            "candidate_id": f"{slot_id}::hcr_006::fixture",
+            "slot_id": slot_id,
+            "recipe_id": "hcr_006",
+            "candidate_prompt_family": "prompt_library_candidate",
+            "provider_prompt_family": "compact_provider_prompt",
+        },
         "soul_name": "Lena",
         "soul_type": "Soul 2.0",
         "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",

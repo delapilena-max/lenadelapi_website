@@ -1417,6 +1417,7 @@ def test_production_pose_and_expression_chain_advances_past_expression_qa(
         "authorization_bound_handoff",
         chain["handoff"]["provider_execution_binding"],
     )
+    chain["manifest"].pop("effective_wardrobe_silhouette_class", None)
     image_path = Path(chain["manifest"]["saved_image_path"])
     image_path.write_bytes(b"pose provenance QA fixture")
     manifest_path = chain["root"] / "generated_manifest.json"

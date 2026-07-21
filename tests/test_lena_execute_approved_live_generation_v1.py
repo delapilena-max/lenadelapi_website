@@ -66,6 +66,44 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
     approval_repo_path = f"pipeline/approvals/lena/generation/{DATE}/{SLOT_ID}_higgsfield_generation_approval.json"
     claim_path = approval.claim_output_path(DATE, SLOT_ID)
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
+    candidate_path = (
+        f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/"
+        "lena_pre_generation_candidate_selected.json"
+    )
+    packet_path = (
+        f"pipeline/strategy/lena/content_packets/{DATE}/"
+        f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+    )
+    candidate_selection_binding = {
+        "selected_candidate_artifact_path": candidate_path,
+        "selected_candidate_artifact_sha256": "d" * 64,
+        "candidate_id": f"{SLOT_ID}::{RECIPE_ID}::fixture",
+        "slot_id": SLOT_ID,
+        "recipe_id": RECIPE_ID,
+        "candidate_prompt_sha256": "b" * 64,
+        "source_prompt_family": "prompt_library_candidate",
+    }
+    provider_execution_binding = {
+        "content_packet_artifact_path": packet_path,
+        "content_packet_artifact_sha256": "e" * 64,
+        "recipe_id": RECIPE_ID,
+        "slot_id": SLOT_ID,
+        "provider_prompt_sha256": "b" * 64,
+        "source_prompt_family": "compact_provider_prompt",
+        "provider": "higgsfield",
+        "model": "text2image_soul_v2",
+    }
+    binding_linkage = {
+        "selected_candidate_artifact_path": candidate_path,
+        "selected_candidate_artifact_sha256": "d" * 64,
+        "content_packet_artifact_path": packet_path,
+        "content_packet_artifact_sha256": "e" * 64,
+        "candidate_id": candidate_selection_binding["candidate_id"],
+        "slot_id": SLOT_ID,
+        "recipe_id": RECIPE_ID,
+        "candidate_prompt_family": "prompt_library_candidate",
+        "provider_prompt_family": "compact_provider_prompt",
+    }
     approval_record = {
         "report_type": "lena_higgsfield_generation_approval",
         "schema_version": "v1",
@@ -80,6 +118,9 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
         "date": DATE,
         "slot_id": SLOT_ID,
         "prompt_sha256": "b" * 64,
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "provider": "Higgsfield",
         "executor": "Higgsfield CLI repo adapter",
         "model": "text2image_soul_v2",
@@ -106,6 +147,9 @@ def _approval_result(tmp_path: Path) -> dict[str, object]:
             "handoff_repo_path": handoff_repo_path,
             "handoff_sha256": "a" * 64,
             "prompt_sha256": "b" * 64,
+            "candidate_selection_binding": candidate_selection_binding,
+            "provider_execution_binding": provider_execution_binding,
+            "binding_linkage": binding_linkage,
             "custom_reference_id": CUSTOM_REFERENCE_ID,
             "soul_name": "Lena",
             "soul_type": "Soul 2.0",

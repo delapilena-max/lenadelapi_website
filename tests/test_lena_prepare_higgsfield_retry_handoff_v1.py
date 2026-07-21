@@ -48,6 +48,7 @@ def _selected_candidate_payload() -> dict:
         "candidate": {
             "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
             "slot_id": ORIGINAL_SLOT,
+            "lane": "fit_check_mirror_getting_ready",
             "recipe_id": "hcr_011",
             "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
@@ -113,6 +114,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
         "recipe_id": "hcr_011",
+        "scene_type": "fit_check_mirror_getting_ready",
         "strong_hook_id": "mf_001",
         "wardrobe_outfit_id": "wc_p020",
         "environment_id": "env_v008",
@@ -334,6 +336,26 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "expression_gaze_id": expression_binding["expression_gaze_id"],
             "expression_gaze_label": expression_binding["expression_gaze_label"],
         },
+        "candidate_selection_binding": {
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+            "slot_id": ORIGINAL_SLOT,
+            "recipe_id": "hcr_011",
+            "candidate_prompt_sha256": PROMPT_SHA,
+            "candidate_lane": "fit_check_mirror_getting_ready",
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "pose_provenance_fingerprint_sha256": pose_binding[
+                "pose_provenance_fingerprint_sha256"
+            ],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+            "source_prompt_family": "prompt_library_candidate",
+        },
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "expression_provenance": expression_binding,
@@ -345,6 +367,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "artifact_sha256": packet_sha,
             "prompt_sha256": PROMPT_SHA,
             "prompt_text": ORIGINAL_PROMPT,
+            "lane": "fit_check_mirror_getting_ready",
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
@@ -382,6 +405,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "provider_execution_binding": {
             "content_packet_artifact_path": packet_repo_path.as_posix(),
             "content_packet_artifact_sha256": packet_sha,
+            "recipe_id": "hcr_011",
+            "slot_id": ORIGINAL_SLOT,
             "provider_prompt_sha256": PROMPT_SHA,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
@@ -389,10 +414,29 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "expression_provenance_fingerprint_sha256": expression_binding[
                 "expression_provenance_fingerprint_sha256"
             ],
+            "provider_lane": "fit_check_mirror_getting_ready",
+            "source_prompt_family": "compact_provider_prompt",
+            "provider": "higgsfield",
+            "model": "text2image_soul_v2",
         },
         "binding_linkage": {
+            "recommendation_artifact_path": recommendation_repo_path.as_posix(),
+            "recommendation_artifact_sha256": recommendation_sha256,
+            "queue_artifact_path": queue_repo_path.as_posix(),
+            "queue_artifact_sha256": hashlib.sha256(queue_path.read_bytes()).hexdigest(),
+            "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
+            "selected_candidate_artifact_sha256": selected_candidate_sha,
             "content_packet_artifact_path": packet_repo_path.as_posix(),
             "content_packet_artifact_sha256": packet_sha,
+            "recipe_id": "hcr_011",
+            "slot_id": ORIGINAL_SLOT,
+            "candidate_id": f"{ORIGINAL_SLOT}::hcr_011::cbn_004",
+            "outfit_id": packet_report["wardrobe_outfit_id"],
+            "environment_id": packet_report["environment_id"],
+            "candidate_lane": "fit_check_mirror_getting_ready",
+            "provider_lane": "fit_check_mirror_getting_ready",
+            "candidate_prompt_family": "prompt_library_candidate",
+            "provider_prompt_family": "compact_provider_prompt",
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
@@ -401,6 +445,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
                 "expression_provenance_fingerprint_sha256"
             ],
             "expression_bound_content_packet_sha256": pose_bound_packet_sha,
+            "prompt_family_relationship": (
+                "candidate prompt family and provider prompt family are intentionally "
+                "distinct for the same recipe/slot chain"
+            ),
         },
     }
     _write_json(handoff_path, handoff_report)

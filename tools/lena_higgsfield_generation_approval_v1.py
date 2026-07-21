@@ -160,6 +160,40 @@ def require_sha256(raw: Any, *, code: str, label: str) -> str:
     return value
 
 
+def require_authority_blocks(container: Any) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    require(
+        isinstance(container, dict),
+        "handoff_authority_contract_missing",
+        "handoff authority contract must be a JSON object",
+    )
+    blocks: list[dict[str, Any]] = []
+    for key, code, label in (
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+            "candidate_selection_binding",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+            "provider_execution_binding",
+        ),
+        (
+            "binding_linkage",
+            "handoff_binding_linkage_missing",
+            "binding_linkage",
+        ),
+    ):
+        value = container.get(key)
+        require(
+            isinstance(value, dict) and bool(value),
+            code,
+            f"handoff {label} must be a nonempty JSON object",
+        )
+        blocks.append(value)
+    return blocks[0], blocks[1], blocks[2]
+
+
 def _validate_bound_provider_prompt_copies(
     *,
     selected_prompt: dict[str, Any],
@@ -323,6 +357,9 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
     selected_candidate = selected_candidate_binding["selected_candidate"]
     selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        require_authority_blocks(report)
+    )
     try:
         bound_pose, pose_bound_packet_sha256 = pose_provenance.validate_handoff_pose_copies(report)
         bound_expression, expression_bound_packet_sha256 = (
@@ -492,55 +529,6 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         label="handoff selected_prompt_input_artifact_sha256",
     )
 
-    candidate_selection_binding = report.get("candidate_selection_binding")
-    provider_execution_binding = report.get("provider_execution_binding")
-    binding_linkage = report.get("binding_linkage")
-    if not (
-        isinstance(candidate_selection_binding, dict)
-        and isinstance(provider_execution_binding, dict)
-        and isinstance(binding_linkage, dict)
-    ):
-        return {
-            "report": report,
-            "handoff_path": handoff_path,
-            "handoff_repo_path": handoff_repo_path,
-            "handoff_sha256": sha256_file(handoff_path),
-            "date": date_str,
-            "slot_id": slot_id,
-            "prompt_sha256": prompt_sha,
-            "custom_reference_id": custom_reference_id,
-            "soul_name": soul.get("name"),
-            "soul_type": soul.get("type"),
-            "selected_candidate_path": selected_candidate_path,
-            "selected_candidate_repo_path": repo_relative_path(selected_candidate_path) if selected_candidate_path else "",
-            "selected_candidate_sha256": selected_candidate_sha_value,
-            "selected_candidate": selected_candidate,
-            "selected_candidate_id": selected_candidate_binding["selected_candidate_id"],
-            "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
-            "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
-            "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
-            "candidate_selection_binding": candidate_selection_binding or {},
-            "provider_execution_binding": provider_execution_binding or {},
-            "binding_linkage": binding_linkage or {},
-            "reconciliation": reconciliation_facts["reconciliation"],
-            "reconciled_candidate": reconciliation_facts["final_candidate"],
-            "reconciliation_decision": reconciliation_facts["decision"],
-        }
-    require(
-        isinstance(candidate_selection_binding, dict),
-        "handoff_candidate_selection_binding_missing",
-        "handoff candidate_selection_binding must be a JSON object",
-    )
-    require(
-        isinstance(provider_execution_binding, dict),
-        "handoff_provider_execution_binding_missing",
-        "handoff provider_execution_binding must be a JSON object",
-    )
-    require(
-        isinstance(binding_linkage, dict),
-        "handoff_binding_linkage_missing",
-        "handoff binding_linkage must be a JSON object",
-    )
     require(
         candidate_selection_binding.get("source_prompt_family") == "prompt_library_candidate",
         "handoff_candidate_selection_source_family_invalid",
@@ -920,6 +908,9 @@ def build_generation_approval_record(
     approved_at = approved_at.astimezone(timezone.utc).replace(microsecond=0)
     expires_at = approved_at + timedelta(minutes=APPROVAL_TTL_MINUTES)
     report = handoff_facts["report"]
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        require_authority_blocks(handoff_facts)
+    )
     return {
         "report_type": APPROVAL_REPORT_TYPE,
         "schema_version": APPROVAL_SCHEMA_VERSION,
@@ -934,9 +925,9 @@ def build_generation_approval_record(
         "date": handoff_facts["date"],
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "provider": APPROVAL_PROVIDER,
         "executor": APPROVAL_EXECUTOR,
         "model": MODEL,
@@ -1191,6 +1182,9 @@ def build_generation_claim_record(
     handoff_facts = approval_result["handoff_facts"]
     date_str = handoff_facts["date"]
     slot_id = handoff_facts["slot_id"]
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        require_authority_blocks(handoff_facts)
+    )
     return {
         "report_type": CLAIM_REPORT_TYPE,
         "schema_version": CLAIM_SCHEMA_VERSION,
@@ -1203,9 +1197,9 @@ def build_generation_claim_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "operator_id": approval["operator_id"],
         "provider": approval["provider"],
         "executor": approval["executor"],
@@ -1251,6 +1245,9 @@ def build_generation_execution_receipt_record(
     date_str = handoff_facts["date"]
     slot_id = handoff_facts["slot_id"]
     claim_path = claim_path.resolve()
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        require_authority_blocks(handoff_facts)
+    )
     return {
         "report_type": RECEIPT_REPORT_TYPE,
         "schema_version": RECEIPT_SCHEMA_VERSION,
@@ -1265,9 +1262,9 @@ def build_generation_execution_receipt_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "outcome": outcome,
         "failure_stage": failure_stage,
         "error_text": error_text,
