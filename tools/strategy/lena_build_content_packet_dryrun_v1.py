@@ -168,7 +168,9 @@ STRUCTURED_TECHNICAL_REALISM = (
 )
 
 # Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
-STRUCTURED_SECTION_MAX = prompt_limits.LEGACY_STRUCTURED_SECTION_MAX_CHARS
+STRUCTURED_SECTION_MAX = (
+    prompt_limits.HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS
+)
 PROVIDER_RECIPE_FIELD_LIMITS = prompt_limits.PROVIDER_RECIPE_FIELD_MAX_CHARS
 PROVIDER_RECIPE_AGGREGATE_MAX_CHARS = (
     prompt_limits.PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS
@@ -394,7 +396,7 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
 
 def build_structured_kling_prompt(
     recipe,
-    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
 ):
     sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
@@ -426,7 +428,7 @@ def build_structured_kling_prompt(
 def compute_proof_prompt_budget(
     wardrobe_entry=None,
     env_entry=None,
-    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
 ):
     # The current dry-run packet builder tracks locked wardrobe/environment
     # bindings as deterministic inputs, but does not append the old provider-
@@ -436,11 +438,11 @@ def compute_proof_prompt_budget(
 
 
 def compute_style_bank_prompt_budget(
-    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
 ):
     reserved = max_production_style_override_len() + 24
     budget = max_chars - reserved
-    if budget < prompt_limits.LEGACY_STYLE_BANK_MIN_BASE_PROMPT_CHARS:
+    if budget < prompt_limits.HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS:
         raise SystemExit(
             "[ABORT] style-bank reserved headroom leaves too little room "
             f"for the base Kling prompt ({budget} chars). "
@@ -685,7 +687,7 @@ def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
 
 def build_compact_kling_prompt(
     recipe,
-    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
 ):
     structured = build_structured_kling_prompt(
@@ -810,12 +812,12 @@ def build_packet(
     outfit_id = recipe.get("wardrobe_outfit_id")
     environment_id = recipe.get("environment_id")
     if prompt_budget is None:
-        prompt_budget = prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+        prompt_budget = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
         if proof_mode and outfit_id:
             prompt_budget = (
-                prompt_limits.LEGACY_PROOF_PROMPT_BUDGET_WITH_ENVIRONMENT
+                prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS
                 if environment_id
-                else prompt_limits.LEGACY_PROOF_PROMPT_BUDGET_WITHOUT_ENVIRONMENT
+                else prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS
             )
         elif not outfit_id:
             prompt_budget = compute_style_bank_prompt_budget()
@@ -838,7 +840,7 @@ def build_packet(
         "live_authority": False,
         "prompt_chars": len(kling_prompt),
         "prompt_headroom": (
-            prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+            prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
             - len(kling_prompt)
         ),
         "scene_logic_contract_present": bool(recipe.get("scene_logic_contract", {})),
@@ -1237,9 +1239,9 @@ def validate_packet(packet, output_path):
 
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
     flags["kling_prompt_under_2500"] = (
-        kling_len <= prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+        kling_len <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     )
-    if kling_len > prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS:
+    if kling_len > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
         errors.append(f"kling prompt too long: {kling_len} chars")
 
     norm = os.path.normpath(output_path)

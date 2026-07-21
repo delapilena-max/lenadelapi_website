@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
+import importlib
 import inspect
 import json
+import os
+import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -59,17 +64,42 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
         prompt_limits.TEMPORARY_REPOSITORY_EXECUTION_POLICY,
         prompt_limits.PER_INPUT_SECURITY_BOUND,
         prompt_limits.RETRY_READINESS_HEADROOM,
-        prompt_limits.LEGACY_DEPRECATED_LIMIT,
     }
     assert all(item["provider_required"] is False for item in classifications.values())
-    execution = classifications["temporary_provider_prompt_execution_max_chars"]
+    assert all(
+        set(item) >= {
+            "value",
+            "provider",
+            "purpose",
+            "classification",
+            "provider_required",
+            "status",
+            "known_consumers",
+        }
+        for item in classifications.values()
+    )
+    execution = classifications["higgsfield_prompt_execution_policy_max_chars"]
     assert execution["value"] == 2499
     assert execution["classification"] == prompt_limits.TEMPORARY_REPOSITORY_EXECUTION_POLICY
     assert "repository" in execution["description"].lower()
+    assert execution["provider"] == "higgsfield"
+
+    kling = classifications["kling_omni_payload_prompt_policy_max_chars"]
+    assert kling["value"] == 2499
+    assert kling["provider"] == "kling_omni"
+    assert kling["provider_required"] is False
+    assert set(kling["known_consumers"]) == {
+        "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
+        "tools/strategy/lena_submit_kling_payload_v1.py",
+        "tools/strategy/lena_build_content_batch_review_report_v1.py",
+    }
 
     assert pose_provenance.PROVIDER_PROMPT_MAX_CHARS == prompt_limits.PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS
     assert pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS == prompt_limits.PROVIDER_SECTION_BODY_MAX_CHARS
-    assert packet_builder.STRUCTURED_SECTION_MAX is prompt_limits.LEGACY_STRUCTURED_SECTION_MAX_CHARS
+    assert (
+        packet_builder.STRUCTURED_SECTION_MAX
+        is prompt_limits.HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS
+    )
     assert packet_builder.PROVIDER_RECIPE_FIELD_LIMITS is prompt_limits.PROVIDER_RECIPE_FIELD_MAX_CHARS
     assert (
         packet_builder.PROVIDER_RECIPE_AGGREGATE_MAX_CHARS
@@ -81,8 +111,69 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
         inspect.signature(packet_builder.build_structured_kling_prompt)
         .parameters["max_chars"]
         .default
-        == prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+        == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     )
+
+
+def test_active_kling_consumers_use_central_limits_without_numeric_duplicates() -> None:
+    def load_worktree_module(name: str, relative_path: str):
+        path = audit.ROOT / relative_path
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        original_sys_path = list(sys.path)
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            sys.path[:] = original_sys_path
+        return module
+
+    kling_payload = load_worktree_module(
+        "budget_review_kling_payload",
+        "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
+    )
+    kling_submit = load_worktree_module(
+        "budget_review_kling_submit",
+        "tools/strategy/lena_submit_kling_payload_v1.py",
+    )
+    batch_review = load_worktree_module(
+        "budget_review_batch_report",
+        "tools/strategy/lena_build_content_batch_review_report_v1.py",
+    )
+
+    assert (
+        inspect.signature(kling_payload.fit_prompt_parts).parameters["max_chars"].default
+        == prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
+    )
+    assert batch_review.prompt_char_stats([
+        {"compact_kling_prompt_chars": prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS},
+    ])["all_under_2500"] is True
+    assert batch_review.prompt_char_stats([
+        {"compact_kling_prompt_chars": prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS + 1},
+    ])["all_under_2500"] is False
+
+    consumer_paths = (
+        Path(kling_payload.__file__),
+        Path(kling_submit.__file__),
+        Path(batch_review.__file__),
+        audit.ROOT / "tools" / "lena_influencer_node_v1_3.py",
+    )
+    forbidden_by_file = {
+        "lena_build_kling_payload_dryrun_v1.py": {2499, 2500},
+        "lena_submit_kling_payload_v1.py": {2499, 2500},
+        "lena_build_content_batch_review_report_v1.py": {2499, 2500},
+        "lena_influencer_node_v1_3.py": {1900, 2500},
+    }
+    for path in consumer_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        integer_literals = {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, int)
+            and not isinstance(node.value, bool)
+        }
+        assert integer_literals.isdisjoint(forbidden_by_file[path.name]), path
 
 
 def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: dict) -> None:
@@ -179,11 +270,13 @@ def test_default_cli_is_stdout_only_and_explicit_temp_output_is_supported(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(audit, "build_audit_report", lambda: {"read_only": True})
-    monkeypatch.setattr(
-        audit,
-        "write_report",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected write")),
-    )
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("no-output audit attempted filesystem mutation")
+
+    monkeypatch.setattr(audit, "write_report", forbidden)
+    monkeypatch.setattr(audit.tempfile, "mkstemp", forbidden)
+    monkeypatch.setattr(Path, "mkdir", forbidden)
     assert audit.main([]) == 0
     assert json.loads(capsys.readouterr().out) == {"read_only": True}
 
@@ -191,6 +284,61 @@ def test_default_cli_is_stdout_only_and_explicit_temp_output_is_supported(
     output = tmp_path / "prompt-budget-audit.json"
     assert audit.write_report({"read_only": True}, output) == output.resolve()
     assert json.loads(output.read_text(encoding="utf-8")) == {"read_only": True}
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+@pytest.mark.parametrize(
+    "output",
+    (
+        audit.ROOT / "prompt-budget-audit.json",
+        Path(r"C:\projects\ai\content_bot\lenadelapi_website_autonomous_live\prompt-budget-audit.json"),
+        Path(r"C:\projects\ai\content_bot\lenadelapi_website_pose_provenance_fix\prompt-budget-audit.json"),
+        Path.home() / "prompt-budget-audit.json",
+        Path("..") / "prompt-budget-audit.json",
+    ),
+)
+def test_auditor_rejects_every_non_temporary_output(output: Path) -> None:
+    with pytest.raises(audit.PromptBudgetAuditError):
+        audit.write_report({"read_only": True}, output)
+
+
+def test_auditor_requires_an_existing_temporary_parent(tmp_path: Path) -> None:
+    output = tmp_path / "missing" / "prompt-budget-audit.json"
+    with pytest.raises(audit.PromptBudgetAuditError):
+        audit.write_report({"read_only": True}, output)
+    assert not output.parent.exists()
+
+
+def test_auditor_rejects_temporary_symlink_escape(tmp_path: Path) -> None:
+    link = tmp_path / "escape"
+    try:
+        link.symlink_to(audit.ROOT, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlink creation is unavailable: {exc}")
+    with pytest.raises(audit.PromptBudgetAuditError):
+        audit.write_report({"read_only": True}, link / "prompt-budget-audit.json")
+
+
+def test_auditor_rejects_temporary_windows_junction_escape(tmp_path: Path) -> None:
+    if os.name != "nt":
+        pytest.skip("Windows junction test")
+    junction = tmp_path / "junction-escape"
+    proc = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(junction), str(audit.ROOT)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        pytest.skip(f"directory junction creation is unavailable: {proc.stderr.strip()}")
+    try:
+        with pytest.raises(audit.PromptBudgetAuditError):
+            audit.write_report(
+                {"read_only": True},
+                junction / "prompt-budget-audit.json",
+            )
+    finally:
+        junction.rmdir()
 
 
 def test_current_production_prompt_matrix_matches_reviewed_parent_baseline() -> None:
@@ -212,4 +360,86 @@ def test_current_production_prompt_matrix_matches_reviewed_parent_baseline() -> 
     assert len(rows) == 342
     assert hashlib.sha256(matrix).hexdigest() == (
         "57c3fa4d19e35c2092296d2fda5c8a5af3bfab67308f8da731da7e3fae8f693a"
+    )
+
+
+def _build_packet_production_matrix() -> list[dict]:
+    recipes, poses = _banks()
+    hook = {
+        "id": "production_matrix_hook",
+        "category": "production_matrix",
+        "hook_text": "",
+        "caption_followup": "",
+        "optional_reels_opening_line": "",
+        "suggested_comment_reply_angle": "",
+        "scores": {"total_score": 0},
+    }
+    rows = []
+    for recipe in recipes:
+        for pose in poses:
+            packet = packet_builder.build_packet(
+                copy.deepcopy(recipe),
+                copy.deepcopy(hook),
+                "deterministic production-entry regression",
+                "2026-07-21",
+                pose_binding=_pose_binding(pose),
+            )
+            prompt = packet["compact_provider_prompt_preview"]
+            rows.append({
+                "recipe_id": recipe["id"],
+                "pose_body_language_id": pose["pose_body_language_id"],
+                "selected_production_budget": packet["compact_provider_prompt_budget"],
+                "provider_prompt": prompt,
+                "provider_prompt_sha256": packet["compact_provider_prompt_sha256"],
+                "provider_prompt_chars": packet["compact_provider_prompt_chars"],
+                "pose_provenance": packet["pose_provenance"],
+                "generation_pose_contract": packet["generation_pose_contract"],
+                "provider_prompt_contract": packet["provider_prompt_contract"],
+            })
+    return rows
+
+
+def test_build_packet_production_matrix_matches_reviewed_parent_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Packet IDs, hook/caption copy, date-derived planning fields, and social
+    # metadata are excluded because they do not influence provider prompt bytes,
+    # budget selection, or pose binding. The production entry point still builds
+    # them; the stable projection retains every prompt and pose authority field.
+    monkeypatch.setattr(
+        packet_builder,
+        "save_packet",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("production matrix attempted to write a packet")
+        ),
+    )
+    rows = _build_packet_production_matrix()
+    assert len(rows) == 342
+    proof_budgets = {
+        (row["recipe_id"], row["selected_production_budget"])
+        for row in rows
+        if row["recipe_id"] in {"hcr_007", "hcr_011", "hcr_012"}
+    }
+    assert proof_budgets == {
+        (
+            recipe_id,
+            prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS,
+        )
+        for recipe_id in ("hcr_007", "hcr_011", "hcr_012")
+    }
+    for row in rows:
+        prompt = row["provider_prompt"]
+        assert row["provider_prompt_chars"] == len(prompt)
+        assert row["provider_prompt_sha256"] == hashlib.sha256(
+            prompt.encode("utf-8")
+        ).hexdigest()
+
+    matrix = json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    assert hashlib.sha256(matrix).hexdigest() == (
+        "f42ad244b6484c9b03633051e341291c44d2d413d6b479afffa1e6dba4df5fc5"
     )

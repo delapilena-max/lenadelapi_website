@@ -40,6 +40,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 ENV_PATH = ROOT / ".env"
 RESULTS_BASE = ROOT / "pipeline" / "strategy" / "lena" / "kling_results"
 
@@ -239,7 +244,8 @@ def validate_envelope(env: dict) -> list[str]:
         ),
         "prompt_chars < 2500": (
             isinstance(env.get("prompt_chars"), int)
-            and env["prompt_chars"] < 2500
+            and env["prompt_chars"]
+            <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
         ),
     }
     for name, ok in gate_checks.items():

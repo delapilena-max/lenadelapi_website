@@ -186,7 +186,7 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
         "packet_path": str(packet_path) if packet_path else "",
         "packet_compact_chars": packet_chars,
         "packet_compact_headroom": (
-            prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+            prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
             - packet_chars
             if isinstance(packet_chars, int)
             else None
@@ -197,7 +197,7 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
         "payload_headroom": provider_prompt_contract.get(
             "prompt_headroom",
             (
-                prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+                prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
                 - payload_chars
                 if isinstance(payload_chars, int)
                 else None

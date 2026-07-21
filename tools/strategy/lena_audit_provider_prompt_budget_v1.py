@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -148,7 +150,7 @@ def audit_recipe_pose(
         recipe,
         canonical_pose["pose_text"],
     )
-    execution_budget = prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+    execution_budget = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     rows = []
     for retry_type in RETRY_TYPES:
         sections = _retry_sections(base_sections, retry_type)
@@ -365,20 +367,38 @@ def build_audit_report(
 
 
 def write_report(report: dict[str, Any], output_path: Path) -> Path:
-    resolved = output_path.resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve(strict=True)
+    resolved = output_path.resolve(strict=False)
     try:
-        resolved.relative_to(ROOT.resolve())
+        resolved.relative_to(temp_root)
     except ValueError:
-        pass
-    else:
         raise PromptBudgetAuditError(
-            "audit output must be an explicit temporary path outside the repository"
+            "audit output must resolve beneath the operating system temporary root"
         )
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(
-        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True) + "\n",
-        encoding="utf-8",
+    if resolved == temp_root or not resolved.parent.is_dir():
+        raise PromptBudgetAuditError(
+            "audit output parent must be an existing directory beneath the temporary root"
+        )
+
+    payload = json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{resolved.name}.",
+        suffix=".tmp",
+        dir=str(resolved.parent),
+        text=True,
     )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, resolved)
+    except BaseException:
+        try:
+            Path(temporary_name).unlink()
+        except FileNotFoundError:
+            pass
+        raise
     return resolved
 
 

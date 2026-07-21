@@ -11,12 +11,13 @@ PER_INPUT_SECURITY_BOUND = "per_input_security_bound"
 RETRY_READINESS_HEADROOM = "retry_readiness_headroom"
 LEGACY_DEPRECATED_LIMIT = "legacy_deprecated_limit"
 
-# This is a repository parser bound, not a published provider limit.
+# No numeric limit in this module is represented as provider-required. The
+# provider field names the execution surface whose repository policy consumes it.
 PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS = 4096
-
-# This temporary repository policy descends from the historical Kling packet
-# budget. It must not be represented as a Higgsfield requirement.
-TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS = 2499
+HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS = 2499
+KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS = 2499
+LEGACY_KLING_DIRECT_PROMPT_MIN_CHARS = 1900
+LEGACY_KLING_DIRECT_PROMPT_MAX_CHARS = 2500
 
 PROVIDER_SECTION_BODY_MAX_CHARS = 2048
 PROVIDER_RECIPE_FIELD_MAX_CHARS = MappingProxyType({
@@ -33,9 +34,9 @@ PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS = 4096
 RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW = 30
 RETRY_PROMPT_HEADROOM_WARNING_BELOW = 70
 
-# These values remain wired into legacy production fitting until a later
-# recipe-migration and zero-loss compiler change removes them.
-LEGACY_STRUCTURED_SECTION_MAX_CHARS = MappingProxyType({
+# These active limits preserve the current fitter and proof-packet behavior.
+# They are repository policy, not published Higgsfield constraints.
+HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS = MappingProxyType({
     "Subject": 540,
     "Action": 330,
     "Environment": 360,
@@ -43,89 +44,186 @@ LEGACY_STRUCTURED_SECTION_MAX_CHARS = MappingProxyType({
     "Lighting/Style": 300,
     "Technical": 500,
 })
-LEGACY_PROOF_PROMPT_BUDGET_WITH_ENVIRONMENT = 1780
-LEGACY_PROOF_PROMPT_BUDGET_WITHOUT_ENVIRONMENT = 1940
-LEGACY_STYLE_BANK_MIN_BASE_PROMPT_CHARS = 1700
+HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS = 1780
+HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS = 1940
+HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS = 1700
+
+
+def _entry(
+    *,
+    value: Any,
+    provider: str,
+    purpose: str,
+    classification: str,
+    status: str,
+    known_consumers: tuple[str, ...],
+    description: str,
+) -> dict[str, Any]:
+    return {
+        "value": value,
+        "provider": provider,
+        "purpose": purpose,
+        "classification": classification,
+        "provider_required": False,
+        "status": status,
+        "known_consumers": list(known_consumers),
+        "description": description,
+    }
 
 
 _LIMIT_CLASSIFICATIONS = {
-    "provider_prompt_parser_safety_max_chars": {
-        "classification": PARSER_SAFETY_LIMIT,
-        "value": PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS,
-        "provider_required": False,
-        "status": "active",
-        "description": "Maximum complete prompt length accepted by the repository grammar parser.",
-    },
-    "temporary_provider_prompt_execution_max_chars": {
-        "classification": TEMPORARY_REPOSITORY_EXECUTION_POLICY,
-        "value": TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
-        "provider_required": False,
-        "status": "temporary",
-        "description": "Conservative repository execution budget pending separately proven provider authority.",
-    },
-    "provider_section_body_max_chars": {
-        "classification": PER_INPUT_SECURITY_BOUND,
-        "value": PROVIDER_SECTION_BODY_MAX_CHARS,
-        "provider_required": False,
-        "status": "active",
-        "description": "Pre-normalization security bound for one canonical provider section body.",
-    },
-    "provider_recipe_field_max_chars": {
-        "classification": PER_INPUT_SECURITY_BOUND,
-        "value": dict(PROVIDER_RECIPE_FIELD_MAX_CHARS),
-        "provider_required": False,
-        "status": "active",
-        "description": "Pre-normalization security bounds for recipe-derived provider inputs.",
-    },
-    "provider_recipe_input_aggregate_max_chars": {
-        "classification": PER_INPUT_SECURITY_BOUND,
-        "value": PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS,
-        "provider_required": False,
-        "status": "active",
-        "description": "Aggregate pre-normalization security bound for recipe-derived provider inputs.",
-    },
-    "retry_prompt_headroom_hard_block_below": {
-        "classification": RETRY_READINESS_HEADROOM,
-        "value": RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW,
-        "provider_required": False,
-        "status": "active",
-        "description": "Repository readiness hard block for remaining execution-budget headroom.",
-    },
-    "retry_prompt_headroom_warning_below": {
-        "classification": RETRY_READINESS_HEADROOM,
-        "value": RETRY_PROMPT_HEADROOM_WARNING_BELOW,
-        "provider_required": False,
-        "status": "active",
-        "description": "Repository readiness warning for remaining execution-budget headroom.",
-    },
-    "legacy_structured_section_max_chars": {
-        "classification": LEGACY_DEPRECATED_LIMIT,
-        "value": dict(LEGACY_STRUCTURED_SECTION_MAX_CHARS),
-        "provider_required": False,
-        "status": "deprecated_but_still_enforced",
-        "description": "Historical fitter budgets retained only to preserve current prompt output.",
-    },
-    "legacy_proof_prompt_budget_with_environment": {
-        "classification": LEGACY_DEPRECATED_LIMIT,
-        "value": LEGACY_PROOF_PROMPT_BUDGET_WITH_ENVIRONMENT,
-        "provider_required": False,
-        "status": "deprecated",
-        "description": "Historical proof-packet budget superseded on the current locked rebuild path.",
-    },
-    "legacy_proof_prompt_budget_without_environment": {
-        "classification": LEGACY_DEPRECATED_LIMIT,
-        "value": LEGACY_PROOF_PROMPT_BUDGET_WITHOUT_ENVIRONMENT,
-        "provider_required": False,
-        "status": "deprecated",
-        "description": "Historical proof-packet budget superseded on the current locked rebuild path.",
-    },
-    "legacy_style_bank_min_base_prompt_chars": {
-        "classification": LEGACY_DEPRECATED_LIMIT,
-        "value": LEGACY_STYLE_BANK_MIN_BASE_PROMPT_CHARS,
-        "provider_required": False,
-        "status": "legacy",
-        "description": "Historical style-bank fitter floor outside the current locked catalog path.",
-    },
+    "provider_prompt_parser_safety_max_chars": _entry(
+        value=PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS,
+        provider="shared_provider_prompt_grammar",
+        purpose="bound complete-prompt grammar parsing before full-string work",
+        classification=PARSER_SAFETY_LIMIT,
+        status="active",
+        known_consumers=(
+            "tools/strategy/lena_pose_provenance_v1.py",
+            "tools/strategy/lena_audit_provider_prompt_budget_v1.py",
+        ),
+        description="Maximum complete prompt length accepted by the repository grammar parser.",
+    ),
+    "higgsfield_prompt_execution_policy_max_chars": _entry(
+        value=HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+        provider="higgsfield",
+        purpose="temporary repository execution budget for the Higgsfield-forward packet path",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="temporary_active",
+        known_consumers=(
+            "tools/strategy/lena_build_content_packet_dryrun_v1.py",
+            "tools/strategy/lena_audit_autonomous_generation_readiness_v1.py",
+            "tools/strategy/lena_audit_provider_prompt_budget_v1.py",
+        ),
+        description="Conservative repository execution budget pending separately proven Higgsfield authority.",
+    ),
+    "kling_omni_payload_prompt_policy_max_chars": _entry(
+        value=KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS,
+        provider="kling_omni",
+        purpose="cap and validate the active Kling Omni payload prompt",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="active_legacy_behavior_preserved",
+        known_consumers=(
+            "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
+            "tools/strategy/lena_submit_kling_payload_v1.py",
+            "tools/strategy/lena_build_content_batch_review_report_v1.py",
+        ),
+        description="Repository Kling Omni payload policy retained without claiming provider authority.",
+    ),
+    "legacy_kling_direct_prompt_min_chars": _entry(
+        value=LEGACY_KLING_DIRECT_PROMPT_MIN_CHARS,
+        provider="legacy_kling_direct",
+        purpose="warn when the legacy direct-generation prompt is shorter than its quality floor",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="legacy_callable",
+        known_consumers=("tools/lena_influencer_node_v1_3.py",),
+        description="Legacy direct-generation repository quality floor; not a provider requirement.",
+    ),
+    "legacy_kling_direct_prompt_max_chars": _entry(
+        value=LEGACY_KLING_DIRECT_PROMPT_MAX_CHARS,
+        provider="legacy_kling_direct",
+        purpose="cap the legacy direct-generation prompt",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="legacy_callable",
+        known_consumers=("tools/lena_influencer_node_v1_3.py",),
+        description="Legacy direct-generation repository cap; not a provider requirement.",
+    ),
+    "provider_section_body_max_chars": _entry(
+        value=PROVIDER_SECTION_BODY_MAX_CHARS,
+        provider="shared_provider_prompt_grammar",
+        purpose="bound one canonical provider section body before normalization",
+        classification=PER_INPUT_SECURITY_BOUND,
+        status="active",
+        known_consumers=(
+            "tools/strategy/lena_pose_provenance_v1.py",
+            "tools/strategy/lena_audit_provider_prompt_budget_v1.py",
+        ),
+        description="Pre-normalization security bound for one canonical provider section body.",
+    ),
+    "provider_recipe_field_max_chars": _entry(
+        value=dict(PROVIDER_RECIPE_FIELD_MAX_CHARS),
+        provider="higgsfield",
+        purpose="bound each recipe-derived provider input before normalization",
+        classification=PER_INPUT_SECURITY_BOUND,
+        status="active",
+        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
+        description="Pre-normalization security bounds for recipe-derived provider inputs.",
+    ),
+    "provider_recipe_input_aggregate_max_chars": _entry(
+        value=PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS,
+        provider="higgsfield",
+        purpose="bound aggregate recipe-derived provider input before normalization",
+        classification=PER_INPUT_SECURITY_BOUND,
+        status="active",
+        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
+        description="Aggregate pre-normalization security bound for recipe-derived provider inputs.",
+    ),
+    "retry_prompt_headroom_hard_block_below": _entry(
+        value=RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW,
+        provider="higgsfield",
+        purpose="block retry preparation when execution-budget headroom is too small",
+        classification=RETRY_READINESS_HEADROOM,
+        status="active",
+        known_consumers=(
+            "tools/strategy/lena_audit_autonomous_generation_readiness_v1.py",
+            "tools/strategy/lena_prepare_higgsfield_retry_handoff_v1.py",
+        ),
+        description="Repository readiness hard block for remaining execution-budget headroom.",
+    ),
+    "retry_prompt_headroom_warning_below": _entry(
+        value=RETRY_PROMPT_HEADROOM_WARNING_BELOW,
+        provider="higgsfield",
+        purpose="warn when retry execution-budget headroom is low",
+        classification=RETRY_READINESS_HEADROOM,
+        status="active",
+        known_consumers=(
+            "tools/strategy/lena_audit_autonomous_generation_readiness_v1.py",
+            "tools/strategy/lena_prepare_higgsfield_retry_handoff_v1.py",
+        ),
+        description="Repository readiness warning for remaining execution-budget headroom.",
+    ),
+    "higgsfield_structured_prompt_section_fitter_max_chars": _entry(
+        value=dict(HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS),
+        provider="higgsfield",
+        purpose="preserve active per-section fitter output",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="active_legacy_behavior_preserved",
+        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
+        description="Historical fitter budgets still enforced to preserve current prompt output.",
+    ),
+    "higgsfield_proof_packet_prompt_budget_with_environment_chars": _entry(
+        value=HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS,
+        provider="higgsfield",
+        purpose="preserve the active proof-packet budget when an environment is bound",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="active_legacy_behavior_preserved",
+        known_consumers=(
+            "tools/strategy/lena_build_content_packet_dryrun_v1.py",
+            "tools/strategy/lena_build_content_batch_dryrun_v1.py",
+        ),
+        description="Historical proof-packet repository budget still used by production packet construction.",
+    ),
+    "higgsfield_proof_packet_prompt_budget_without_environment_chars": _entry(
+        value=HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS,
+        provider="higgsfield",
+        purpose="preserve the active proof-packet budget when no environment is bound",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="active_legacy_behavior_preserved",
+        known_consumers=(
+            "tools/strategy/lena_build_content_packet_dryrun_v1.py",
+            "tools/strategy/lena_build_content_batch_dryrun_v1.py",
+        ),
+        description="Historical proof-packet repository budget still used by production packet construction.",
+    ),
+    "higgsfield_style_bank_prompt_min_base_chars": _entry(
+        value=HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS,
+        provider="higgsfield",
+        purpose="preserve minimum base-prompt space after style-bank reservation",
+        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
+        status="active_legacy_behavior_preserved",
+        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
+        description="Historical style-bank repository floor still used by production packet construction.",
+    ),
 }
 
 
