@@ -27,6 +27,7 @@ from pipeline.prompting.lena_prompt_brain import (
     max_production_style_override_len,
 )
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 
 RECIPE_BANK = os.path.join(
     ROOT, "pipeline", "prompt_banks", "lena",
@@ -166,24 +167,12 @@ STRUCTURED_TECHNICAL_REALISM = (
     "or environment/wardrobe contradictions."
 )
 
-STRUCTURED_SECTION_MAX = {
-    "Subject": 540,
-    "Action": 330,
-    "Environment": 360,
-    "Cinematography": 230,
-    "Lighting/Style": 300,
-    "Technical": 500,
-}
-PROVIDER_RECIPE_FIELD_LIMITS = {
-    "subject_pose": 768,
-    "fashion_accessories": 896,
-    "setting_background": 768,
-    "environment_realism_notes": 512,
-    "technical_keywords": 320,
-    "style_lighting": 640,
-    "negative_constraints": 768,
-}
-PROVIDER_RECIPE_AGGREGATE_MAX_CHARS = 4096
+# Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
+STRUCTURED_SECTION_MAX = prompt_limits.LEGACY_STRUCTURED_SECTION_MAX_CHARS
+PROVIDER_RECIPE_FIELD_LIMITS = prompt_limits.PROVIDER_RECIPE_FIELD_MAX_CHARS
+PROVIDER_RECIPE_AGGREGATE_MAX_CHARS = (
+    prompt_limits.PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS
+)
 
 AI_TERMS = re.compile(
     r"\b(ai|bot|virtual|synthetic|fake|generated|prompt|algorithm|"
@@ -326,19 +315,14 @@ def build_hpe_subject_presence(recipe) -> str:
     return HPE_SUBJECT_PRESENCE_COMPACT
 
 
-def build_structured_prompt_sections(recipe, pose_binding=None):
-    bound_pose = (
-        pose_provenance.validate_pose_provenance(pose_binding)
-        if pose_binding is not None
-        else None
-    )
+def _validate_recipe_provider_inputs(recipe):
     scene_logic_contract = recipe.get("scene_logic_contract") or {}
     if not isinstance(scene_logic_contract, dict):
         raise pose_provenance.PoseProvenanceError(
             "provider_body_type_invalid",
             "recipe scene_logic_contract must be a JSON object",
         )
-    recipe_section_inputs = pose_provenance.validate_provider_body_inputs({
+    return pose_provenance.validate_provider_body_inputs({
         "subject_pose": recipe.get("subject_pose", ""),
         "fashion_accessories": recipe.get("fashion_accessories", ""),
         "setting_background": recipe.get("setting_background", ""),
@@ -348,13 +332,14 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
         "negative_constraints": recipe.get("negative_constraints", ""),
     }, field_limits=PROVIDER_RECIPE_FIELD_LIMITS, aggregate_max_chars=PROVIDER_RECIPE_AGGREGATE_MAX_CHARS)
 
+
+def _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action):
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
     fashion = recipe_section_inputs["fashion_accessories"]
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
     subject = " ".join(subject_parts)
     subject_presence = build_hpe_subject_presence(recipe)
-    action = bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
     environment_note = recipe_section_inputs["environment_realism_notes"]
     environment_parts = [recipe_section_inputs["setting_background"]]
     if environment_note:
@@ -381,7 +366,37 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
     return sections
 
 
-def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):
+def build_zero_loss_prompt_sections_for_budget_audit(recipe, pose_text):
+    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
+    pose_text = pose_provenance.validate_provider_body_text(
+        pose_text,
+        label="canonical pose text for budget audit",
+        max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+    )
+    if not pose_text:
+        raise pose_provenance.PoseProvenanceError(
+            "pose_identity_missing",
+            "canonical pose text is required for budget audit",
+        )
+    return _assemble_structured_prompt_sections(recipe, recipe_section_inputs, pose_text)
+
+
+def build_structured_prompt_sections(recipe, pose_binding=None):
+    bound_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
+    )
+    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
+    action = bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
+    return _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action)
+
+
+def build_structured_kling_prompt(
+    recipe,
+    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    pose_binding=None,
+):
     sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
     built = []
     current_chars = 0
@@ -411,7 +426,7 @@ def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):
 def compute_proof_prompt_budget(
     wardrobe_entry=None,
     env_entry=None,
-    max_chars=2499,
+    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
 ):
     # The current dry-run packet builder tracks locked wardrobe/environment
     # bindings as deterministic inputs, but does not append the old provider-
@@ -420,10 +435,12 @@ def compute_proof_prompt_budget(
     return max_chars
 
 
-def compute_style_bank_prompt_budget(max_chars=2499):
+def compute_style_bank_prompt_budget(
+    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+):
     reserved = max_production_style_override_len() + 24
     budget = max_chars - reserved
-    if budget < 1700:
+    if budget < prompt_limits.LEGACY_STYLE_BANK_MIN_BASE_PROMPT_CHARS:
         raise SystemExit(
             "[ABORT] style-bank reserved headroom leaves too little room "
             f"for the base Kling prompt ({budget} chars). "
@@ -666,7 +683,11 @@ def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
     return hook, reason
 
 
-def build_compact_kling_prompt(recipe, max_chars=2499, pose_binding=None):
+def build_compact_kling_prompt(
+    recipe,
+    max_chars=prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS,
+    pose_binding=None,
+):
     structured = build_structured_kling_prompt(
         recipe,
         max_chars=max_chars,
@@ -789,9 +810,13 @@ def build_packet(
     outfit_id = recipe.get("wardrobe_outfit_id")
     environment_id = recipe.get("environment_id")
     if prompt_budget is None:
-        prompt_budget = 2499
+        prompt_budget = prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
         if proof_mode and outfit_id:
-            prompt_budget = 1780 if environment_id else 1940
+            prompt_budget = (
+                prompt_limits.LEGACY_PROOF_PROMPT_BUDGET_WITH_ENVIRONMENT
+                if environment_id
+                else prompt_limits.LEGACY_PROOF_PROMPT_BUDGET_WITHOUT_ENVIRONMENT
+            )
         elif not outfit_id:
             prompt_budget = compute_style_bank_prompt_budget()
     bound_pose = (
@@ -812,7 +837,10 @@ def build_packet(
         "provider_route": "higgsfield_forward_no_live",
         "live_authority": False,
         "prompt_chars": len(kling_prompt),
-        "prompt_headroom": 2499 - len(kling_prompt),
+        "prompt_headroom": (
+            prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+            - len(kling_prompt)
+        ),
         "scene_logic_contract_present": bool(recipe.get("scene_logic_contract", {})),
         "master_identity_body_present": check_master_identity(kling_prompt),
         "blocked_terms_absent": len(provider_prompt_blocked_terms) == 0,
@@ -1208,8 +1236,10 @@ def validate_packet(packet, output_path):
         flags["provider_action_pose_bound"] = False
 
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
-    flags["kling_prompt_under_2500"] = kling_len < 2500
-    if kling_len >= 2500:
+    flags["kling_prompt_under_2500"] = (
+        kling_len <= prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS
+    )
+    if kling_len > prompt_limits.TEMPORARY_PROVIDER_PROMPT_EXECUTION_MAX_CHARS:
         errors.append(f"kling prompt too long: {kling_len} chars")
 
     norm = os.path.normpath(output_path)

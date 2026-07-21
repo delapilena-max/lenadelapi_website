@@ -7,6 +7,8 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_VERSION = "lena_pose_provenance_binding_v1"
@@ -24,8 +26,9 @@ PROVIDER_SECTION_ORDER = (
     "Lighting/Style",
     "Technical",
 )
-PROVIDER_PROMPT_MAX_CHARS = 4096
-PROVIDER_SECTION_BODY_MAX_CHARS = 2048
+# Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
+PROVIDER_PROMPT_MAX_CHARS = prompt_limits.PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS
+PROVIDER_SECTION_BODY_MAX_CHARS = prompt_limits.PROVIDER_SECTION_BODY_MAX_CHARS
 
 
 DEFAULT_IGNORABLE_RANGES = (
