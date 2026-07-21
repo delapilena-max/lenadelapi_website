@@ -377,6 +377,19 @@ def _write_handoff(tmp_path: Path, report: dict | None = None) -> Path:
     return handoff_path
 
 
+def _reseal_provenance(payload: dict, fingerprint_field: str) -> dict:
+    core = {key: value for key, value in payload.items() if key != fingerprint_field}
+    payload[fingerprint_field] = hashlib.sha256(
+        json.dumps(
+            core,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    return payload
+
+
 def _record_and_write(
     tmp_path: Path,
     handoff_path: Path,
@@ -415,6 +428,114 @@ def test_inspect_handoff_artifact_extracts_expected_facts(tmp_path: Path, monkey
     assert facts["provider_execution_binding"]["provider_lane"] == "parking_garage_flash"
     assert facts["binding_linkage"]["candidate_prompt_family"] == "prompt_library_candidate"
     assert facts["binding_linkage"]["provider_prompt_family"] == "compact_provider_prompt"
+
+
+@pytest.mark.parametrize(
+    ("section", "original_body", "forged_body"),
+    [
+        ("Expression", pose_fixture.EXPRESSION_TEXT, "forged expression authority"),
+        ("Action", pose_fixture.POSE_TEXT, "forged pose authority"),
+    ],
+)
+def test_inspect_rejects_forged_bound_prompt_with_stale_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    section: str,
+    original_body: str,
+    forged_body: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    report = _valid_handoff_report(tmp_path)
+    forged = report["selected_prompt_input"]["prompt_text"].replace(
+        f"[{section}]: {original_body}",
+        f"[{section}]: {forged_body}",
+    )
+    report["selected_prompt_input"]["prompt_text"] = forged
+    report["structured_executor_inputs"]["selected_prompt_text"] = forged
+    handoff_path = _write_handoff(tmp_path, report)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == "handoff_prompt_text_sha_mismatch"
+
+
+def test_inspect_rejects_disagreeing_prompt_text_copies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    report = _valid_handoff_report(tmp_path)
+    report["selected_prompt_input"]["prompt_text"] += " forged"
+    handoff_path = _write_handoff(tmp_path, report)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == "handoff_prompt_text_mismatch"
+
+
+def test_inspect_rejects_stale_recorded_prompt_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    report = _valid_handoff_report(tmp_path)
+    stale_sha = hashlib.sha256(b"stale provider prompt").hexdigest()
+    report["selected_prompt_input"]["prompt_sha256"] = stale_sha
+    report["structured_executor_inputs"]["selected_prompt_sha256"] = stale_sha
+    handoff_path = _write_handoff(tmp_path, report)
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == "handoff_prompt_text_sha_mismatch"
+
+
+@pytest.mark.parametrize("authority", ["pose", "expression"])
+def test_inspect_rejects_candidate_derived_provider_authority_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    authority: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    report = _valid_handoff_report(tmp_path)
+    handoff_path = _write_handoff(tmp_path, report)
+    if authority == "pose":
+        original = pose_fixture.candidate_pose_provenance
+
+        def derive(candidate_path: Path, *, root: Path) -> dict:
+            value = original(candidate_path, root=root)
+            value["pose_authority_artifact_sha256"] = "f" * 64
+            return _reseal_provenance(
+                value,
+                "pose_provenance_fingerprint_sha256",
+            )
+
+        monkeypatch.setattr(
+            approval_mod.pose_provenance,
+            "build_candidate_pose_provenance",
+            derive,
+        )
+        expected_code = "handoff_candidate_pose_provenance_mismatch"
+    else:
+        original = pose_fixture.candidate_expression_provenance
+
+        def derive(candidate_path: Path, *, root: Path) -> dict:
+            value = original(candidate_path, root=root)
+            value["expression_authority_artifact_sha256"] = "f" * 64
+            return _reseal_provenance(
+                value,
+                "expression_provenance_fingerprint_sha256",
+            )
+
+        monkeypatch.setattr(
+            approval_mod.pose_provenance,
+            "build_candidate_expression_provenance",
+            derive,
+        )
+        expected_code = "handoff_candidate_expression_provenance_mismatch"
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == expected_code
 
 
 # --- build + validate round trip ---------------------------------------------

@@ -125,6 +125,18 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+def _write_resealed_retry_handoff(path: Path, artifact: dict) -> None:
+    core = {
+        key: value
+        for key, value in artifact.items()
+        if key not in {"created_at_utc", "retry_handoff_fingerprint_sha256"}
+    }
+    artifact["retry_handoff_fingerprint_sha256"] = hashlib.sha256(
+        retry_mod._canonical_bytes(core)
+    ).hexdigest()
+    _write_json(path, artifact)
+
+
 def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_live_image_handoff_{DATE}.json"
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / DATE / f"lena_content_packet_dryrun_{DATE}_hcr_011.json"
@@ -505,6 +517,56 @@ def test_valid_retry_approval_round_trip(tmp_path: Path, monkeypatch: pytest.Mon
     assert result["scope_summary"]["publish_authorized"] is False
     assert result["scope_summary"]["scheduling_authorized"] is False
     assert result["scope_summary"]["analytics_mutation_authorized"] is False
+
+
+@pytest.mark.parametrize(
+    ("section", "original_body", "forged_body"),
+    [
+        ("Expression", pose_fixture.EXPRESSION_TEXT, "forged retry expression"),
+        ("Action", pose_fixture.POSE_TEXT, "forged retry action"),
+    ],
+)
+def test_retry_approval_inspection_rejects_forged_bound_prompt_with_stale_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    section: str,
+    original_body: str,
+    forged_body: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    artifact = json.loads(
+        seeded["retry_handoff_path"].read_text(encoding="utf-8")
+    )
+    artifact["retry_prompt_text"] = artifact["retry_prompt_text"].replace(
+        f"[{section}]: {original_body}",
+        f"[{section}]: {forged_body}",
+    )
+    _write_resealed_retry_handoff(seeded["retry_handoff_path"], artifact)
+
+    with pytest.raises(HiggsfieldRetryGenerationApprovalError) as excinfo:
+        inspect_retry_handoff_artifact(seeded["retry_handoff_path"])
+    assert excinfo.value.code == "retry_prompt_sha_mismatch"
+
+
+def test_retry_approval_inherits_source_handoff_prompt_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
+    forged = handoff["selected_prompt_input"]["prompt_text"].replace(
+        f"[Expression]: {pose_fixture.EXPRESSION_TEXT}",
+        "[Expression]: forged source expression",
+    )
+    handoff["selected_prompt_input"]["prompt_text"] = forged
+    handoff["structured_executor_inputs"]["selected_prompt_text"] = forged
+    _write_json(seeded["handoff_path"], handoff)
+
+    with pytest.raises(canonical_approval.HiggsfieldGenerationApprovalError) as excinfo:
+        inspect_retry_handoff_artifact(seeded["retry_handoff_path"])
+    assert excinfo.value.code == "handoff_prompt_text_sha_mismatch"
 
 
 def test_retry_recording_tool_writes_scoped_approval(

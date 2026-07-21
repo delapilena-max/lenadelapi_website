@@ -681,6 +681,54 @@ def test_handoff_drift_rejects_before_provider_access(
     assert expected_code in stdout
 
 
+def test_forged_expression_prompt_rejects_before_approval_validation_or_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
+    approval_path = _build_approval_fixture(packet_path)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    forged_prompt = packet["selected_prompt_input"]["prompt_text"].replace(
+        f"[Expression]: {pose_fixture.EXPRESSION_TEXT}",
+        "[Expression]: forged expression",
+    )
+    assert forged_prompt != packet["selected_prompt_input"]["prompt_text"]
+    packet["selected_prompt_input"]["prompt_text"] = forged_prompt
+    packet["structured_executor_inputs"]["selected_prompt_text"] = forged_prompt
+    packet_path.write_text(json.dumps(packet, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        executor,
+        "_validate_approval_artifact",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("approval validation must not be reached for a forged handoff")
+        ),
+    )
+    monkeypatch.setattr(
+        executor,
+        "run_live",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("provider execution must not be reached for a forged handoff")
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--handoff-artifact",
+            str(packet_path),
+            "--approval-artifact",
+            str(approval_path),
+            "--live",
+        ],
+    )
+
+    assert executor.main() == 1
+    assert "handoff_prompt_text_mismatch" in capsys.readouterr().out
+
+
 def test_validate_handoff_packet_rejects_selected_candidate_recommendation_mismatch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

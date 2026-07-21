@@ -393,7 +393,6 @@ def _production_dual_binding_fixture(
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
     handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
-    selected_prompt_text = "provider prompt preview"
     canonical_pose_text = "weight shifted onto one hip, stance easy and unforced"
     canonical_expression = disposition.lena_prompt_brain._higgsfield_safe_expression_text(
         "",
@@ -405,7 +404,9 @@ def _production_dual_binding_fixture(
     wardrobe_catalog = json.loads(
         (ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json").read_text(encoding="utf-8")
     )
-    wardrobe_prompt = next(item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050")
+    wardrobe_prompt = next(
+        item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050"
+    )
     reference_authority_commit = disposition.subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=ROOT,
@@ -413,9 +414,9 @@ def _production_dual_binding_fixture(
         check=True,
         text=True,
     ).stdout.strip()
-    provider_prompt_text = (
-        f"{selected_prompt_text} Pose: {canonical_pose_text}. "
-        f"Expression: {canonical_expression['text']}. Wardrobe: {wardrobe_prompt}"
+    provider_prompt_text = pose_fixture.canonical_prompt().replace(
+        "Lena in a controlled fashion portrait with a calm expression.",
+        f"Lena in a controlled fashion portrait with a calm expression. Wardrobe: {wardrobe_prompt}",
     )
     provider_prompt_sha = hashlib.sha256(provider_prompt_text.encode("utf-8")).hexdigest()
     auth["influencer_id"] = "lena"
@@ -491,6 +492,16 @@ def _production_dual_binding_fixture(
         candidate_path=resolved_candidate_path,
         candidate_sha256=candidate_sha,
         authority_commit=reference_authority_commit,
+    )
+    monkeypatch.setattr(
+        disposition.approval.pose_provenance,
+        "build_candidate_pose_provenance",
+        lambda candidate_path, *, root: dict(pose_binding),
+    )
+    monkeypatch.setattr(
+        disposition.approval.pose_provenance,
+        "build_candidate_expression_provenance",
+        lambda candidate_path, *, root: dict(expression_binding),
     )
     handoff["repo_executor_path"] = "pipeline/higgsfield_lena_api_executor.py"
     handoff["created_at"] = "2026-07-19T00:00:00Z"

@@ -160,6 +160,75 @@ def require_sha256(raw: Any, *, code: str, label: str) -> str:
     return value
 
 
+def _validate_bound_provider_prompt_copies(
+    *,
+    selected_prompt: dict[str, Any],
+    structured: dict[str, Any],
+    expected_prompt_sha256: str,
+    bound_pose: dict[str, Any],
+    bound_expression: dict[str, Any],
+) -> str:
+    copies = (
+        (
+            "selected_prompt_input",
+            selected_prompt.get("prompt_text"),
+            selected_prompt.get("prompt_sha256"),
+        ),
+        (
+            "structured_executor_inputs",
+            structured.get("selected_prompt_text"),
+            structured.get("selected_prompt_sha256"),
+        ),
+    )
+    validated: list[tuple[str, str, str, str]] = []
+    for label, prompt_text, recorded_sha in copies:
+        require(
+            isinstance(prompt_text, str) and bool(prompt_text),
+            "handoff_prompt_text_missing",
+            f"handoff {label} prompt text is missing",
+        )
+        prompt_sha = require_sha256(
+            recorded_sha,
+            code="handoff_prompt_sha_missing_or_invalid",
+            label=f"handoff {label} prompt SHA",
+        )
+        validated.append(
+            (
+                label,
+                prompt_text,
+                prompt_sha,
+                hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+            )
+        )
+
+    require(
+        validated[0][1] == validated[1][1],
+        "handoff_prompt_text_mismatch",
+        "handoff selected_prompt_input and structured_executor_inputs prompt text must match byte-for-byte",
+    )
+    for label, prompt_text, recorded_sha, actual_sha in validated:
+        require(
+            recorded_sha == expected_prompt_sha256,
+            "handoff_prompt_sha_binding_mismatch",
+            f"handoff {label} prompt SHA differs from the shared provider prompt SHA",
+        )
+        require(
+            actual_sha == recorded_sha,
+            "handoff_prompt_text_sha_mismatch",
+            f"handoff {label} prompt text does not match its recorded SHA",
+        )
+        try:
+            pose_provenance.parse_provider_prompt_sections(prompt_text)
+            pose_provenance.require_pose_bound_prompt(prompt_text, bound_pose)
+            pose_provenance.require_expression_bound_prompt(
+                prompt_text,
+                bound_expression,
+            )
+        except pose_provenance.PoseProvenanceError as exc:
+            raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    return validated[0][1]
+
+
 def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     handoff_path = handoff_path.resolve()
     report = read_json_object(
@@ -271,8 +340,28 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
             expected_candidate_sha256=selected_candidate_sha_value,
             expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
         )
+        derived_pose = pose_provenance.build_candidate_pose_provenance(
+            selected_candidate_path,
+            root=ROOT,
+        )
+        derived_expression = pose_provenance.build_candidate_expression_provenance(
+            selected_candidate_path,
+            root=ROOT,
+        )
+        pose_provenance.validate_pose_provenance(derived_pose)
+        pose_provenance.validate_expression_provenance(derived_expression)
     except pose_provenance.PoseProvenanceError as exc:
         raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    require(
+        bound_pose == derived_pose,
+        "handoff_candidate_pose_provenance_mismatch",
+        "handoff pose provenance does not match independently derived selected-candidate authority",
+    )
+    require(
+        bound_expression == derived_expression,
+        "handoff_candidate_expression_provenance_mismatch",
+        "handoff expression provenance does not match independently derived selected-candidate authority",
+    )
     require(
         pose_bound_packet_sha256 == expression_bound_packet_sha256,
         "handoff_provider_authority_packet_mismatch",
@@ -389,6 +478,13 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         selected_prompt.get("prompt_sha256") == prompt_sha,
         "handoff_prompt_sha_binding_mismatch",
         "handoff selected_prompt_input.prompt_sha256 does not match structured selected_prompt_sha256",
+    )
+    _validate_bound_provider_prompt_copies(
+        selected_prompt=selected_prompt,
+        structured=structured,
+        expected_prompt_sha256=prompt_sha,
+        bound_pose=bound_pose,
+        bound_expression=bound_expression,
     )
     require_sha256(
         report.get("selected_prompt_input_artifact_sha256"),

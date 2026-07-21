@@ -17,6 +17,8 @@ from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 DATE = "2026-07-14"
 SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+PROMPT_TEXT = pose_fixture.canonical_prompt()
+PROMPT_SHA = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
 
 
 def _selected_candidate_repo_path() -> str:
@@ -33,7 +35,7 @@ def _selected_candidate_payload() -> dict:
             "candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
             "slot_id": SLOT_ID,
             "recipe_id": "hcr_011",
-            "prompt_sha256": "b" * 64,
+            "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
             "expression_gaze_id": pose_fixture.EXPRESSION_ID,
@@ -62,6 +64,16 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
     monkeypatch.setattr(record_tool, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        approval_mod.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        approval_mod.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -132,6 +144,7 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
         "selected_prompt_input_artifact_sha256": "a" * 64,
         "selected_prompt_input": {
             "prompt_sha256": prompt_sha,
+            "prompt_text": PROMPT_TEXT,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
@@ -157,6 +170,7 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
                 "identity_is_prompt_instruction": False,
             },
             "selected_prompt_sha256": prompt_sha,
+            "selected_prompt_text": PROMPT_TEXT,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
@@ -167,7 +181,7 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
     }
 
 
-def _write_handoff(tmp_path: Path, *, prompt_sha: str = "b" * 64) -> Path:
+def _write_handoff(tmp_path: Path, *, prompt_sha: str = PROMPT_SHA) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path = tmp_path / _selected_candidate_repo_path()
