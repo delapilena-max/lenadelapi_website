@@ -3,9 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
-import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -366,61 +364,17 @@ def build_audit_report(
     }
 
 
-def write_report(report: dict[str, Any], output_path: Path) -> Path:
-    temp_root = Path(tempfile.gettempdir()).resolve(strict=True)
-    resolved = output_path.resolve(strict=False)
-    try:
-        resolved.relative_to(temp_root)
-    except ValueError:
-        raise PromptBudgetAuditError(
-            "audit output must resolve beneath the operating system temporary root"
-        )
-    if resolved == temp_root or not resolved.parent.is_dir():
-        raise PromptBudgetAuditError(
-            "audit output parent must be an existing directory beneath the temporary root"
-        )
-
-    payload = json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{resolved.name}.",
-        suffix=".tmp",
-        dir=str(resolved.parent),
-        text=True,
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_name, resolved)
-    except BaseException:
-        try:
-            Path(temporary_name).unlink()
-        except FileNotFoundError:
-            pass
-        raise
-    return resolved
-
-
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Read-only zero-loss Lena provider prompt budget audit."
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional explicit temporary output path outside the repository.",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+    parse_args(argv)
     report = build_audit_report()
-    if args.output is None:
-        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True))
-    else:
-        print(write_report(report, args.output))
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True))
     return 0
 
 

@@ -361,7 +361,7 @@ def print_summary(
     print()
     print(f"  prompt chars    : {chars}")
     print(
-        "  under 2500      : "
+        f"  maximum {prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS}: "
         f"{chars <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS}"
     )
     print()

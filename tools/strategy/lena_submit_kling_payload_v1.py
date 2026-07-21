@@ -242,7 +242,7 @@ def validate_envelope(env: dict) -> list[str]:
         "blocked_terms_absent": (
             env.get("blocked_terms_absent") is True
         ),
-        "prompt_chars < 2500": (
+        f"prompt_chars <= {prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS}": (
             isinstance(env.get("prompt_chars"), int)
             and env["prompt_chars"]
             <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS

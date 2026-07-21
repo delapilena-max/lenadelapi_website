@@ -6,8 +6,6 @@ import hashlib
 import importlib
 import inspect
 import json
-import os
-import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -175,6 +173,26 @@ def test_active_kling_consumers_use_central_limits_without_numeric_duplicates() 
         }
         assert integer_literals.isdisjoint(forbidden_by_file[path.name]), path
 
+    diagnostic_paths = (
+        Path(kling_payload.__file__),
+        Path(kling_submit.__file__),
+    )
+    for path in diagnostic_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+        string_literals = {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        assert not any(
+            "2499" in value or "2500" in value
+            for value in string_literals
+        ), path
+        assert (
+            "KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS"
+            in path.read_text(encoding="utf-8-sig")
+        )
+
 
 def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: dict) -> None:
     assert governed_report["read_only"] is True
@@ -264,81 +282,78 @@ def test_hcr_012_is_over_budget_and_carries_required_migration_inventory(
     )
 
 
-def test_default_cli_is_stdout_only_and_explicit_temp_output_is_supported(
-    tmp_path: Path,
+def test_cli_is_deterministic_stdout_only_and_rejects_output_paths(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setattr(audit, "build_audit_report", lambda: {"read_only": True})
+    report = {"z": [2, 1], "read_only": True, "a": {"value": 3}}
+    monkeypatch.setattr(audit, "build_audit_report", lambda: report)
 
     def forbidden(*_args, **_kwargs):
         raise AssertionError("no-output audit attempted filesystem mutation")
 
-    monkeypatch.setattr(audit, "write_report", forbidden)
-    monkeypatch.setattr(audit.tempfile, "mkstemp", forbidden)
     monkeypatch.setattr(Path, "mkdir", forbidden)
+    monkeypatch.setattr(Path, "open", forbidden)
+    monkeypatch.setattr(Path, "write_text", forbidden)
+    monkeypatch.setattr(Path, "write_bytes", forbidden)
+    monkeypatch.setattr(Path, "replace", forbidden)
+    monkeypatch.setattr(Path, "rename", forbidden)
+    monkeypatch.setattr(Path, "touch", forbidden)
+
+    expected = json.dumps(report, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
     assert audit.main([]) == 0
-    assert json.loads(capsys.readouterr().out) == {"read_only": True}
+    assert capsys.readouterr().out == expected
+    assert audit.main([]) == 0
+    assert capsys.readouterr().out == expected
+    assert not hasattr(audit, "write_report")
 
-    monkeypatch.undo()
-    output = tmp_path / "prompt-budget-audit.json"
-    assert audit.write_report({"read_only": True}, output) == output.resolve()
-    assert json.loads(output.read_text(encoding="utf-8")) == {"read_only": True}
-    assert list(tmp_path.glob("*.tmp")) == []
-
-
-@pytest.mark.parametrize(
-    "output",
-    (
-        audit.ROOT / "prompt-budget-audit.json",
-        Path(r"C:\projects\ai\content_bot\lenadelapi_website_autonomous_live\prompt-budget-audit.json"),
-        Path(r"C:\projects\ai\content_bot\lenadelapi_website_pose_provenance_fix\prompt-budget-audit.json"),
-        Path.home() / "prompt-budget-audit.json",
-        Path("..") / "prompt-budget-audit.json",
-    ),
-)
-def test_auditor_rejects_every_non_temporary_output(output: Path) -> None:
-    with pytest.raises(audit.PromptBudgetAuditError):
-        audit.write_report({"read_only": True}, output)
+    with pytest.raises(SystemExit):
+        audit.parse_args(["--output", "prompt-budget-audit.json"])
+    assert "unrecognized arguments: --output" in capsys.readouterr().err
 
 
-def test_auditor_requires_an_existing_temporary_parent(tmp_path: Path) -> None:
-    output = tmp_path / "missing" / "prompt-budget-audit.json"
-    with pytest.raises(audit.PromptBudgetAuditError):
-        audit.write_report({"read_only": True}, output)
-    assert not output.parent.exists()
+def test_auditor_source_has_no_file_writing_surface() -> None:
+    source = Path(audit.__file__).read_text(encoding="utf-8-sig")
+    tree = ast.parse(source, filename=str(audit.__file__))
+    imported_modules = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    called_names = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    called_attributes = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+
+    assert "write_report" not in {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
+    assert imported_modules.isdisjoint({"os", "tempfile"})
+    assert called_names.isdisjoint({"open"})
+    assert called_attributes.isdisjoint({
+        "mkdir",
+        "mkstemp",
+        "open",
+        "replace",
+        "rename",
+        "touch",
+        "write_bytes",
+        "write_text",
+    })
 
 
-def test_auditor_rejects_temporary_symlink_escape(tmp_path: Path) -> None:
-    link = tmp_path / "escape"
-    try:
-        link.symlink_to(audit.ROOT, target_is_directory=True)
-    except OSError as exc:
-        pytest.skip(f"directory symlink creation is unavailable: {exc}")
-    with pytest.raises(audit.PromptBudgetAuditError):
-        audit.write_report({"read_only": True}, link / "prompt-budget-audit.json")
-
-
-def test_auditor_rejects_temporary_windows_junction_escape(tmp_path: Path) -> None:
-    if os.name != "nt":
-        pytest.skip("Windows junction test")
-    junction = tmp_path / "junction-escape"
-    proc = subprocess.run(
-        ["cmd", "/c", "mklink", "/J", str(junction), str(audit.ROOT)],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        pytest.skip(f"directory junction creation is unavailable: {proc.stderr.strip()}")
-    try:
-        with pytest.raises(audit.PromptBudgetAuditError):
-            audit.write_report(
-                {"read_only": True},
-                junction / "prompt-budget-audit.json",
-            )
-    finally:
-        junction.rmdir()
+def test_auditor_structured_report_remains_available_in_memory(
+    governed_report: dict,
+) -> None:
+    assert governed_report["report_type"] == audit.REPORT_TYPE
+    assert governed_report["schema_version"] == audit.SCHEMA_VERSION
+    assert governed_report["summary"]["combination_count"] == 1710
+    assert len(governed_report["rows"]) == 1710
 
 
 def test_current_production_prompt_matrix_matches_reviewed_parent_baseline() -> None:
