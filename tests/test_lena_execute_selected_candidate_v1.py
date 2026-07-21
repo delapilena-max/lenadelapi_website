@@ -286,7 +286,11 @@ def test_authority_commit_must_be_full_real_commit(canonical_decision, tmp_path)
 
 def test_authority_commit_ancestor_rule_is_fail_closed(canonical_decision, monkeypatch):
     artifact = canonical_decision[1]
-    monkeypatch.setattr(consumer, "_git_bytes", lambda *args: b"")
+    monkeypatch.setattr(
+        consumer,
+        "_git_bytes",
+        lambda *args: b"commit\n" if args[:2] == ("cat-file", "-t") else (artifact["authority_commit"] + "\n").encode(),
+    )
 
     class Result:
         returncode = 1

@@ -98,6 +98,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
         "recipe_id": "hcr_011",
+        "strong_hook_id": "mf_001",
+        "wardrobe_outfit_id": "wc_p020",
+        "environment_id": "env_v008",
+        "hook_selection_reason": "retry source fixture",
         "compact_provider_prompt_preview": ORIGINAL_PROMPT,
         "compact_provider_prompt_sha256": PROMPT_SHA,
         "compact_provider_prompt_budget": 2499,
@@ -112,7 +116,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
-    pose_bound_packet = pose_fixture.bind_packet(packet_report, pose_binding=pose_binding)
+    pose_bound_packet = pose_fixture.authoritatively_bind_packet(packet_report, pose_binding=pose_binding)
     pose_bound_packet_sha = hashlib.sha256(
         json.dumps(
             pose_bound_packet,
@@ -310,6 +314,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
+            "artifact_path": packet_repo_path.as_posix(),
+            "artifact_sha256": packet_sha,
             "prompt_sha256": PROMPT_SHA,
             "prompt_text": ORIGINAL_PROMPT,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
@@ -336,10 +342,25 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             },
             "selected_prompt_sha256": PROMPT_SHA,
             "selected_prompt_text": ORIGINAL_PROMPT,
+            "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        },
+        "provider_execution_binding": {
+            "content_packet_artifact_path": packet_repo_path.as_posix(),
+            "content_packet_artifact_sha256": packet_sha,
+            "provider_prompt_sha256": PROMPT_SHA,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+        },
+        "binding_linkage": {
+            "content_packet_artifact_path": packet_repo_path.as_posix(),
+            "content_packet_artifact_sha256": packet_sha,
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -353,7 +374,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     manifest_path = tmp_path / manifest_repo_path
     manifest_report = {
         "provider": "higgsfield",
+        "date": DATE,
         "slot_id": ORIGINAL_SLOT,
+        "lane": "fit_check_mirror_getting_ready",
         "prompt_sha256": PROMPT_SHA,
         "image_prompt": ORIGINAL_PROMPT,
         "pose_body_language_id": pose_binding["pose_body_language_id"],
@@ -407,14 +430,20 @@ def _refresh_bound_packet_evidence(seeded: dict[str, Path]) -> None:
     packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
     packet_sha = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
     handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
-    bound_packet = pose_fixture.bind_packet(packet, pose_binding=handoff["pose_provenance"])
+    bound_packet = pose_fixture.authoritatively_bind_packet(packet, pose_binding=handoff["pose_provenance"])
     bound_packet_sha = hashlib.sha256(
         json.dumps(bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     ).hexdigest()
     handoff["selected_prompt_input_artifact_sha256"] = packet_sha
+    handoff["selected_prompt_input"]["artifact_sha256"] = packet_sha
     handoff["pose_bound_content_packet_sha256"] = bound_packet_sha
     handoff["selected_prompt_input"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["structured_executor_inputs"]["selected_prompt_input_artifact_sha256"] = packet_sha
     handoff["structured_executor_inputs"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["provider_execution_binding"]["content_packet_artifact_sha256"] = packet_sha
+    handoff["provider_execution_binding"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["binding_linkage"]["content_packet_artifact_sha256"] = packet_sha
+    handoff["binding_linkage"]["pose_bound_content_packet_sha256"] = bound_packet_sha
     _write_json(seeded["handoff_path"], handoff)
     manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
     manifest["pose_bound_content_packet_artifact_sha256"] = packet_sha
@@ -468,6 +497,9 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact["retry_prompt_headroom"] >= 70
     assert artifact["retry_prompt_headroom_policy"] == {"hard_block_below": 30, "warning_below": 70}
     assert artifact["retry_prompt_headroom_status"] == "ready"
+    source_handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
+    assert artifact["pose_provenance"] == source_handoff["pose_provenance"]
+    assert artifact["source_pose_bound_content_packet_sha256"] == source_handoff["pose_bound_content_packet_sha256"]
 
 
 @pytest.mark.parametrize(
@@ -533,6 +565,35 @@ def test_source_manifest_pose_binding_must_match_source_handoff(
     assert excinfo.value.code == "manifest_pose_provenance_mismatch"
 
 
+@pytest.mark.parametrize(
+    ("mutation", "code"),
+    [
+        (lambda manifest: manifest["pose_provenance"].pop("pose_text"), "pose_provenance_incomplete"),
+        (lambda manifest: manifest.update(pose_body_language_id="pose_conflict"), "manifest_pose_provenance_mismatch"),
+        (lambda manifest: manifest.update(pose_bound_content_packet_sha256="f" * 64), "manifest_pose_bound_packet_mismatch"),
+    ],
+)
+def test_partial_flat_or_packet_digest_source_pose_contract_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+    code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    mutation(manifest)
+    _write_json(seeded["manifest_path"], manifest)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.build_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+        )
+    assert excinfo.value.code == code
+
+
 def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -544,14 +605,20 @@ def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
     handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
     packet_sha = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
-    bound_packet = pose_fixture.bind_packet(packet, pose_binding=handoff["pose_provenance"])
+    bound_packet = pose_fixture.authoritatively_bind_packet(packet, pose_binding=handoff["pose_provenance"])
     bound_packet_sha = hashlib.sha256(
         json.dumps(bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     ).hexdigest()
     handoff["selected_prompt_input_artifact_sha256"] = packet_sha
+    handoff["selected_prompt_input"]["artifact_sha256"] = packet_sha
     handoff["pose_bound_content_packet_sha256"] = bound_packet_sha
     handoff["selected_prompt_input"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["structured_executor_inputs"]["selected_prompt_input_artifact_sha256"] = packet_sha
     handoff["structured_executor_inputs"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["provider_execution_binding"]["content_packet_artifact_sha256"] = packet_sha
+    handoff["provider_execution_binding"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["binding_linkage"]["content_packet_artifact_sha256"] = packet_sha
+    handoff["binding_linkage"]["pose_bound_content_packet_sha256"] = bound_packet_sha
     seeded["handoff_path"].write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
     manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
     manifest["pose_bound_content_packet_artifact_sha256"] = packet_sha

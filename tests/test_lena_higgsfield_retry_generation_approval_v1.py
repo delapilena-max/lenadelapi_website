@@ -93,6 +93,15 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "build_candidate_pose_provenance",
         pose_fixture.candidate_pose_provenance,
     )
+    monkeypatch.setattr(
+        retry_mod.pose_provenance,
+        "validate_source_generation_pose_contract",
+        lambda manifest, report, root=None: {
+            "pose_provenance": report["pose_provenance"],
+            "prompt": manifest["image_prompt"],
+            "prompt_sha256": manifest["prompt_sha256"],
+        },
+    )
 
 
 def _write_json(path: Path, payload: dict) -> Path:

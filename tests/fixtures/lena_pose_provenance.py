@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
+
+
+_AUTHORITATIVE_PACKET_REBUILD = packet_builder.rebuild_packet_from_authoritative_sources
 
 
 POSE_ID = "pose_p001"
@@ -81,3 +85,14 @@ def bind_packet(packet: dict[str, Any], *, pose_binding: dict[str, Any]) -> dict
     )
     bound["high_caliber_source_sections"]["provider_action_pose"] = pose_binding["pose_text"]
     return bound
+
+
+def authoritatively_bind_packet(
+    packet: dict[str, Any],
+    *,
+    pose_binding: dict[str, Any],
+) -> dict[str, Any]:
+    return _AUTHORITATIVE_PACKET_REBUILD(
+        copy.deepcopy(packet),
+        pose_binding=pose_binding,
+    )

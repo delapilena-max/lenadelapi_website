@@ -298,27 +298,13 @@ def _validate_execution_receipt(
         "manifest provider_status does not match the execution receipt",
     )
     try:
-        source_pose = pose_provenance.validate_pose_provenance(manifest.get("pose_provenance"))
-        handoff_pose = pose_provenance.validate_pose_provenance(
-            handoff_facts["report"].get("pose_provenance")
-        )
-        pose_provenance.require_pose_bound_prompt(
-            str(manifest.get("image_prompt") or ""),
-            source_pose,
+        pose_provenance.validate_source_generation_pose_contract(
+            manifest,
+            handoff_facts["report"],
+            root=ROOT,
         )
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
-    _require(
-        source_pose == handoff_pose,
-        "manifest_pose_provenance_mismatch",
-        "source manifest pose provenance does not match the source generation handoff",
-    )
-    for field in ("pose_body_language_id", "pose_body_language_label", "pose_text"):
-        _require(
-            manifest.get(field) == source_pose[field],
-            "manifest_pose_provenance_mismatch",
-            f"source manifest {field} does not match its nested pose provenance",
-        )
     manifest_prompt = manifest.get("image_prompt")
     _require(
         isinstance(manifest_prompt, str)
@@ -326,24 +312,6 @@ def _validate_execution_receipt(
         "manifest_prompt_text_mismatch",
         "source manifest image_prompt does not re-hash to the source handoff prompt",
     )
-    handoff_report = handoff_facts["report"]
-    expected_packet_binding = {
-        "pose_bound_content_packet_artifact_path": handoff_report.get(
-            "selected_prompt_input_artifact_path"
-        ),
-        "pose_bound_content_packet_artifact_sha256": handoff_report.get(
-            "selected_prompt_input_artifact_sha256"
-        ),
-        "pose_bound_content_packet_sha256": handoff_report.get(
-            "pose_bound_content_packet_sha256"
-        ),
-    }
-    for field, expected in expected_packet_binding.items():
-        _require(
-            manifest.get(field) == expected,
-            "manifest_pose_bound_packet_mismatch",
-            f"source manifest {field} does not match the source handoff packet binding",
-        )
     return receipt, output_path, manifest, manifest_path, receipt_path, image_sha
 
 
@@ -485,6 +453,7 @@ def build_retry_handoff(
         "source_handoff_artifact_sha256": handoff_facts["handoff_sha256"],
         "source_selected_prompt_input_artifact_path": repo_relative_path(packet_path),
         "source_selected_prompt_input_artifact_sha256": packet_sha,
+        "source_pose_bound_content_packet_sha256": handoff_report["pose_bound_content_packet_sha256"],
         "source_execution_receipt_path": approval_contract.repo_relative_path(receipt_path),
         "source_execution_receipt_sha256": _sha256_file(receipt_path),
         "source_manifest_path": approval_contract.repo_relative_path(manifest_path),
@@ -599,6 +568,12 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(bound_pose == source_pose, "pose_provenance_mismatch", "retry handoff pose provenance differs from the source handoff")
+    _require(
+        artifact.get("source_pose_bound_content_packet_sha256")
+        == handoff_facts["report"].get("pose_bound_content_packet_sha256"),
+        "pose_bound_packet_sha_mismatch",
+        "retry handoff source packet digest differs from the source generation handoff",
+    )
     _require(
         artifact.get("pose_provenance_fingerprint_sha256") == bound_pose["pose_provenance_fingerprint_sha256"],
         "pose_provenance_fingerprint_mismatch",

@@ -18,9 +18,11 @@ if str(ROOT) not in sys.path:
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline import higgsfield_lena_api_executor as executor  # noqa: E402
+from tools import lena_higgsfield_generation_approval_v1 as generation_approval  # noqa: E402
 from tools import lena_human_rejection_gate_v1 as rejection_gate  # noqa: E402
 from tools import lena_record_human_rejection_v1 as rejection_record  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_consumer  # noqa: E402
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
 SCHEMA_VERSION = "lena_retry_decision_v1"
 CORRECTION_SCHEMA_VERSION = "lena_bounded_retry_plan_correction_v1"
@@ -149,33 +151,89 @@ def _mutate_prompt_for_retry(original_prompt: str, mutation_type: str = MUTATION
     return f"{original_prompt} {constraint}"
 
 
-def _validate_original_decision_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
+def _validate_original_decision_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     artifact = selected_consumer._read_artifact(path)
-    candidate = selected_consumer._validate_shape(artifact)
-    selected_consumer._validate_fingerprint(artifact)
-    selected_consumer._validate_authority(artifact)
-
     try:
-        source = executor.resolve_prompt_source(str(artifact["as_of_date"]), str(candidate["slot_id"]))
-    except executor.PromptSourceError as exc:
-        raise RetryDecisionError("original_prompt_missing", str(exc)) from exc
-    image = source.get("image", {})
-    prompt = image.get("image_prompt")
-    if not isinstance(prompt, str) or not prompt:
-        raise RetryDecisionError("original_prompt_missing", "original decision could not regenerate its exact prompt bytes")
-    if image.get("slot_id") != candidate["slot_id"]:
-        raise RetryDecisionError("slot_invalid", "executor-resolved slot does not match the original decision")
-    if image.get("lane") != candidate["lane"]:
-        raise RetryDecisionError("lane_mismatch", "executor-resolved lane does not match the original decision")
-    if hashlib.sha256(prompt.encode("utf-8")).hexdigest() != candidate["prompt_sha256"]:
-        raise RetryDecisionError("prompt_sha_mismatch", "original decision prompt_sha256 does not match the regenerated executor prompt")
-    validation = executor.validate_candidate(source, None)
-    if validation.get("ok") is not True:
-        raise RetryDecisionError("executor_candidate_invalid", json.dumps(validation.get("all_reasons", [])))
-    return artifact, candidate, prompt
+        issuance = selected_consumer.validate_selected_candidate_issuance(
+            artifact,
+            root=ROOT,
+        )
+    except selected_consumer.ConsumerError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
+    return artifact, issuance["candidate"]
 
 
-def _validate_correction_artifact(correction_artifact_path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], str]:
+def _resolve_repo_artifact(raw: Any, *, label: str) -> Path:
+    value = str(raw or "").strip()
+    if not value:
+        raise RetryDecisionError("lineage_missing", f"{label} is missing")
+    relative = Path(value)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise RetryDecisionError("lineage_path_invalid", f"{label} must be repository-relative")
+    path = (ROOT / relative).resolve()
+    try:
+        canonical = path.relative_to(ROOT.resolve()).as_posix()
+    except ValueError as exc:
+        raise RetryDecisionError("lineage_path_invalid", f"{label} escapes the repository") from exc
+    if canonical != relative.as_posix() or not path.is_file():
+        raise RetryDecisionError("lineage_missing", f"{label} is missing or noncanonical: {value}")
+    return path
+
+
+def _validate_source_generation_lineage(
+    manifest_path: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
+
+    receipt_path = _resolve_repo_artifact(
+        manifest.get("generation_execution_receipt_path"),
+        label="source generation execution receipt",
+    )
+    receipt = _read_object(receipt_path, "source generation execution receipt")
+    handoff_path = _resolve_repo_artifact(
+        receipt.get("handoff_artifact_path"),
+        label="source generation handoff",
+    )
+    try:
+        handoff_facts = generation_approval.inspect_handoff_artifact(handoff_path)
+    except generation_approval.HiggsfieldGenerationApprovalError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
+    if receipt.get("handoff_artifact_sha256") != handoff_facts["handoff_sha256"]:
+        raise RetryDecisionError("source_handoff_sha_mismatch", "source execution receipt does not bind the current handoff bytes")
+    try:
+        _, _, validated_manifest, validated_manifest_path, _, _ = retry_handoff._validate_execution_receipt(
+            receipt_path,
+            handoff_facts,
+        )
+    except retry_handoff.RetryHandoffError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
+    if validated_manifest_path.resolve() != manifest_path.resolve() or validated_manifest != manifest:
+        raise RetryDecisionError("source_manifest_binding_mismatch", "source execution receipt does not bind the exact original manifest")
+    try:
+        source_pose = pose_provenance.validate_source_generation_pose_contract(
+            manifest,
+            handoff_facts["report"],
+            root=ROOT,
+        )
+        _, source, _, _ = executor._validate_handoff_packet(handoff_path)
+    except (pose_provenance.PoseProvenanceError, executor.HandoffArtifactError) as exc:
+        raise RetryDecisionError(getattr(exc, "code", "source_pose_provenance_invalid"), str(exc)) from exc
+    if source.get("image", {}).get("image_prompt") != source_pose["prompt"]:
+        raise RetryDecisionError("source_prompt_text_mismatch", "executor reconstruction does not match the source generation manifest prompt")
+    return {
+        "receipt_path": receipt_path,
+        "receipt_sha256": _sha256_file(receipt_path),
+        "handoff_path": handoff_path,
+        "handoff_repo_path": handoff_facts["handoff_repo_path"],
+        "handoff_sha256": handoff_facts["handoff_sha256"],
+        "handoff_report": handoff_facts["report"],
+        "source": source,
+        **source_pose,
+    }
+
+
+def _validate_correction_artifact(correction_artifact_path: Path) -> dict[str, Any]:
     correction_path = correction_artifact_path.resolve()
     correction = _read_object(correction_path, "retry-plan correction artifact")
     if correction.get("schema_version") != CORRECTION_SCHEMA_VERSION:
@@ -255,11 +313,9 @@ def _validate_correction_artifact(correction_artifact_path: Path) -> tuple[dict[
     if embedded_rejection_sha != correction.get("invalid_retry_plan_embedded_rejection_sha256"):
         raise RetryDecisionError("invalid_retry_binding", "retry-plan correction does not match the superseded retry plan's embedded rejection SHA")
 
-    original_decision, candidate, original_prompt = _validate_original_decision_artifact(original_decision_path)
+    original_decision, candidate = _validate_original_decision_artifact(original_decision_path)
     if original_decision.get("decision_fingerprint_sha256") != correction.get("decision_fingerprint_sha256"):
         raise RetryDecisionError("decision_binding_mismatch", "retry-plan correction decision_fingerprint_sha256 does not match the original decision artifact")
-    if candidate.get("prompt_sha256") != hashlib.sha256(original_prompt.encode("utf-8")).hexdigest():
-        raise RetryDecisionError("prompt_sha_mismatch", "original decision prompt_sha256 does not match the regenerated prompt bytes")
     if correction.get("original_publish_packet_path") != str(packet_path):
         raise RetryDecisionError("packet_binding_mismatch", "retry-plan correction original_publish_packet_path does not match the rejection lineage")
     if correction.get("original_queue_draft_path") != str(draft_path):
@@ -267,12 +323,43 @@ def _validate_correction_artifact(correction_artifact_path: Path) -> tuple[dict[
     if correction.get("original_image_sha256") != rejection.get("image_sha256"):
         raise RetryDecisionError("image_binding_mismatch", "retry-plan correction original_image_sha256 does not match the authoritative rejection lineage")
     manifest = _read_object(manifest_path, "original generation manifest")
-    return correction, rejection, invalid_retry, original_decision, manifest, candidate, original_prompt
+    source_generation = _validate_source_generation_lineage(manifest_path, manifest)
+    if manifest.get("slot_id") != candidate.get("slot_id"):
+        raise RetryDecisionError("slot_invalid", "source generation manifest slot does not match the original selected candidate")
+    if manifest.get("date") != original_decision.get("as_of_date"):
+        raise RetryDecisionError("date_binding_mismatch", "source generation manifest date does not match the original selected decision")
+    if manifest.get("lane") != candidate.get("lane"):
+        raise RetryDecisionError("lane_mismatch", "source generation manifest lane does not match the original selected candidate")
+    source_pose = source_generation["pose_provenance"]
+    if (
+        source_pose.get("selected_candidate_artifact_sha256")
+        != correction.get("original_decision_artifact_sha256")
+    ):
+        raise RetryDecisionError(
+            "source_candidate_binding_mismatch",
+            "source generation pose provenance does not bind the original selected candidate artifact bytes",
+        )
+    return {
+        "correction": correction,
+        "rejection": rejection,
+        "invalid_retry": invalid_retry,
+        "original_decision": original_decision,
+        "manifest": manifest,
+        "candidate": candidate,
+        "source_generation": source_generation,
+    }
 
 
 def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEFAULT_OUTPUT_ROOT) -> tuple[Path, dict[str, Any]]:
     correction_path = correction_artifact_path.resolve()
-    correction, rejection, invalid_retry, original_decision, manifest, candidate, original_prompt = _validate_correction_artifact(correction_path)
+    lineage = _validate_correction_artifact(correction_path)
+    correction = lineage["correction"]
+    rejection = lineage["rejection"]
+    original_decision = lineage["original_decision"]
+    manifest = lineage["manifest"]
+    candidate = lineage["candidate"]
+    source_generation = lineage["source_generation"]
+    original_prompt = source_generation["prompt"]
     contract = rejection_record.correction_contract_for_reason(
         str(rejection.get("operator_reason") or ""),
         str(rejection.get("reason_code") or "") or None,
@@ -308,6 +395,13 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         "source_original_decision_fingerprint_sha256": original_decision["decision_fingerprint_sha256"],
         "source_original_manifest_path": correction["original_manifest_path"],
         "source_original_manifest_sha256": correction["original_manifest_sha256"],
+        "source_execution_receipt_path": source_generation["receipt_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
+        "source_execution_receipt_sha256": source_generation["receipt_sha256"],
+        "source_handoff_artifact_path": source_generation["handoff_repo_path"],
+        "source_handoff_artifact_sha256": source_generation["handoff_sha256"],
+        "source_selected_prompt_input_artifact_path": source_generation["packet_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
+        "source_selected_prompt_input_artifact_sha256": source_generation["packet_artifact_sha256"],
+        "source_pose_bound_content_packet_sha256": source_generation["packet_digest_sha256"],
         "source_original_provider_job_evidence": {
             "provider": manifest.get("provider"),
             "provider_job_id": manifest.get("provider_job_id"),
@@ -336,11 +430,13 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         "caption_seed": candidate["caption_seed"],
         "wardrobe_outfit_id": candidate.get("wardrobe_outfit_id"),
         "visual_style": candidate.get("visual_style"),
-        "pose_body_language_id": candidate.get("pose_body_language_id"),
-        "pose": candidate.get("pose"),
+        "pose_body_language_id": source_generation["pose_provenance"]["pose_body_language_id"],
+        "pose": source_generation["pose_provenance"]["pose_body_language_label"],
+        "pose_provenance": source_generation["pose_provenance"],
+        "pose_provenance_fingerprint_sha256": source_generation["pose_provenance"]["pose_provenance_fingerprint_sha256"],
         "camera_text": candidate.get("camera_text"),
         "lighting_text": candidate.get("lighting_text"),
-        "original_prompt_sha256": candidate["prompt_sha256"],
+        "original_prompt_sha256": source_generation["prompt_sha256"],
         "retry_prompt_sha256": retry_prompt_sha,
         "prompt_mutation": {
             "mode": "scene_constraint_only",
@@ -370,7 +466,32 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
 
 
 def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
-    source = executor.resolve_prompt_source(str(artifact["as_of_date"]), str(artifact["original_slot_id"]))
+    handoff_path = _resolve_repo_artifact(
+        artifact.get("source_handoff_artifact_path"),
+        label="retry decision source handoff",
+    )
+    if _sha256_file(handoff_path) != artifact.get("source_handoff_artifact_sha256"):
+        raise RetryDecisionError("source_handoff_sha_mismatch", "retry decision source handoff SHA does not match current bytes")
+    try:
+        _, source, _, _ = executor._validate_handoff_packet(handoff_path)
+    except executor.HandoffArtifactError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
+    source_image = source.get("image", {})
+    if source_image.get("image_prompt") != artifact.get("retry_prompt_text", "").removesuffix(
+        " " + str(artifact.get("prompt_mutation", {}).get("added_constraint") or "")
+    ):
+        raise RetryDecisionError("source_prompt_text_mismatch", "source handoff prompt does not match the retry decision original prompt")
+    if source_image.get("pose_provenance") != artifact.get("pose_provenance"):
+        raise RetryDecisionError("source_pose_provenance_mismatch", "source handoff pose provenance does not match the retry decision")
+    if (
+        source_image.get("pose_bound_content_packet_artifact_path")
+        != artifact.get("source_selected_prompt_input_artifact_path")
+        or source_image.get("pose_bound_content_packet_artifact_sha256")
+        != artifact.get("source_selected_prompt_input_artifact_sha256")
+        or source_image.get("pose_bound_content_packet_sha256")
+        != artifact.get("source_pose_bound_content_packet_sha256")
+    ):
+        raise RetryDecisionError("source_packet_binding_mismatch", "source handoff packet binding does not match the retry decision")
     retry_source = copy.deepcopy(source)
     retry_source["image"]["slot_id"] = artifact["retry_slot_id"]
     retry_source["image"]["image_prompt"] = artifact["retry_prompt_text"]
@@ -390,6 +511,15 @@ def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
         "source_original_decision_fingerprint_sha256": artifact["source_original_decision_fingerprint_sha256"],
         "source_original_manifest_path": artifact["source_original_manifest_path"],
         "source_original_manifest_sha256": artifact["source_original_manifest_sha256"],
+        "source_execution_receipt_path": artifact["source_execution_receipt_path"],
+        "source_execution_receipt_sha256": artifact["source_execution_receipt_sha256"],
+        "source_handoff_artifact_path": artifact["source_handoff_artifact_path"],
+        "source_handoff_artifact_sha256": artifact["source_handoff_artifact_sha256"],
+        "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
+        "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
+        "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
+        "pose_provenance": artifact["pose_provenance"],
+        "pose_provenance_fingerprint_sha256": artifact["pose_provenance_fingerprint_sha256"],
         "source_original_provider_job_evidence": artifact["source_original_provider_job_evidence"],
         "source_valid_human_rejection_artifact_path": artifact["source_valid_human_rejection_artifact_path"],
         "source_valid_human_rejection_artifact_sha256": artifact["source_valid_human_rejection_artifact_sha256"],
@@ -466,12 +596,18 @@ def _validate_retry_decision_artifact(path: Path) -> dict[str, Any]:
 
     correction_path = Path(str(artifact.get("source_retry_plan_correction_artifact_path") or "")).resolve()
     _require_exact_sha(correction_path, str(artifact.get("source_retry_plan_correction_artifact_sha256") or ""), "source_retry_plan_correction_artifact_sha256")
-    correction, rejection, invalid_retry, original_decision, manifest, candidate, original_prompt = _validate_correction_artifact(correction_path)
+    lineage = _validate_correction_artifact(correction_path)
+    correction = lineage["correction"]
+    rejection = lineage["rejection"]
+    invalid_retry = lineage["invalid_retry"]
+    original_decision = lineage["original_decision"]
+    manifest = lineage["manifest"]
+    source_generation = lineage["source_generation"]
     if artifact.get("source_original_decision_fingerprint_sha256") != original_decision.get("decision_fingerprint_sha256"):
         raise RetryDecisionError("decision_binding_mismatch", "retry decision does not bind the original decision fingerprint exactly")
-    if artifact.get("original_prompt_sha256") != candidate.get("prompt_sha256"):
+    if artifact.get("original_prompt_sha256") != source_generation["prompt_sha256"]:
         raise RetryDecisionError("prompt_sha_mismatch", "retry decision does not preserve the original prompt SHA exactly")
-    expected_prompt = _mutate_prompt_for_retry(original_prompt, mutation_type)
+    expected_prompt = _mutate_prompt_for_retry(source_generation["prompt"], mutation_type)
     if retry_prompt != expected_prompt:
         raise RetryDecisionError("prompt_mutation_invalid", "retry decision prompt text does not match the canonical retry mutation")
     if artifact.get("source_valid_human_rejection_artifact_path") != correction.get("valid_human_rejection_artifact_path"):
@@ -482,6 +618,22 @@ def _validate_retry_decision_artifact(path: Path) -> dict[str, Any]:
         raise RetryDecisionError("packet_binding_mismatch", "retry decision publish packet SHA binding drifted")
     if artifact.get("source_queue_draft_sha256") != rejection.get("queue_draft_sha256"):
         raise RetryDecisionError("draft_binding_mismatch", "retry decision queue draft SHA binding drifted")
+    expected_source_bindings = {
+        "source_execution_receipt_path": source_generation["receipt_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
+        "source_execution_receipt_sha256": source_generation["receipt_sha256"],
+        "source_handoff_artifact_path": source_generation["handoff_repo_path"],
+        "source_handoff_artifact_sha256": source_generation["handoff_sha256"],
+        "source_selected_prompt_input_artifact_path": source_generation["packet_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
+        "source_selected_prompt_input_artifact_sha256": source_generation["packet_artifact_sha256"],
+        "source_pose_bound_content_packet_sha256": source_generation["packet_digest_sha256"],
+        "pose_provenance": source_generation["pose_provenance"],
+        "pose_provenance_fingerprint_sha256": source_generation["pose_provenance"]["pose_provenance_fingerprint_sha256"],
+        "pose_body_language_id": source_generation["pose_provenance"]["pose_body_language_id"],
+        "pose": source_generation["pose_provenance"]["pose_body_language_label"],
+    }
+    for field, expected in expected_source_bindings.items():
+        if artifact.get(field) != expected:
+            raise RetryDecisionError("source_pose_lineage_mismatch", f"retry decision {field} drifted from the source generation")
     if invalid_retry.get("retry_attempt") != artifact.get("retry_attempt"):
         raise RetryDecisionError("retry_cap_invalid", "retry decision retry attempt does not match the superseded invalid retry plan")
     if artifact.get("source_original_provider_job_evidence") != {

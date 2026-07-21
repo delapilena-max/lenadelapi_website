@@ -268,7 +268,7 @@ def _git_show_bytes(commit: str, path: Path) -> bytes:
     except ValueError as exc:
         raise BoundaryError("identity_evidence_invalid", f"authority artifact must be inside the repository: {path}") from exc
     try:
-        return handoff._git_bytes("show", f"{commit}:{relative}")
+        return handoff._git_bytes("show", f"{commit}:{relative}", root=ROOT)
     except handoff.ConsumerError as exc:
         raise BoundaryError("identity_evidence_invalid", f"authority artifact is not committed at {commit}: {relative}") from exc
 
@@ -278,11 +278,18 @@ def _git_blob_oid(commit: str, path: Path) -> str:
         relative = path.resolve().relative_to(ROOT.resolve()).as_posix()
     except ValueError as exc:
         raise BoundaryError("identity_evidence_invalid", f"authority input must be inside the repository: {path}") from exc
-    result = subprocess.run(
-        ["git", "rev-parse", f"{commit}:{relative}"], cwd=ROOT, capture_output=True, text=True, check=False,
-    )
-    oid = result.stdout.strip()
-    if result.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", oid):
+    try:
+        oid = handoff._git_bytes(
+            "rev-parse",
+            f"{commit}:{relative}",
+            root=ROOT,
+        ).decode("ascii", errors="replace").strip()
+    except handoff.ConsumerError as exc:
+        raise BoundaryError(
+            "identity_evidence_invalid",
+            f"authority input is not committed at {commit}: {relative}",
+        ) from exc
+    if not re.fullmatch(r"[0-9a-f]{40}", oid):
         raise BoundaryError("identity_evidence_invalid", f"authority input is not committed at {commit}: {relative}")
     return oid
 
@@ -476,9 +483,8 @@ def _validate_model_authority(path: Path, expected_sha: str, commit: str, provid
 def _validate_selected_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
         artifact = handoff._read_artifact(path)
-        candidate = handoff._validate_shape(artifact)
-        handoff._validate_fingerprint(artifact)
-        handoff._validate_authority(artifact)
+        issuance = handoff.validate_selected_candidate_issuance(artifact, root=ROOT)
+        candidate = issuance["candidate"]
     except handoff.ConsumerError as exc:
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     return artifact, candidate
@@ -508,7 +514,8 @@ def _validate_retry_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]
     try:
         artifact = retry_handoff._validate_retry_decision_artifact(path)
         correction_path = Path(str(artifact.get("source_retry_plan_correction_artifact_path") or "")).resolve()
-        _, _, _, original_decision, _, _, _ = retry_handoff._validate_correction_artifact(correction_path)
+        lineage = retry_handoff._validate_correction_artifact(correction_path)
+        original_decision = lineage["original_decision"]
     except retry_handoff.RetryDecisionError as exc:
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     artifact = dict(artifact)
@@ -761,6 +768,23 @@ def _validate_manifest(
             "source_original_decision_fingerprint_sha256": decision["source_original_decision_fingerprint_sha256"],
             "source_original_manifest_path": decision["source_original_manifest_path"],
             "source_original_manifest_sha256": decision["source_original_manifest_sha256"],
+            "source_execution_receipt_path": decision["source_execution_receipt_path"],
+            "source_execution_receipt_sha256": decision["source_execution_receipt_sha256"],
+            "source_handoff_artifact_path": decision["source_handoff_artifact_path"],
+            "source_handoff_artifact_sha256": decision["source_handoff_artifact_sha256"],
+            "source_selected_prompt_input_artifact_path": decision[
+                "source_selected_prompt_input_artifact_path"
+            ],
+            "source_selected_prompt_input_artifact_sha256": decision[
+                "source_selected_prompt_input_artifact_sha256"
+            ],
+            "source_pose_bound_content_packet_sha256": decision[
+                "source_pose_bound_content_packet_sha256"
+            ],
+            "pose_provenance": decision["pose_provenance"],
+            "pose_provenance_fingerprint_sha256": decision[
+                "pose_provenance_fingerprint_sha256"
+            ],
             "source_original_provider_job_evidence": decision["source_original_provider_job_evidence"],
             "source_valid_human_rejection_artifact_path": decision["source_valid_human_rejection_artifact_path"],
             "source_valid_human_rejection_artifact_sha256": decision["source_valid_human_rejection_artifact_sha256"],

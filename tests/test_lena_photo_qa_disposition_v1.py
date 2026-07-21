@@ -211,6 +211,23 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     _write_json(decision_path, decision)
     monkeypatch.setattr(handoff, "_validate_authority", lambda artifact: None)
 
+    def validate_fixture_issuance(artifact, root=None):
+        candidate_value = handoff._validate_shape(artifact)
+        stored_core, recomputed = handoff._validate_fingerprint(artifact)
+        return {
+            "candidate": candidate_value,
+            "stored_core": stored_core,
+            "recomputed_fingerprint_sha256": recomputed,
+            "fresh_fingerprint_sha256": recomputed,
+            "executor_validation": {"ok": True},
+        }
+
+    monkeypatch.setattr(
+        handoff,
+        "validate_selected_candidate_issuance",
+        validate_fixture_issuance,
+    )
+
     image_path = tmp_path / "generated.png"
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
     reference_path = tmp_path / "reference.png"
@@ -442,6 +459,23 @@ def _production_dual_binding_fixture(
     candidate_file["generated_at_utc"] = "2026-07-19T00:00:00Z"
     candidate_file["decision_fingerprint_sha256"] = hashlib.sha256(selector._canonical_bytes(candidate_file_core)).hexdigest()
     _write_json(candidate_path, candidate_file)
+
+    def validate_fixture_issuance(artifact, root=None):
+        candidate_value = disposition.handoff._validate_shape(artifact)
+        stored_core, recomputed = disposition.handoff._validate_fingerprint(artifact)
+        return {
+            "candidate": candidate_value,
+            "stored_core": stored_core,
+            "recomputed_fingerprint_sha256": recomputed,
+            "fresh_fingerprint_sha256": recomputed,
+            "executor_validation": {"ok": True},
+        }
+
+    monkeypatch.setattr(
+        disposition.handoff,
+        "validate_selected_candidate_issuance",
+        validate_fixture_issuance,
+    )
     candidate_sha = _sha(candidate_path)
     pose_binding = pose_fixture.static_pose_provenance(
         candidate_path=resolved_candidate_path,
@@ -969,7 +1003,6 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
         reference_authority_sha256=str(bundle["reference_authority_sha"]),
         expected_image_sha256=_sha(Path(bundle["image_path"])),
     )
-
     assert result["qa_inputs"]["decision_kind"] == "authorization_bound_handoff"
     assert result["provider_called"] is False
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]

@@ -1472,6 +1472,19 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
             "custom_reference_id": custom_reference_id,
         },
     )
+    monkeypatch.setattr(
+        retry_handoff_mod.pose_provenance,
+        "validate_source_generation_pose_contract",
+        lambda manifest, report, root=None: {
+            "pose_provenance": pose_binding,
+            "prompt": original_prompt,
+            "prompt_sha256": original_prompt_sha,
+            "packet_path": packet_path,
+            "packet_artifact_sha256": packet_sha,
+            "packet_digest_sha256": "4" * 64,
+            "rebuilt_packet": {},
+        },
+    )
     retry_report = retry_handoff_mod.evaluate_retry_handoff(
         handoff_artifact=handoff_path,
         execution_receipt=receipt_path,

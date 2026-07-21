@@ -980,6 +980,51 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
             str(packet.get("compact_provider_prompt_preview") or ""),
             existing_pose,
         )
+        provider_prompt = str(packet.get("compact_provider_prompt_preview") or "")
+        provider_prompt_sha = hashlib.sha256(provider_prompt.encode("utf-8")).hexdigest()
+        if packet.get("compact_provider_prompt_sha256") != provider_prompt_sha:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_sha_mismatch",
+                "already-bound content packet provider prompt SHA does not match its prompt bytes",
+            )
+        if packet.get("compact_provider_prompt_chars") != len(provider_prompt):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_chars_mismatch",
+                "already-bound content packet provider prompt character count does not match its prompt bytes",
+            )
+        kling_prompt = packet.get("compact_kling_prompt_preview")
+        if not isinstance(kling_prompt, str) or kling_prompt != provider_prompt:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_retained_prompt_mismatch",
+                "already-bound compact_kling_prompt_preview must remain an exact retained copy of the provider prompt",
+            )
+        pose_provenance.require_pose_bound_prompt(kling_prompt, existing_pose)
+        if packet.get("compact_kling_prompt_chars") != len(kling_prompt):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_retained_prompt_chars_mismatch",
+                "already-bound Kling prompt character count does not match its retained prompt bytes",
+            )
+        provider_budget = packet.get("compact_provider_prompt_budget")
+        if (
+            type(provider_budget) is not int
+            or provider_budget <= 0
+            or packet.get("compact_kling_prompt_budget") != provider_budget
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_budget_mismatch",
+                "already-bound retained prompt budgets must be identical positive integers",
+            )
+        provider_contract = packet.get("provider_prompt_contract")
+        if (
+            not isinstance(provider_contract, dict)
+            or provider_contract.get("prompt_chars") != len(provider_prompt)
+            or provider_contract.get("pose_binding_status") != "bound"
+            or provider_contract.get("pose_authority_source") != pose_provenance.AUTHORITY_SOURCE
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_provider_contract_mismatch",
+                "already-bound provider prompt contract disagrees with its pose-bound prompt",
+            )
     elif isinstance(existing_contract, dict) and existing_contract.get("status") == "bound":
         raise pose_provenance.PoseProvenanceError(
             "pose_bound_packet_provenance_missing",
@@ -1044,7 +1089,7 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
     effective_pose_binding = supplied_pose
     if effective_pose_binding is None and packet.get("pose_provenance") is not None:
         effective_pose_binding = packet["pose_provenance"]
-    return build_packet(
+    rebuilt = build_packet(
         recipe,
         hook,
         packet.get("hook_selection_reason", "authoritative source rebuild"),
@@ -1053,6 +1098,12 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
         expansion_matrix=expansion_matrix,
         pose_binding=effective_pose_binding,
     )
+    if existing_pose_value is not None and packet != rebuilt:
+        raise pose_provenance.PoseProvenanceError(
+            "pose_bound_packet_integrity_mismatch",
+            "already-bound content packet differs from deterministic authoritative reconstruction",
+        )
+    return rebuilt
 
 
 def validate_packet(packet, output_path):

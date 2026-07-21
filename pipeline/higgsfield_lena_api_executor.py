@@ -1608,6 +1608,7 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
             "source_handoff_artifact_sha256": artifact["source_handoff_artifact_sha256"],
             "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
             "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
+            "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
             "source_execution_receipt_path": artifact["source_execution_receipt_path"],
             "source_execution_receipt_sha256": artifact["source_execution_receipt_sha256"],
             "source_manifest_path": artifact["source_manifest_path"],

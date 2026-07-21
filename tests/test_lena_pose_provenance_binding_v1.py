@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -9,11 +10,41 @@ import pytest
 
 from pipeline import higgsfield_lena_api_executor as executor
 from tests.fixtures import lena_pose_provenance as pose_fixture
+from tools import lena_higgsfield_generation_approval_v1 as generation_approval
 from tools import lena_photo_qa_disposition_v1 as disposition
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
+from tools.strategy import lena_build_next_live_image_handoff_v1 as handoff_builder
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_hand_built_candidate_contracts(request, monkeypatch: pytest.MonkeyPatch) -> None:
+    if request.node.name.startswith("test_production_selector_"):
+        return
+
+    def validate_fixture_issuance(artifact: dict, *, root: Path | None = None) -> dict:
+        candidate = selected_candidate._validate_shape(artifact)
+        stored_core, recomputed = selected_candidate._validate_fingerprint(artifact)
+        selected_candidate._validate_authority(artifact, root=root)
+        return {
+            "candidate": candidate,
+            "stored_core": stored_core,
+            "recomputed_fingerprint_sha256": recomputed,
+            "fresh_fingerprint_sha256": recomputed,
+            "executor_validation": {"ok": True},
+        }
+
+    monkeypatch.setattr(
+        selected_candidate,
+        "validate_selected_candidate_issuance",
+        validate_fixture_issuance,
+    )
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -93,7 +124,7 @@ def _seed_authority_repo(tmp_path: Path) -> tuple[Path, Path]:
     _git(root, "init", "-q")
     _git(root, "config", "user.email", "pose-test@example.invalid")
     _git(root, "config", "user.name", "Pose Test")
-    for repo_path in selector.AUTHORITY_PATHS:
+    for repo_path in (*selector.AUTHORITY_PATHS, pose_provenance.POSE_AUTHORITY_REPO_PATH):
         _write_json(root / repo_path, {"fixture": repo_path})
     bank_path = root / pose_provenance.POSE_AUTHORITY_REPO_PATH
     _write_json(
@@ -117,84 +148,251 @@ def _seed_authority_repo(tmp_path: Path) -> tuple[Path, Path]:
     return root, candidate_path
 
 
-def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
-    root, candidate_path = _seed_authority_repo(tmp_path)
-    binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
-    raw_packet = {
-        "recipe_id": "hcr_011",
-        "strong_hook_id": "mf_001",
-        "generated_date": "2026-07-21",
-        "wardrobe_outfit_id": "wc_p020",
-        "environment_id": "env_v008",
-        "hook_selection_reason": "end-to-end pose provenance test",
+def _seed_production_selector_repo(tmp_path: Path) -> tuple[Path, Path, dict]:
+    root = tmp_path / "selector-repo"
+    root.mkdir(parents=True)
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "pose-test@example.invalid")
+    _git(root, "config", "user.name", "Pose Test")
+    for repo_path in (*selector.AUTHORITY_PATHS, pose_provenance.POSE_AUTHORITY_REPO_PATH):
+        target = root / repo_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(REPO_ROOT / repo_path, target)
+    _git(root, "add", ".")
+    _git(root, "commit", "-q", "-m", "canonical selector authority fixture")
+    authority_commit = _git(root, "rev-parse", "HEAD")
+    authorities = selector.load_authorities(root)
+    recent = selector.load_recent_content(root)
+    candidate = None
+    for as_of_date in ("2026-07-21", "2026-07-20", "2026-07-19", "2026-07-18", "2026-07-17"):
+        prompt_candidates, prompt_meta = selector.build_prompt_candidates(
+            as_of_date,
+            authority_commit[:8],
+        )
+        candidate, rejected, _ = selector.select_candidate(
+            authorities,
+            prompt_candidates,
+            recent,
+        )
+        if candidate is not None:
+            break
+    assert candidate is not None
+    core = selector._decision_core(
+        authority_commit,
+        as_of_date,
+        authorities,
+        candidate,
+        rejected,
+        recent,
+        prompt_meta,
+    )
+    candidate_path, artifact, _ = selector.write_decision(
+        core,
+        output_root=root / "pipeline/strategy/lena/pre_generation_candidates",
+        generated_at_utc="2026-07-21T00:00:00Z",
+    )
+    return root, candidate_path, artifact
+
+
+def _raw_packet_for_candidate(candidate: dict, date_str: str, reason: str) -> dict:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = packet_builder.select_recipe(recipe_bank, candidate["recipe_id"])
+    environment_catalog = packet_builder.load_json(packet_builder.ENV_CATALOG)
+    environment = next(
+        entry
+        for entry in environment_catalog["environments"]
+        if recipe["scene_type"] in entry.get("allowed_recipe_types", [])
+        or recipe["content_pillar"] in entry.get("allowed_recipe_types", [])
+    )
+    wardrobe_catalog = packet_builder.load_json(packet_builder.WARDROBE_CATALOG)
+    wardrobe = next(
+        entry
+        for entry in wardrobe_catalog["outfits"]
+        if entry.get("status") not in {"rejected", "high_risk"}
+    )
+    return {
+        "recipe_id": candidate["recipe_id"],
+        "strong_hook_id": candidate["hook_id"],
+        "generated_date": date_str,
+        "wardrobe_outfit_id": wardrobe["outfit_id"],
+        "environment_id": environment["environment_id"],
+        "hook_selection_reason": reason,
     }
+
+
+def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
+    root, candidate_path, artifact = _seed_production_selector_repo(tmp_path)
+    binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    candidate = artifact["candidate"]
+    date_str = artifact["as_of_date"]
+    raw_packet = _raw_packet_for_candidate(
+        candidate,
+        date_str,
+        "end-to-end pose provenance test",
+    )
     bound_packet = packet_builder.rebuild_packet_from_authoritative_sources(
         raw_packet,
         pose_binding=binding,
     )
-    packet_path = root / "pipeline/strategy/lena/content_packets/2026-07-21/packet.json"
+    packet_path = root / (
+        f"pipeline/strategy/lena/content_packets/{date_str}/"
+        f"lena_content_packet_dryrun_{date_str}_{candidate['recipe_id']}.json"
+    )
     _write_json(packet_path, bound_packet)
-    packet_repo_path = packet_path.relative_to(root).as_posix()
-    packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
-    packet_bound_sha = hashlib.sha256(
-        json.dumps(
-            bound_packet,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-        ).encode("utf-8")
-    ).hexdigest()
-    prompt_sha = hashlib.sha256(
-        bound_packet["compact_provider_prompt_preview"].encode("utf-8")
-    ).hexdigest()
     candidate_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
     candidate_repo_path = candidate_path.relative_to(root).as_posix()
-    handoff = {
-        "pose_provenance": binding,
-        "pose_bound_content_packet_sha256": packet_bound_sha,
-        "selected_candidate": {
-            "pose_body_language_id": binding["pose_body_language_id"],
-            "pose_body_language_label": binding["pose_body_language_label"],
-        },
-        "candidate_selection_binding": {
-            "pose_body_language_id": binding["pose_body_language_id"],
-            "pose_body_language_label": binding["pose_body_language_label"],
-            "pose_provenance_fingerprint_sha256": binding["pose_provenance_fingerprint_sha256"],
-        },
-        "provider_execution_binding": {
-            "content_packet_artifact_path": packet_repo_path,
-            "content_packet_artifact_sha256": packet_sha,
-            "provider_prompt_sha256": prompt_sha,
-            "pose_bound_content_packet_sha256": packet_bound_sha,
-            "pose_provenance_fingerprint_sha256": binding["pose_provenance_fingerprint_sha256"],
-        },
-        "binding_linkage": {
-            "pose_body_language_id": binding["pose_body_language_id"],
-            "pose_provenance_fingerprint_sha256": binding["pose_provenance_fingerprint_sha256"],
-            "pose_bound_content_packet_sha256": packet_bound_sha,
-        },
-        "selected_prompt_input": {
-            "pose_provenance": binding,
-            "pose_bound_content_packet_sha256": packet_bound_sha,
-        },
-        "structured_executor_inputs": {
-            "pose_provenance": binding,
-            "pose_bound_content_packet_sha256": packet_bound_sha,
+    next_actions = root / "pipeline/strategy/lena/next_actions" / date_str
+    learning_path = next_actions / f"lena_post_outcome_learning_state_{date_str}.json"
+    recommendation_path = next_actions / f"lena_next_generation_step_{date_str}.json"
+    queue_path = next_actions / f"lena_autonomous_generation_queue_dryrun_{date_str}.json"
+    reconciliation_path = root / (
+        f"pipeline/strategy/lena/reconciliations/{date_str}/"
+        "lena_generation_reconciliation_fixture.json"
+    )
+    learning_summary = {
+        "learning_status": "current",
+        "current_count": 1,
+        "usable_but_incomplete_count": 0,
+        "stale_unresolved_count": 0,
+        "manual_or_future_capability_required_count": 0,
+    }
+    learning = {
+        "report_type": "lena_post_outcome_learning_state",
+        "version": "v1",
+        "date": date_str,
+        "published_post_count": 1,
+        "pending_metrics_posts": [],
+        "stale_pending_metrics_posts": [],
+        "winner_posts": [{"recipe_id": candidate["recipe_id"]}],
+        "queue_boosts": {"preferred_recipe_ids": [candidate["recipe_id"]]},
+        "metrics_resolution_summary": learning_summary,
+    }
+    recommendation = {
+        "report_type": "lena_next_generation_step",
+        "version": "v1",
+        "date": date_str,
+        "learning_artifact_path": str(learning_path),
+        "learning_status": "current",
+        "learning_status_label": "learning_current",
+        "learning_validation_state": "valid",
+        "learning_validation_error": "",
+        "learning_availability": "available",
+        "learning_published_post_count": 1,
+        "learning_pending_metrics_count": 0,
+        "learning_stale_pending_metrics_count": 0,
+        "learning_resolution_state_summary": learning_summary,
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "learning_winner_post_count": 1,
+        "recommendation": {
+            "action_type": "collect_first_controlled_proof",
+            "recommended_recipe_id": candidate["recipe_id"],
+            "recommended_outfit_id": raw_packet["wardrobe_outfit_id"],
+            "recommended_environment_id": raw_packet["environment_id"],
+            "learning_signal_used": ["queue_boosts.preferred_recipe_ids"],
+            "next_live_gate": "review",
         },
     }
-    pose_provenance.validate_handoff_pose_copies(handoff)
+    queue = {
+        "report_type": "lena_autonomous_generation_queue_dryrun",
+        "version": "v1",
+        "date": date_str,
+        "dry_run": True,
+        "proof_lane_lock_active": False,
+        "queue_slots": [
+            {
+                "recipe_id": candidate["recipe_id"],
+                "title": "Production selector pose chain",
+                "scene_type": bound_packet["scene_type"],
+                "autonomy_grade": "ready",
+                "payload_headroom": 100,
+                "outfit_used": raw_packet["wardrobe_outfit_id"],
+                "environment_used": raw_packet["environment_id"],
+                "priority_score": 1,
+                "proof_lane_locked": False,
+                "why": ["production selector provenance test"],
+            }
+        ],
+    }
+    _write_json(learning_path, learning)
+    _write_json(recommendation_path, recommendation)
+    _write_json(queue_path, queue)
+    candidate_sha = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
+    reconciliation = {
+        "report_type": "lena_generation_reconciliation",
+        "schema_version": "lena_generation_reconciliation_v1",
+        "date": date_str,
+        "generated_at": "2026-07-21T00:00:00+00:00",
+        "source_revision": artifact["authority_commit"][:8],
+        "source_revision_commit": artifact["authority_commit"],
+        "source_artifacts": {
+            "learning": {
+                "source_artifact_path": learning_path.relative_to(root).as_posix(),
+                "source_artifact_sha256": hashlib.sha256(learning_path.read_bytes()).hexdigest(),
+            },
+            "recommendation": {
+                "source_artifact_path": recommendation_path.relative_to(root).as_posix(),
+                "source_artifact_sha256": hashlib.sha256(recommendation_path.read_bytes()).hexdigest(),
+            },
+            "selected_candidate": {
+                "source_artifact_path": candidate_repo_path,
+                "source_artifact_sha256": candidate_sha,
+            },
+        },
+        "learning_status": "current",
+        "recommendation_recipe_id": candidate["recipe_id"],
+        "recommendation_outfit_id": raw_packet["wardrobe_outfit_id"],
+        "recommendation_environment_id": raw_packet["environment_id"],
+        "recommendation_action_type": "collect_first_controlled_proof",
+        "selected_candidate_id": candidate["candidate_id"],
+        "selected_candidate_recipe_id": candidate["recipe_id"],
+        "selected_candidate_slot_id": candidate["slot_id"],
+        "selected_candidate_hook_id": candidate["hook_id"],
+        "selected_candidate_prompt_sha256": candidate["prompt_sha256"],
+        "divergence_status": "aligned",
+        "resolution_policy": "selected_candidate_authoritative",
+        "reconciliation_status": "reconciled",
+        "operator_review_required": False,
+        "final_reconciled_candidate_id": candidate["candidate_id"],
+        "final_reconciled_candidate_recipe_id": candidate["recipe_id"],
+        "final_reconciled_candidate_slot_id": candidate["slot_id"],
+        "final_reconciled_candidate_hook_id": candidate["hook_id"],
+        "final_reconciled_candidate_prompt_sha256": candidate["prompt_sha256"],
+        "final_reconciled_candidate_artifact_path": candidate_repo_path,
+        "final_reconciled_candidate_artifact_sha256": candidate_sha,
+        "exact_next_allowed_action": "build_next_live_image_handoff",
+        "next_allowed_action": {"status": "reconciled", "action": "build_next_live_image_handoff"},
+        "dirty_workspace_dependency": False,
+        "shadow_mode_only": True,
+        "provider_call_performed": False,
+        "approval_consumed": False,
+        "claims_written": False,
+        "receipts_written": False,
+        "queue_mutated": False,
+        "publish_performed": False,
+        "blocking_reasons": [],
+    }
+    _write_json(reconciliation_path, reconciliation)
+    monkeypatch.setattr(handoff_builder, "ROOT", root)
+    monkeypatch.setattr(handoff_builder, "NEXT_ACTIONS", root / "pipeline/strategy/lena/next_actions")
+    monkeypatch.setattr(handoff_builder, "CONTENT_PACKETS", root / "pipeline/strategy/lena/content_packets")
+    monkeypatch.setattr(handoff_builder, "PRE_GENERATION_CANDIDATES", root / "pipeline/strategy/lena/pre_generation_candidates")
+    monkeypatch.setattr(reconciliation_contract, "ROOT", root)
+    handoff = handoff_builder.build_handoff(
+        date_str,
+        reconciliation_path.relative_to(root).as_posix(),
+    )
+    handoff_path, _ = handoff_builder.save_handoff(handoff, date_str)
+    monkeypatch.setattr(generation_approval, "ROOT", root)
+    handoff_facts = generation_approval.inspect_handoff_artifact(handoff_path)
+    assert handoff_facts["pose_provenance"] == binding
 
     monkeypatch.setattr(executor, "ROOT", root)
-    rebuilt_packet, source = executor._rebuild_packet_prompt_source(
-        packet_path,
-        "higgsfield-20260721-hcr_011-photo",
-        candidate_path,
-        expected_pose_provenance=binding,
-    )
-    assert rebuilt_packet == bound_packet
+    validated_handoff, source, _, _ = executor._validate_handoff_packet(handoff_path)
+    assert validated_handoff == handoff
+    assert source["image"]["image_prompt"] == bound_packet["compact_provider_prompt_preview"]
     manifest = executor.build_manifest(
-        "2026-07-21",
-        "higgsfield-20260721-hcr_011-photo",
+        date_str,
+        candidate["slot_id"],
         source,
         executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         {
@@ -208,11 +406,8 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
     return {
         "root": root,
         "candidate_path": candidate_path,
-        "candidate": json.loads(candidate_path.read_text(encoding="utf-8"))["candidate"],
-        "decision": {
-            "authority_commit": binding["selected_candidate_authority_commit"],
-            "as_of_date": "2026-07-21",
-        },
+        "candidate": candidate,
+        "decision": artifact,
         "binding": binding,
         "handoff": handoff,
         "manifest": manifest,
@@ -234,6 +429,95 @@ def test_candidate_pose_authority_is_git_bound_and_tamper_evident(tmp_path: Path
         pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
     assert excinfo.value.code == "pose_authority_worktree_drift"
 
+
+def test_production_selector_rejects_resealed_alternate_valid_pose(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, candidate_path, artifact = _seed_production_selector_repo(tmp_path)
+    binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    authority = json.loads(
+        (root / pose_provenance.POSE_AUTHORITY_REPO_PATH).read_text(encoding="utf-8")
+    )
+    alternate = next(
+        entry
+        for entry in authority["combos"]
+        if entry["pose_body_language_id"] != binding["pose_body_language_id"]
+    )
+    tampered = json.loads(json.dumps(artifact))
+    tampered["candidate"]["pose_body_language_id"] = alternate["pose_body_language_id"]
+    tampered["candidate"]["pose"] = alternate["label"]
+    _write_json(candidate_path, _seal_candidate(tampered))
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    assert excinfo.value.code == "stale_decision"
+
+    packet = _raw_packet_for_candidate(
+        artifact["candidate"],
+        artifact["as_of_date"],
+        "resealed candidate rejection test",
+    )
+    packet_path = root / "packet.json"
+    bound_packet = packet_builder.rebuild_packet_from_authoritative_sources(
+        packet,
+        pose_binding=binding,
+    )
+    _write_json(packet_path, bound_packet)
+    monkeypatch.setattr(executor, "ROOT", root)
+    with pytest.raises(executor.HandoffArtifactError) as executor_exc:
+        executor._rebuild_packet_prompt_source(
+            packet_path,
+            artifact["candidate"]["slot_id"],
+            candidate_path,
+            expected_pose_provenance=binding,
+        )
+    assert executor_exc.value.code == "stale_decision"
+
+    recommendation = {
+        "learning_status": "current",
+        "learning_published_post_count": 1,
+        "learning_pending_metrics_count": 0,
+        "learning_stale_pending_metrics_count": 0,
+        "learning_resolution_state_summary": {"learning_status": "current"},
+        "learning_required_follow_up_action": "no_follow_up_required",
+        "recommendation": {"recommended_recipe_id": artifact["candidate"]["recipe_id"]},
+    }
+    learning = {
+        "published_post_count": 1,
+        "pending_metrics_posts": [],
+        "stale_pending_metrics_posts": [],
+        "metrics_resolution_summary": {"learning_status": "current"},
+    }
+    queue = {
+        "proof_lane_lock_active": False,
+        "queue_slots": [
+            {
+                "recipe_id": artifact["candidate"]["recipe_id"],
+                "environment_used": packet["environment_id"],
+                "outfit_used": packet["wardrobe_outfit_id"],
+            }
+        ],
+    }
+    monkeypatch.setattr(handoff_builder, "ROOT", root)
+    monkeypatch.setattr(handoff_builder, "load_report", lambda *args, **kwargs: recommendation)
+    monkeypatch.setattr(handoff_builder, "load_learning_report", lambda *args, **kwargs: (root / "learning.json", learning))
+    monkeypatch.setattr(handoff_builder, "load_queue_report", lambda *args, **kwargs: (root / "queue.json", queue))
+    monkeypatch.setattr(handoff_builder, "load_selected_candidate_report", lambda *args, **kwargs: (candidate_path, tampered))
+    monkeypatch.setattr(handoff_builder, "content_packet_path", lambda *args, **kwargs: packet_path)
+    monkeypatch.setattr(handoff_builder, "load_content_packet_report", lambda *args, **kwargs: bound_packet)
+    monkeypatch.setattr(
+        handoff_builder.reconciliation_contract,
+        "build_handoff_reconciliation_provenance",
+        lambda **kwargs: {
+            "final_candidate": {
+                "recipe_id": artifact["candidate"]["recipe_id"],
+                "slot_id": artifact["candidate"]["slot_id"],
+            }
+        },
+    )
+    with pytest.raises(handoff_builder.HandoffBuildError, match="stale_decision"):
+        handoff_builder.build_handoff(artifact["as_of_date"], "reconciliation.json")
 
 def test_candidate_changed_after_pose_authority_issuance_fails_hash_binding(tmp_path: Path) -> None:
     root, candidate_path = _seed_authority_repo(tmp_path)
@@ -377,6 +661,54 @@ def test_duplicate_or_injected_provider_action_fails_closed(prompt: str) -> None
     assert excinfo.value.code == "provider_action_section_count_invalid"
 
 
+@pytest.mark.parametrize(
+    "disguised",
+    [
+        "[action]",
+        "[ Action ]",
+        "[\uff21ction]",
+        "[\u200bAction]",
+        "[" + b"\xef\xbc\xa1ction".decode("latin-1") + "]",
+    ],
+)
+def test_noncanonical_action_spellings_fail_closed(disguised: str) -> None:
+    prompt = pose_fixture.canonical_prompt().replace("[Action]", disguised)
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.require_pose_bound_prompt(
+            prompt,
+            pose_fixture.static_pose_provenance(),
+        )
+    assert excinfo.value.code == "provider_section_token_noncanonical"
+
+
+@pytest.mark.parametrize(
+    "section",
+    ["Subject", "Environment", "Cinematography", "Lighting/Style", "Technical"],
+)
+def test_reserved_action_in_any_provider_body_fails_closed(section: str) -> None:
+    marker = f"[{section}]:"
+    prompt = pose_fixture.canonical_prompt().replace(
+        marker,
+        f"{marker} [Action]: injected pose.",
+        1,
+    )
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.require_pose_bound_prompt(
+            prompt,
+            pose_fixture.static_pose_provenance(),
+        )
+    assert excinfo.value.code == "provider_action_section_count_invalid"
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_canonical_provider_sections_accept_lf_and_crlf(newline: str) -> None:
+    prompt = pose_fixture.canonical_prompt().replace(" [", newline + "[")
+    pose_provenance.require_pose_bound_prompt(
+        prompt,
+        pose_fixture.static_pose_provenance(),
+    )
+
+
 def test_recipe_derived_reserved_section_token_fails_closed() -> None:
     recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
     recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
@@ -392,7 +724,7 @@ def test_recipe_derived_reserved_section_token_fails_closed() -> None:
 
 def test_conflicting_already_bound_content_packet_fails_closed() -> None:
     original = pose_fixture.static_pose_provenance()
-    packet = pose_fixture.bind_packet(
+    packet = pose_fixture.authoritatively_bind_packet(
         {
             "recipe_id": "hcr_011",
             "strong_hook_id": "mf_001",
@@ -415,7 +747,46 @@ def test_conflicting_already_bound_content_packet_fails_closed() -> None:
     assert excinfo.value.code == "pose_bound_packet_conflict"
 
 
-def test_real_candidate_packet_handoff_executor_manifest_qa_chain(
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda packet: packet.update(compact_provider_prompt_sha256="f" * 64),
+        lambda packet: packet.update(compact_provider_prompt_chars=0),
+        lambda packet: packet.update(compact_kling_prompt_preview=packet["compact_kling_prompt_preview"].replace(pose_fixture.POSE_TEXT, "arms raised overhead")),
+        lambda packet: packet.update(compact_kling_prompt_chars=0),
+        lambda packet: packet.update(compact_provider_prompt_budget=1),
+        lambda packet: packet.update(compact_kling_prompt_budget=1),
+        lambda packet: packet["provider_prompt_contract"].update(prompt_chars=0),
+        lambda packet: packet["provider_prompt_contract"].update(pose_binding_status="unbound"),
+        lambda packet: packet["provider_prompt_contract"].update(pose_authority_source="wrong"),
+        lambda packet: packet["generation_pose_contract"].update(status="unbound"),
+        lambda packet: packet["high_caliber_source_sections"].update(provider_action_pose="arms raised overhead"),
+        lambda packet: packet["high_caliber_source_sections"].update(subject_pose_semantics="authoritative"),
+    ],
+)
+def test_every_retained_bound_packet_integrity_field_fails_on_conflict(mutation) -> None:
+    binding = pose_fixture.static_pose_provenance()
+    packet = pose_fixture.authoritatively_bind_packet(
+        {
+            "recipe_id": "hcr_011",
+            "strong_hook_id": "mf_001",
+            "generated_date": "2026-07-21",
+            "wardrobe_outfit_id": "wc_p020",
+            "environment_id": "env_v008",
+            "hook_selection_reason": "bound packet integrity test",
+        },
+        pose_binding=binding,
+    )
+    mutation(packet)
+
+    with pytest.raises(pose_provenance.PoseProvenanceError):
+        packet_builder.rebuild_packet_from_authoritative_sources(
+            packet,
+            pose_binding=binding,
+        )
+
+
+def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
