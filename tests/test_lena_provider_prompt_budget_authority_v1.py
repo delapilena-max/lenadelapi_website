@@ -16,7 +16,9 @@ from tests.fixtures.lena_pose_provenance import static_pose_provenance
 from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as readiness
 from tools.strategy import lena_audit_provider_prompt_budget_v1 as audit
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
+from tools.strategy import lena_execute_retry_decision_v1 as legacy_retry
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 
 
@@ -62,6 +64,7 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
         prompt_limits.TEMPORARY_REPOSITORY_EXECUTION_POLICY,
         prompt_limits.PER_INPUT_SECURITY_BOUND,
         prompt_limits.RETRY_READINESS_HEADROOM,
+        prompt_limits.LEGACY_DEPRECATED_LIMIT,
     }
     assert all(item["provider_required"] is False for item in classifications.values())
     assert all(
@@ -77,7 +80,7 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
         for item in classifications.values()
     )
     execution = classifications["higgsfield_prompt_execution_policy_max_chars"]
-    assert execution["value"] == 2499
+    assert execution["value"] == 4096
     assert execution["classification"] == prompt_limits.TEMPORARY_REPOSITORY_EXECUTION_POLICY
     assert "repository" in execution["description"].lower()
     assert execution["provider"] == "higgsfield"
@@ -208,6 +211,23 @@ def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: di
         == pose_provenance.PROVIDER_SECTION_ORDER
         for row in governed_report["rows"]
     )
+    assert governed_report["summary"]["fit_count"] == 1638
+    assert governed_report["summary"]["over_budget_count"] == 72
+    assert governed_report["summary"]["parser_safety_over_budget_count"] == 72
+
+    hcr_012_p008 = [
+        row["assembled_prompt_length"]
+        for row in governed_report["rows"]
+        if row["recipe_id"] == "hcr_012"
+        and row["pose_body_language_id"] == "pose_p008"
+    ]
+    assert hcr_012_p008 == [3305, 3216, 3589, 3585, 3589]
+    assert all(
+        row["fits_execution_budget"]
+        for row in governed_report["rows"]
+        if row["recipe_id"] == "hcr_012"
+        and row["pose_body_language_id"] == "pose_p008"
+    )
 
 
 def test_auditor_never_calls_production_fitters(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -225,7 +245,7 @@ def test_auditor_never_calls_production_fitters(monkeypatch: pytest.MonkeyPatch)
     prompt, _ = audit.assemble_zero_loss_prompt(recipe, pose, audit.FIRST_GENERATION)
 
     assert first["assembled_prompt_length"] == len(prompt)
-    assert first["assembled_prompt_length"] > first["execution_budget"]
+    assert first["assembled_prompt_length"] <= first["execution_budget"]
     assert recipe["fashion_accessories"] in prompt
     assert recipe["negative_constraints"] in prompt
     assert packet_builder.STRUCTURED_TECHNICAL_REALISM in prompt
@@ -253,14 +273,14 @@ def test_exact_accepted_input_characters_and_bytes_determine_audit_length() -> N
     assert changed["assembled_prompt_sha256"] != baseline["assembled_prompt_sha256"]
 
 
-def test_hcr_012_is_over_budget_and_carries_required_migration_inventory(
+def test_hcr_012_fits_zero_loss_and_carries_required_semantic_inventory(
     governed_report: dict,
 ) -> None:
     rows = [row for row in governed_report["rows"] if row["recipe_id"] == "hcr_012"]
     first_generation = [row for row in rows if row["retry_type"] == audit.FIRST_GENERATION]
     assert len(first_generation) == 18
-    assert all(row["execution_budget"] == 2499 for row in first_generation)
-    assert all(row["fits_execution_budget"] is False for row in first_generation)
+    assert all(row["execution_budget"] == 4096 for row in first_generation)
+    assert all(row["fits_execution_budget"] is True for row in first_generation)
 
     inventory = governed_report["hcr_012_semantic_inventory"]
     assert inventory["all_required_concepts_present"] is True
@@ -356,29 +376,123 @@ def test_auditor_structured_report_remains_available_in_memory(
     assert len(governed_report["rows"]) == 1710
 
 
-def test_current_production_prompt_matrix_matches_reviewed_parent_baseline() -> None:
+def test_current_production_formatter_matches_zero_loss_authority() -> None:
     recipes, poses = _banks()
-    rows = []
+    fit_count = 0
+    over_count = 0
     for recipe in recipes:
         for pose in poses:
-            prompt = packet_builder.build_structured_kling_prompt(
+            expected, _ = audit.assemble_zero_loss_prompt(
                 recipe,
-                pose_binding=_pose_binding(pose),
+                pose,
+                audit.FIRST_GENERATION,
             )
-            rows.append([
-                recipe["id"],
-                pose["pose_body_language_id"],
-                len(prompt),
-                hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-            ])
-    matrix = json.dumps(rows, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-    assert len(rows) == 342
-    assert hashlib.sha256(matrix).hexdigest() == (
-        "57c3fa4d19e35c2092296d2fda5c8a5af3bfab67308f8da731da7e3fae8f693a"
+            if len(expected) <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+                actual = packet_builder.build_structured_kling_prompt(
+                    recipe,
+                    pose_binding=_pose_binding(pose),
+                )
+                assert actual == expected
+                fit_count += 1
+            else:
+                with pytest.raises(prompt_limits.PromptExecutionPolicyError) as excinfo:
+                    packet_builder.build_structured_kling_prompt(
+                        recipe,
+                        pose_binding=_pose_binding(pose),
+                    )
+                assert excinfo.value.code == "higgsfield_prompt_execution_policy_exceeded"
+                over_count += 1
+    assert (fit_count, over_count) == (324, 18)
+
+
+def test_all_zero_loss_routes_use_the_shared_execution_gate(governed_report: dict) -> None:
+    recipes, poses = _banks()
+    recipe_by_id = {recipe["id"]: recipe for recipe in recipes}
+    pose_by_id = {pose["pose_body_language_id"]: pose for pose in poses}
+    accepted = 0
+    rejected = 0
+    for row in governed_report["rows"]:
+        prompt, _ = audit.assemble_zero_loss_prompt(
+            recipe_by_id[row["recipe_id"]],
+            pose_by_id[row["pose_body_language_id"]],
+            row["retry_type"],
+        )
+        if row["fits_execution_budget"]:
+            assert prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt) == prompt
+            accepted += 1
+        else:
+            with pytest.raises(prompt_limits.PromptExecutionPolicyError) as excinfo:
+                prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
+            assert excinfo.value.code == "higgsfield_prompt_execution_policy_exceeded"
+            rejected += 1
+    assert (accepted, rejected) == (1638, 72)
+
+
+def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recipes, poses = _banks()
+    recipe = next(item for item in recipes if item["id"] == "hcr_012")
+    pose = next(item for item in poses if item["pose_body_language_id"] == "pose_p008")
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("provider execution called a legacy fitter or trimmer")
+
+    monkeypatch.setattr(packet_builder, "fit_prompt_units", forbidden)
+    monkeypatch.setattr(packet_builder, "trim_fragment_to_chars", forbidden)
+    first_expected, _ = audit.assemble_zero_loss_prompt(recipe, pose, audit.FIRST_GENERATION)
+    first_actual = packet_builder.build_structured_kling_prompt(
+        recipe,
+        pose_binding=_pose_binding(pose),
     )
+    assert first_actual == first_expected
+    for field in (
+        "fashion_accessories",
+        "setting_background",
+        "technical_keywords",
+        "style_lighting",
+        "negative_constraints",
+    ):
+        assert recipe[field] in first_actual
+
+    ordinary, _ = retry_handoff._build_retry_prompt(first_actual, 4096)
+    typed_hair, _ = retry_handoff._build_hair_crown_retry_prompt(first_actual, 4096)
+    legacy_background = legacy_retry._mutate_prompt_for_retry(
+        first_actual,
+        "prevent_duplicated_background_identity",
+    )
+    legacy_hair = legacy_retry._mutate_prompt_for_retry(
+        first_actual,
+        "correct_hair_crown_forelock",
+    )
+    actual = [first_actual, ordinary, typed_hair, legacy_background, legacy_hair]
+    expected = [
+        audit.assemble_zero_loss_prompt(recipe, pose, retry_type)[0]
+        for retry_type in audit.RETRY_TYPES
+    ]
+    assert actual == expected
+    assert [len(prompt) for prompt in actual] == [3305, 3216, 3589, 3585, 3589]
 
 
-def _build_packet_production_matrix() -> list[dict]:
+def test_legacy_2499_budget_cannot_gate_higgsfield_execution() -> None:
+    recipes, poses = _banks()
+    recipe = next(item for item in recipes if item["id"] == "hcr_012")
+    pose = next(item for item in poses if item["pose_body_language_id"] == "pose_p008")
+    with pytest.raises(prompt_limits.PromptExecutionPolicyError) as excinfo:
+        packet_builder.build_structured_kling_prompt(
+            recipe,
+            max_chars=2499,
+            pose_binding=_pose_binding(pose),
+        )
+    assert excinfo.value.code == "higgsfield_prompt_budget_override_forbidden"
+
+    prompt, _ = audit.assemble_zero_loss_prompt(recipe, pose, audit.FIRST_GENERATION)
+    with pytest.raises(retry_handoff.RetryHandoffError) as retry_exc:
+        retry_handoff._build_hair_crown_retry_prompt(prompt, 2499)
+    assert retry_exc.value.code == "packet_prompt_budget_policy_mismatch"
+
+
+def test_build_packet_uses_zero_loss_prompt_or_fails_before_packet_return() -> None:
     recipes, poses = _banks()
     hook = {
         "id": "production_matrix_hook",
@@ -389,72 +503,32 @@ def _build_packet_production_matrix() -> list[dict]:
         "suggested_comment_reply_angle": "",
         "scores": {"total_score": 0},
     }
-    rows = []
+    built = 0
+    blocked = 0
     for recipe in recipes:
         for pose in poses:
+            expected, _ = audit.assemble_zero_loss_prompt(recipe, pose, audit.FIRST_GENERATION)
+            if len(expected) > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+                with pytest.raises(prompt_limits.PromptExecutionPolicyError):
+                    packet_builder.build_packet(
+                        copy.deepcopy(recipe),
+                        copy.deepcopy(hook),
+                        "zero-loss production-entry regression",
+                        "2026-07-21",
+                        pose_binding=_pose_binding(pose),
+                    )
+                blocked += 1
+                continue
             packet = packet_builder.build_packet(
                 copy.deepcopy(recipe),
                 copy.deepcopy(hook),
-                "deterministic production-entry regression",
+                "zero-loss production-entry regression",
                 "2026-07-21",
                 pose_binding=_pose_binding(pose),
             )
-            prompt = packet["compact_provider_prompt_preview"]
-            rows.append({
-                "recipe_id": recipe["id"],
-                "pose_body_language_id": pose["pose_body_language_id"],
-                "selected_production_budget": packet["compact_provider_prompt_budget"],
-                "provider_prompt": prompt,
-                "provider_prompt_sha256": packet["compact_provider_prompt_sha256"],
-                "provider_prompt_chars": packet["compact_provider_prompt_chars"],
-                "pose_provenance": packet["pose_provenance"],
-                "generation_pose_contract": packet["generation_pose_contract"],
-                "provider_prompt_contract": packet["provider_prompt_contract"],
-            })
-    return rows
-
-
-def test_build_packet_production_matrix_matches_reviewed_parent_baseline(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Packet IDs, hook/caption copy, date-derived planning fields, and social
-    # metadata are excluded because they do not influence provider prompt bytes,
-    # budget selection, or pose binding. The production entry point still builds
-    # them; the stable projection retains every prompt and pose authority field.
-    monkeypatch.setattr(
-        packet_builder,
-        "save_packet",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("production matrix attempted to write a packet")
-        ),
-    )
-    rows = _build_packet_production_matrix()
-    assert len(rows) == 342
-    proof_budgets = {
-        (row["recipe_id"], row["selected_production_budget"])
-        for row in rows
-        if row["recipe_id"] in {"hcr_007", "hcr_011", "hcr_012"}
-    }
-    assert proof_budgets == {
-        (
-            recipe_id,
-            prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS,
-        )
-        for recipe_id in ("hcr_007", "hcr_011", "hcr_012")
-    }
-    for row in rows:
-        prompt = row["provider_prompt"]
-        assert row["provider_prompt_chars"] == len(prompt)
-        assert row["provider_prompt_sha256"] == hashlib.sha256(
-            prompt.encode("utf-8")
-        ).hexdigest()
-
-    matrix = json.dumps(
-        rows,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-    ).encode("utf-8")
-    assert hashlib.sha256(matrix).hexdigest() == (
-        "f42ad244b6484c9b03633051e341291c44d2d413d6b479afffa1e6dba4df5fc5"
-    )
+            assert packet["compact_provider_prompt_preview"] == expected
+            assert packet["compact_kling_prompt_preview"] == expected
+            assert packet["compact_provider_prompt_budget"] == 4096
+            assert packet["compact_provider_prompt_chars"] == len(expected)
+            built += 1
+    assert (built, blocked) == (324, 18)

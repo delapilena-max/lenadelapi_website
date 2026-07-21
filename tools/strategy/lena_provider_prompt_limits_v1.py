@@ -14,7 +14,7 @@ LEGACY_DEPRECATED_LIMIT = "legacy_deprecated_limit"
 # No numeric limit in this module is represented as provider-required. The
 # provider field names the execution surface whose repository policy consumes it.
 PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS = 4096
-HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS = 2499
+HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS = 4096
 KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS = 2499
 LEGACY_KLING_DIRECT_PROMPT_MIN_CHARS = 1900
 LEGACY_KLING_DIRECT_PROMPT_MAX_CHARS = 2500
@@ -34,8 +34,8 @@ PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS = 4096
 RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW = 30
 RETRY_PROMPT_HEADROOM_WARNING_BELOW = 70
 
-# These active limits preserve the current fitter and proof-packet behavior.
-# They are repository policy, not published Higgsfield constraints.
+# Retained historical values document the retired fitter and proof-packet
+# behavior. They are not active execution policy or provider constraints.
 HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS = MappingProxyType({
     "Subject": 540,
     "Action": 330,
@@ -47,6 +47,42 @@ HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS = MappingProxyType({
 HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS = 1780
 HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS = 1940
 HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS = 1700
+
+
+class PromptExecutionPolicyError(RuntimeError):
+    def __init__(self, code: str, detail: str):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+
+
+def require_higgsfield_prompt_length_within_execution_policy(prompt_length: int) -> int:
+    if type(prompt_length) is not int or prompt_length < 0:
+        raise PromptExecutionPolicyError(
+            "higgsfield_prompt_length_invalid",
+            "Higgsfield provider prompt length must be a nonnegative integer",
+        )
+    if prompt_length > HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        raise PromptExecutionPolicyError(
+            "higgsfield_prompt_execution_policy_exceeded",
+            (
+                f"zero-loss Higgsfield prompt is {prompt_length} characters; "
+                "the temporary repository execution policy maximum is "
+                f"{HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}. Author the "
+                "recipe to fit; truncation and automatic shortening are forbidden"
+            ),
+        )
+    return prompt_length
+
+
+def require_higgsfield_prompt_within_execution_policy(prompt: str) -> str:
+    if not isinstance(prompt, str):
+        raise PromptExecutionPolicyError(
+            "higgsfield_prompt_type_invalid",
+            "Higgsfield provider prompt must be a string",
+        )
+    require_higgsfield_prompt_length_within_execution_policy(len(prompt))
+    return prompt
 
 
 def _entry(
@@ -94,8 +130,10 @@ _LIMIT_CLASSIFICATIONS = {
             "tools/strategy/lena_build_content_packet_dryrun_v1.py",
             "tools/strategy/lena_audit_autonomous_generation_readiness_v1.py",
             "tools/strategy/lena_audit_provider_prompt_budget_v1.py",
+            "tools/strategy/lena_prepare_higgsfield_retry_handoff_v1.py",
+            "tools/strategy/lena_execute_retry_decision_v1.py",
         ),
-        description="Conservative repository execution budget pending separately proven Higgsfield authority.",
+        description="Temporary zero-loss repository execution budget; it is not a Higgsfield provider maximum.",
     ),
     "kling_omni_payload_prompt_policy_max_chars": _entry(
         value=KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS,
@@ -185,44 +223,38 @@ _LIMIT_CLASSIFICATIONS = {
     "higgsfield_structured_prompt_section_fitter_max_chars": _entry(
         value=dict(HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS),
         provider="higgsfield",
-        purpose="preserve active per-section fitter output",
-        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
-        status="active_legacy_behavior_preserved",
-        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
-        description="Historical fitter budgets still enforced to preserve current prompt output.",
+        purpose="document retired per-section fitter output",
+        classification=LEGACY_DEPRECATED_LIMIT,
+        status="deprecated_not_used_for_provider_execution",
+        known_consumers=(),
+        description="Historical fitter budgets retained only for compatibility analysis.",
     ),
     "higgsfield_proof_packet_prompt_budget_with_environment_chars": _entry(
         value=HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS,
         provider="higgsfield",
-        purpose="preserve the active proof-packet budget when an environment is bound",
-        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
-        status="active_legacy_behavior_preserved",
-        known_consumers=(
-            "tools/strategy/lena_build_content_packet_dryrun_v1.py",
-            "tools/strategy/lena_build_content_batch_dryrun_v1.py",
-        ),
-        description="Historical proof-packet repository budget still used by production packet construction.",
+        purpose="document the retired proof-packet budget when an environment was bound",
+        classification=LEGACY_DEPRECATED_LIMIT,
+        status="deprecated_not_used_for_provider_execution",
+        known_consumers=(),
+        description="Historical proof-packet budget retained only for compatibility analysis.",
     ),
     "higgsfield_proof_packet_prompt_budget_without_environment_chars": _entry(
         value=HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS,
         provider="higgsfield",
-        purpose="preserve the active proof-packet budget when no environment is bound",
-        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
-        status="active_legacy_behavior_preserved",
-        known_consumers=(
-            "tools/strategy/lena_build_content_packet_dryrun_v1.py",
-            "tools/strategy/lena_build_content_batch_dryrun_v1.py",
-        ),
-        description="Historical proof-packet repository budget still used by production packet construction.",
+        purpose="document the retired proof-packet budget when no environment was bound",
+        classification=LEGACY_DEPRECATED_LIMIT,
+        status="deprecated_not_used_for_provider_execution",
+        known_consumers=(),
+        description="Historical proof-packet budget retained only for compatibility analysis.",
     ),
     "higgsfield_style_bank_prompt_min_base_chars": _entry(
         value=HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS,
         provider="higgsfield",
-        purpose="preserve minimum base-prompt space after style-bank reservation",
-        classification=TEMPORARY_REPOSITORY_EXECUTION_POLICY,
-        status="active_legacy_behavior_preserved",
-        known_consumers=("tools/strategy/lena_build_content_packet_dryrun_v1.py",),
-        description="Historical style-bank repository floor still used by production packet construction.",
+        purpose="document the retired base-prompt floor after style-bank reservation",
+        classification=LEGACY_DEPRECATED_LIMIT,
+        status="deprecated_not_used_for_provider_execution",
+        known_consumers=(),
+        description="Historical style-bank floor retained only for compatibility analysis.",
     ),
 }
 

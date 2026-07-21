@@ -17,6 +17,7 @@ import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 from tests.fixtures import lena_pose_provenance as pose_fixture
 from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 
@@ -186,7 +187,7 @@ def _content_packet_payload(prompt_text: str = PROMPT_TEXT) -> dict:
         },
         "compact_provider_prompt_preview": prompt_text,
         "compact_provider_prompt_chars": len(prompt_text),
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "compact_provider_prompt_sha256": prompt_sha,
         "strong_hook_id": "cbn_004",
         "hook_text": "Tried To Dress Down. Failed.",
@@ -738,7 +739,7 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
         "caption_draft": "caught me on the way in",
         "compact_provider_prompt_preview": prompt_text,
         "compact_provider_prompt_sha256": prompt_sha,
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "provider_prompt_contract": {
             "provider_route": "higgsfield_forward_no_live",
             "live_authority": False,
@@ -1138,12 +1139,21 @@ def _build_approval_fixture(handoff_path: Path, *, slot_id: str = SLOT_ID, date_
     return out_path
 
 
-def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+def _build_retry_fixture(
+    tmp_root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    safe_prompt: bool = True,
+) -> tuple[Path, Path]:
     _patch_roots(tmp_root, monkeypatch)
     retry_date = "2026-07-14"
     original_slot = "higgsfield-20260714-hcr_011-photo"
     custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
-    original_prompt = ORIGINAL_PROMPT
+    original_prompt = (
+        ORIGINAL_PROMPT.replace("lingerie", "intimate apparel")
+        if safe_prompt
+        else ORIGINAL_PROMPT
+    )
     original_prompt_sha = hashlib.sha256(original_prompt.encode("utf-8")).hexdigest()
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_next_live_image_handoff_{retry_date}.json"
     packet_repo_path = Path("pipeline/strategy/lena/content_packets") / retry_date / f"lena_content_packet_dryrun_{retry_date}_hcr_011.json"
@@ -1158,7 +1168,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
             "recipe_id": "hcr_011",
             "compact_provider_prompt_preview": original_prompt,
             "compact_provider_prompt_sha256": original_prompt_sha,
-            "compact_provider_prompt_budget": 2499,
+            "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
             "provider_prompt_contract": {"provider_route": "higgsfield_forward_no_live", "live_authority": False},
         },
     )
@@ -1811,6 +1821,42 @@ def test_retry_dry_run_reports_valid_retry_approval_binding(
     stdout = capsys.readouterr().out
     assert "=== Higgsfield retry generation approval -- validation (no consumption) ===" in stdout
     assert "approval-retry binding   : confirmed exact match to supplied --retry-decision-artifact" in stdout
+
+
+def test_retry_prompt_validation_failure_precedes_approval_consumption_and_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    retry_handoff_path, retry_approval_path = _build_retry_fixture(
+        tmp_path,
+        monkeypatch,
+        safe_prompt=False,
+    )
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("invalid zero-loss retry prompt reached provider execution")
+
+    monkeypatch.setattr(executor, "run_live", forbidden)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "executor",
+            "--retry-decision-artifact",
+            str(retry_handoff_path),
+            "--retry-approval-artifact",
+            str(retry_approval_path),
+            "--live",
+        ],
+    )
+
+    assert executor.main() == 1
+    stdout = capsys.readouterr().out
+    assert "failed validation before approval consumption or provider execution" in stdout
+    retry_slot = "higgsfield-20260714-hcr_011-retry01-photo"
+    assert not retry_approval_mod.claim_output_path("2026-07-14", retry_slot).exists()
+    assert not retry_approval_mod.receipt_output_path("2026-07-14", retry_slot).exists()
 
 
 def test_retry_live_rejects_wrong_slot_or_prompt_or_retry_handoff_binding(

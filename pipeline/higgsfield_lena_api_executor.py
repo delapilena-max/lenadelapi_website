@@ -2003,6 +2003,9 @@ def main() -> int:
 
     if args.retry_decision_artifact is not None:
         print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
+        if not validation["ok"]:
+            print("[ABORT] retry prompt failed validation before approval consumption or provider execution.")
+            return 1
         retry_approval_result = None
         retry_approval_error: Optional[HandoffArtifactError] = None
         if args.retry_approval_artifact is not None:

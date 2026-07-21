@@ -23,6 +23,7 @@ from tools import lena_human_rejection_gate_v1 as rejection_gate  # noqa: E402
 from tools import lena_record_human_rejection_v1 as rejection_record  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_consumer  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits  # noqa: E402
 
 SCHEMA_VERSION = "lena_retry_decision_v1"
 CORRECTION_SCHEMA_VERSION = "lena_bounded_retry_plan_correction_v1"
@@ -151,8 +152,11 @@ def _mutate_prompt_for_retry(original_prompt: str, mutation_type: str = MUTATION
         if constraint in original_prompt:
             raise RetryDecisionError("prompt_already_mutated", "original prompt already contains the retry correction constraint")
         retry_prompt = f"{original_prompt} {constraint}"
+        prompt_limits.require_higgsfield_prompt_within_execution_policy(retry_prompt)
         pose_provenance.parse_provider_prompt_sections(retry_prompt)
         return retry_prompt
+    except prompt_limits.PromptExecutionPolicyError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryDecisionError(exc.code, exc.detail) from exc
 

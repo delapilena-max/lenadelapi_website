@@ -14,6 +14,7 @@ import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 from tests.fixtures import lena_pose_provenance as pose_fixture
 
 
@@ -173,7 +174,7 @@ def _packet_payload() -> dict:
         },
         "compact_provider_prompt_preview": PROMPT_TEXT,
         "compact_provider_prompt_chars": len(PROMPT_TEXT),
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "compact_provider_prompt_sha256": prompt_sha,
         "strong_hook_id": "cbn_004",
         "hook_text": "Tried To Dress Down. Failed.",

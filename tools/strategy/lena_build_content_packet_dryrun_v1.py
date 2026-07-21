@@ -399,30 +399,30 @@ def build_structured_kling_prompt(
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
 ):
+    if max_chars != prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        raise prompt_limits.PromptExecutionPolicyError(
+            "higgsfield_prompt_budget_override_forbidden",
+            (
+                "Higgsfield provider prompt construction must use the central "
+                "temporary repository execution policy maximum "
+                f"{prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}"
+            ),
+        )
     sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
-    built = []
-    current_chars = 0
-
-    for label, body in sections:
-        if not body:
-            continue
-        prefix_chars = len(label) + len("[]: ")
-        remaining = max_chars - current_chars - (1 if built else 0) - prefix_chars
-        if remaining <= 0:
-            break
-        section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
-        trimmed = fit_prompt_units(body, min(remaining, section_cap))
-        if not trimmed:
-            trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
-        if not trimmed:
-            continue
-        chunk_chars = prefix_chars + len(trimmed)
-        candidate_chars = current_chars + (1 if built else 0) + chunk_chars
-        if candidate_chars <= max_chars:
-            built.append((label, trimmed))
-            current_chars = candidate_chars
-
-    return pose_provenance.serialize_provider_prompt_sections(built)
+    sections = [
+        (label, body)
+        for label, body in sections
+        if body or label != "Subject Presence"
+    ]
+    serialized_length = sum(
+        len(label) + len(body) + len("[]: ")
+        for label, body in sections
+    ) + max(0, len(sections) - 1)
+    prompt_limits.require_higgsfield_prompt_length_within_execution_policy(
+        serialized_length
+    )
+    prompt = pose_provenance.serialize_provider_prompt_sections(sections)
+    return prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
 
 
 def compute_proof_prompt_budget(
@@ -690,43 +690,10 @@ def build_compact_kling_prompt(
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
 ):
-    structured = build_structured_kling_prompt(
+    return build_structured_kling_prompt(
         recipe,
         max_chars=max_chars,
         pose_binding=pose_binding,
-    )
-    if structured:
-        return structured
-
-    scene_label = recipe["scene_type"].replace("_", " ")
-    pillar_label = recipe["content_pillar"].replace("_", " ")
-    scene_prefix = (
-        f"Scene: {scene_label}. Pillar: {pillar_label}. "
-    )
-    kling_notes = (
-        recipe.get("provider_rendering_notes", {}).get("kling_omni", "")
-    )
-    proof_mode = recipe.get("production_proof_mode", False)
-    identity_brief = (
-        PROOF_MODE_IDENTITY_BRIEF if proof_mode else LENA_IDENTITY_BRIEF
-    )
-    return fit_prompt_sentences(
-        [
-            identity_brief,
-            FACE_LIGHT_REALISM_PRIORITY if proof_mode else "",
-            (
-                FACE_PRIORITY_FRAMING
-                if recipe.get("content_pillar") == "face_priority_getting_ready"
-                else ""
-            ),
-            build_hpe_subject_presence(recipe),
-            DRESS_CONTINUITY_PRIORITY if proof_mode else "",
-            SKIN_REALISM_COMPACT,
-            scene_prefix,
-            kling_notes,
-            HAND_REALISM_COMPACT,
-        ],
-        max_chars=max_chars,
     )
 
 
@@ -813,14 +780,15 @@ def build_packet(
     environment_id = recipe.get("environment_id")
     if prompt_budget is None:
         prompt_budget = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
-        if proof_mode and outfit_id:
-            prompt_budget = (
-                prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITH_ENVIRONMENT_CHARS
-                if environment_id
-                else prompt_limits.HIGGSFIELD_PROOF_PACKET_PROMPT_BUDGET_WITHOUT_ENVIRONMENT_CHARS
-            )
-        elif not outfit_id:
-            prompt_budget = compute_style_bank_prompt_budget()
+    if prompt_budget != prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        raise prompt_limits.PromptExecutionPolicyError(
+            "higgsfield_prompt_budget_override_forbidden",
+            (
+                "content packets must use the central temporary Higgsfield "
+                "repository execution policy maximum "
+                f"{prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}"
+            ),
+        )
     bound_pose = (
         pose_provenance.validate_pose_provenance(pose_binding)
         if pose_binding is not None
@@ -1102,13 +1070,6 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
                 f"Environment: {env_entry['prompt_fragment']} "
             )
 
-    prompt_budget_override = None
-    if wf_entry:
-        prompt_budget_override = compute_proof_prompt_budget(
-            wardrobe_entry=wf_entry,
-            env_entry=env_entry,
-        )
-
     expansion_matrix = build_safe_expansion_matrix(
         recipe,
         recipe_bank,
@@ -1133,7 +1094,7 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
         hook,
         packet.get("hook_selection_reason", "authoritative source rebuild"),
         packet["generated_date"],
-        prompt_budget=prompt_budget_override,
+        prompt_budget=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         expansion_matrix=expansion_matrix,
         pose_binding=effective_pose_binding,
     )
@@ -1238,7 +1199,7 @@ def validate_packet(packet, output_path):
         flags["provider_action_pose_bound"] = False
 
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
-    flags["kling_prompt_under_2500"] = (
+    flags["higgsfield_prompt_within_execution_policy"] = (
         kling_len <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     )
     if kling_len > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
@@ -1306,8 +1267,10 @@ def print_summary(packet, filepath, flags, errors):
             )
         print()
     print(f"  Kling prompt chars   : {packet['compact_kling_prompt_chars']}")
-    print(f"  Kling under 2500     : "
-          f"{flags.get('kling_prompt_under_2500')}")
+    print(
+        "  Higgsfield policy fit: "
+        f"{flags.get('higgsfield_prompt_within_execution_policy')}"
+    )
     print()
     print("  VALIDATION FLAGS:")
     for k, v in flags.items():
@@ -1500,13 +1463,6 @@ def main():
     hook, hook_reason = select_hook(
         hook_bank, linked_cats, args.hook_category, args.hook_id
     )
-    prompt_budget_override = None
-    if wf_entry:
-        prompt_budget_override = compute_proof_prompt_budget(
-            wardrobe_entry=wf_entry,
-            env_entry=env_entry,
-        )
-
     expansion_matrix = build_safe_expansion_matrix(
         recipe,
         recipe_bank,
@@ -1525,7 +1481,7 @@ def main():
         hook,
         hook_reason,
         run_date,
-        prompt_budget=prompt_budget_override,
+        prompt_budget=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         expansion_matrix=expansion_matrix,
     )
 

@@ -18,6 +18,7 @@ if str(ROOT) not in os.sys.path:
 from tools import lena_higgsfield_generation_approval_v1 as approval_contract  # noqa: E402
 from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as readiness_audit  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits  # noqa: E402
 
 SCHEMA_VERSION = "lena_higgsfield_retry_handoff_v1"
 REPORT_TYPE = "lena_higgsfield_retry_handoff"
@@ -293,20 +294,35 @@ def _validate_execution_receipt(
 
 
 def _build_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, str]:
+    _require(
+        prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+        "packet_prompt_budget_policy_mismatch",
+        "retry source packet does not use the current Higgsfield repository execution policy",
+    )
     retry_prompt = _replace_sections(original_prompt)
-    _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
+    try:
+        prompt_limits.require_higgsfield_prompt_within_execution_policy(retry_prompt)
+    except prompt_limits.PromptExecutionPolicyError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
 
 
 def _build_hair_crown_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, str]:
+    _require(
+        prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+        "packet_prompt_budget_policy_mismatch",
+        "retry source packet does not use the current Higgsfield repository execution policy",
+    )
     try:
         pose_provenance.parse_provider_prompt_sections(original_prompt)
         if HAIR_CROWN_CONSTRAINT in original_prompt:
             raise RetryHandoffError("retry_prompt_already_mutated", "original prompt already contains the hair-crown correction")
         retry_prompt = f"{original_prompt} {HAIR_CROWN_CONSTRAINT}"
+        prompt_limits.require_higgsfield_prompt_within_execution_policy(retry_prompt)
         pose_provenance.parse_provider_prompt_sections(retry_prompt)
-        _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
         return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
+    except prompt_limits.PromptExecutionPolicyError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
 
@@ -348,7 +364,11 @@ def build_retry_handoff(
         raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(derived_pose == bound_pose, "pose_provenance_mismatch", "source handoff pose provenance no longer matches its candidate authority")
     prompt_budget = int(packet_report.get("compact_provider_prompt_budget") or 0)
-    _require(prompt_budget > 0, "packet_prompt_budget_missing", "selected prompt packet must record a positive compact_provider_prompt_budget")
+    _require(
+        prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+        "packet_prompt_budget_policy_mismatch",
+        "selected prompt packet must record the current Higgsfield repository execution policy",
+    )
     receipt, output_path, manifest, manifest_path, receipt_path, image_sha = _validate_execution_receipt(
         execution_receipt.resolve(),
         handoff_facts,
@@ -590,7 +610,11 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         "source_selected_prompt_input_artifact_sha256 does not match the current packet bytes",
     )
     prompt_budget = int(packet_report.get("compact_provider_prompt_budget") or 0)
-    _require(prompt_budget > 0, "packet_prompt_budget_missing", "selected prompt packet must record a positive compact_provider_prompt_budget")
+    _require(
+        prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+        "packet_prompt_budget_policy_mismatch",
+        "selected prompt packet must record the current Higgsfield repository execution policy",
+    )
 
     receipt_path = approval_contract.resolve_repo_path(
         str(artifact.get("source_execution_receipt_path") or ""),

@@ -13,6 +13,7 @@ import tools.lena_higgsfield_generation_approval_v1 as canonical_approval
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval
 import tools.lena_record_higgsfield_retry_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 from tests.fixtures import lena_pose_provenance as pose_fixture
 from tools.lena_higgsfield_retry_generation_approval_v1 import (
@@ -123,7 +124,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "recipe_id": "hcr_011",
         "compact_provider_prompt_preview": ORIGINAL_PROMPT,
         "compact_provider_prompt_sha256": PROMPT_SHA,
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "provider_prompt_contract": {"provider_route": "higgsfield_forward_no_live", "live_authority": False},
     }
     _write_json(packet_path, packet_report)

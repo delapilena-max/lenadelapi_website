@@ -411,7 +411,9 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
         "candidate": candidate,
         "decision": artifact,
         "binding": binding,
+        "packet": bound_packet,
         "handoff": handoff,
+        "executor_source": source,
         "manifest": manifest,
     }
 
@@ -1245,6 +1247,14 @@ def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain
     assert chain["manifest"]["pose_bound_content_packet_sha256"] == (
         chain["handoff"]["pose_bound_content_packet_sha256"]
     )
+    prompt = chain["packet"]["compact_provider_prompt_preview"]
+    assert chain["packet"]["compact_kling_prompt_preview"] == prompt
+    assert chain["handoff"]["structured_executor_inputs"]["selected_prompt_text"] == prompt
+    assert chain["executor_source"]["image"]["image_prompt"] == prompt
+    assert chain["manifest"]["image_prompt"] == prompt
+    assert chain["manifest"]["prompt_sha256"] == hashlib.sha256(
+        prompt.encode("utf-8")
+    ).hexdigest()
 
 
 def test_production_pose_chain_reaches_preexisting_expression_boundary(

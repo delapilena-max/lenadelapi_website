@@ -13,6 +13,7 @@ from tools import lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_mod
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 from tests.fixtures import lena_pose_provenance as pose_fixture
 
 
@@ -104,7 +105,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "hook_selection_reason": "retry source fixture",
         "compact_provider_prompt_preview": ORIGINAL_PROMPT,
         "compact_provider_prompt_sha256": PROMPT_SHA,
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "provider_prompt_contract": {
             "provider_route": "higgsfield_forward_no_live",
             "live_authority": False,
@@ -490,10 +491,12 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert "must read as a real getting-ready vanity moment" in prompt
     assert "No fake freckles or poreless/plastic skin." in prompt
     assert "slightly fuller is okay, not a hard gate" in prompt
-    assert len(prompt) <= 2499
-    assert artifact["retry_prompt_budget"] == 2499
+    assert len(prompt) <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+    assert artifact["retry_prompt_budget"] == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     assert artifact["retry_prompt_length"] == len(prompt)
-    assert artifact["retry_prompt_headroom"] == 2499 - len(prompt)
+    assert artifact["retry_prompt_headroom"] == (
+        prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS - len(prompt)
+    )
     assert artifact["retry_prompt_headroom"] >= 70
     assert artifact["retry_prompt_headroom_policy"] == {"hard_block_below": 30, "warning_below": 70}
     assert artifact["retry_prompt_headroom_status"] == "ready"
@@ -711,13 +714,15 @@ def test_retry_handoff_fails_closed_on_receipt_prompt_mismatch(tmp_path: Path, m
     assert excinfo.value.code == "receipt_prompt_sha_mismatch"
 
 
-def test_retry_handoff_warns_but_allows_when_headroom_is_under_70(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_handoff_warns_but_allows_below_configured_warning_threshold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_roots(tmp_path, monkeypatch)
     seeded = _seed_bound_retry_source(tmp_path)
-    packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
-    packet["compact_provider_prompt_budget"] = len(retry_mod._replace_sections(ORIGINAL_PROMPT)) + 50
-    seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
-    _refresh_bound_packet_evidence(seeded)
+    headroom = (
+        prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+        - len(retry_mod._replace_sections(ORIGINAL_PROMPT))
+    )
+    monkeypatch.setattr(retry_mod.readiness_audit, "PAYLOAD_HEADROOM_HARD_BLOCK_BELOW", headroom - 1)
+    monkeypatch.setattr(retry_mod.readiness_audit, "PAYLOAD_HEADROOM_WARNING_BELOW", headroom + 1)
 
     report = retry_mod.evaluate_retry_handoff(
         handoff_artifact=seeded["handoff_path"],
@@ -725,18 +730,22 @@ def test_retry_handoff_warns_but_allows_when_headroom_is_under_70(tmp_path: Path
         output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
         write_artifact=False,
     )
-    assert report["retry_prompt_headroom"] == 50
+    assert report["retry_prompt_headroom"] == headroom
     assert report["retry_prompt_headroom_status"] == "warning"
-    assert report["retry_prompt_headroom_policy"] == {"hard_block_below": 30, "warning_below": 70}
+    assert report["retry_prompt_headroom_policy"] == {
+        "hard_block_below": headroom - 1,
+        "warning_below": headroom + 1,
+    }
 
 
-def test_retry_handoff_fails_closed_when_headroom_is_under_30(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retry_handoff_fails_closed_below_configured_hard_threshold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_roots(tmp_path, monkeypatch)
     seeded = _seed_bound_retry_source(tmp_path)
-    packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
-    packet["compact_provider_prompt_budget"] = len(retry_mod._replace_sections(ORIGINAL_PROMPT)) + 29
-    seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
-    _refresh_bound_packet_evidence(seeded)
+    headroom = (
+        prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+        - len(retry_mod._replace_sections(ORIGINAL_PROMPT))
+    )
+    monkeypatch.setattr(retry_mod.readiness_audit, "PAYLOAD_HEADROOM_HARD_BLOCK_BELOW", headroom + 1)
 
     with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
         retry_mod.build_retry_handoff(
