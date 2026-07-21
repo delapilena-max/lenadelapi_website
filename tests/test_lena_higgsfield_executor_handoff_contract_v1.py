@@ -235,7 +235,14 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
     }
 
 
-def _source_from_prompt(prompt_text: str = PROMPT_TEXT, pose_binding: dict | None = None) -> dict:
+def _source_from_prompt(
+    prompt_text: str = PROMPT_TEXT,
+    pose_binding: dict | None = None,
+    *,
+    packet_path: str | None = None,
+    packet_sha256: str | None = None,
+    packet_bound_sha256: str | None = None,
+) -> dict:
     pose_binding = pose_binding or pose_fixture.static_pose_provenance()
     return {
         "resolver": "content_packet_dryrun",
@@ -253,6 +260,12 @@ def _source_from_prompt(prompt_text: str = PROMPT_TEXT, pose_binding: dict | Non
             "pose_body_language_label": pose_binding["pose_body_language_label"],
             "pose_text": pose_binding["pose_text"],
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_artifact_path": packet_path or (
+                f"pipeline/strategy/lena/content_packets/{DATE}/"
+                f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+            ),
+            "pose_bound_content_packet_artifact_sha256": packet_sha256 or "3" * 64,
+            "pose_bound_content_packet_sha256": packet_bound_sha256 or "4" * 64,
             "expression_gaze_id": "exp_fixture",
             "expression_gaze_label": "calm expression",
             "effective_wardrobe_silhouette_class": "beautiful_trouble",
@@ -371,14 +384,25 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
         },
     )
 
-    monkeypatch.setattr(
-        executor,
-        "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
-            pose_fixture.bind_packet(packet_report, pose_binding=expected_pose_provenance),
-            _source_from_prompt(prompt_text, expected_pose_provenance),
-        ),
-    )
+    def rebuild_fixture(
+        _path,
+        _slot_id_override=None,
+        _candidate_path=None,
+        expected_pose_provenance=None,
+    ):
+        bound = pose_fixture.bind_packet(packet_report, pose_binding=expected_pose_provenance)
+        bound_sha = hashlib.sha256(
+            json.dumps(bound, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest()
+        return bound, _source_from_prompt(
+            prompt_text,
+            expected_pose_provenance,
+            packet_path=content_packet_path.relative_to(tmp_root).as_posix(),
+            packet_sha256=hashlib.sha256(content_packet_path.read_bytes()).hexdigest(),
+            packet_bound_sha256=bound_sha,
+        )
+
+    monkeypatch.setattr(executor, "_rebuild_packet_prompt_source", rebuild_fixture)
 
     packet = handoff_builder.build_handoff(DATE, str(reconciliation_path.relative_to(tmp_root).as_posix()))
     packet_path, _ = handoff_builder.save_handoff(packet, DATE)
@@ -451,6 +475,11 @@ def test_candidate_to_handoff_to_manifest_to_qa_preserves_pose_provenance(
     }
     decision = {"as_of_date": DATE, "authority_commit": "a" * 40}
     monkeypatch.setattr(disposition_mod, "_validate_manifest_bank_context", lambda *_args: None)
+    monkeypatch.setattr(
+        disposition_mod,
+        "_validate_manifest_pose_contract",
+        lambda *_args, **_kwargs: bound_pose,
+    )
     validated = disposition_mod._validate_manifest(
         manifest_path,
         decision,
@@ -468,6 +497,31 @@ def test_candidate_to_handoff_to_manifest_to_qa_preserves_pose_provenance(
     assert source["image"]["pose_provenance"] == bound_pose
     assert validated["pose_provenance"] == bound_pose
     assert validated["pose_body_language_id"] == bound_pose["pose_body_language_id"]
+
+
+@pytest.mark.parametrize("boundary", ["executor", "approval"])
+def test_pose_copy_disagreement_is_rejected_by_executor_and_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+) -> None:
+    handoff_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
+    report = json.loads(handoff_path.read_text(encoding="utf-8"))
+    report["structured_executor_inputs"]["pose_provenance"] = dict(report["pose_provenance"])
+    report["structured_executor_inputs"]["pose_provenance"]["pose_body_language_id"] = "pose_conflict"
+    _write_json(handoff_path, report)
+
+    error_type = (
+        executor.HandoffArtifactError
+        if boundary == "executor"
+        else approval_mod.HiggsfieldGenerationApprovalError
+    )
+    with pytest.raises(error_type) as excinfo:
+        if boundary == "executor":
+            executor._validate_handoff_packet(handoff_path)
+        else:
+            approval_mod.inspect_handoff_artifact(handoff_path)
+    assert excinfo.value.code == "handoff_pose_provenance_mismatch"
 
 
 def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_prompt_bytes(
@@ -1172,6 +1226,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "pose_body_language_label": pose_fixture.POSE_LABEL,
             },
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": "4" * 64,
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_prompt_input": {
@@ -1180,6 +1235,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
                 "pose_provenance": pose_binding,
+                "pose_bound_content_packet_sha256": "4" * 64,
             },
             "structured_executor_inputs": {
                 "provider": "higgsfield",
@@ -1195,6 +1251,7 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
                 "pose_provenance": pose_binding,
+                "pose_bound_content_packet_sha256": "4" * 64,
                 "soul_metadata": {
                     "name": "Lena",
                     "type": "Soul 2.0",
@@ -1375,6 +1432,14 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
             "provider": "higgsfield",
             "slot_id": original_slot,
             "prompt_sha256": original_prompt_sha,
+            "image_prompt": original_prompt,
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "pose_text": pose_binding["pose_text"],
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+            "pose_bound_content_packet_artifact_sha256": packet_sha,
+            "pose_bound_content_packet_sha256": "4" * 64,
             "saved_image_path": str(image_path),
             "provider_job_id": "job-123",
             "provider_status": "completed",
@@ -1439,6 +1504,9 @@ def _build_retry_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> tup
                 "pose_body_language_label": pose_binding["pose_body_language_label"],
                 "pose_text": pose_binding["pose_text"],
                 "pose_provenance": pose_binding,
+                "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+                "pose_bound_content_packet_artifact_sha256": packet_sha,
+                "pose_bound_content_packet_sha256": "4" * 64,
                 "effective_wardrobe_silhouette_class": "beautiful_trouble",
                 "soul_name": "Lena",
                 "soul_version": "Soul 2.0",

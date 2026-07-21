@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tests.fixtures.lena_retry_lineage import build_retry_lineage
 from tests.test_lena_bounded_live_cycle_v1 import _build_bundle as build_live_cycle_bundle
 from tests.test_lena_bounded_live_cycle_v1 import _patch_clock as patch_live_cycle_clock
@@ -162,6 +163,7 @@ def retry_lineage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         },
     )
     monkeypatch.setattr(disposition, "_validate_manifest_bank_context", lambda manifest, candidate, commit: None)
+    monkeypatch.setattr(disposition, "_validate_manifest_pose_contract", lambda *args, **kwargs: None)
     lineage["reference_set_sha"] = reference_set_sha
     return lineage
 
@@ -316,6 +318,7 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "authority_commit": commit, "required_semantic_dimensions": {"identity": ["face"], "character_fit": ["confident"], "reject_character_traits": ["fake-rich signaling", "melodramatic", "audience-controlled identity"], "sexuality_and_safety": ["no sexual-signal stacking"], "aesthetic_quality": ["premium visual discipline"]},
     })
     monkeypatch.setattr(disposition, "_validate_manifest_bank_context", lambda manifest, candidate, commit: None)
+    monkeypatch.setattr(disposition, "_validate_manifest_pose_contract", lambda *args, **kwargs: None)
     return {
         "kwargs": kwargs,
         "decision": decision,
@@ -440,6 +443,11 @@ def _production_dual_binding_fixture(
     candidate_file["decision_fingerprint_sha256"] = hashlib.sha256(selector._canonical_bytes(candidate_file_core)).hexdigest()
     _write_json(candidate_path, candidate_file)
     candidate_sha = _sha(candidate_path)
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=resolved_candidate_path,
+        candidate_sha256=candidate_sha,
+        authority_commit=reference_authority_commit,
+    )
     handoff["repo_executor_path"] = "pipeline/higgsfield_lena_api_executor.py"
     handoff["created_at"] = "2026-07-19T00:00:00Z"
     handoff["influencer_id"] = "lena"
@@ -453,6 +461,10 @@ def _production_dual_binding_fixture(
     selected_candidate["schema_version"] = "lena_pre_generation_candidate_gate_v1"
     selected_candidate["candidate_status"] = "selected"
     handoff["selected_candidate"] = selected_candidate
+    handoff["selected_candidate"]["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    handoff["selected_candidate"]["pose_body_language_label"] = pose_binding["pose_body_language_label"]
+    handoff["pose_provenance"] = pose_binding
+    handoff["pose_bound_content_packet_sha256"] = "4" * 64
     selected_prompt_input = dict(handoff["selected_prompt_input"])
     selected_prompt_input["slot_id"] = str(handoff["selected_slot_id"])
     selected_prompt_input["selected_candidate_artifact_path"] = resolved_candidate_path
@@ -460,6 +472,8 @@ def _production_dual_binding_fixture(
     selected_prompt_input["prompt_text"] = provider_prompt_text
     selected_prompt_input["selected_prompt_text"] = provider_prompt_text
     selected_prompt_input["prompt_sha256"] = provider_prompt_sha
+    selected_prompt_input["pose_provenance"] = pose_binding
+    selected_prompt_input["pose_bound_content_packet_sha256"] = "4" * 64
     handoff["selected_prompt_input"] = selected_prompt_input
     structured_executor_inputs = dict(handoff["structured_executor_inputs"])
     structured_executor_inputs["slot_id"] = str(handoff["selected_slot_id"])
@@ -468,6 +482,8 @@ def _production_dual_binding_fixture(
     structured_executor_inputs["selected_candidate_artifact_sha256"] = candidate_sha
     structured_executor_inputs["selected_prompt_text"] = provider_prompt_text
     structured_executor_inputs["selected_prompt_sha256"] = provider_prompt_sha
+    structured_executor_inputs["pose_provenance"] = pose_binding
+    structured_executor_inputs["pose_bound_content_packet_sha256"] = "4" * 64
     structured_executor_inputs["soul_metadata"] = {
         "name": "Lena",
         "type": "Soul 2.0",
@@ -481,11 +497,25 @@ def _production_dual_binding_fixture(
     candidate_selection_binding["selected_candidate_artifact_path"] = resolved_candidate_path
     candidate_selection_binding["selected_candidate_artifact_sha256"] = candidate_sha
     candidate_selection_binding["candidate_prompt_sha256"] = provider_prompt_sha
+    candidate_selection_binding["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    candidate_selection_binding["pose_body_language_label"] = pose_binding["pose_body_language_label"]
+    candidate_selection_binding["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
     handoff["candidate_selection_binding"] = candidate_selection_binding
+    handoff["provider_execution_binding"]["pose_bound_content_packet_sha256"] = "4" * 64
+    handoff["provider_execution_binding"]["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
     binding_linkage = dict(handoff["binding_linkage"])
     binding_linkage["selected_candidate_artifact_path"] = resolved_candidate_path
     binding_linkage["selected_candidate_artifact_sha256"] = candidate_sha
     binding_linkage["recommendation_artifact_sha256"] = _sha(recommendation_path)
+    binding_linkage["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    binding_linkage["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
+    binding_linkage["pose_bound_content_packet_sha256"] = "4" * 64
     handoff["binding_linkage"] = binding_linkage
     handoff["expected_handoff_artifact_path"] = handoff_path.relative_to(tmp_path).as_posix()
     monkeypatch.setattr(reconciliation_builder, "ROOT", tmp_path)
@@ -730,6 +760,11 @@ def _production_dual_binding_fixture(
 
     monkeypatch.setattr(disposition, "_git_show_bytes", synthetic_git_show_bytes)
     monkeypatch.setattr(disposition, "_git_blob_oid", synthetic_git_blob_oid)
+    monkeypatch.setattr(
+        disposition,
+        "_validate_manifest_pose_contract",
+        lambda *args, **kwargs: pose_binding,
+    )
     _write_json(handoff_path, handoff)
     handoff_sha = _sha(handoff_path)
     auth["consumed"] = True

@@ -14,6 +14,7 @@ if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
@@ -253,6 +254,16 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
     selected_candidate = selected_candidate_binding["selected_candidate"]
     selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
+    try:
+        bound_pose, pose_bound_packet_sha256 = pose_provenance.validate_handoff_pose_copies(report)
+        pose_provenance.validate_pose_provenance(
+            bound_pose,
+            expected_candidate_path=selected_candidate_path_value,
+            expected_candidate_sha256=selected_candidate_sha_value,
+            expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
+        )
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
     reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
         report,
         selected_candidate_binding,
@@ -599,6 +610,8 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "candidate_selection_binding": candidate_selection_binding,
         "provider_execution_binding": provider_execution_binding,
         "binding_linkage": binding_linkage,
+        "pose_provenance": bound_pose,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
         "reconciliation": reconciliation_facts["reconciliation"],
         "reconciled_candidate": reconciliation_facts["final_candidate"],
         "reconciliation_decision": reconciliation_facts["decision"],

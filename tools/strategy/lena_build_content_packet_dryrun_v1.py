@@ -322,6 +322,22 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
         if pose_binding is not None
         else None
     )
+    recipe_section_inputs = {
+        "fashion_accessories": recipe.get("fashion_accessories", ""),
+        "setting_background": recipe.get("setting_background", ""),
+        "environment_realism_notes": recipe.get("scene_logic_contract", {}).get(
+            "environment_realism_notes", ""
+        ),
+        "technical_keywords": recipe.get("technical_keywords", ""),
+        "style_lighting": recipe.get("style_lighting", ""),
+        "negative_constraints": recipe.get("negative_constraints", ""),
+    }
+    for label, value in recipe_section_inputs.items():
+        pose_provenance.reject_reserved_provider_section_tokens(
+            str(value or ""),
+            label=f"recipe {label}",
+        )
+
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
     fashion = clean_fragment(recipe.get("fashion_accessories", ""))
     if fashion:
@@ -926,6 +942,50 @@ def build_packet(
 
 
 def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
+    supplied_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
+    )
+    existing_pose_value = packet.get("pose_provenance")
+    existing_contract = packet.get("generation_pose_contract")
+    if existing_pose_value is not None:
+        existing_pose = pose_provenance.validate_pose_provenance(existing_pose_value)
+        if supplied_pose is not None and existing_pose != supplied_pose:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_conflict",
+                "already-bound content packet pose provenance differs from the supplied candidate authority",
+            )
+        expected_contract = {
+            "status": "bound",
+            "authority_source": pose_provenance.AUTHORITY_SOURCE,
+            "recipe_subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+        }
+        if existing_contract != expected_contract:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_contract_mismatch",
+                "already-bound content packet generation pose contract is incomplete or inconsistent",
+            )
+        source_sections = packet.get("high_caliber_source_sections")
+        if not isinstance(source_sections, dict) or (
+            source_sections.get("provider_action_pose") != existing_pose["pose_text"]
+            or source_sections.get("subject_pose_semantics")
+            != pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_source_mismatch",
+                "already-bound content packet provider pose fields disagree with its pose provenance",
+            )
+        pose_provenance.require_pose_bound_prompt(
+            str(packet.get("compact_provider_prompt_preview") or ""),
+            existing_pose,
+        )
+    elif isinstance(existing_contract, dict) and existing_contract.get("status") == "bound":
+        raise pose_provenance.PoseProvenanceError(
+            "pose_bound_packet_provenance_missing",
+            "content packet claims a bound generation pose without pose provenance",
+        )
+
     recipe_bank = load_json(RECIPE_BANK)
     hook_bank = load_json(HOOK_BANK)
     wardrobe_catalog = load_json(WARDROBE_CATALOG)
@@ -981,7 +1041,7 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
             f"[ABORT] Hook '{packet['strong_hook_id']}' not found."
         )
 
-    effective_pose_binding = pose_binding
+    effective_pose_binding = supplied_pose
     if effective_pose_binding is None and packet.get("pose_provenance") is not None:
         effective_pose_binding = packet["pose_provenance"]
     return build_packet(

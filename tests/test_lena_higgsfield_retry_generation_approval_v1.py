@@ -123,6 +123,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
+    pose_bound_packet = pose_fixture.bind_packet(packet_report, pose_binding=pose_binding)
+    pose_bound_packet_sha = hashlib.sha256(
+        json.dumps(pose_bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
 
     learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
@@ -308,6 +312,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
         "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -316,6 +321,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -339,6 +345,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -354,6 +361,14 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "provider": "higgsfield",
         "slot_id": ORIGINAL_SLOT,
         "prompt_sha256": PROMPT_SHA,
+        "image_prompt": ORIGINAL_PROMPT,
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_body_language_label": pose_binding["pose_body_language_label"],
+        "pose_text": pose_binding["pose_text"],
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+        "pose_bound_content_packet_artifact_sha256": packet_sha,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "saved_image_path": str(image_path),
         "provider_job_id": "job-123",
         "provider_status": "completed",

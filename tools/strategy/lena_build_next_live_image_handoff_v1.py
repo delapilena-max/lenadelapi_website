@@ -901,6 +901,10 @@ def build_handoff(
             "reconciliation_decision_required": reconciliation_provenance["reconciliation"]["decision_required"],
         },
     }
+    try:
+        pose_provenance.validate_handoff_pose_copies(report)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
     return report
 
 

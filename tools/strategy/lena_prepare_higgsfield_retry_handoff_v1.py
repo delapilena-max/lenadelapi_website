@@ -297,6 +297,53 @@ def _validate_execution_receipt(
         "manifest_provider_status_binding_mismatch",
         "manifest provider_status does not match the execution receipt",
     )
+    try:
+        source_pose = pose_provenance.validate_pose_provenance(manifest.get("pose_provenance"))
+        handoff_pose = pose_provenance.validate_pose_provenance(
+            handoff_facts["report"].get("pose_provenance")
+        )
+        pose_provenance.require_pose_bound_prompt(
+            str(manifest.get("image_prompt") or ""),
+            source_pose,
+        )
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
+    _require(
+        source_pose == handoff_pose,
+        "manifest_pose_provenance_mismatch",
+        "source manifest pose provenance does not match the source generation handoff",
+    )
+    for field in ("pose_body_language_id", "pose_body_language_label", "pose_text"):
+        _require(
+            manifest.get(field) == source_pose[field],
+            "manifest_pose_provenance_mismatch",
+            f"source manifest {field} does not match its nested pose provenance",
+        )
+    manifest_prompt = manifest.get("image_prompt")
+    _require(
+        isinstance(manifest_prompt, str)
+        and _sha256_bytes(manifest_prompt.encode("utf-8")) == handoff_facts["prompt_sha256"],
+        "manifest_prompt_text_mismatch",
+        "source manifest image_prompt does not re-hash to the source handoff prompt",
+    )
+    handoff_report = handoff_facts["report"]
+    expected_packet_binding = {
+        "pose_bound_content_packet_artifact_path": handoff_report.get(
+            "selected_prompt_input_artifact_path"
+        ),
+        "pose_bound_content_packet_artifact_sha256": handoff_report.get(
+            "selected_prompt_input_artifact_sha256"
+        ),
+        "pose_bound_content_packet_sha256": handoff_report.get(
+            "pose_bound_content_packet_sha256"
+        ),
+    }
+    for field, expected in expected_packet_binding.items():
+        _require(
+            manifest.get(field) == expected,
+            "manifest_pose_bound_packet_mismatch",
+            f"source manifest {field} does not match the source handoff packet binding",
+        )
     return receipt, output_path, manifest, manifest_path, receipt_path, image_sha
 
 

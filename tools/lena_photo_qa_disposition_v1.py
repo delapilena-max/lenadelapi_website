@@ -33,6 +33,8 @@ from tools.lena_structured_visual_tool_v1 import (  # noqa: E402
 from tools import lena_higgsfield_qa_bridge_v1 as qa_bridge  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff  # noqa: E402
 from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff  # noqa: E402
+from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector  # noqa: E402
 
 
@@ -559,6 +561,110 @@ def _resolve_generation_binding_context(
     return decision, candidate, decision_kind, None
 
 
+def _resolve_pose_repo_path(raw: Any, *, label: str) -> Path:
+    try:
+        return _exact_lexical_repo_path(str(raw or ""), label)
+    except BoundaryError as exc:
+        raise BoundaryError("provenance_mismatch", exc.detail) from exc
+
+
+def _validate_manifest_pose_contract(
+    manifest: dict[str, Any],
+    decision: dict[str, Any],
+    candidate: dict[str, Any],
+    decision_kind: str,
+    provider_binding: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        bound_pose = pose_provenance.validate_pose_provenance(manifest.get("pose_provenance"))
+        candidate_path = _resolve_pose_repo_path(
+            bound_pose["selected_candidate_artifact_path"],
+            label="pose selected candidate artifact",
+        )
+        derived_pose = pose_provenance.build_candidate_pose_provenance(candidate_path, root=ROOT)
+        pose_provenance.require_pose_bound_prompt(manifest["image_prompt"], bound_pose)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise BoundaryError("provenance_mismatch", f"{exc.code}: {exc.detail}") from exc
+    if bound_pose != derived_pose:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest pose provenance does not match the SHA-bound selected candidate and committed pose bank",
+        )
+    if bound_pose["selected_candidate_authority_commit"] != decision["authority_commit"]:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest pose authority commit does not match the active generation decision",
+        )
+    candidate_label = candidate.get("pose_body_language_label") or candidate.get("pose")
+    if (
+        candidate.get("pose_body_language_id") != bound_pose["pose_body_language_id"]
+        or candidate_label != bound_pose["pose_body_language_label"]
+    ):
+        raise BoundaryError(
+            "provenance_mismatch",
+            "active candidate pose identity does not match manifest pose provenance",
+        )
+    for field in ("pose_body_language_id", "pose_body_language_label", "pose_text"):
+        if manifest.get(field) != bound_pose[field]:
+            raise BoundaryError(
+                "provenance_mismatch",
+                f"manifest flat {field} does not match nested pose provenance",
+            )
+
+    packet_path_value = manifest.get("pose_bound_content_packet_artifact_path")
+    packet_sha = manifest.get("pose_bound_content_packet_artifact_sha256")
+    packet_bound_sha = manifest.get("pose_bound_content_packet_sha256")
+    if not isinstance(packet_sha, str) or not SHA256_RE.fullmatch(packet_sha):
+        raise BoundaryError("provenance_mismatch", "manifest content packet artifact SHA is missing or invalid")
+    if not isinstance(packet_bound_sha, str) or not SHA256_RE.fullmatch(packet_bound_sha):
+        raise BoundaryError("provenance_mismatch", "manifest pose-bound content packet digest is missing or invalid")
+    packet_path = _resolve_pose_repo_path(packet_path_value, label="pose-bound content packet artifact")
+    if _sha256_file(packet_path) != packet_sha:
+        raise BoundaryError("provenance_mismatch", "manifest content packet artifact SHA does not match current bytes")
+    packet = _read_json_object(packet_path, "provenance_mismatch", "pose-bound content packet source")
+    try:
+        rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(
+            packet,
+            pose_binding=bound_pose,
+        )
+    except (pose_provenance.PoseProvenanceError, SystemExit) as exc:
+        raise BoundaryError("provenance_mismatch", f"content packet pose reconstruction failed: {exc}") from exc
+    rebuilt_digest = _sha256_bytes(
+        json.dumps(
+            rebuilt_packet,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    )
+    if rebuilt_digest != packet_bound_sha:
+        raise BoundaryError("provenance_mismatch", "manifest pose-bound content packet digest does not reconstruct")
+    if decision_kind in {"selected_candidate", "authorization_bound_handoff"} and (
+        rebuilt_packet.get("compact_provider_prompt_preview") != manifest["image_prompt"]
+    ):
+        raise BoundaryError("provenance_mismatch", "manifest provider prompt differs from the reconstructed pose-bound packet")
+
+    if provider_binding:
+        expected_provider_binding = {
+            "content_packet_artifact_path": packet_path_value,
+            "content_packet_artifact_sha256": packet_sha,
+            "provider_prompt_sha256": manifest["prompt_sha256"],
+            "pose_bound_content_packet_sha256": packet_bound_sha,
+            "pose_provenance_fingerprint_sha256": bound_pose["pose_provenance_fingerprint_sha256"],
+        }
+        mismatches = [
+            key
+            for key, expected in expected_provider_binding.items()
+            if provider_binding.get(key) != expected
+        ]
+        if mismatches:
+            raise BoundaryError(
+                "provenance_mismatch",
+                "manifest pose packet binding disagrees with approved handoff: " + ", ".join(mismatches),
+            )
+    return bound_pose
+
+
 def _validate_manifest(
     path: Path,
     decision: dict[str, Any],
@@ -603,6 +709,13 @@ def _validate_manifest(
     for key in required_text:
         if not isinstance(manifest.get(key), str) or not manifest[key].strip():
             raise BoundaryError("provenance_mismatch", f"manifest is missing required generation provenance: {key}")
+    _validate_manifest_pose_contract(
+        manifest,
+        decision,
+        candidate,
+        decision_kind,
+        provider_binding,
+    )
     if type(manifest.get("expression_safe_fallback_used")) is not bool:
         raise BoundaryError("provenance_mismatch", "manifest expression_safe_fallback_used must be a boolean")
     if "expression_safe_fallback_reason" not in manifest:

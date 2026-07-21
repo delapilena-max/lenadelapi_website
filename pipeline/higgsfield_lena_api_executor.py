@@ -426,8 +426,11 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
     try:
-        expected_pose_provenance = pose_provenance.validate_pose_provenance(
-            report.get("pose_provenance"),
+        expected_pose_provenance, expected_pose_bound_packet_sha256 = (
+            pose_provenance.validate_handoff_pose_copies(report)
+        )
+        pose_provenance.validate_pose_provenance(
+            expected_pose_provenance,
             expected_candidate_path=str(report.get("source_selected_candidate_artifact_path") or ""),
             expected_candidate_sha256=str(report.get("source_selected_candidate_artifact_sha256") or ""),
             expected_authority_commit=str(
@@ -463,13 +466,28 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         expected_pose_provenance=expected_pose_provenance,
     )
     image = source.get("image", {})
+    _require_handoff(
+        image.get("pose_provenance") == expected_pose_provenance,
+        "handoff_executor_pose_provenance_mismatch",
+        f"{handoff_path} executor source pose provenance differs from the handoff binding",
+    )
     prompt = image.get("image_prompt")
     _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
     regenerated_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     expected_sha = str(report.get("selected_prompt_input", {}).get("prompt_sha256", ""))
     _require_handoff(expected_sha and regenerated_sha == expected_sha, "handoff_prompt_sha_mismatch", f"{handoff_path} regenerated prompt SHA does not match packet expectation")
     _require_handoff(
-        report.get("pose_bound_content_packet_sha256")
+        image.get("pose_bound_content_packet_artifact_path")
+        == report.get("selected_prompt_input_artifact_path")
+        and image.get("pose_bound_content_packet_artifact_sha256")
+        == report.get("selected_prompt_input_artifact_sha256")
+        and image.get("pose_bound_content_packet_sha256")
+        == expected_pose_bound_packet_sha256,
+        "handoff_executor_pose_bound_packet_mismatch",
+        f"{handoff_path} executor source packet binding differs from the handoff binding",
+    )
+    _require_handoff(
+        expected_pose_bound_packet_sha256
         == hashlib.sha256(
             json.dumps(rebuilt_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
         ).hexdigest(),
@@ -1141,6 +1159,14 @@ def _rebuild_packet_prompt_source(
         packet_report,
         pose_binding=derived_pose_provenance,
     )
+    pose_bound_packet_sha256 = hashlib.sha256(
+        json.dumps(
+            rebuilt_packet,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
     prompt = str(rebuilt_packet.get("compact_provider_prompt_preview", "")).strip()
     _require_handoff(
         bool(prompt),
@@ -1203,6 +1229,9 @@ def _rebuild_packet_prompt_source(
             "pose_body_language_label": derived_pose_provenance["pose_body_language_label"],
             "pose_text": derived_pose_provenance["pose_text"],
             "pose_provenance": derived_pose_provenance,
+            "pose_bound_content_packet_artifact_path": _repo_relative_path(packet_path),
+            "pose_bound_content_packet_artifact_sha256": _sha256_file(packet_path),
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
             "expression_gaze_id": expression_gaze_id,
             "expression_gaze_label": expression_gaze_label,
             "effective_wardrobe_silhouette_class": wardrobe_silhouette_class,
@@ -1424,6 +1453,26 @@ def build_manifest(
         "manifest_pose_provenance_mismatch",
         "manifest pose fields must equal the validated provider pose authority",
     )
+    packet_path_value = image.get("pose_bound_content_packet_artifact_path")
+    packet_artifact_sha256 = image.get("pose_bound_content_packet_artifact_sha256")
+    packet_bound_sha256 = image.get("pose_bound_content_packet_sha256")
+    _require_handoff(
+        isinstance(packet_path_value, str) and bool(packet_path_value.strip()),
+        "manifest_pose_bound_packet_path_missing",
+        "manifest source must identify the pose-bound content packet artifact",
+    )
+    _require_handoff(
+        isinstance(packet_artifact_sha256, str)
+        and bool(pose_provenance.SHA256_RE.fullmatch(packet_artifact_sha256)),
+        "manifest_pose_bound_packet_artifact_sha_invalid",
+        "manifest source content packet artifact SHA must be a lowercase SHA-256",
+    )
+    _require_handoff(
+        isinstance(packet_bound_sha256, str)
+        and bool(pose_provenance.SHA256_RE.fullmatch(packet_bound_sha256)),
+        "manifest_pose_bound_packet_sha_invalid",
+        "manifest source pose-bound content packet digest must be a lowercase SHA-256",
+    )
 
     manifest = {
         "provider": "higgsfield",
@@ -1455,6 +1504,9 @@ def build_manifest(
         "pose_body_language_label": image.get("pose_body_language_label"),
         "pose_text": bound_pose["pose_text"],
         "pose_provenance": bound_pose,
+        "pose_bound_content_packet_artifact_path": packet_path_value,
+        "pose_bound_content_packet_artifact_sha256": packet_artifact_sha256,
+        "pose_bound_content_packet_sha256": packet_bound_sha256,
         # Persisted (2026-07-10) so a real, non-fabricated visual_style
         # (f"{camera_text}; {lighting_text}", matching the Kling package
         # builder's own convention) can be built later without re-parsing

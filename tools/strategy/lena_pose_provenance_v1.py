@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -15,6 +16,18 @@ POSE_AUTHORITY_REPO_PATH = "pipeline/prompt_banks/lena/lena_pose_body_language_b
 RECIPE_SUBJECT_POSE_SEMANTICS = "non_authoritative_recipe_context_only"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+PROVIDER_SECTION_ORDER = (
+    "Subject",
+    "Subject Presence",
+    "Action",
+    "Environment",
+    "Cinematography",
+    "Lighting/Style",
+    "Technical",
+)
+PROVIDER_SECTION_TOKEN_RE = re.compile(
+    r"\[(Subject Presence|Lighting/Style|Subject|Action|Environment|Cinematography|Technical)\]"
+)
 
 
 class PoseProvenanceError(RuntimeError):
@@ -51,19 +64,163 @@ def _repo_relative(path: Path, root: Path) -> str:
         ) from exc
 
 
-def _git_show_bytes(root: Path, commit: str, repo_path: str) -> bytes:
+def _git_environment() -> dict[str, str]:
+    return {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+
+
+def _git_bytes(root: Path, *args: str, code: str = "pose_authority_unavailable") -> bytes:
     completed = subprocess.run(
-        ["git", "-C", str(root), "show", f"{commit}:{repo_path}"],
+        ["git", "-C", str(root), *args],
         capture_output=True,
         check=False,
+        env=_git_environment(),
     )
     if completed.returncode != 0:
         detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise PoseProvenanceError(code, detail or "git authority validation failed")
+    return completed.stdout
+
+
+def _worktree_bytes_match_commit(root: Path, commit: str, repo_path: str, current: bytes) -> bool:
+    cleaned = subprocess.run(
+        ["git", "-C", str(root), "hash-object", f"--path={repo_path}", "--stdin"],
+        input=current,
+        capture_output=True,
+        check=False,
+        env=_git_environment(),
+    )
+    if cleaned.returncode != 0:
         raise PoseProvenanceError(
             "pose_authority_unavailable",
-            f"could not read {repo_path} at {commit}: {detail}",
+            f"git could not canonicalize authority input: {repo_path}",
         )
-    return completed.stdout
+    committed_blob = _git_bytes(root, "rev-parse", f"{commit}:{repo_path}").strip()
+    return cleaned.stdout.strip() == committed_blob
+
+
+def _validate_selected_candidate_issuance(
+    artifact: dict[str, Any],
+    *,
+    root: Path,
+) -> dict[str, Any]:
+    from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
+    from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
+
+    try:
+        candidate = selected_candidate._validate_shape(artifact)
+    except selected_candidate.ConsumerError as exc:
+        raise PoseProvenanceError(exc.code, exc.detail) from exc
+
+    stored_fingerprint = artifact.get("decision_fingerprint_sha256")
+    _require(
+        isinstance(stored_fingerprint, str) and bool(SHA256_RE.fullmatch(stored_fingerprint)),
+        "decision_fingerprint_missing",
+        "selected candidate decision fingerprint is missing or invalid",
+    )
+    decision_core = {
+        key: value
+        for key, value in artifact.items()
+        if key not in {"generated_at_utc", "decision_fingerprint_sha256"}
+    }
+    _require(
+        _sha256_bytes(selector._canonical_bytes(decision_core)) == stored_fingerprint,
+        "decision_fingerprint_mismatch",
+        "selected candidate decision fingerprint does not match its immutable body",
+    )
+
+    authority_commit = artifact.get("authority_commit")
+    _require(
+        isinstance(authority_commit, str) and bool(COMMIT_RE.fullmatch(authority_commit)),
+        "pose_authority_commit_invalid",
+        "selected candidate must bind a full authority_commit",
+    )
+    object_type = _git_bytes(
+        root,
+        "cat-file",
+        "-t",
+        authority_commit,
+        code="pose_authority_commit_invalid",
+    ).decode("ascii", errors="replace").strip()
+    _require(
+        object_type == "commit",
+        "pose_authority_commit_invalid",
+        "selected candidate authority_commit must identify a commit object exactly",
+    )
+    resolved_commit = _git_bytes(
+        root,
+        "rev-parse",
+        "--verify",
+        f"{authority_commit}^{{commit}}",
+        code="pose_authority_commit_invalid",
+    ).decode("ascii", errors="replace").strip()
+    _require(
+        resolved_commit == authority_commit,
+        "pose_authority_commit_invalid",
+        "selected candidate authority_commit did not resolve to the exact commit",
+    )
+    ancestor = subprocess.run(
+        ["git", "-C", str(root), "merge-base", "--is-ancestor", authority_commit, "HEAD"],
+        capture_output=True,
+        check=False,
+        env=_git_environment(),
+    )
+    _require(
+        ancestor.returncode == 0,
+        "pose_authority_commit_not_ancestor",
+        "selected candidate authority_commit is unavailable or is not an ancestor of HEAD",
+    )
+
+    provenance = artifact.get("input_provenance")
+    _require(
+        isinstance(provenance, list),
+        "pose_authority_provenance_invalid",
+        "selected candidate input_provenance must be a list",
+    )
+    for repo_path in selector.AUTHORITY_PATHS:
+        matches = [
+            item
+            for item in provenance
+            if isinstance(item, dict) and item.get("path") == repo_path
+        ]
+        _require(
+            len(matches) == 1,
+            "pose_authority_provenance_invalid",
+            f"canonical candidate authority must appear exactly once: {repo_path}",
+        )
+        recorded_sha = matches[0].get("sha256")
+        _require(
+            isinstance(recorded_sha, str) and bool(SHA256_RE.fullmatch(recorded_sha)),
+            "pose_authority_provenance_invalid",
+            f"canonical candidate authority has invalid SHA: {repo_path}",
+        )
+        authority_path = root / repo_path
+        _require(
+            authority_path.is_file(),
+            "pose_authority_unavailable",
+            f"canonical candidate authority is unavailable: {repo_path}",
+        )
+        current = authority_path.read_bytes()
+        _require(
+            _sha256_bytes(current) == recorded_sha,
+            "pose_authority_worktree_drift",
+            f"canonical candidate authority changed after candidate selection: {repo_path}",
+        )
+        _require(
+            _worktree_bytes_match_commit(root, authority_commit, repo_path, current),
+            "pose_authority_commit_hash_mismatch",
+            f"canonical candidate authority does not match {authority_commit}: {repo_path}",
+        )
+    return candidate
+
+
+def _git_show_bytes(root: Path, commit: str, repo_path: str) -> bytes:
+    try:
+        return _git_bytes(root, "show", f"{commit}:{repo_path}")
+    except PoseProvenanceError as exc:
+        raise PoseProvenanceError(
+            "pose_authority_unavailable",
+            f"could not read {repo_path} at {commit}: {exc.detail}",
+        ) from exc
 
 
 def validate_pose_provenance(
@@ -136,11 +293,8 @@ def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) 
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise PoseProvenanceError("pose_candidate_unreadable", f"could not read selected candidate artifact: {exc}") from exc
     _require(isinstance(artifact, dict), "pose_candidate_invalid", "selected candidate artifact must contain a JSON object")
-    _require(artifact.get("candidate_status") == "selected", "pose_candidate_not_selected", "pose authority requires a selected candidate")
-    candidate = artifact.get("candidate")
-    _require(isinstance(candidate, dict), "pose_candidate_invalid", "selected candidate artifact must contain candidate data")
-    authority_commit = str(artifact.get("authority_commit") or "").strip()
-    _require(bool(COMMIT_RE.fullmatch(authority_commit)), "pose_authority_commit_invalid", "selected candidate must bind a full authority_commit")
+    candidate = _validate_selected_candidate_issuance(artifact, root=root)
+    authority_commit = str(artifact["authority_commit"])
 
     pose_id = str(candidate.get("pose_body_language_id") or "").strip()
     candidate_label = str(candidate.get("pose_body_language_label") or candidate.get("pose") or "").strip()
@@ -190,19 +344,146 @@ def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) 
     return validate_pose_provenance(value)
 
 
+def reject_reserved_provider_section_tokens(value: str, *, label: str) -> None:
+    token = PROVIDER_SECTION_TOKEN_RE.search(value)
+    _require(
+        token is None,
+        "provider_section_token_injection",
+        f"{label} contains reserved provider section token {token.group(0)!r}" if token else label,
+    )
+
+
+def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
+    _require(isinstance(prompt, str) and bool(prompt.strip()), "provider_prompt_missing", "provider prompt is required")
+    tokens = list(PROVIDER_SECTION_TOKEN_RE.finditer(prompt))
+    _require(tokens, "provider_section_grammar_invalid", "provider prompt contains no canonical sections")
+    labels = [match.group(1) for match in tokens]
+    _require(
+        labels.count("Action") == 1,
+        "provider_action_section_count_invalid",
+        "provider prompt must contain exactly one [Action] section",
+    )
+    _require(
+        len(labels) == len(set(labels)),
+        "provider_section_duplicate",
+        "provider prompt contains a duplicate reserved section",
+    )
+    positions = [PROVIDER_SECTION_ORDER.index(label) for label in labels]
+    _require(
+        positions == sorted(positions),
+        "provider_section_order_invalid",
+        "provider prompt sections are not in canonical order",
+    )
+
+    sections: dict[str, str] = {}
+    for index, match in enumerate(tokens):
+        suffix = prompt[match.end():]
+        _require(
+            bool(re.match(r"\s*:", suffix)),
+            "provider_section_grammar_invalid",
+            f"reserved provider section [{match.group(1)}] must be followed by a colon",
+        )
+        body_start = match.end() + re.match(r"\s*:", suffix).end()
+        body_end = tokens[index + 1].start() if index + 1 < len(tokens) else len(prompt)
+        body = prompt[body_start:body_end].strip()
+        _require(
+            bool(body),
+            "provider_section_body_missing",
+            f"provider section [{match.group(1)}] must have a nonempty body",
+        )
+        sections[match.group(1)] = body
+    return sections
+
+
 def require_pose_bound_prompt(prompt: str, provenance: Any) -> None:
     binding = validate_pose_provenance(provenance)
-    canonical_text = binding["pose_text"]
-    action_match = re.search(
-        r"\[Action\]:\s*(.*?)(?=\s+\[(?:Environment|Cinematography|Lighting/Style|Technical)\]:|$)",
-        prompt,
-        flags=re.DOTALL,
+    sections = parse_provider_prompt_sections(prompt)
+    _require(
+        sections["Action"] == binding["pose_text"],
+        "provider_action_pose_mismatch",
+        "provider Action must equal the selected candidate canonical pose text exactly",
     )
-    if action_match is not None:
-        actual = action_match.group(1).strip()
-        _require(actual == canonical_text, "provider_action_pose_mismatch", "provider Action must equal the selected candidate canonical pose text exactly")
-        return
-    pose_match = re.search(r"(?:^|\s)Pose:\s*(.*?)(?=\s+(?:Expression|Camera|Lighting|Mood):|$)", prompt, flags=re.DOTALL)
-    _require(pose_match is not None, "provider_pose_section_missing", "provider prompt is missing a canonical Action or Pose section")
-    actual = pose_match.group(1).strip().removesuffix(".")
-    _require(actual == canonical_text, "provider_action_pose_mismatch", "provider Pose must equal the selected candidate canonical pose text exactly")
+
+
+def validate_handoff_pose_copies(report: Any) -> tuple[dict[str, Any], str]:
+    _require(isinstance(report, dict), "handoff_pose_contract_missing", "handoff must be a JSON object")
+    binding = validate_pose_provenance(report.get("pose_provenance"))
+    digest = report.get("pose_bound_content_packet_sha256")
+    _require(
+        isinstance(digest, str) and bool(SHA256_RE.fullmatch(digest)),
+        "handoff_pose_bound_packet_sha_invalid",
+        "handoff pose-bound content packet digest must be a lowercase SHA-256",
+    )
+    selected_prompt = report.get("selected_prompt_input")
+    structured = report.get("structured_executor_inputs")
+    candidate_summary = report.get("selected_candidate")
+    candidate_binding = report.get("candidate_selection_binding")
+    provider_binding = report.get("provider_execution_binding")
+    linkage = report.get("binding_linkage")
+    for label, value in (
+        ("selected_prompt_input", selected_prompt),
+        ("structured_executor_inputs", structured),
+        ("selected_candidate", candidate_summary),
+    ):
+        _require(isinstance(value, dict), "handoff_pose_copy_missing", f"handoff {label} must be a JSON object")
+    for label, value in (
+        ("selected_prompt_input", selected_prompt),
+        ("structured_executor_inputs", structured),
+    ):
+        _require(
+            value.get("pose_provenance") == binding,
+            "handoff_pose_provenance_mismatch",
+            f"handoff {label} pose provenance differs from the top-level binding",
+        )
+        _require(
+            value.get("pose_bound_content_packet_sha256") == digest,
+            "handoff_pose_bound_packet_sha_mismatch",
+            f"handoff {label} packet digest differs from the top-level binding",
+        )
+    identity_copies = [("selected_candidate", candidate_summary)]
+    if isinstance(candidate_binding, dict):
+        identity_copies.append(("candidate_selection_binding", candidate_binding))
+    for label, value in identity_copies:
+        _require(
+            value.get("pose_body_language_id") == binding["pose_body_language_id"]
+            and value.get("pose_body_language_label") == binding["pose_body_language_label"],
+            "handoff_pose_identity_mismatch",
+            f"handoff {label} pose identity differs from the top-level binding",
+        )
+    fingerprint_copies = [
+        (label, value)
+        for label, value in (
+            ("candidate_selection_binding", candidate_binding),
+            ("provider_execution_binding", provider_binding),
+            ("binding_linkage", linkage),
+        )
+        if isinstance(value, dict)
+    ]
+    for label, value in fingerprint_copies:
+        _require(
+            value.get("pose_provenance_fingerprint_sha256")
+            == binding["pose_provenance_fingerprint_sha256"],
+            "handoff_pose_fingerprint_mismatch",
+            f"handoff {label} pose fingerprint differs from the top-level binding",
+        )
+    if isinstance(linkage, dict):
+        _require(
+            linkage.get("pose_body_language_id") == binding["pose_body_language_id"],
+            "handoff_pose_identity_mismatch",
+            "handoff binding_linkage pose ID differs from the top-level binding",
+        )
+    digest_copies = [
+        (label, value)
+        for label, value in (
+            ("provider_execution_binding", provider_binding),
+            ("binding_linkage", linkage),
+        )
+        if isinstance(value, dict)
+    ]
+    for label, value in digest_copies:
+        _require(
+            value.get("pose_bound_content_packet_sha256") == digest,
+            "handoff_pose_bound_packet_sha_mismatch",
+            f"handoff {label} packet digest differs from the top-level binding",
+        )
+    return binding, digest

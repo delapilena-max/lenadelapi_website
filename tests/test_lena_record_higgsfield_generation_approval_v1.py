@@ -11,6 +11,7 @@ import pytest
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_record_higgsfield_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 
 DATE = "2026-07-14"
@@ -25,6 +26,7 @@ def _selected_candidate_repo_path() -> str:
 def _selected_candidate_payload() -> dict:
     return {
         "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "authority_commit": "a" * 40,
         "candidate_status": "selected",
         "generated_at_utc": "2026-07-14T12:00:00+00:00",
         "candidate": {
@@ -32,6 +34,8 @@ def _selected_candidate_payload() -> dict:
             "slot_id": SLOT_ID,
             "recipe_id": "hcr_011",
             "prompt_sha256": "b" * 64,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
     }
 
@@ -66,6 +70,11 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
     handoff_repo_path = _handoff_repo_path()
     selected_candidate_repo_path = _selected_candidate_repo_path()
     selected_candidate_sha = _selected_candidate_sha()
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=selected_candidate_repo_path,
+        candidate_sha256=selected_candidate_sha,
+    )
+    pose_bound_packet_sha = "4" * 64
     return {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -99,12 +108,18 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "prompt_sha256": prompt_sha,
             "schema_version": "lena_pre_generation_candidate_gate_v1",
             "candidate_status": "selected",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_sha256": "a" * 64,
         "selected_prompt_input": {
             "prompt_sha256": prompt_sha,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -126,6 +141,8 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "selected_prompt_sha256": prompt_sha,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
 

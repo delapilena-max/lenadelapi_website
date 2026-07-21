@@ -112,6 +112,15 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
+    pose_bound_packet = pose_fixture.bind_packet(packet_report, pose_binding=pose_binding)
+    pose_bound_packet_sha = hashlib.sha256(
+        json.dumps(
+            pose_bound_packet,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
     learning_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_post_outcome_learning_state_{DATE}.json"
     recommendation_repo_path = Path("pipeline/strategy/lena/next_actions") / DATE / f"lena_next_generation_step_{DATE}.json"
@@ -297,6 +306,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "pose_body_language_label": pose_fixture.POSE_LABEL,
         },
         "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -305,6 +315,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -328,6 +339,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -343,6 +355,14 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "provider": "higgsfield",
         "slot_id": ORIGINAL_SLOT,
         "prompt_sha256": PROMPT_SHA,
+        "image_prompt": ORIGINAL_PROMPT,
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_body_language_label": pose_binding["pose_body_language_label"],
+        "pose_text": pose_binding["pose_text"],
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+        "pose_bound_content_packet_artifact_sha256": packet_sha,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "saved_image_path": str(image_path),
         "provider_job_id": "job-123",
         "provider_status": "completed",
@@ -381,6 +401,30 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "manifest_path": manifest_path,
         "image_path": image_path,
     }
+
+
+def _refresh_bound_packet_evidence(seeded: dict[str, Path]) -> None:
+    packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
+    packet_sha = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
+    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
+    bound_packet = pose_fixture.bind_packet(packet, pose_binding=handoff["pose_provenance"])
+    bound_packet_sha = hashlib.sha256(
+        json.dumps(bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    handoff["selected_prompt_input_artifact_sha256"] = packet_sha
+    handoff["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["selected_prompt_input"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["structured_executor_inputs"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    _write_json(seeded["handoff_path"], handoff)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    manifest["pose_bound_content_packet_artifact_sha256"] = packet_sha
+    manifest["pose_bound_content_packet_sha256"] = bound_packet_sha
+    _write_json(seeded["manifest_path"], manifest)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["handoff_artifact_sha256"] = hashlib.sha256(
+        seeded["handoff_path"].read_bytes()
+    ).hexdigest()
+    _write_json(seeded["receipt_path"], receipt)
 
 
 def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -426,6 +470,69 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     assert artifact["retry_prompt_headroom_status"] == "ready"
 
 
+@pytest.mark.parametrize(
+    "reason_code",
+    ["background_identity_duplication", "hair_crown_forelock_artifact"],
+)
+def test_null_pose_source_manifest_cannot_seed_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reason_code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    manifest["pose_provenance"] = None
+    manifest["pose_body_language_id"] = None
+    manifest["pose_body_language_label"] = None
+    manifest["pose_text"] = None
+    _write_json(seeded["manifest_path"], manifest)
+    soul = (
+        {"id": "current", "name": "Lena", "type": "soul_2", "status": "completed"}
+        if reason_code == "hair_crown_forelock_artifact"
+        else None
+    )
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.build_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            reason_code=reason_code,
+            soul_record=soul,
+        )
+    assert excinfo.value.code == "pose_provenance_missing"
+
+
+def test_source_manifest_pose_binding_must_match_source_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    changed = dict(manifest["pose_provenance"])
+    changed["selected_candidate_artifact_sha256"] = "9" * 64
+    core = {
+        key: value
+        for key, value in changed.items()
+        if key != "pose_provenance_fingerprint_sha256"
+    }
+    changed["pose_provenance_fingerprint_sha256"] = hashlib.sha256(
+        json.dumps(core, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    manifest["pose_provenance"] = changed
+    _write_json(seeded["manifest_path"], manifest)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.build_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+        )
+    assert excinfo.value.code == "manifest_pose_provenance_mismatch"
+
+
 def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -436,8 +543,20 @@ def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     packet["compact_provider_prompt_budget"] = 4096
     seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
     handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
-    handoff["selected_prompt_input_artifact_sha256"] = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
+    packet_sha = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
+    bound_packet = pose_fixture.bind_packet(packet, pose_binding=handoff["pose_provenance"])
+    bound_packet_sha = hashlib.sha256(
+        json.dumps(bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    handoff["selected_prompt_input_artifact_sha256"] = packet_sha
+    handoff["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["selected_prompt_input"]["pose_bound_content_packet_sha256"] = bound_packet_sha
+    handoff["structured_executor_inputs"]["pose_bound_content_packet_sha256"] = bound_packet_sha
     seeded["handoff_path"].write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    manifest["pose_bound_content_packet_artifact_sha256"] = packet_sha
+    manifest["pose_bound_content_packet_sha256"] = bound_packet_sha
+    seeded["manifest_path"].write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
     receipt["handoff_artifact_sha256"] = hashlib.sha256(seeded["handoff_path"].read_bytes()).hexdigest()
     seeded["receipt_path"].write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
@@ -531,12 +650,7 @@ def test_retry_handoff_warns_but_allows_when_headroom_is_under_70(tmp_path: Path
     packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
     packet["compact_provider_prompt_budget"] = len(retry_mod._replace_sections(ORIGINAL_PROMPT)) + 50
     seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
-    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
-    handoff["selected_prompt_input_artifact_sha256"] = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
-    seeded["handoff_path"].write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
-    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
-    receipt["handoff_artifact_sha256"] = hashlib.sha256(seeded["handoff_path"].read_bytes()).hexdigest()
-    seeded["receipt_path"].write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    _refresh_bound_packet_evidence(seeded)
 
     report = retry_mod.evaluate_retry_handoff(
         handoff_artifact=seeded["handoff_path"],
@@ -555,12 +669,7 @@ def test_retry_handoff_fails_closed_when_headroom_is_under_30(tmp_path: Path, mo
     packet = json.loads(seeded["packet_path"].read_text(encoding="utf-8"))
     packet["compact_provider_prompt_budget"] = len(retry_mod._replace_sections(ORIGINAL_PROMPT)) + 29
     seeded["packet_path"].write_text(json.dumps(packet, indent=2) + "\n", encoding="utf-8")
-    handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
-    handoff["selected_prompt_input_artifact_sha256"] = hashlib.sha256(seeded["packet_path"].read_bytes()).hexdigest()
-    seeded["handoff_path"].write_text(json.dumps(handoff, indent=2) + "\n", encoding="utf-8")
-    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
-    receipt["handoff_artifact_sha256"] = hashlib.sha256(seeded["handoff_path"].read_bytes()).hexdigest()
-    seeded["receipt_path"].write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    _refresh_bound_packet_evidence(seeded)
 
     with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
         retry_mod.build_retry_handoff(
