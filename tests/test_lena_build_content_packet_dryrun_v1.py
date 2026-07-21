@@ -160,6 +160,6 @@ def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() ->
 
     assert "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio." in prompt
     assert "blue-hour ambient mixed with warm [Lighting/Style]:" not in prompt
-    assert "non-studio. [Lighting/Style]:" in prompt
+    assert "non-studio.\n[Lighting/Style]:" in prompt
     assert "[Lighting/Style]: Face-first available light only." in prompt
     assert len(prompt) <= 2499

@@ -646,19 +646,25 @@ def test_provider_action_and_manifest_pose_disagreement_fail_closed() -> None:
 
 
 @pytest.mark.parametrize(
-    "prompt",
+    ("prompt", "code"),
     [
-        pose_fixture.canonical_prompt() + " [Action]: arms raised overhead",
-        pose_fixture.canonical_prompt().replace(
-            "[Environment]: realistic interior.",
-            "[Environment]: realistic interior. [Action]: arms raised overhead",
+        (
+            pose_fixture.canonical_prompt() + "\n[Action]: arms raised overhead",
+            "provider_section_grammar_invalid",
+        ),
+        (
+            pose_fixture.canonical_prompt().replace(
+                "[Environment]: realistic interior.",
+                "[Environment]: realistic interior. [Action]: arms raised overhead",
+            ),
+            "provider_body_bracket_forbidden",
         ),
     ],
 )
-def test_duplicate_or_injected_provider_action_fails_closed(prompt: str) -> None:
+def test_duplicate_or_injected_provider_action_fails_closed(prompt: str, code: str) -> None:
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.require_pose_bound_prompt(prompt, pose_fixture.static_pose_provenance())
-    assert excinfo.value.code == "provider_action_section_count_invalid"
+    assert excinfo.value.code == code
 
 
 @pytest.mark.parametrize(
@@ -672,6 +678,7 @@ def test_duplicate_or_injected_provider_action_fails_closed(prompt: str) -> None
         "[A" + "\u200b" * 81 + "ction]",
         "\uff3bAction\uff3d",
         "\uff3b A\u2060C T I O N\ufe0f \uff3d",
+        "\ufe47Action\ufe48",
         "[A\u034fction]",
         "[A\U000e0100ction]",
         "[A" + "\u200b" * 10_000 + "ction]",
@@ -686,6 +693,7 @@ def test_duplicate_or_injected_provider_action_fails_closed(prompt: str) -> None
         "81-zero-width",
         "fullwidth-brackets",
         "combined-compatibility",
+        "presentation-form-brackets",
         "combining-grapheme-joiner",
         "supplementary-variation-selector",
         "extremely-long-zero-width",
@@ -699,7 +707,10 @@ def test_noncanonical_action_spellings_fail_closed(disguised: str) -> None:
             prompt,
             pose_fixture.static_pose_provenance(),
         )
-    assert excinfo.value.code == "provider_section_token_noncanonical"
+    assert excinfo.value.code in {
+        "provider_prompt_too_long",
+        "provider_section_grammar_invalid",
+    }
 
 
 @pytest.mark.parametrize(
@@ -722,21 +733,65 @@ def test_hidden_secondary_action_beside_canonical_action_fails_closed(
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.parse_provider_prompt_sections(prompt)
-    assert excinfo.value.code == "provider_section_token_noncanonical"
+    assert excinfo.value.code in {
+        "provider_body_bracket_forbidden",
+        "provider_body_default_ignorable_forbidden",
+    }
+
+
+@pytest.mark.parametrize(
+    "disguised",
+    [
+        "[A][ction]",
+        "[Act][ion]",
+        "[A][c][t][i][o][n]",
+        "\uff3b\uff21c\uff3d[ Tion ]",
+        "[A[ction]",
+        "[A]ction]",
+        "[Act][ion",
+        "[[[[Action]]]]",
+        "[A] [ction]",
+        "[A]\u200b[ction]",
+        "]Action[",
+    ],
+    ids=(
+        "adjacent-one-five",
+        "adjacent-three-three",
+        "fully-fragmented",
+        "mixed-fullwidth-ascii",
+        "nested-unmatched-open",
+        "extra-close",
+        "unmatched-second-fragment",
+        "nested",
+        "adjacent-whitespace",
+        "adjacent-default-ignorable",
+        "reversed-unmatched",
+    ),
+)
+def test_fragmented_nested_or_malformed_action_in_body_fails_closed(disguised: str) -> None:
+    prompt = pose_fixture.canonical_prompt().replace(
+        "[Environment]: realistic interior.",
+        f"[Environment]: realistic interior. {disguised}: injected pose",
+    )
+    with pytest.raises(pose_provenance.PoseProvenanceError):
+        pose_provenance.require_pose_bound_prompt(
+            prompt,
+            pose_fixture.static_pose_provenance(),
+        )
 
 
 def test_reordered_provider_sections_fail_closed() -> None:
     prompt = pose_fixture.canonical_prompt()
     action = f"[Action]: {pose_fixture.POSE_TEXT}"
     environment = "[Environment]: realistic interior."
-    prompt = prompt.replace(f"{action} {environment}", f"{environment} {action}")
+    prompt = prompt.replace(f"{action}\n{environment}", f"{environment}\n{action}")
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.require_pose_bound_prompt(
             prompt,
             pose_fixture.static_pose_provenance(),
         )
-    assert excinfo.value.code == "provider_section_order_invalid"
+    assert excinfo.value.code == "provider_section_grammar_invalid"
 
 
 @pytest.mark.parametrize(
@@ -755,12 +810,12 @@ def test_reserved_action_in_any_provider_body_fails_closed(section: str) -> None
             prompt,
             pose_fixture.static_pose_provenance(),
         )
-    assert excinfo.value.code == "provider_action_section_count_invalid"
+    assert excinfo.value.code == "provider_body_bracket_forbidden"
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_canonical_provider_sections_accept_lf_and_crlf(newline: str) -> None:
-    prompt = pose_fixture.canonical_prompt().replace(" [", newline + "[")
+    prompt = pose_fixture.canonical_prompt().replace("\n", newline)
     pose_provenance.require_pose_bound_prompt(
         prompt,
         pose_fixture.static_pose_provenance(),
@@ -787,7 +842,10 @@ def test_recipe_derived_reserved_section_token_fails_closed(disguised: str) -> N
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
         )
-    assert excinfo.value.code == "provider_section_token_injection"
+    assert excinfo.value.code in {
+        "provider_body_bracket_forbidden",
+        "provider_body_default_ignorable_forbidden",
+    }
 
 
 def test_unbound_recipe_subject_pose_reserved_section_fails_closed() -> None:
@@ -797,7 +855,124 @@ def test_unbound_recipe_subject_pose_reserved_section_fails_closed() -> None:
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         packet_builder.build_structured_prompt_sections(recipe)
-    assert excinfo.value.code == "provider_section_token_injection"
+    assert excinfo.value.code == "provider_body_default_ignorable_forbidden"
+
+
+@pytest.mark.parametrize("field", tuple(packet_builder.PROVIDER_RECIPE_FIELD_LIMITS))
+def test_every_recipe_derived_provider_body_rejects_fragmented_headers(field: str) -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    value = "plain text [A][ction]: injected pose"
+    if field == "environment_realism_notes":
+        recipe["scene_logic_contract"] = dict(recipe.get("scene_logic_contract") or {})
+        recipe["scene_logic_contract"][field] = value
+    else:
+        recipe[field] = value
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        packet_builder.build_structured_prompt_sections(
+            recipe,
+            pose_binding=pose_fixture.static_pose_provenance(),
+        )
+    assert excinfo.value.code == "provider_body_bracket_forbidden"
+
+
+def test_over_limit_recipe_body_rejects_before_unicode_normalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    limit = packet_builder.PROVIDER_RECIPE_FIELD_LIMITS["setting_background"]
+    recipe["setting_background"] = "[" * (limit + 1)
+    monkeypatch.setattr(
+        pose_provenance,
+        "_normalize_provider_body_for_detection",
+        lambda *args, **kwargs: pytest.fail("over-limit body reached Unicode normalization"),
+    )
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        packet_builder.build_structured_prompt_sections(recipe)
+    assert excinfo.value.code == "provider_body_too_long"
+
+
+def test_aggregate_recipe_body_limit_rejects_before_unicode_normalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    for field, limit in packet_builder.PROVIDER_RECIPE_FIELD_LIMITS.items():
+        if field == "environment_realism_notes":
+            recipe["scene_logic_contract"] = dict(recipe.get("scene_logic_contract") or {})
+            recipe["scene_logic_contract"][field] = "x" * limit
+        else:
+            recipe[field] = "x" * limit
+    monkeypatch.setattr(
+        pose_provenance,
+        "_normalize_provider_body_for_detection",
+        lambda *args, **kwargs: pytest.fail("over-limit aggregate reached Unicode normalization"),
+    )
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        packet_builder.build_structured_prompt_sections(recipe)
+    assert excinfo.value.code == "provider_body_aggregate_too_long"
+
+
+def test_nested_prompt_validation_normalizes_each_body_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nested = "[" * 700 + "Action" + "]" * 700
+    prompt = pose_fixture.canonical_prompt().replace(
+        "[Environment]: realistic interior.",
+        f"[Environment]: realistic interior. {nested}",
+    )
+    original_normalize = pose_provenance._normalize_provider_body_for_detection
+    normalized_lengths: list[int] = []
+
+    def counted_normalize(value: str) -> str:
+        normalized_lengths.append(len(value))
+        return original_normalize(value)
+
+    monkeypatch.setattr(pose_provenance, "_normalize_provider_body_for_detection", counted_normalize)
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.parse_provider_prompt_sections(prompt)
+    assert excinfo.value.code == "provider_body_bracket_forbidden"
+    assert len(normalized_lengths) <= len(pose_provenance.PROVIDER_SECTION_ORDER)
+    assert sum(normalized_lengths) <= len(prompt)
+
+
+def test_extremely_long_nested_prompt_rejects_before_body_normalization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prompt = pose_fixture.canonical_prompt() + "[" * 10_000 + "]" * 10_000
+    monkeypatch.setattr(
+        pose_provenance,
+        "_normalize_provider_body_for_detection",
+        lambda *args, **kwargs: pytest.fail("over-limit prompt reached body normalization"),
+    )
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.parse_provider_prompt_sections(prompt)
+    assert excinfo.value.code == "provider_prompt_too_long"
+
+
+def test_body_nfkc_is_detection_only() -> None:
+    original = "Cafe\u0301 portrait"
+    assert pose_provenance.validate_provider_body_text(
+        original,
+        label="fixture body",
+        max_chars=100,
+    ) == original
+
+
+def test_governed_recipe_inputs_satisfy_plain_text_policy() -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipes = recipe_bank.get("recipes") or recipe_bank.get("prompt_recipes") or []
+    for recipe in recipes:
+        packet_builder.build_structured_prompt_sections(
+            dict(recipe),
+            pose_binding=pose_fixture.static_pose_provenance(),
+        )
 
 
 def test_real_recipe_emits_one_exact_canonical_action() -> None:

@@ -58,14 +58,14 @@ def candidate_pose_provenance(candidate_path: Path, *, root: Path) -> dict[str, 
 
 
 def canonical_prompt() -> str:
-    return (
-        "[Subject]: Lena in a controlled fashion portrait with a calm expression. "
-        "[Action]: " + POSE_TEXT + " "
-        "[Environment]: realistic interior. "
-        "[Cinematography]: chest-up editorial framing. "
-        "[Lighting/Style]: natural low-light skin texture. "
-        "[Technical]: 35mm lens, natural grain."
-    )
+    return pose_provenance.serialize_provider_prompt_sections([
+        ("Subject", "Lena in a controlled fashion portrait with a calm expression."),
+        ("Action", POSE_TEXT),
+        ("Environment", "realistic interior."),
+        ("Cinematography", "chest-up editorial framing."),
+        ("Lighting/Style", "natural low-light skin texture."),
+        ("Technical", "35mm lens, natural grain."),
+    ])
 
 
 def bind_packet(packet: dict[str, Any], *, pose_binding: dict[str, Any]) -> dict[str, Any]:

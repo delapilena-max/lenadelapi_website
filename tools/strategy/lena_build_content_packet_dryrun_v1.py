@@ -167,13 +167,23 @@ STRUCTURED_TECHNICAL_REALISM = (
 )
 
 STRUCTURED_SECTION_MAX = {
-    "[Subject]": 540,
-    "[Action]": 330,
-    "[Environment]": 360,
-    "[Cinematography]": 230,
-    "[Lighting/Style]": 300,
-    "[Technical]": 500,
+    "Subject": 540,
+    "Action": 330,
+    "Environment": 360,
+    "Cinematography": 230,
+    "Lighting/Style": 300,
+    "Technical": 500,
 }
+PROVIDER_RECIPE_FIELD_LIMITS = {
+    "subject_pose": 768,
+    "fashion_accessories": 896,
+    "setting_background": 768,
+    "environment_realism_notes": 512,
+    "technical_keywords": 320,
+    "style_lighting": 640,
+    "negative_constraints": 768,
+}
+PROVIDER_RECIPE_AGGREGATE_MAX_CHARS = 4096
 
 AI_TERMS = re.compile(
     r"\b(ai|bot|virtual|synthetic|fake|generated|prompt|algorithm|"
@@ -322,67 +332,59 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
         if pose_binding is not None
         else None
     )
-    recipe_section_inputs = {
+    scene_logic_contract = recipe.get("scene_logic_contract") or {}
+    if not isinstance(scene_logic_contract, dict):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_body_type_invalid",
+            "recipe scene_logic_contract must be a JSON object",
+        )
+    recipe_section_inputs = pose_provenance.validate_provider_body_inputs({
         "subject_pose": recipe.get("subject_pose", ""),
         "fashion_accessories": recipe.get("fashion_accessories", ""),
         "setting_background": recipe.get("setting_background", ""),
-        "environment_realism_notes": recipe.get("scene_logic_contract", {}).get(
-            "environment_realism_notes", ""
-        ),
+        "environment_realism_notes": scene_logic_contract.get("environment_realism_notes", ""),
         "technical_keywords": recipe.get("technical_keywords", ""),
         "style_lighting": recipe.get("style_lighting", ""),
         "negative_constraints": recipe.get("negative_constraints", ""),
-    }
-    for label, value in recipe_section_inputs.items():
-        pose_provenance.reject_reserved_provider_section_tokens(
-            str(value or ""),
-            label=f"recipe {label}",
-        )
+    }, field_limits=PROVIDER_RECIPE_FIELD_LIMITS, aggregate_max_chars=PROVIDER_RECIPE_AGGREGATE_MAX_CHARS)
 
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
-    fashion = clean_fragment(recipe.get("fashion_accessories", ""))
+    fashion = clean_fragment(recipe_section_inputs["fashion_accessories"])
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
     subject = clean_fragment(" ".join(subject_parts))
     subject_presence = build_hpe_subject_presence(recipe)
     action = clean_fragment(
-        bound_pose["pose_text"] if bound_pose is not None else recipe.get("subject_pose", "")
+        bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
     )
-    environment_note = recipe.get("scene_logic_contract", {}).get(
-        "environment_realism_notes", ""
-    )
-    environment_parts = [recipe.get("setting_background", "")]
+    environment_note = recipe_section_inputs["environment_realism_notes"]
+    environment_parts = [recipe_section_inputs["setting_background"]]
     if environment_note:
         environment_parts.append(f"Realism cues: {environment_note}")
     environment = clean_fragment(" ".join(part for part in environment_parts if part))
-    cinematography = clean_fragment(recipe.get("technical_keywords", ""))
-    lighting = clean_fragment(recipe.get("style_lighting", ""))
+    cinematography = clean_fragment(recipe_section_inputs["technical_keywords"])
+    lighting = clean_fragment(recipe_section_inputs["style_lighting"])
     technical_parts = [
         STRUCTURED_TECHNICAL_REALISM,
-        recipe.get("negative_constraints", ""),
+        recipe_section_inputs["negative_constraints"],
     ]
     technical = clean_fragment(" ".join(part for part in technical_parts if part))
-    return [
-        ("[Subject]", subject),
-        ("[Subject Presence]", subject_presence),
-        ("[Action]", action),
-        ("[Environment]", environment),
-        ("[Cinematography]", cinematography),
-        ("[Lighting/Style]", lighting),
-        ("[Technical]", technical),
-    ]
+    return list(zip(
+        pose_provenance.PROVIDER_SECTION_ORDER,
+        (subject, subject_presence, action, environment, cinematography, lighting, technical),
+    ))
 
 
 def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):
     sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
     built = []
-    current = ""
+    current_chars = 0
 
     for label, body in sections:
         if not body:
             continue
-        prefix = f"{label}: "
-        remaining = max_chars - len(current) - (1 if current else 0) - len(prefix)
+        prefix_chars = len(label) + len("[]: ")
+        remaining = max_chars - current_chars - (1 if built else 0) - prefix_chars
         if remaining <= 0:
             break
         section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
@@ -391,13 +393,13 @@ def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):
             trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
         if not trimmed:
             continue
-        chunk = f"{prefix}{trimmed}".strip()
-        candidate = f"{current} {chunk}".strip() if current else chunk
-        if len(candidate) <= max_chars:
-            built.append(chunk)
-            current = candidate
+        chunk_chars = prefix_chars + len(trimmed)
+        candidate_chars = current_chars + (1 if built else 0) + chunk_chars
+        if candidate_chars <= max_chars:
+            built.append((label, trimmed))
+            current_chars = candidate_chars
 
-    return " ".join(built).strip()
+    return pose_provenance.serialize_provider_prompt_sections(built)
 
 
 def compute_proof_prompt_budget(

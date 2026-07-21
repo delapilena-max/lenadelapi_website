@@ -28,12 +28,6 @@ FINAL_ACTION = "prepare_higgsfield_retry_handoff_dry_run_for_review"
 DEFAULT_OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "retry_handoffs"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SLOT_RE = re.compile(r"^(?P<prefix>.+)-(?P<media_type>photo|video)$")
-SECTION_RE = re.compile(
-    r"(?P<section>\[(?:Subject|Subject Presence|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)"
-    r"(?P<body>.*?)(?=(?:\s+\[(?:Subject|Subject Presence|Action|Environment|Cinematography|Lighting/Style|Technical)\]:)|$)",
-    re.S,
-)
-
 RETRY_ACTION_TEXT = (
     "Chest-up or waist-up only. Hips, thighs, and the dress hemline never appear. Lena stands near the mirror at "
     "a 20-30 degree angle, actively checking or adjusting one gold hoop earring. No foreground phone, visible "
@@ -199,35 +193,18 @@ def _load_packet(path_value: str) -> tuple[Path, dict[str, Any]]:
 
 
 def _replace_sections(prompt_text: str) -> str:
-    sections = {match.group("section"): match.group("body").strip() for match in SECTION_RE.finditer(prompt_text)}
-    expected = {
-        "[Subject]:",
-        "[Subject Presence]:",
-        "[Action]:",
-        "[Environment]:",
-        "[Cinematography]:",
-        "[Lighting/Style]:",
-        "[Technical]:",
-    }
-    expected_without_presence = expected - {"[Subject Presence]:"}
-    if set(sections) not in (expected, expected_without_presence):
-        raise RetryHandoffError(
-            "prompt_section_mismatch",
-            "original prompt must contain the expected Subject, optional Subject Presence, Action, Environment, Cinematography, Lighting/Style, and Technical sections",
-        )
-    sections["[Environment]:"] = RETRY_ENVIRONMENT_TEXT
-    sections["[Cinematography]:"] = RETRY_CINEMATOGRAPHY_TEXT
-    sections["[Technical]:"] = sections["[Technical]:"] + RETRY_TECHNICAL_APPEND
-    ordered = (
-        "[Subject]:",
-        "[Subject Presence]:",
-        "[Action]:",
-        "[Environment]:",
-        "[Cinematography]:",
-        "[Lighting/Style]:",
-        "[Technical]:",
-    )
-    return " ".join(f"{section} {sections[section]}" for section in ordered if section in sections)
+    try:
+        sections = pose_provenance.parse_provider_prompt_sections(prompt_text)
+        sections["Environment"] = RETRY_ENVIRONMENT_TEXT
+        sections["Cinematography"] = RETRY_CINEMATOGRAPHY_TEXT
+        sections["Technical"] = sections["Technical"] + RETRY_TECHNICAL_APPEND
+        return pose_provenance.serialize_provider_prompt_sections([
+            (label, sections[label])
+            for label in pose_provenance.PROVIDER_SECTION_ORDER
+            if label in sections
+        ])
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
 
 
 def _validate_execution_receipt(

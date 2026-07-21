@@ -24,6 +24,8 @@ PROVIDER_SECTION_ORDER = (
     "Lighting/Style",
     "Technical",
 )
+PROVIDER_PROMPT_MAX_CHARS = 4096
+PROVIDER_SECTION_BODY_MAX_CHARS = 2048
 
 
 DEFAULT_IGNORABLE_RANGES = (
@@ -54,66 +56,91 @@ def _is_default_ignorable_for_detection(char: str) -> bool:
     )
 
 
-def _compatibility_bracket(char: str) -> str | None:
-    normalized = unicodedata.normalize("NFKC", char)
-    return normalized if normalized in {"[", "]"} else None
+def _normalize_provider_body_for_detection(value: str) -> str:
+    return unicodedata.normalize("NFKC", value)
 
 
-def _normalized_section_detection_name(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value)
-    detection_chars = "".join(
-        char
-        for char in normalized
-        if not _is_default_ignorable_for_detection(char)
-        and not char.isspace()
-        and char not in "[]"
+def validate_provider_body_text(
+    value: Any,
+    *,
+    label: str,
+    max_chars: int,
+) -> str:
+    _require(
+        isinstance(value, str),
+        "provider_body_type_invalid",
+        f"{label} must be plain text",
     )
-    return detection_chars.strip(":").casefold()
+    _require(
+        type(max_chars) is int and max_chars > 0,
+        "provider_body_limit_invalid",
+        f"{label} must have a positive character limit",
+    )
+    _require(
+        len(value) <= max_chars,
+        "provider_body_too_long",
+        f"{label} exceeds its {max_chars}-character limit",
+    )
+    for char in value:
+        codepoint = f"U+{ord(char):04X}"
+        _require(
+            not _is_default_ignorable_for_detection(char),
+            "provider_body_default_ignorable_forbidden",
+            f"{label} contains forbidden default-ignorable character {codepoint}",
+        )
+        _require(
+            not unicodedata.category(char).startswith("C"),
+            "provider_body_control_forbidden",
+            f"{label} contains forbidden control character {codepoint}",
+        )
+    detection_text = _normalize_provider_body_for_detection(value)
+    _require(
+        "[" not in detection_text and "]" not in detection_text,
+        "provider_body_bracket_forbidden",
+        f"{label} contains square-bracket provider syntax",
+    )
+    return value
 
 
-RESERVED_SECTION_DETECTION_NAMES = {
-    _normalized_section_detection_name(name): name
-    for name in PROVIDER_SECTION_ORDER
-}
-
-
-def _section_detection_variants(value: str) -> set[str]:
-    variants = {_normalized_section_detection_name(value)}
-    try:
-        repaired = value.encode("latin-1").decode("utf-8")
-    except (UnicodeEncodeError, UnicodeDecodeError):
-        return variants
-    variants.add(_normalized_section_detection_name(repaired))
-    return variants
-
-
-def _iter_bracketed_provider_tokens(value: str):
-    openings: list[int] = []
-    for index, char in enumerate(value):
-        bracket = _compatibility_bracket(char)
-        if bracket == "[":
-            openings.append(index)
-        elif bracket == "]" and openings:
-            start = openings.pop()
-            yield start, index + 1, value[start:index + 1], value[start + 1:index]
-
-
-def _scan_reserved_provider_tokens(value: str) -> list[tuple[int, int, str, str]]:
-    reserved: list[tuple[int, int, str, str]] = []
-    for start, end, token, token_name in _iter_bracketed_provider_tokens(value):
-        names = {
-            RESERVED_SECTION_DETECTION_NAMES[variant]
-            for variant in _section_detection_variants(token_name)
-            if variant in RESERVED_SECTION_DETECTION_NAMES
-        }
-        if names:
-            _require(
-                len(names) == 1,
-                "provider_section_token_ambiguous",
-                f"provider section token is ambiguous after normalization: {token!r}",
-            )
-            reserved.append((start, end, token, names.pop()))
-    return reserved
+def validate_provider_body_inputs(
+    values: Any,
+    *,
+    field_limits: dict[str, int],
+    aggregate_max_chars: int,
+) -> dict[str, str]:
+    _require(isinstance(values, dict), "provider_body_inputs_invalid", "provider body inputs must be a mapping")
+    _require(
+        type(aggregate_max_chars) is int and aggregate_max_chars > 0,
+        "provider_body_aggregate_limit_invalid",
+        "provider body aggregate limit must be positive",
+    )
+    bounded: dict[str, str] = {}
+    for label, max_chars in field_limits.items():
+        value = values.get(label, "")
+        if value is None:
+            value = ""
+        _require(isinstance(value, str), "provider_body_type_invalid", f"{label} must be plain text")
+        _require(
+            type(max_chars) is int and max_chars > 0,
+            "provider_body_limit_invalid",
+            f"{label} must have a positive character limit",
+        )
+        _require(
+            len(value) <= max_chars,
+            "provider_body_too_long",
+            f"{label} exceeds its {max_chars}-character limit",
+        )
+        bounded[label] = value
+    aggregate_chars = sum(len(value) for value in bounded.values())
+    _require(
+        aggregate_chars <= aggregate_max_chars,
+        "provider_body_aggregate_too_long",
+        f"provider body inputs exceed their {aggregate_max_chars}-character aggregate limit",
+    )
+    return {
+        label: validate_provider_body_text(value, label=label, max_chars=field_limits[label])
+        for label, value in bounded.items()
+    }
 
 
 class PoseProvenanceError(RuntimeError):
@@ -333,75 +360,112 @@ def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) 
 
 
 def reject_reserved_provider_section_tokens(value: str, *, label: str) -> None:
-    tokens = _scan_reserved_provider_tokens(value)
-    _require(
-        not tokens,
-        "provider_section_token_injection",
-        f"{label} contains reserved provider section token {tokens[0][2]!r}"
-        if tokens
-        else label,
+    validate_provider_body_text(
+        value,
+        label=label,
+        max_chars=PROVIDER_SECTION_BODY_MAX_CHARS,
     )
+
+
+def _allowed_provider_section_sequences() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    complete = tuple(PROVIDER_SECTION_ORDER)
+    without_presence = tuple(
+        label for label in PROVIDER_SECTION_ORDER if label != "Subject Presence"
+    )
+    return complete, without_presence
+
+
+def serialize_provider_prompt_sections(sections: Any) -> str:
+    _require(
+        isinstance(sections, (list, tuple)),
+        "provider_section_grammar_invalid",
+        "provider sections must be an ordered sequence",
+    )
+    normalized_sections: list[tuple[str, str]] = []
+    for item in sections:
+        _require(
+            isinstance(item, (list, tuple)) and len(item) == 2,
+            "provider_section_grammar_invalid",
+            "each provider section must contain one label and one body",
+        )
+        label, body = item
+        _require(
+            isinstance(label, str) and label in PROVIDER_SECTION_ORDER,
+            "provider_section_grammar_invalid",
+            "provider section label is not canonical",
+        )
+        body = validate_provider_body_text(
+            body,
+            label=f"provider section {label}",
+            max_chars=PROVIDER_SECTION_BODY_MAX_CHARS,
+        )
+        _require(
+            bool(body) and body == body.strip(),
+            "provider_section_body_invalid",
+            f"provider section [{label}] body must be nonempty with canonical surrounding whitespace",
+        )
+        normalized_sections.append((label, body))
+    labels = tuple(label for label, _ in normalized_sections)
+    _require(
+        labels in _allowed_provider_section_sequences(),
+        "provider_section_grammar_invalid",
+        "provider sections must use the complete canonical sequence",
+    )
+    prompt = "\n".join(f"[{label}]: {body}" for label, body in normalized_sections)
+    _require(
+        len(prompt) <= PROVIDER_PROMPT_MAX_CHARS,
+        "provider_prompt_too_long",
+        f"provider prompt exceeds its {PROVIDER_PROMPT_MAX_CHARS}-character limit",
+    )
+    return prompt
 
 
 def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
     _require(isinstance(prompt, str) and bool(prompt.strip()), "provider_prompt_missing", "provider prompt is required")
-    scanned = _scan_reserved_provider_tokens(prompt)
-    for _, _, token, label in scanned:
-        _require(
-            token == f"[{label}]",
-            "provider_section_token_noncanonical",
-            f"reserved provider section token must use exact ASCII spelling [{label}]: {token!r}",
-        )
-    tokens = [(start, end) for start, end, _, _ in scanned]
-    _require(tokens, "provider_section_grammar_invalid", "provider prompt contains no canonical sections")
-    labels = [label for _, _, _, label in scanned]
     _require(
-        tokens[0][0] == 0,
+        len(prompt) <= PROVIDER_PROMPT_MAX_CHARS,
+        "provider_prompt_too_long",
+        f"provider prompt exceeds its {PROVIDER_PROMPT_MAX_CHARS}-character limit",
+    )
+    _require(
+        "\r" not in prompt.replace("\r\n", ""),
         "provider_section_grammar_invalid",
-        "provider prompt must begin with the canonical [Subject] section",
+        "provider prompt may use LF or CRLF line endings only",
     )
+    lines = prompt.replace("\r\n", "\n").split("\n")
+    complete, without_presence = _allowed_provider_section_sequences()
+    expected = complete if len(lines) == len(complete) else without_presence
     _require(
-        labels.count("Action") == 1,
-        "provider_action_section_count_invalid",
-        "provider prompt must contain exactly one [Action] section",
-    )
-    _require(
-        len(labels) == len(set(labels)),
-        "provider_section_duplicate",
-        "provider prompt contains a duplicate reserved section",
-    )
-    positions = [PROVIDER_SECTION_ORDER.index(label) for label in labels]
-    _require(
-        positions == sorted(positions),
-        "provider_section_order_invalid",
-        "provider prompt sections are not in canonical order",
-    )
-    expected = tuple(PROVIDER_SECTION_ORDER)
-    expected_without_presence = tuple(
-        label for label in PROVIDER_SECTION_ORDER if label != "Subject Presence"
-    )
-    _require(
-        tuple(labels) in {expected, expected_without_presence},
+        len(lines) == len(expected),
         "provider_section_grammar_invalid",
-        "provider prompt must contain the complete canonical section sequence",
+        "provider prompt must contain exactly the complete canonical header lines",
     )
-
     sections: dict[str, str] = {}
-    for index, (start, end, _, label) in enumerate(scanned):
+    for line, label in zip(lines, expected):
+        prefix = f"[{label}]: "
         _require(
-            prompt[end:end + 1] == ":",
+            line.startswith(prefix),
             "provider_section_grammar_invalid",
-            f"reserved provider section [{label}] must be followed immediately by a colon",
+            f"provider section line must begin exactly with {prefix!r}",
         )
-        body_start = end + 1
-        body_end = tokens[index + 1][0] if index + 1 < len(tokens) else len(prompt)
-        body = prompt[body_start:body_end].strip()
+        body = line[len(prefix):]
+        body = validate_provider_body_text(
+            body,
+            label=f"provider section {label}",
+            max_chars=PROVIDER_SECTION_BODY_MAX_CHARS,
+        )
         _require(
-            bool(body),
-            "provider_section_body_missing",
-            f"provider section [{label}] must have a nonempty body",
+            bool(body) and body == body.strip(),
+            "provider_section_body_invalid",
+            f"provider section [{label}] body must be nonempty with canonical surrounding whitespace",
         )
         sections[label] = body
+    _require(
+        tuple(sections) in _allowed_provider_section_sequences()
+        and tuple(sections).count("Action") == 1,
+        "provider_action_section_count_invalid",
+        "provider prompt must contain exactly one canonical [Action] section",
+    )
     return sections
 
 
