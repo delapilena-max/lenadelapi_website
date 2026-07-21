@@ -142,7 +142,10 @@ def _validate_shape(artifact: dict[str, Any]) -> dict[str, Any]:
         date.fromisoformat(as_of_date)
     except ValueError as exc:
         raise ConsumerError("decision_date_invalid", "as_of_date must be a valid ISO date") from exc
-    required = ("candidate_id", "slot_id", "lane", "recipe_id", "hook_id", "prompt_sha256", "exact_proposed_dry_run_command")
+    required = (
+        "candidate_id", "slot_id", "lane", "recipe_id", "hook_id",
+        "prompt_sha256", "exact_proposed_dry_run_command",
+    )
     missing = [key for key in required if not candidate.get(key)]
     if missing:
         raise ConsumerError("candidate_identity_missing", f"candidate is missing required fields: {', '.join(missing)}")
@@ -290,7 +293,13 @@ def _validate_regenerated_candidate(
     ):
         raise ConsumerError("stale_decision", "current decision-critical evidence does not reproduce the stored decision")
 
-    for field in ("candidate_id", "slot_id", "lane", "recipe_id", "hook_id", "prompt_sha256"):
+    for field in (
+        "candidate_id", "slot_id", "lane", "recipe_id", "hook_id",
+        "prompt_sha256", "expression_gaze_id", "expression_gaze_label",
+        "expression_canonical_text", "expression_text",
+        "expression_safe_fallback_used", "expression_safe_fallback_reason",
+        "expression_scene_conflict_terms", "expression_derivation_scene_action",
+    ):
         if candidate.get(field) != selected.get(field):
             raise ConsumerError(f"{field}_mismatch", f"stored {field} does not match current deterministic selection")
 

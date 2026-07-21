@@ -180,6 +180,9 @@ def build_report(
                 "wardrobe_outfit_id": package.get("wardrobe_outfit_id"),
                 "wardrobe_outfit_name": package.get("wardrobe_outfit_name"),
                 "wardrobe_silhouette_class": package.get("wardrobe_silhouette_class"),
+                "effective_wardrobe_silhouette_class": package.get(
+                    "effective_wardrobe_silhouette_class"
+                ),
                 "environment_id": package.get("environment_id"),
                 "environment_name": package.get("environment_name"),
                 "pose_body_language_id": package.get("pose_body_language_id"),
@@ -187,6 +190,14 @@ def build_report(
                 "photo_dump_pose_variant": package.get("photo_dump_pose_variant"),
                 "expression_gaze_id": package.get("expression_gaze_id"),
                 "expression_gaze_label": package.get("expression_gaze_label"),
+                "expression_canonical_text": package.get("expression_canonical_text"),
+                "expression_text": package.get("expression_text"),
+                "expression_safe_fallback_used": package.get("expression_safe_fallback_used"),
+                "expression_safe_fallback_reason": package.get("expression_safe_fallback_reason"),
+                "expression_scene_conflict_terms": package.get("expression_scene_conflict_terms"),
+                "expression_derivation_scene_action": package.get(
+                    "expression_derivation_scene_action"
+                ),
                 "prompt_length": len(package["image_prompt"]),
                 "negative_prompt_enabled": package["negative_prompt_enabled"],
                 "soul_name": package["soul_name"],

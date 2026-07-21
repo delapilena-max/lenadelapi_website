@@ -518,7 +518,13 @@ def test_no_provider_generation_retry_fallback_or_downstream_side_effect_path_ex
     assert "learning" not in source
     assert "dotenv" not in source
     assert "retry" not in source.lower().replace("no retry", "")
-    assert "fallback" not in source.lower().replace("no retry, fallback", "")
+    fallback_scan = source.lower().replace("no retry, fallback", "")
+    for provenance_field in (
+        "expression_safe_fallback_used",
+        "expression_safe_fallback_reason",
+    ):
+        fallback_scan = fallback_scan.replace(provenance_field, "")
+    assert "fallback" not in fallback_scan
 
 
 def test_cli_emits_one_machine_readable_blocked_report(monkeypatch, capsys, tmp_path):

@@ -49,8 +49,15 @@ def _retry_execution_contract(artifact: dict) -> dict:
         "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
         "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
         "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
+        "source_expression_bound_content_packet_sha256": artifact[
+            "source_expression_bound_content_packet_sha256"
+        ],
         "pose_provenance": artifact["pose_provenance"],
         "pose_provenance_fingerprint_sha256": artifact["pose_provenance_fingerprint_sha256"],
+        "expression_provenance": artifact["expression_provenance"],
+        "expression_provenance_fingerprint_sha256": artifact[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "source_original_provider_job_evidence": artifact["source_original_provider_job_evidence"],
         "source_valid_human_rejection_artifact_path": artifact["source_valid_human_rejection_artifact_path"],
         "source_valid_human_rejection_artifact_sha256": artifact["source_valid_human_rejection_artifact_sha256"],
@@ -89,6 +96,14 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "caption_seed": "The mirror version of me would have stayed home.",
         "pose": "weight_shift_one_hip",
         "pose_body_language_id": "pose_p001",
+        "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+        "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+        "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+        "expression_text": pose_fixture.EXPRESSION_TEXT,
+        "expression_safe_fallback_used": False,
+        "expression_safe_fallback_reason": None,
+        "expression_scene_conflict_terms": [],
+        "expression_derivation_scene_action": "blue-hour street pause outside the restaurant",
         "wardrobe_outfit_id": "wc_fixture",
         "visual_style": "fitted_dress",
         "camera_text": "50mm candid vertical",
@@ -123,6 +138,10 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         candidate_path="decision.json",
         candidate_sha256=hashlib.sha256(decision_path.read_bytes()).hexdigest(),
     )
+    expression_binding = pose_fixture.static_expression_provenance(
+        candidate_path="decision.json",
+        candidate_sha256=hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+    )
     source_prompt = pose_fixture.canonical_prompt()
     source_prompt_sha = hashlib.sha256(source_prompt.encode("utf-8")).hexdigest()
     packet_path = root / "source_content_packet.json"
@@ -136,6 +155,7 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "hook_selection_reason": "legacy retry source fixture",
         },
         pose_binding=pose_binding,
+        expression_binding=expression_binding,
     )
     _write_json(packet_path, packet)
     packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
@@ -148,14 +168,23 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "selected_slot_id": slot,
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": packet_digest,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": packet_digest,
         "selected_candidate": {
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
         },
         "candidate_selection_binding": {
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_body_language_label": pose_binding["pose_body_language_label"],
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
         },
         "selected_prompt_input_artifact_path": "source_content_packet.json",
         "selected_prompt_input_artifact_sha256": packet_sha,
@@ -166,6 +195,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "prompt_text": source_prompt,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": packet_digest,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_digest,
         },
         "structured_executor_inputs": {
             "selected_prompt_sha256": source_prompt_sha,
@@ -173,6 +204,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "selected_prompt_input_artifact_sha256": packet_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": packet_digest,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_digest,
         },
         "provider_execution_binding": {
             "content_packet_artifact_path": "source_content_packet.json",
@@ -180,6 +213,10 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "provider_prompt_sha256": source_prompt_sha,
             "pose_bound_content_packet_sha256": packet_digest,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_bound_content_packet_sha256": packet_digest,
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
         },
         "binding_linkage": {
             "content_packet_artifact_path": "source_content_packet.json",
@@ -187,6 +224,11 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_bound_content_packet_sha256": packet_digest,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+            "expression_bound_content_packet_sha256": packet_digest,
         },
     }
     _write_json(handoff_path, handoff)
@@ -219,10 +261,15 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "pose_bound_content_packet_artifact_path": "source_content_packet.json",
         "pose_bound_content_packet_artifact_sha256": packet_sha,
         "pose_bound_content_packet_sha256": packet_digest,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_artifact_path": "source_content_packet.json",
+        "expression_bound_content_packet_artifact_sha256": packet_sha,
+        "expression_bound_content_packet_sha256": packet_digest,
         "generation_execution_receipt_path": "source_receipt.json",
-        "expression_gaze_id": "exp_fixture",
-        "expression_gaze_label": "calm expression",
-        "expression_text": "calm expression",
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_text": expression_binding["expression_text"],
+        "expression_provenance": expression_binding,
         "expression_safe_fallback_used": False,
         "expression_safe_fallback_reason": None,
         "expression_scene_conflict_terms": [],
@@ -325,6 +372,13 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
                 "pose_bound_content_packet_artifact_path": "source_content_packet.json",
                 "pose_bound_content_packet_artifact_sha256": packet_sha,
                 "pose_bound_content_packet_sha256": packet_digest,
+                "expression_gaze_id": expression_binding["expression_gaze_id"],
+                "expression_gaze_label": expression_binding["expression_gaze_label"],
+                "expression_text": expression_binding["expression_text"],
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_artifact_path": "source_content_packet.json",
+                "expression_bound_content_packet_artifact_sha256": packet_sha,
+                "expression_bound_content_packet_sha256": packet_digest,
                 "wardrobe_outfit_id": candidate["wardrobe_outfit_id"],
                 "effective_wardrobe_silhouette_class": candidate["visual_style"],
                 "camera_text": candidate["camera_text"],
@@ -349,6 +403,11 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         retry_consumer.pose_provenance,
         "build_candidate_pose_provenance",
         lambda path, root=None: pose_binding,
+    )
+    monkeypatch.setattr(
+        retry_consumer.pose_provenance,
+        "build_candidate_expression_provenance",
+        lambda path, root=None: expression_binding,
     )
     monkeypatch.setattr(
         retry_consumer.generation_approval,

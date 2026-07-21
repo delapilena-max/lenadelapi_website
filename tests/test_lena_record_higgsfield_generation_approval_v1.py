@@ -36,6 +36,14 @@ def _selected_candidate_payload() -> dict:
             "prompt_sha256": "b" * 64,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
         },
     }
 
@@ -71,6 +79,10 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
     selected_candidate_repo_path = _selected_candidate_repo_path()
     selected_candidate_sha = _selected_candidate_sha()
     pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=selected_candidate_repo_path,
+        candidate_sha256=selected_candidate_sha,
+    )
+    expression_binding = pose_fixture.static_expression_provenance(
         candidate_path=selected_candidate_repo_path,
         candidate_sha256=selected_candidate_sha,
     )
@@ -110,9 +122,13 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "candidate_status": "selected",
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
         },
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_sha256": "a" * 64,
         "selected_prompt_input": {
             "prompt_sha256": prompt_sha,
@@ -120,6 +136,8 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -143,6 +161,8 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
 

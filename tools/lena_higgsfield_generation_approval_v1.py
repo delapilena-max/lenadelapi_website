@@ -256,14 +256,28 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
     try:
         bound_pose, pose_bound_packet_sha256 = pose_provenance.validate_handoff_pose_copies(report)
+        bound_expression, expression_bound_packet_sha256 = (
+            pose_provenance.validate_handoff_expression_copies(report)
+        )
         pose_provenance.validate_pose_provenance(
             bound_pose,
             expected_candidate_path=selected_candidate_path_value,
             expected_candidate_sha256=selected_candidate_sha_value,
             expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
         )
+        pose_provenance.validate_expression_provenance(
+            bound_expression,
+            expected_candidate_path=selected_candidate_path_value,
+            expected_candidate_sha256=selected_candidate_sha_value,
+            expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    require(
+        pose_bound_packet_sha256 == expression_bound_packet_sha256,
+        "handoff_provider_authority_packet_mismatch",
+        "handoff pose and expression packet digests must match",
+    )
     reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
         report,
         selected_candidate_binding,
@@ -612,6 +626,8 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "binding_linkage": binding_linkage,
         "pose_provenance": bound_pose,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+        "expression_provenance": bound_expression,
+        "expression_bound_content_packet_sha256": expression_bound_packet_sha256,
         "reconciliation": reconciliation_facts["reconciliation"],
         "reconciled_candidate": reconciliation_facts["final_candidate"],
         "reconciliation_decision": reconciliation_facts["decision"],

@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_VERSION = "lena_pose_provenance_binding_v1"
 AUTHORITY_SOURCE = "selected_candidate_canonical_pose"
 POSE_AUTHORITY_REPO_PATH = "pipeline/prompt_banks/lena/lena_pose_body_language_bank_v1.json"
+EXPRESSION_SCHEMA_VERSION = "lena_expression_provenance_binding_v1"
+EXPRESSION_AUTHORITY_SOURCE = "selected_candidate_canonical_expression"
+EXPRESSION_AUTHORITY_REPO_PATH = "pipeline/prompt_banks/lena/lena_expression_gaze_bank_v1.json"
+EXPRESSION_DERIVATION_REPO_PATH = "pipeline/prompting/lena_prompt_brain.py"
 RECIPE_SUBJECT_POSE_SEMANTICS = "non_authoritative_recipe_context_only"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -21,6 +25,7 @@ PROVIDER_SECTION_ORDER = (
     "Subject",
     "Subject Presence",
     "Action",
+    "Expression",
     "Environment",
     "Cinematography",
     "Lighting/Style",
@@ -378,6 +383,265 @@ def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) 
     return validate_pose_provenance(value)
 
 
+def validate_expression_provenance(
+    value: Any,
+    *,
+    expected_candidate_path: str | None = None,
+    expected_candidate_sha256: str | None = None,
+    expected_authority_commit: str | None = None,
+) -> dict[str, Any]:
+    _require(
+        isinstance(value, dict),
+        "expression_provenance_missing",
+        "expression provenance must be a JSON object",
+    )
+    required_text = (
+        "schema_version",
+        "authority_source",
+        "selected_candidate_artifact_path",
+        "selected_candidate_artifact_sha256",
+        "selected_candidate_authority_commit",
+        "expression_authority_artifact_path",
+        "expression_authority_artifact_sha256",
+        "expression_derivation_artifact_path",
+        "expression_derivation_artifact_sha256",
+        "expression_gaze_id",
+        "expression_gaze_label",
+        "expression_canonical_text",
+        "expression_canonical_text_sha256",
+        "expression_text",
+        "expression_text_sha256",
+        "expression_derivation_scene_action",
+        "expression_provenance_fingerprint_sha256",
+    )
+    for key in required_text:
+        _require(
+            isinstance(value.get(key), str) and bool(value[key].strip()),
+            "expression_provenance_incomplete",
+            f"expression provenance field {key} is required",
+        )
+    _require(
+        type(value.get("expression_safe_fallback_used")) is bool,
+        "expression_provenance_incomplete",
+        "expression_safe_fallback_used must be a boolean",
+    )
+    fallback_reason = value.get("expression_safe_fallback_reason")
+    _require(
+        fallback_reason is None or (isinstance(fallback_reason, str) and bool(fallback_reason)),
+        "expression_provenance_incomplete",
+        "expression_safe_fallback_reason must be null or a nonempty string",
+    )
+    conflict_terms = value.get("expression_scene_conflict_terms")
+    _require(
+        isinstance(conflict_terms, list)
+        and all(isinstance(item, str) and bool(item) for item in conflict_terms),
+        "expression_provenance_incomplete",
+        "expression_scene_conflict_terms must be a list of nonempty strings",
+    )
+    _require(
+        value["schema_version"] == EXPRESSION_SCHEMA_VERSION,
+        "expression_provenance_schema_mismatch",
+        "expression provenance schema is invalid",
+    )
+    _require(
+        value["authority_source"] == EXPRESSION_AUTHORITY_SOURCE,
+        "expression_authority_source_mismatch",
+        "expression authority source is invalid",
+    )
+    _require(
+        value["expression_authority_artifact_path"] == EXPRESSION_AUTHORITY_REPO_PATH,
+        "expression_authority_path_mismatch",
+        "expression authority path is invalid",
+    )
+    _require(
+        value["expression_derivation_artifact_path"] == EXPRESSION_DERIVATION_REPO_PATH,
+        "expression_derivation_path_mismatch",
+        "expression derivation authority path is invalid",
+    )
+    for key in (
+        "selected_candidate_artifact_sha256",
+        "expression_authority_artifact_sha256",
+        "expression_derivation_artifact_sha256",
+        "expression_canonical_text_sha256",
+        "expression_text_sha256",
+        "expression_provenance_fingerprint_sha256",
+    ):
+        _require(
+            bool(SHA256_RE.fullmatch(value[key])),
+            "expression_provenance_sha_invalid",
+            f"{key} must be a lowercase SHA-256",
+        )
+    _require(
+        bool(COMMIT_RE.fullmatch(value["selected_candidate_authority_commit"])),
+        "expression_authority_commit_invalid",
+        "selected candidate authority commit must be a full commit SHA",
+    )
+    _require(
+        value["expression_canonical_text_sha256"]
+        == _sha256_bytes(value["expression_canonical_text"].encode("utf-8")),
+        "expression_canonical_text_sha_mismatch",
+        "expression canonical text SHA does not match its bytes",
+    )
+    _require(
+        value["expression_text_sha256"]
+        == _sha256_bytes(value["expression_text"].encode("utf-8")),
+        "expression_text_sha_mismatch",
+        "expression text SHA does not match its bytes",
+    )
+    core = {
+        key: item
+        for key, item in value.items()
+        if key != "expression_provenance_fingerprint_sha256"
+    }
+    _require(
+        value["expression_provenance_fingerprint_sha256"]
+        == _sha256_bytes(_canonical_bytes(core)),
+        "expression_provenance_fingerprint_mismatch",
+        "expression provenance fingerprint does not match its immutable body",
+    )
+    if expected_candidate_path is not None:
+        _require(
+            value["selected_candidate_artifact_path"] == expected_candidate_path,
+            "expression_candidate_path_mismatch",
+            "expression provenance candidate path does not match the handoff binding",
+        )
+    if expected_candidate_sha256 is not None:
+        _require(
+            value["selected_candidate_artifact_sha256"] == expected_candidate_sha256,
+            "expression_candidate_sha_mismatch",
+            "expression provenance candidate SHA does not match the handoff binding",
+        )
+    if expected_authority_commit is not None:
+        _require(
+            value["selected_candidate_authority_commit"] == expected_authority_commit,
+            "expression_authority_commit_mismatch",
+            "expression provenance authority commit does not match the selected candidate",
+        )
+    return dict(value)
+
+
+def build_candidate_expression_provenance(
+    candidate_path: Path,
+    *,
+    root: Path = ROOT,
+) -> dict[str, Any]:
+    candidate_path = candidate_path.resolve()
+    candidate_repo_path = _repo_relative(candidate_path, root)
+    try:
+        candidate_bytes = candidate_path.read_bytes()
+        artifact = json.loads(candidate_bytes.decode("utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise PoseProvenanceError(
+            "expression_candidate_unreadable",
+            f"could not read selected candidate artifact: {exc}",
+        ) from exc
+    _require(
+        isinstance(artifact, dict),
+        "expression_candidate_invalid",
+        "selected candidate artifact must contain a JSON object",
+    )
+    candidate = _validate_selected_candidate_issuance(artifact, root=root)
+    authority_commit = str(artifact["authority_commit"])
+    expression_id = str(candidate.get("expression_gaze_id") or "").strip()
+    candidate_label = str(candidate.get("expression_gaze_label") or "").strip()
+    candidate_canonical = str(candidate.get("expression_canonical_text") or "").strip()
+    candidate_text = str(candidate.get("expression_text") or "").strip()
+    derivation_scene_action = str(
+        candidate.get("expression_derivation_scene_action") or ""
+    ).strip()
+    _require(bool(expression_id), "expression_identity_missing", "selected candidate is missing expression_gaze_id")
+    _require(bool(candidate_label), "expression_label_missing", "selected candidate is missing expression_gaze_label")
+    _require(bool(candidate_canonical), "expression_canonical_text_missing", "selected candidate is missing expression_canonical_text")
+    _require(bool(candidate_text), "expression_text_missing", "selected candidate is missing expression_text")
+    _require(bool(derivation_scene_action), "expression_derivation_input_missing", "selected candidate is missing expression derivation scene action")
+
+    bank_bytes = _git_show_bytes(root, authority_commit, EXPRESSION_AUTHORITY_REPO_PATH)
+    derivation_bytes = _git_show_bytes(root, authority_commit, EXPRESSION_DERIVATION_REPO_PATH)
+    for repo_path, committed, code in (
+        (EXPRESSION_AUTHORITY_REPO_PATH, bank_bytes, "expression_authority_worktree_drift"),
+        (EXPRESSION_DERIVATION_REPO_PATH, derivation_bytes, "expression_derivation_worktree_drift"),
+    ):
+        local_path = root / repo_path
+        _require(local_path.is_file(), "expression_authority_missing", f"expression authority is missing: {local_path}")
+        _require(
+            _normalize_line_endings(local_path.read_bytes()) == _normalize_line_endings(committed),
+            code,
+            f"local {repo_path} differs from the selected candidate authority commit beyond CRLF/LF materialization",
+        )
+    try:
+        bank = json.loads(bank_bytes.decode("utf-8-sig"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise PoseProvenanceError("expression_authority_invalid", f"expression authority is invalid JSON: {exc}") from exc
+    matches = [
+        item
+        for item in bank.get("combos", [])
+        if isinstance(item, dict) and item.get("expression_gaze_id") == expression_id
+    ]
+    _require(
+        len(matches) == 1,
+        "expression_identity_not_authoritative",
+        f"expression ID {expression_id!r} must resolve exactly once in canonical authority",
+    )
+    entry = matches[0]
+    canonical_label = str(entry.get("label") or "").strip()
+    from pipeline.prompting import lena_prompt_brain
+
+    canonical_text = lena_prompt_brain._clean_sentence_fragment(
+        str(entry.get("text") or "")
+    )
+    _require(bool(canonical_label and canonical_text), "expression_authority_incomplete", "canonical expression entry must contain label and text")
+    _require(candidate_label == canonical_label, "expression_label_mismatch", "selected candidate expression label disagrees with canonical authority")
+    _require(candidate_canonical == canonical_text, "expression_canonical_text_mismatch", "selected candidate canonical expression text disagrees with canonical authority")
+    expected = lena_prompt_brain._higgsfield_safe_expression_text(
+        derivation_scene_action,
+        entry,
+    )
+    _require(candidate_text == expected["text"], "expression_text_mismatch", "selected candidate expression text disagrees with deterministic prompt-brain derivation")
+    _require(
+        candidate.get("expression_safe_fallback_used") is expected["fallback_used"],
+        "expression_fallback_mismatch",
+        "selected candidate expression fallback flag disagrees with deterministic derivation",
+    )
+    _require(
+        candidate.get("expression_safe_fallback_reason") == expected["fallback_reason"],
+        "expression_fallback_mismatch",
+        "selected candidate expression fallback reason disagrees with deterministic derivation",
+    )
+    _require(
+        candidate.get("expression_scene_conflict_terms") == expected["conflict_terms"],
+        "expression_fallback_mismatch",
+        "selected candidate expression conflict terms disagree with deterministic derivation",
+    )
+    core = {
+        "schema_version": EXPRESSION_SCHEMA_VERSION,
+        "authority_source": EXPRESSION_AUTHORITY_SOURCE,
+        "selected_candidate_artifact_path": candidate_repo_path,
+        "selected_candidate_artifact_sha256": _sha256_bytes(candidate_bytes),
+        "selected_candidate_authority_commit": authority_commit,
+        "expression_authority_artifact_path": EXPRESSION_AUTHORITY_REPO_PATH,
+        "expression_authority_artifact_sha256": _sha256_bytes(bank_bytes),
+        "expression_derivation_artifact_path": EXPRESSION_DERIVATION_REPO_PATH,
+        "expression_derivation_artifact_sha256": _sha256_bytes(derivation_bytes),
+        "expression_gaze_id": expression_id,
+        "expression_gaze_label": canonical_label,
+        "expression_canonical_text": canonical_text,
+        "expression_canonical_text_sha256": _sha256_bytes(canonical_text.encode("utf-8")),
+        "expression_text": expected["text"],
+        "expression_text_sha256": _sha256_bytes(expected["text"].encode("utf-8")),
+        "expression_safe_fallback_used": expected["fallback_used"],
+        "expression_safe_fallback_reason": expected["fallback_reason"],
+        "expression_scene_conflict_terms": expected["conflict_terms"],
+        "expression_derivation_scene_action": derivation_scene_action,
+    }
+    value = {
+        **core,
+        "expression_provenance_fingerprint_sha256": _sha256_bytes(
+            _canonical_bytes(core)
+        ),
+    }
+    return validate_expression_provenance(value)
+
+
 def reject_reserved_provider_section_tokens(value: str, *, label: str) -> None:
     validate_provider_body_text(
         value,
@@ -482,9 +746,10 @@ def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
         sections[label] = body
     _require(
         tuple(sections) in _allowed_provider_section_sequences()
-        and tuple(sections).count("Action") == 1,
+        and tuple(sections).count("Action") == 1
+        and tuple(sections).count("Expression") == 1,
         "provider_action_section_count_invalid",
-        "provider prompt must contain exactly one canonical [Action] section",
+        "provider prompt must contain exactly one canonical [Action] and [Expression] section",
     )
     return sections
 
@@ -496,6 +761,16 @@ def require_pose_bound_prompt(prompt: str, provenance: Any) -> None:
         sections["Action"] == binding["pose_text"],
         "provider_action_pose_mismatch",
         "provider Action must equal the selected candidate canonical pose text exactly",
+    )
+
+
+def require_expression_bound_prompt(prompt: str, provenance: Any) -> None:
+    binding = validate_expression_provenance(provenance)
+    sections = parse_provider_prompt_sections(prompt)
+    _require(
+        sections["Expression"] == binding["expression_text"],
+        "provider_expression_mismatch",
+        "provider Expression must equal the selected candidate effective expression text exactly",
     )
 
 
@@ -583,6 +858,81 @@ def validate_handoff_pose_copies(report: Any) -> tuple[dict[str, Any], str]:
     return binding, digest
 
 
+def validate_handoff_expression_copies(report: Any) -> tuple[dict[str, Any], str]:
+    _require(
+        isinstance(report, dict),
+        "handoff_expression_contract_missing",
+        "handoff must be a JSON object",
+    )
+    binding = validate_expression_provenance(report.get("expression_provenance"))
+    digest = report.get("expression_bound_content_packet_sha256")
+    _require(
+        isinstance(digest, str) and bool(SHA256_RE.fullmatch(digest)),
+        "handoff_expression_bound_packet_sha_invalid",
+        "handoff expression-bound content packet digest must be a lowercase SHA-256",
+    )
+    selected_prompt = report.get("selected_prompt_input")
+    structured = report.get("structured_executor_inputs")
+    candidate_summary = report.get("selected_candidate")
+    candidate_binding = report.get("candidate_selection_binding")
+    provider_binding = report.get("provider_execution_binding")
+    linkage = report.get("binding_linkage")
+    for label, value in (
+        ("selected_prompt_input", selected_prompt),
+        ("structured_executor_inputs", structured),
+        ("selected_candidate", candidate_summary),
+    ):
+        _require(isinstance(value, dict), "handoff_expression_copy_missing", f"handoff {label} must be a JSON object")
+    for label, value in (
+        ("selected_prompt_input", selected_prompt),
+        ("structured_executor_inputs", structured),
+    ):
+        _require(
+            value.get("expression_provenance") == binding,
+            "handoff_expression_provenance_mismatch",
+            f"handoff {label} expression provenance differs from the top-level binding",
+        )
+        _require(
+            value.get("expression_bound_content_packet_sha256") == digest,
+            "handoff_expression_bound_packet_sha_mismatch",
+            f"handoff {label} packet digest differs from the top-level binding",
+        )
+    for label, value in (
+        ("selected_candidate", candidate_summary),
+        ("candidate_selection_binding", candidate_binding),
+    ):
+        if isinstance(value, dict):
+            _require(
+                value.get("expression_gaze_id") == binding["expression_gaze_id"]
+                and value.get("expression_gaze_label") == binding["expression_gaze_label"],
+                "handoff_expression_identity_mismatch",
+                f"handoff {label} expression identity differs from the top-level binding",
+            )
+    for label, value in (
+        ("candidate_selection_binding", candidate_binding),
+        ("provider_execution_binding", provider_binding),
+        ("binding_linkage", linkage),
+    ):
+        if isinstance(value, dict):
+            _require(
+                value.get("expression_provenance_fingerprint_sha256")
+                == binding["expression_provenance_fingerprint_sha256"],
+                "handoff_expression_fingerprint_mismatch",
+                f"handoff {label} expression fingerprint differs from the top-level binding",
+            )
+    for label, value in (
+        ("provider_execution_binding", provider_binding),
+        ("binding_linkage", linkage),
+    ):
+        if isinstance(value, dict):
+            _require(
+                value.get("expression_bound_content_packet_sha256") == digest,
+                "handoff_expression_bound_packet_sha_mismatch",
+                f"handoff {label} packet digest differs from the top-level binding",
+            )
+    return binding, digest
+
+
 def _resolve_bound_repo_path(root: Path, raw: Any, *, label: str) -> Path:
     value = str(raw or "").strip()
     _require(bool(value), "source_pose_path_missing", f"{label} is required")
@@ -635,11 +985,27 @@ def validate_source_generation_pose_contract(
     _require(isinstance(manifest, dict), "source_manifest_invalid", "source generation manifest must be a JSON object")
     _require(isinstance(handoff_report, dict), "source_handoff_invalid", "source generation handoff must be a JSON object")
     source_pose = validate_pose_provenance(manifest.get("pose_provenance"))
+    source_expression = validate_expression_provenance(
+        manifest.get("expression_provenance")
+    )
     handoff_pose, packet_digest = validate_handoff_pose_copies(handoff_report)
+    handoff_expression, expression_packet_digest = validate_handoff_expression_copies(
+        handoff_report
+    )
     _require(
         source_pose == handoff_pose,
         "manifest_pose_provenance_mismatch",
         "source manifest pose provenance does not match the source generation handoff",
+    )
+    _require(
+        source_expression == handoff_expression,
+        "manifest_expression_provenance_mismatch",
+        "source manifest expression provenance does not match the source generation handoff",
+    )
+    _require(
+        packet_digest == expression_packet_digest,
+        "manifest_expression_bound_packet_mismatch",
+        "source handoff pose and expression packet digests disagree",
     )
     for field in ("pose_body_language_id", "pose_body_language_label", "pose_text"):
         _require(
@@ -647,10 +1013,24 @@ def validate_source_generation_pose_contract(
             "manifest_pose_provenance_mismatch",
             f"source manifest {field} does not match its nested pose provenance",
         )
+    for field in (
+        "expression_gaze_id",
+        "expression_gaze_label",
+        "expression_text",
+        "expression_safe_fallback_used",
+        "expression_safe_fallback_reason",
+        "expression_scene_conflict_terms",
+    ):
+        _require(
+            manifest.get(field) == source_expression[field],
+            "manifest_expression_provenance_mismatch",
+            f"source manifest {field} does not match its nested expression provenance",
+        )
 
     prompt = manifest.get("image_prompt")
     _require(isinstance(prompt, str) and bool(prompt), "source_manifest_prompt_missing", "source manifest image_prompt is required")
     require_pose_bound_prompt(prompt, source_pose)
+    require_expression_bound_prompt(prompt, source_expression)
     prompt_sha = _sha256_bytes(prompt.encode("utf-8"))
     selected_prompt = handoff_report.get("selected_prompt_input")
     structured = handoff_report.get("structured_executor_inputs")
@@ -693,10 +1073,16 @@ def validate_source_generation_pose_contract(
         "source pose selected candidate SHA does not match current candidate bytes",
     )
     derived_pose = build_candidate_pose_provenance(candidate_path, root=root)
+    derived_expression = build_candidate_expression_provenance(candidate_path, root=root)
     _require(
         derived_pose == source_pose,
         "manifest_pose_provenance_mismatch",
         "source manifest pose provenance does not match deterministic candidate authority",
+    )
+    _require(
+        derived_expression == source_expression,
+        "manifest_expression_provenance_mismatch",
+        "source manifest expression provenance does not match deterministic candidate authority",
     )
 
     packet_path_value = handoff_report.get("selected_prompt_input_artifact_path")
@@ -730,6 +1116,7 @@ def validate_source_generation_pose_contract(
     rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(
         packet,
         pose_binding=source_pose,
+        expression_binding=source_expression,
     )
     rebuilt_digest = _sha256_bytes(_canonical_bytes(rebuilt_packet))
     _require(
@@ -742,8 +1129,14 @@ def validate_source_generation_pose_contract(
         "manifest_pose_bound_packet_mismatch",
         "source manifest packet digest does not match the source handoff",
     )
+    _require(
+        manifest.get("expression_bound_content_packet_sha256") == packet_digest,
+        "manifest_expression_bound_packet_mismatch",
+        "source manifest expression packet digest does not match the source handoff",
+    )
     return {
         "pose_provenance": source_pose,
+        "expression_provenance": source_expression,
         "prompt": prompt,
         "prompt_sha256": prompt_sha,
         "packet_path": packet_path,

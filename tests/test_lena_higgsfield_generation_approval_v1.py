@@ -61,9 +61,18 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         pose_fixture.candidate_pose_provenance,
     )
     monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
         handoff_builder.packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+        lambda packet, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            packet,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
 
 
@@ -91,6 +100,14 @@ def _selected_candidate_payload() -> dict:
             "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
         },
         "decision_fingerprint_sha256": "c" * 64,

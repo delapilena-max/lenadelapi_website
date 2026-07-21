@@ -5045,6 +5045,9 @@ def generate_higgsfield_prompt_package(
     scene_action = _higgsfield_sanitize_scene_action(scene_action)
     expression_result = _higgsfield_safe_expression_text(scene_action, expression_gaze_entry)
     expression_text = expression_result["text"]
+    expression_canonical_text = _clean_sentence_fragment(
+        str(expression_gaze_entry.get("text", ""))
+    )
     camera_text = _clean_sentence_fragment(str(scene.get("camera", "")))
     camera_text = _higgsfield_safe_camera_text(camera_text)
     lighting_text = _clean_sentence_fragment(str(scene.get("lighting", "")))
@@ -5091,6 +5094,7 @@ def generate_higgsfield_prompt_package(
         "pose_body_language_label": pose_body_language_entry.get("label"),
         "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
         "expression_gaze_label": expression_gaze_entry.get("label"),
+        "expression_canonical_text": expression_canonical_text,
         # The actual Expression: text used in this render (real selected bank
         # text, or HIGGSFIELD_EXPRESSION_SAFE_FALLBACK for the narrow
         # HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set). Callers retain this
@@ -5104,6 +5108,7 @@ def generate_higgsfield_prompt_package(
         "expression_safe_fallback_used": expression_result["fallback_used"],
         "expression_safe_fallback_reason": expression_result["fallback_reason"],
         "expression_scene_conflict_terms": expression_result["conflict_terms"],
+        "expression_derivation_scene_action": scene_action,
         "reference_mode": reference_mode,
         # The final, already-sanitized scene-action text (post
         # _higgsfield_sanitize_scene_action) -- exposed so callers like

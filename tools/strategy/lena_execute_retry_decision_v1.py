@@ -412,6 +412,9 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         "source_selected_prompt_input_artifact_path": source_generation["packet_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
         "source_selected_prompt_input_artifact_sha256": source_generation["packet_artifact_sha256"],
         "source_pose_bound_content_packet_sha256": source_generation["packet_digest_sha256"],
+        "source_expression_bound_content_packet_sha256": source_generation[
+            "packet_digest_sha256"
+        ],
         "source_original_provider_job_evidence": {
             "provider": manifest.get("provider"),
             "provider_job_id": manifest.get("provider_job_id"),
@@ -444,6 +447,19 @@ def build_retry_decision(correction_artifact_path: Path, output_root: Path = DEF
         "pose": source_generation["pose_provenance"]["pose_body_language_label"],
         "pose_provenance": source_generation["pose_provenance"],
         "pose_provenance_fingerprint_sha256": source_generation["pose_provenance"]["pose_provenance_fingerprint_sha256"],
+        "expression_gaze_id": source_generation["expression_provenance"][
+            "expression_gaze_id"
+        ],
+        "expression_gaze_label": source_generation["expression_provenance"][
+            "expression_gaze_label"
+        ],
+        "expression_text": source_generation["expression_provenance"][
+            "expression_text"
+        ],
+        "expression_provenance": source_generation["expression_provenance"],
+        "expression_provenance_fingerprint_sha256": source_generation[
+            "expression_provenance"
+        ]["expression_provenance_fingerprint_sha256"],
         "camera_text": candidate.get("camera_text"),
         "lighting_text": candidate.get("lighting_text"),
         "original_prompt_sha256": source_generation["prompt_sha256"],
@@ -493,6 +509,11 @@ def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
         raise RetryDecisionError("source_prompt_text_mismatch", "source handoff prompt does not match the retry decision original prompt")
     if source_image.get("pose_provenance") != artifact.get("pose_provenance"):
         raise RetryDecisionError("source_pose_provenance_mismatch", "source handoff pose provenance does not match the retry decision")
+    if source_image.get("expression_provenance") != artifact.get("expression_provenance"):
+        raise RetryDecisionError(
+            "source_expression_provenance_mismatch",
+            "source handoff expression provenance does not match the retry decision",
+        )
     if (
         source_image.get("pose_bound_content_packet_artifact_path")
         != artifact.get("source_selected_prompt_input_artifact_path")
@@ -502,6 +523,18 @@ def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
         != artifact.get("source_pose_bound_content_packet_sha256")
     ):
         raise RetryDecisionError("source_packet_binding_mismatch", "source handoff packet binding does not match the retry decision")
+    if (
+        source_image.get("expression_bound_content_packet_artifact_path")
+        != artifact.get("source_selected_prompt_input_artifact_path")
+        or source_image.get("expression_bound_content_packet_artifact_sha256")
+        != artifact.get("source_selected_prompt_input_artifact_sha256")
+        or source_image.get("expression_bound_content_packet_sha256")
+        != artifact.get("source_expression_bound_content_packet_sha256")
+    ):
+        raise RetryDecisionError(
+            "source_expression_packet_binding_mismatch",
+            "source handoff expression packet binding does not match the retry decision",
+        )
     retry_source = copy.deepcopy(source)
     retry_source["image"]["slot_id"] = artifact["retry_slot_id"]
     retry_source["image"]["image_prompt"] = artifact["retry_prompt_text"]
@@ -528,8 +561,15 @@ def _build_retry_source(artifact: dict[str, Any]) -> dict[str, Any]:
         "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
         "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
         "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
+        "source_expression_bound_content_packet_sha256": artifact[
+            "source_expression_bound_content_packet_sha256"
+        ],
         "pose_provenance": artifact["pose_provenance"],
         "pose_provenance_fingerprint_sha256": artifact["pose_provenance_fingerprint_sha256"],
+        "expression_provenance": artifact["expression_provenance"],
+        "expression_provenance_fingerprint_sha256": artifact[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "source_original_provider_job_evidence": artifact["source_original_provider_job_evidence"],
         "source_valid_human_rejection_artifact_path": artifact["source_valid_human_rejection_artifact_path"],
         "source_valid_human_rejection_artifact_sha256": artifact["source_valid_human_rejection_artifact_sha256"],
@@ -636,10 +676,26 @@ def _validate_retry_decision_artifact(path: Path) -> dict[str, Any]:
         "source_selected_prompt_input_artifact_path": source_generation["packet_path"].resolve().relative_to(ROOT.resolve()).as_posix(),
         "source_selected_prompt_input_artifact_sha256": source_generation["packet_artifact_sha256"],
         "source_pose_bound_content_packet_sha256": source_generation["packet_digest_sha256"],
+        "source_expression_bound_content_packet_sha256": source_generation[
+            "packet_digest_sha256"
+        ],
         "pose_provenance": source_generation["pose_provenance"],
         "pose_provenance_fingerprint_sha256": source_generation["pose_provenance"]["pose_provenance_fingerprint_sha256"],
         "pose_body_language_id": source_generation["pose_provenance"]["pose_body_language_id"],
         "pose": source_generation["pose_provenance"]["pose_body_language_label"],
+        "expression_provenance": source_generation["expression_provenance"],
+        "expression_provenance_fingerprint_sha256": source_generation[
+            "expression_provenance"
+        ]["expression_provenance_fingerprint_sha256"],
+        "expression_gaze_id": source_generation["expression_provenance"][
+            "expression_gaze_id"
+        ],
+        "expression_gaze_label": source_generation["expression_provenance"][
+            "expression_gaze_label"
+        ],
+        "expression_text": source_generation["expression_provenance"][
+            "expression_text"
+        ],
     }
     for field, expected in expected_source_bindings.items():
         if artifact.get(field) != expected:

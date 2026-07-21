@@ -73,6 +73,7 @@ def _fake_retry_facts() -> dict:
         "soul_name": "Lena",
         "soul_type": "Soul 2.0",
         "retry_handoff_fingerprint_sha256": "1" * 64,
+        "expression_provenance_fingerprint_sha256": "2" * 64,
     }
 
 

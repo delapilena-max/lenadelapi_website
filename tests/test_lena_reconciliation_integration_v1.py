@@ -61,9 +61,18 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         pose_fixture.candidate_pose_provenance,
     )
     monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
         handoff_builder.packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+        lambda packet, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            packet,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
 
 
@@ -456,10 +465,15 @@ def test_report_only_reconciliation_flow_binds_handoff_and_blocks_live_without_a
     assert handoff_report["source_selected_candidate_artifact_path"] == paths["selected_candidate_path"].relative_to(tmp_path).as_posix()
     selected_candidate_path = paths["selected_candidate_path"]
     expected_pose = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
+    expected_expression = pose_fixture.candidate_expression_provenance(
+        selected_candidate_path,
+        root=tmp_path,
+    )
     rebuilt_packet, rebuilt_source = executor._rebuild_packet_prompt_source(
         paths["packet_path"],
         candidate_path=selected_candidate_path,
         expected_pose_provenance=expected_pose,
+        expected_expression_provenance=expected_expression,
     )
     assert rebuilt_packet["recipe_id"] == SELECTED_RECIPE_ID
     assert rebuilt_source["image"]["slot_id"] == f"higgsfield-{DATE.replace('-', '')}-{SELECTED_RECIPE_ID}-photo"

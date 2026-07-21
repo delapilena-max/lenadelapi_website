@@ -163,7 +163,12 @@ def test_motorcycle_photo_dump_preserves_selected_expression(
             "pose_body_language_id": "pose_test",
             "expression_gaze_id": "exp_test",
             "expression_gaze_label": "test_expression",
+            "expression_canonical_text": expression_text,
             "expression_text": expression_text,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing beside a real parked motorcycle",
             "image_prompt": source_prompt,
             "prompt": source_prompt,
             "positive_prompt": source_prompt,
@@ -179,6 +184,13 @@ def test_motorcycle_photo_dump_preserves_selected_expression(
 
     for image in pack["images"]:
         assert image["expression_text"] == expression_text
+        assert image["expression_canonical_text"] == expression_text
+        assert image["expression_safe_fallback_used"] is False
+        assert image["expression_safe_fallback_reason"] is None
+        assert image["expression_scene_conflict_terms"] == []
+        assert image["expression_derivation_scene_action"] == (
+            "standing beside a real parked motorcycle"
+        )
         assert "photo_dump_expression_variant" not in image
         for prompt_key in ("image_prompt", "prompt", "positive_prompt"):
             assert f"Expression: {expression_text}." in image[prompt_key]

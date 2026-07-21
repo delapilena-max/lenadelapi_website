@@ -78,9 +78,18 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         pose_fixture.candidate_pose_provenance,
     )
     monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
         handoff_builder.packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+        lambda packet, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            packet,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
 
 
@@ -227,6 +236,22 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
             "prompt_sha256": prompt_sha,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
         },
         "decision_fingerprint_sha256": "5" * 64,
@@ -239,12 +264,14 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
 def _source_from_prompt(
     prompt_text: str = PROMPT_TEXT,
     pose_binding: dict | None = None,
+    expression_binding: dict | None = None,
     *,
     packet_path: str | None = None,
     packet_sha256: str | None = None,
     packet_bound_sha256: str | None = None,
 ) -> dict:
     pose_binding = pose_binding or pose_fixture.static_pose_provenance()
+    expression_binding = expression_binding or pose_fixture.static_expression_provenance()
     return {
         "resolver": "content_packet_dryrun",
         "slot_prefix": RECIPE_ID,
@@ -267,8 +294,16 @@ def _source_from_prompt(
             ),
             "pose_bound_content_packet_artifact_sha256": packet_sha256 or "3" * 64,
             "pose_bound_content_packet_sha256": packet_bound_sha256 or "4" * 64,
-            "expression_gaze_id": "exp_fixture",
-            "expression_gaze_label": "calm expression",
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+            "expression_text": expression_binding["expression_text"],
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_artifact_path": packet_path or (
+                f"pipeline/strategy/lena/content_packets/{DATE}/"
+                f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
+            ),
+            "expression_bound_content_packet_artifact_sha256": packet_sha256 or "3" * 64,
+            "expression_bound_content_packet_sha256": packet_bound_sha256 or "4" * 64,
             "effective_wardrobe_silhouette_class": "beautiful_trouble",
             "soul_name": "Lena",
             "soul_version": "Soul 2.0",
@@ -390,14 +425,20 @@ def _build_packet_fixture(tmp_root: Path, monkeypatch: pytest.MonkeyPatch, *, pr
         _slot_id_override=None,
         _candidate_path=None,
         expected_pose_provenance=None,
+        expected_expression_provenance=None,
     ):
-        bound = pose_fixture.bind_packet(packet_report, pose_binding=expected_pose_provenance)
+        bound = pose_fixture.bind_packet(
+            packet_report,
+            pose_binding=expected_pose_provenance,
+            expression_binding=expected_expression_provenance,
+        )
         bound_sha = hashlib.sha256(
             json.dumps(bound, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
         ).hexdigest()
         return bound, _source_from_prompt(
             prompt_text,
             expected_pose_provenance,
+            expected_expression_provenance,
             packet_path=content_packet_path.relative_to(tmp_root).as_posix(),
             packet_sha256=hashlib.sha256(content_packet_path.read_bytes()).hexdigest(),
             packet_bound_sha256=bound_sha,
@@ -533,13 +574,21 @@ def test_validate_handoff_packet_uses_authoritative_handoff_slot_and_preserves_p
     original_rebuild = executor._rebuild_packet_prompt_source
     seen: dict[str, str | None] = {}
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None, *, expected_pose_provenance=None):
+    def rebuild(
+        packet_path: Path,
+        slot_id_override: str | None = None,
+        candidate_path=None,
+        *,
+        expected_pose_provenance=None,
+        expected_expression_provenance=None,
+    ):
         seen["slot_id_override"] = slot_id_override
         rebuilt_packet, source = original_rebuild(
             packet_path,
             slot_id_override,
             candidate_path,
             expected_pose_provenance=expected_pose_provenance,
+            expected_expression_provenance=expected_expression_provenance,
         )
         if isinstance(slot_id_override, str) and slot_id_override.strip():
             source["image"]["slot_id"] = slot_id_override
@@ -570,12 +619,20 @@ def test_validate_handoff_packet_rejects_rebuilt_source_slot_mismatch(
     packet_path, _ = _build_packet_fixture(tmp_path, monkeypatch)
     original_rebuild = executor._rebuild_packet_prompt_source
 
-    def rebuild(packet_path: Path, slot_id_override: str | None = None, candidate_path=None, *, expected_pose_provenance=None):
+    def rebuild(
+        packet_path: Path,
+        slot_id_override: str | None = None,
+        candidate_path=None,
+        *,
+        expected_pose_provenance=None,
+        expected_expression_provenance=None,
+    ):
         rebuilt_packet, source = original_rebuild(
             packet_path,
             slot_id_override,
             candidate_path,
             expected_pose_provenance=expected_pose_provenance,
+            expected_expression_provenance=expected_expression_provenance,
         )
         source["image"]["slot_id"] = "unrelated-slot"
         return rebuilt_packet, source
@@ -995,7 +1052,8 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
+        lambda _path, _slot_id_override=None, _candidate_path=None,
+        expected_pose_provenance=None, expected_expression_provenance=None: (
             copy.deepcopy(packet_report), copy.deepcopy(source)
         ),
     )
@@ -1048,8 +1106,14 @@ def test_prompt_drift_rejects_before_provider_access(
     monkeypatch.setattr(
         executor,
         "_rebuild_packet_prompt_source",
-        lambda _path, _slot_id_override=None, _candidate_path=None, expected_pose_provenance=None: (
-            copy.deepcopy(packet_report), _source_from_prompt(PROMPT_TEXT + " drift", expected_pose_provenance)
+        lambda _path, _slot_id_override=None, _candidate_path=None,
+        expected_pose_provenance=None, expected_expression_provenance=None: (
+            copy.deepcopy(packet_report),
+            _source_from_prompt(
+                PROMPT_TEXT + " drift",
+                expected_pose_provenance,
+                expected_expression_provenance,
+            )
         ),
     )
     monkeypatch.setattr(sys, "argv", ["executor", "--handoff-artifact", str(packet_path)])
@@ -1199,6 +1263,10 @@ def _build_retry_fixture(
     _write_json(selected_candidate_path, selected_candidate_payload)
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_root)
+    expression_binding = pose_fixture.candidate_expression_provenance(
+        selected_candidate_path,
+        root=tmp_root,
+    )
     handoff_report = {
             "report_type": "lena_next_live_image_handoff",
             "schema_version": "v1",
@@ -1234,9 +1302,13 @@ def _build_retry_fixture(
                 "candidate_status": selected_candidate_payload["candidate_status"],
                 "pose_body_language_id": pose_fixture.POSE_ID,
                 "pose_body_language_label": pose_fixture.POSE_LABEL,
+                "expression_gaze_id": expression_binding["expression_gaze_id"],
+                "expression_gaze_label": expression_binding["expression_gaze_label"],
             },
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": "4" * 64,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": "4" * 64,
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_prompt_input": {
@@ -1246,6 +1318,8 @@ def _build_retry_fixture(
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
                 "pose_provenance": pose_binding,
                 "pose_bound_content_packet_sha256": "4" * 64,
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_sha256": "4" * 64,
             },
             "structured_executor_inputs": {
                 "provider": "higgsfield",
@@ -1262,6 +1336,8 @@ def _build_retry_fixture(
                 "selected_candidate_artifact_sha256": selected_candidate_sha,
                 "pose_provenance": pose_binding,
                 "pose_bound_content_packet_sha256": "4" * 64,
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_sha256": "4" * 64,
                 "soul_metadata": {
                     "name": "Lena",
                     "type": "Soul 2.0",
@@ -1450,6 +1526,16 @@ def _build_retry_fixture(
             "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
             "pose_bound_content_packet_artifact_sha256": packet_sha,
             "pose_bound_content_packet_sha256": "4" * 64,
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+            "expression_text": expression_binding["expression_text"],
+            "expression_safe_fallback_used": expression_binding["expression_safe_fallback_used"],
+            "expression_safe_fallback_reason": expression_binding["expression_safe_fallback_reason"],
+            "expression_scene_conflict_terms": expression_binding["expression_scene_conflict_terms"],
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+            "expression_bound_content_packet_artifact_sha256": packet_sha,
+            "expression_bound_content_packet_sha256": "4" * 64,
             "saved_image_path": str(image_path),
             "provider_job_id": "job-123",
             "provider_status": "completed",
@@ -1487,6 +1573,7 @@ def _build_retry_fixture(
         "validate_source_generation_pose_contract",
         lambda manifest, report, root=None: {
             "pose_provenance": pose_binding,
+            "expression_provenance": expression_binding,
             "prompt": original_prompt,
             "prompt_sha256": original_prompt_sha,
             "packet_path": packet_path,
@@ -1530,6 +1617,13 @@ def _build_retry_fixture(
                 "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
                 "pose_bound_content_packet_artifact_sha256": packet_sha,
                 "pose_bound_content_packet_sha256": "4" * 64,
+                "expression_gaze_id": expression_binding["expression_gaze_id"],
+                "expression_gaze_label": expression_binding["expression_gaze_label"],
+                "expression_text": expression_binding["expression_text"],
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+                "expression_bound_content_packet_artifact_sha256": packet_sha,
+                "expression_bound_content_packet_sha256": "4" * 64,
                 "effective_wardrobe_silhouette_class": "beautiful_trouble",
                 "soul_name": "Lena",
                 "soul_version": "Soul 2.0",
@@ -2155,13 +2249,23 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     monkeypatch.setattr(
         packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda _r, pose_binding=None: pose_fixture.bind_packet(_r, pose_binding=pose_binding),
+        lambda _r, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            _r,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
     expected_pose = pose_fixture.static_pose_provenance()
+    expected_expression = pose_fixture.static_expression_provenance()
     monkeypatch.setattr(
         handoff_builder.pose_provenance,
         "build_candidate_pose_provenance",
         lambda _path, root=None: expected_pose,
+    )
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_expression_provenance",
+        lambda _path, root=None: expected_expression,
     )
     fake_wf_entry = {
         "outfit_id": "wc_p050",
@@ -2179,6 +2283,7 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
         "test-slot-001",
         candidate_path,
         expected_pose_provenance=expected_pose,
+        expected_expression_provenance=expected_expression,
     )
     img = source["image"]
 

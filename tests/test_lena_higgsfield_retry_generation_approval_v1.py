@@ -58,6 +58,14 @@ def _selected_candidate_payload() -> dict:
             "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
         },
     }
 
@@ -96,9 +104,15 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         retry_mod.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
+        retry_mod.pose_provenance,
         "validate_source_generation_pose_contract",
         lambda manifest, report, root=None: {
             "pose_provenance": report["pose_provenance"],
+            "expression_provenance": report["expression_provenance"],
             "prompt": manifest["image_prompt"],
             "prompt_sha256": manifest["prompt_sha256"],
         },
@@ -133,7 +147,12 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
-    pose_bound_packet = pose_fixture.bind_packet(packet_report, pose_binding=pose_binding)
+    expression_binding = pose_fixture.candidate_expression_provenance(selected_candidate_path, root=tmp_path)
+    pose_bound_packet = pose_fixture.bind_packet(
+        packet_report,
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
+    )
     pose_bound_packet_sha = hashlib.sha256(
         json.dumps(pose_bound_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     ).hexdigest()
@@ -320,9 +339,13 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "candidate_status": "selected",
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
         },
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -332,6 +355,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -356,6 +381,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -379,6 +406,16 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
         "pose_bound_content_packet_artifact_sha256": packet_sha,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_text": expression_binding["expression_text"],
+        "expression_safe_fallback_used": expression_binding["expression_safe_fallback_used"],
+        "expression_safe_fallback_reason": expression_binding["expression_safe_fallback_reason"],
+        "expression_scene_conflict_terms": expression_binding["expression_scene_conflict_terms"],
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+        "expression_bound_content_packet_artifact_sha256": packet_sha,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "saved_image_path": str(image_path),
         "provider_job_id": "job-123",
         "provider_status": "completed",

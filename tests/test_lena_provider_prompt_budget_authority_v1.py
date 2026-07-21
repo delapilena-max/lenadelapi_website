@@ -12,7 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.lena_pose_provenance import static_pose_provenance
+from tests.fixtures.lena_pose_provenance import (
+    static_expression_provenance,
+    static_pose_provenance,
+)
 from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as readiness
 from tools.strategy import lena_audit_provider_prompt_budget_v1 as audit
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
@@ -48,6 +51,32 @@ def _pose_binding(entry: dict) -> dict:
             separators=(",", ":"),
             ensure_ascii=True,
         ).encode("utf-8")
+    ).hexdigest()
+    return binding
+
+
+def _expression_binding() -> dict:
+    entry = audit._default_audit_expression_entry()
+    binding = static_expression_provenance()
+    binding.update({
+        "expression_gaze_id": entry["expression_gaze_id"],
+        "expression_gaze_label": entry["expression_gaze_label"],
+        "expression_canonical_text": entry["expression_text"],
+        "expression_canonical_text_sha256": hashlib.sha256(
+            entry["expression_text"].encode("utf-8")
+        ).hexdigest(),
+        "expression_text": entry["expression_text"],
+        "expression_text_sha256": hashlib.sha256(
+            entry["expression_text"].encode("utf-8")
+        ).hexdigest(),
+    })
+    core = {
+        key: value
+        for key, value in binding.items()
+        if key != "expression_provenance_fingerprint_sha256"
+    }
+    binding["expression_provenance_fingerprint_sha256"] = hashlib.sha256(
+        json.dumps(core, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     ).hexdigest()
     return binding
 
@@ -221,7 +250,7 @@ def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: di
         if row["recipe_id"] == "hcr_012"
         and row["pose_body_language_id"] == "pose_p008"
     ]
-    assert hcr_012_p008 == [3305, 3216, 3589, 3585, 3589]
+    assert hcr_012_p008 == [3432, 3343, 3716, 3712, 3716]
     assert all(
         row["fits_execution_budget"]
         for row in governed_report["rows"]
@@ -391,6 +420,7 @@ def test_current_production_formatter_matches_zero_loss_authority() -> None:
                 actual = packet_builder.build_structured_kling_prompt(
                     recipe,
                     pose_binding=_pose_binding(pose),
+                    expression_binding=_expression_binding(),
                 )
                 assert actual == expected
                 fit_count += 1
@@ -399,6 +429,7 @@ def test_current_production_formatter_matches_zero_loss_authority() -> None:
                     packet_builder.build_structured_kling_prompt(
                         recipe,
                         pose_binding=_pose_binding(pose),
+                        expression_binding=_expression_binding(),
                     )
                 assert excinfo.value.code == "higgsfield_prompt_execution_policy_exceeded"
                 over_count += 1
@@ -444,6 +475,7 @@ def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
     first_actual = packet_builder.build_structured_kling_prompt(
         recipe,
         pose_binding=_pose_binding(pose),
+        expression_binding=_expression_binding(),
     )
     assert first_actual == first_expected
     for field in (
@@ -471,7 +503,7 @@ def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
         for retry_type in audit.RETRY_TYPES
     ]
     assert actual == expected
-    assert [len(prompt) for prompt in actual] == [3305, 3216, 3589, 3585, 3589]
+    assert [len(prompt) for prompt in actual] == [3432, 3343, 3716, 3712, 3716]
 
 
 def test_legacy_2499_budget_cannot_gate_higgsfield_execution() -> None:
@@ -483,6 +515,7 @@ def test_legacy_2499_budget_cannot_gate_higgsfield_execution() -> None:
             recipe,
             max_chars=2499,
             pose_binding=_pose_binding(pose),
+            expression_binding=_expression_binding(),
         )
     assert excinfo.value.code == "higgsfield_prompt_budget_override_forbidden"
 
@@ -516,6 +549,7 @@ def test_build_packet_uses_zero_loss_prompt_or_fails_before_packet_return() -> N
                         "zero-loss production-entry regression",
                         "2026-07-21",
                         pose_binding=_pose_binding(pose),
+                        expression_binding=_expression_binding(),
                     )
                 blocked += 1
                 continue
@@ -525,6 +559,7 @@ def test_build_packet_uses_zero_loss_prompt_or_fails_before_packet_return() -> N
                 "zero-loss production-entry regression",
                 "2026-07-21",
                 pose_binding=_pose_binding(pose),
+                expression_binding=_expression_binding(),
             )
             assert packet["compact_provider_prompt_preview"] == expected
             assert packet["compact_kling_prompt_preview"] == expected

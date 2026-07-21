@@ -297,9 +297,18 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
     monkeypatch.setattr(handoff.pose_provenance, "build_candidate_pose_provenance", pose_fixture.candidate_pose_provenance)
     monkeypatch.setattr(
+        handoff.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
         handoff.packet_builder,
         "rebuild_packet_from_authoritative_sources",
-        lambda packet, pose_binding=None: pose_fixture.bind_packet(packet, pose_binding=pose_binding),
+        lambda packet, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            packet,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
 
 

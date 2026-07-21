@@ -517,12 +517,21 @@ def build_handoff(
             selected_candidate_path_value,
             root=ROOT,
         )
+        expression_binding = pose_provenance.build_candidate_expression_provenance(
+            selected_candidate_path_value,
+            root=ROOT,
+        )
         bound_packet = packet_builder.rebuild_packet_from_authoritative_sources(
             packet,
             pose_binding=pose_binding,
+            expression_binding=expression_binding,
         )
         prompt_text = str(bound_packet.get("compact_provider_prompt_preview", "")).strip()
         pose_provenance.require_pose_bound_prompt(prompt_text, pose_binding)
+        pose_provenance.require_expression_bound_prompt(
+            prompt_text,
+            expression_binding,
+        )
     except (pose_provenance.PoseProvenanceError, SystemExit) as exc:
         raise HandoffBuildError(f"[ABORT] pose_provenance_invalid: {exc}") from exc
     prompt_sha256 = sha256_bytes(prompt_text.encode("utf-8"))
@@ -535,6 +544,9 @@ def build_handoff(
         ).encode("utf-8")
     )
     pose_fingerprint = pose_binding["pose_provenance_fingerprint_sha256"]
+    expression_fingerprint = expression_binding[
+        "expression_provenance_fingerprint_sha256"
+    ]
     candidate_selection_binding = {
         "selected_candidate_artifact_path": repo_relative_path(selected_candidate_path_value),
         "selected_candidate_artifact_sha256": sha256_file(selected_candidate_path_value),
@@ -546,6 +558,9 @@ def build_handoff(
         "pose_body_language_id": pose_binding["pose_body_language_id"],
         "pose_body_language_label": pose_binding["pose_body_language_label"],
         "pose_provenance_fingerprint_sha256": pose_fingerprint,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_provenance_fingerprint_sha256": expression_fingerprint,
         "source_prompt_family": PROMPT_FAMILY_CANDIDATE_SELECTION,
     }
     provider_execution_binding = {
@@ -556,6 +571,8 @@ def build_handoff(
         "provider_prompt_sha256": prompt_sha256,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
         "pose_provenance_fingerprint_sha256": pose_fingerprint,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
+        "expression_provenance_fingerprint_sha256": expression_fingerprint,
         "provider_lane": str(packet.get("scene_type", "")).strip(),
         "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
         "provider": PROVIDER,
@@ -582,6 +599,9 @@ def build_handoff(
         "pose_body_language_id": pose_binding["pose_body_language_id"],
         "pose_provenance_fingerprint_sha256": pose_fingerprint,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_provenance_fingerprint_sha256": expression_fingerprint,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
         "prompt_family_relationship": "candidate prompt family and provider prompt family are intentionally distinct for the same recipe/slot chain",
     }
 
@@ -657,10 +677,14 @@ def build_handoff(
             "candidate_status": selected_candidate.get("candidate_status", ""),
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
         },
         "candidate_selection_binding": candidate_selection_binding,
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
         "selected_lane": packet.get("scene_type", ""),
         "selected_hook_id": selected_candidate_hook_id,
         "selected_hook_text": packet.get("hook_text", ""),
@@ -725,6 +749,8 @@ def build_handoff(
             "prompt_text_available": True,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
             "exact_proposed_dry_run_command": dry_run_command,
             "lane": packet.get("scene_type", ""),
             "recipe_id": packet.get("recipe_id", ""),
@@ -732,6 +758,7 @@ def build_handoff(
             "hook_text": packet.get("hook_text", ""),
             "caption_seed": packet.get("caption_draft", ""),
             "activity": pose_binding["pose_text"],
+            "expression_text": expression_binding["expression_text"],
             "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
             "concept_summary": " | ".join(
                 part
@@ -769,6 +796,8 @@ def build_handoff(
             "selected_prompt_text_available": True,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
             "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
             "handoff_artifact_path": handoff_json_rel_path,
             "handoff_markdown_path": handoff_md_rel_path,
@@ -903,6 +932,7 @@ def build_handoff(
     }
     try:
         pose_provenance.validate_handoff_pose_copies(report)
+        pose_provenance.validate_handoff_expression_copies(report)
     except pose_provenance.PoseProvenanceError as exc:
         raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
     return report

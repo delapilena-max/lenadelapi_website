@@ -25,8 +25,10 @@ REPORT_TYPE = "lena_provider_prompt_budget_audit"
 EXPECTED_GOVERNED_RECIPE_COUNT = 19
 RECIPE_BANK_REPO_PATH = "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json"
 POSE_BANK_REPO_PATH = pose_provenance.POSE_AUTHORITY_REPO_PATH
+EXPRESSION_BANK_REPO_PATH = pose_provenance.EXPRESSION_AUTHORITY_REPO_PATH
 RECIPE_BANK = ROOT / RECIPE_BANK_REPO_PATH
 POSE_BANK = ROOT / POSE_BANK_REPO_PATH
+EXPRESSION_BANK = ROOT / EXPRESSION_BANK_REPO_PATH
 
 FIRST_GENERATION = "first_generation"
 ORDINARY_RETRY = "ordinary_retry"
@@ -81,6 +83,42 @@ def _canonical_pose_entry(value: Any) -> dict[str, str]:
     }
 
 
+def _canonical_expression_entry(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise PromptBudgetAuditError("expression bank entries must be JSON objects")
+    expression_id = value.get("expression_gaze_id")
+    label = value.get("label", value.get("expression_gaze_label"))
+    text = value.get("text", value.get("expression_text"))
+    if not all(isinstance(item, str) and item for item in (expression_id, label, text)):
+        raise PromptBudgetAuditError(
+            "every canonical expression requires a nonempty ID, label, and text"
+        )
+    pose_provenance.validate_provider_body_text(
+        text,
+        label=f"canonical expression {expression_id}",
+        max_chars=prompt_limits.PROVIDER_SECTION_BODY_MAX_CHARS,
+    )
+    return {
+        "expression_gaze_id": expression_id,
+        "expression_gaze_label": label,
+        "expression_text": text,
+    }
+
+
+def _default_audit_expression_entry() -> dict[str, str]:
+    bank, _ = _read_json_object(EXPRESSION_BANK)
+    expressions = bank.get("combos")
+    if not isinstance(expressions, list) or not expressions:
+        raise PromptBudgetAuditError(
+            "canonical expression bank must contain at least one expression"
+        )
+    canonical = [_canonical_expression_entry(item) for item in expressions]
+    return max(
+        canonical,
+        key=lambda item: (len(item["expression_text"]), item["expression_gaze_id"]),
+    )
+
+
 def _retry_sections(
     base_sections: list[tuple[str, str]],
     retry_type: str,
@@ -126,11 +164,16 @@ def assemble_zero_loss_prompt(
     recipe: dict[str, Any],
     pose_entry: dict[str, Any],
     retry_type: str,
+    expression_entry: dict[str, Any] | None = None,
 ) -> tuple[str, list[tuple[str, str]]]:
     canonical_pose = _canonical_pose_entry(pose_entry)
+    canonical_expression = _canonical_expression_entry(
+        expression_entry or _default_audit_expression_entry()
+    )
     base_sections = packet_builder.build_zero_loss_prompt_sections_for_budget_audit(
         recipe,
         canonical_pose["pose_text"],
+        canonical_expression["expression_text"],
     )
     sections = _retry_sections(base_sections, retry_type)
     return _render_zero_loss_prompt(sections), sections
@@ -139,14 +182,19 @@ def assemble_zero_loss_prompt(
 def audit_recipe_pose(
     recipe: dict[str, Any],
     pose_entry: dict[str, Any],
+    expression_entry: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     recipe_id = recipe.get("id")
     if not isinstance(recipe_id, str) or not recipe_id:
         raise PromptBudgetAuditError("every governed recipe requires a nonempty ID")
     canonical_pose = _canonical_pose_entry(pose_entry)
+    canonical_expression = _canonical_expression_entry(
+        expression_entry or _default_audit_expression_entry()
+    )
     base_sections = packet_builder.build_zero_loss_prompt_sections_for_budget_audit(
         recipe,
         canonical_pose["pose_text"],
+        canonical_expression["expression_text"],
     )
     execution_budget = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     rows = []
@@ -160,6 +208,8 @@ def audit_recipe_pose(
             "recipe_id": recipe_id,
             "pose_body_language_id": canonical_pose["pose_body_language_id"],
             "pose_body_language_label": canonical_pose["pose_body_language_label"],
+            "expression_gaze_id": canonical_expression["expression_gaze_id"],
+            "expression_gaze_label": canonical_expression["expression_gaze_label"],
             "retry_type": retry_type,
             "assembled_prompt_length": prompt_length,
             "assembled_prompt_utf8_bytes": len(prompt_bytes),
@@ -197,10 +247,16 @@ def _semantic_evidence(source: str, text: str, prompt: str) -> dict[str, Any]:
 def build_hcr_012_semantic_inventory(
     recipe: dict[str, Any],
     pose_entry: dict[str, Any],
+    expression_entry: dict[str, Any],
 ) -> dict[str, Any]:
     if recipe.get("id") != "hcr_012":
         raise PromptBudgetAuditError("hcr_012 semantic inventory requires recipe hcr_012")
-    prompt, _ = assemble_zero_loss_prompt(recipe, pose_entry, FIRST_GENERATION)
+    prompt, _ = assemble_zero_loss_prompt(
+        recipe,
+        pose_entry,
+        FIRST_GENERATION,
+        expression_entry,
+    )
     scene_logic = recipe.get("scene_logic_contract") or {}
     evidence = {
         "identity": (
@@ -305,17 +361,24 @@ def build_audit_report(
     *,
     recipe_bank_path: Path = RECIPE_BANK,
     pose_bank_path: Path = POSE_BANK,
+    expression_bank_path: Path = EXPRESSION_BANK,
 ) -> dict[str, Any]:
     recipe_bank, recipe_bytes = _read_json_object(recipe_bank_path)
     pose_bank, pose_bytes = _read_json_object(pose_bank_path)
+    expression_bank, expression_bytes = _read_json_object(expression_bank_path)
     recipes = recipe_bank.get("recipes")
     poses = pose_bank.get("combos")
+    expressions = expression_bank.get("combos")
     if not isinstance(recipes, list) or len(recipes) != EXPECTED_GOVERNED_RECIPE_COUNT:
         raise PromptBudgetAuditError(
             f"expected {EXPECTED_GOVERNED_RECIPE_COUNT} governed recipes"
         )
     if not isinstance(poses, list) or not poses:
         raise PromptBudgetAuditError("canonical pose bank must contain at least one pose")
+    if not isinstance(expressions, list) or not expressions:
+        raise PromptBudgetAuditError(
+            "canonical expression bank must contain at least one expression"
+        )
     recipe_ids = [recipe.get("id") for recipe in recipes if isinstance(recipe, dict)]
     if len(recipe_ids) != len(set(recipe_ids)):
         raise PromptBudgetAuditError("governed recipe IDs must be unique")
@@ -323,13 +386,20 @@ def build_audit_report(
     pose_ids = [item["pose_body_language_id"] for item in canonical_poses]
     if len(pose_ids) != len(set(pose_ids)):
         raise PromptBudgetAuditError("canonical pose IDs must be unique")
+    canonical_expressions = [_canonical_expression_entry(item) for item in expressions]
+    # The matrix remains recipe x pose x route. Use the longest canonical
+    # expression as a deterministic conservative budget probe.
+    audit_expression = max(
+        canonical_expressions,
+        key=lambda item: (len(item["expression_text"]), item["expression_gaze_id"]),
+    )
 
     rows = []
     for recipe in recipes:
         if not isinstance(recipe, dict):
             raise PromptBudgetAuditError("governed recipes must be JSON objects")
         for pose in canonical_poses:
-            rows.extend(audit_recipe_pose(recipe, pose))
+            rows.extend(audit_recipe_pose(recipe, pose, audit_expression))
     hcr_012 = next((recipe for recipe in recipes if recipe.get("id") == "hcr_012"), None)
     if hcr_012 is None:
         raise PromptBudgetAuditError("governed recipe hcr_012 is missing")
@@ -353,12 +423,22 @@ def build_audit_report(
                 "sha256": _sha256_bytes(pose_bytes),
                 "pose_count": len(canonical_poses),
             },
+            "expression_bank": {
+                "path": EXPRESSION_BANK_REPO_PATH,
+                "sha256": _sha256_bytes(expression_bytes),
+                "expression_count": len(canonical_expressions),
+                "audit_expression_gaze_id": audit_expression[
+                    "expression_gaze_id"
+                ],
+                "selection_policy": "longest_canonical_expression_then_id",
+            },
         },
         "retry_types": list(RETRY_TYPES),
         "summary": _summarize_rows(rows),
         "hcr_012_semantic_inventory": build_hcr_012_semantic_inventory(
             hcr_012,
             canonical_poses[0],
+            audit_expression,
         ),
         "rows": rows,
     }

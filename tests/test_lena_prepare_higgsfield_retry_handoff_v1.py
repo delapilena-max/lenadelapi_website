@@ -31,6 +31,7 @@ ORIGINAL_PROMPT = packet_builder.rebuild_packet_from_authoritative_sources(
         "hook_selection_reason": "mirror fitcheck",
     },
     pose_binding=pose_fixture.static_pose_provenance(),
+    expression_binding=pose_fixture.static_expression_provenance(),
 )["compact_provider_prompt_preview"]
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
@@ -51,6 +52,14 @@ def _selected_candidate_payload() -> dict:
             "prompt_sha256": PROMPT_SHA,
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
         },
     }
 
@@ -79,6 +88,11 @@ def _patch_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         retry_mod.pose_provenance,
         "build_candidate_pose_provenance",
         pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        retry_mod.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
     )
 
 
@@ -117,7 +131,15 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     selected_candidate_path.write_text(json.dumps(_selected_candidate_payload(), indent=2) + "\n", encoding="utf-8")
     selected_candidate_sha = hashlib.sha256(selected_candidate_path.read_bytes()).hexdigest()
     pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
-    pose_bound_packet = pose_fixture.authoritatively_bind_packet(packet_report, pose_binding=pose_binding)
+    expression_binding = pose_fixture.candidate_expression_provenance(
+        selected_candidate_path,
+        root=tmp_path,
+    )
+    pose_bound_packet = pose_fixture.authoritatively_bind_packet(
+        packet_report,
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
+    )
     pose_bound_packet_sha = hashlib.sha256(
         json.dumps(
             pose_bound_packet,
@@ -309,9 +331,13 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "candidate_status": "selected",
             "pose_body_language_id": pose_fixture.POSE_ID,
             "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
         },
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
         "selected_prompt_input_artifact_sha256": packet_sha,
         "selected_prompt_input": {
@@ -323,6 +349,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -348,6 +376,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "pose_provenance": pose_binding,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "provider_execution_binding": {
             "content_packet_artifact_path": packet_repo_path.as_posix(),
@@ -355,6 +385,10 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "provider_prompt_sha256": PROMPT_SHA,
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
         },
         "binding_linkage": {
             "content_packet_artifact_path": packet_repo_path.as_posix(),
@@ -362,6 +396,11 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "pose_body_language_id": pose_binding["pose_body_language_id"],
             "pose_bound_content_packet_sha256": pose_bound_packet_sha,
             "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
     _write_json(handoff_path, handoff_report)
@@ -387,6 +426,22 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "pose_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
         "pose_bound_content_packet_artifact_sha256": packet_sha,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_text": expression_binding["expression_text"],
+        "expression_safe_fallback_used": expression_binding[
+            "expression_safe_fallback_used"
+        ],
+        "expression_safe_fallback_reason": expression_binding[
+            "expression_safe_fallback_reason"
+        ],
+        "expression_scene_conflict_terms": expression_binding[
+            "expression_scene_conflict_terms"
+        ],
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
+        "expression_bound_content_packet_artifact_sha256": packet_sha,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "saved_image_path": str(image_path),
         "provider_job_id": "job-123",
         "provider_status": "completed",
@@ -539,6 +594,40 @@ def test_null_pose_source_manifest_cannot_seed_retry(
     assert excinfo.value.code == "pose_provenance_missing"
 
 
+@pytest.mark.parametrize(
+    "reason_code",
+    ["background_identity_duplication", "hair_crown_forelock_artifact"],
+)
+def test_null_expression_source_manifest_cannot_seed_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reason_code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    manifest["expression_provenance"] = None
+    manifest["expression_gaze_id"] = None
+    manifest["expression_gaze_label"] = None
+    manifest["expression_text"] = None
+    _write_json(seeded["manifest_path"], manifest)
+    soul = (
+        {"id": "current", "name": "Lena", "type": "soul_2", "status": "completed"}
+        if reason_code == "hair_crown_forelock_artifact"
+        else None
+    )
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.build_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            reason_code=reason_code,
+            soul_record=soul,
+        )
+    assert excinfo.value.code == "expression_provenance_missing"
+
+
 def test_source_manifest_pose_binding_must_match_source_handoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -577,6 +666,44 @@ def test_source_manifest_pose_binding_must_match_source_handoff(
     ],
 )
 def test_partial_flat_or_packet_digest_source_pose_contract_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+    code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    manifest = json.loads(seeded["manifest_path"].read_text(encoding="utf-8"))
+    mutation(manifest)
+    _write_json(seeded["manifest_path"], manifest)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.build_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+        )
+    assert excinfo.value.code == code
+
+
+@pytest.mark.parametrize(
+    ("mutation", "code"),
+    [
+        (
+            lambda manifest: manifest["expression_provenance"].pop("expression_text"),
+            "expression_provenance_incomplete",
+        ),
+        (
+            lambda manifest: manifest.update(expression_gaze_id="expression_conflict"),
+            "manifest_expression_provenance_mismatch",
+        ),
+        (
+            lambda manifest: manifest.update(expression_bound_content_packet_sha256="f" * 64),
+            "manifest_expression_bound_packet_mismatch",
+        ),
+    ],
+)
+def test_partial_flat_or_packet_digest_source_expression_contract_fails_closed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     mutation,
@@ -772,6 +899,7 @@ def test_executor_accepts_new_retry_handoff_artifact_in_dry_run(
     artifact_path = Path(report["retry_handoff_artifact_path"])
     retry_artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     bound_pose = retry_artifact["pose_provenance"]
+    bound_expression = retry_artifact["expression_provenance"]
 
     def fake_validate_handoff_packet(path: Path):
         source = {
@@ -787,6 +915,10 @@ def test_executor_accepts_new_retry_handoff_artifact_in_dry_run(
                 "pose_body_language_label": bound_pose["pose_body_language_label"],
                 "pose_text": bound_pose["pose_text"],
                 "pose_provenance": bound_pose,
+                "expression_gaze_id": bound_expression["expression_gaze_id"],
+                "expression_gaze_label": bound_expression["expression_gaze_label"],
+                "expression_text": bound_expression["expression_text"],
+                "expression_provenance": bound_expression,
             },
         }
         return ({}, source, {}, {"ok": True, "prompt_matches_expected": None, "hard_exclude_reasons": [], "all_reasons": []})

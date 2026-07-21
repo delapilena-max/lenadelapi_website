@@ -335,7 +335,15 @@ def _validate_recipe_provider_inputs(recipe):
     }, field_limits=PROVIDER_RECIPE_FIELD_LIMITS, aggregate_max_chars=PROVIDER_RECIPE_AGGREGATE_MAX_CHARS)
 
 
-def _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action):
+UNBOUND_EXPRESSION_PLACEHOLDER = "selected candidate expression authority required"
+
+
+def _assemble_structured_prompt_sections(
+    recipe,
+    recipe_section_inputs,
+    action,
+    expression,
+):
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
     fashion = recipe_section_inputs["fashion_accessories"]
     if fashion:
@@ -356,7 +364,16 @@ def _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action):
     technical = " ".join(part for part in technical_parts if part)
     sections = list(zip(
         pose_provenance.PROVIDER_SECTION_ORDER,
-        (subject, subject_presence, action, environment, cinematography, lighting, technical),
+        (
+            subject,
+            subject_presence,
+            action,
+            expression,
+            environment,
+            cinematography,
+            lighting,
+            technical,
+        ),
     ))
     for label, body in sections:
         if body:
@@ -368,7 +385,11 @@ def _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action):
     return sections
 
 
-def build_zero_loss_prompt_sections_for_budget_audit(recipe, pose_text):
+def build_zero_loss_prompt_sections_for_budget_audit(
+    recipe,
+    pose_text,
+    expression_text,
+):
     recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
     pose_text = pose_provenance.validate_provider_body_text(
         pose_text,
@@ -380,24 +401,64 @@ def build_zero_loss_prompt_sections_for_budget_audit(recipe, pose_text):
             "pose_identity_missing",
             "canonical pose text is required for budget audit",
         )
-    return _assemble_structured_prompt_sections(recipe, recipe_section_inputs, pose_text)
+    expression_text = pose_provenance.validate_provider_body_text(
+        expression_text,
+        label="canonical expression text for budget audit",
+        max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+    )
+    if not expression_text:
+        raise pose_provenance.PoseProvenanceError(
+            "expression_identity_missing",
+            "canonical expression text is required for budget audit",
+        )
+    return _assemble_structured_prompt_sections(
+        recipe,
+        recipe_section_inputs,
+        pose_text,
+        expression_text,
+    )
 
 
-def build_structured_prompt_sections(recipe, pose_binding=None):
+def build_structured_prompt_sections(
+    recipe,
+    pose_binding=None,
+    expression_binding=None,
+):
+    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
     bound_pose = (
         pose_provenance.validate_pose_provenance(pose_binding)
         if pose_binding is not None
         else None
     )
-    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
+    bound_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (bound_pose is None) != (bound_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "provider prompt construction requires pose and expression authority together",
+        )
     action = bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
-    return _assemble_structured_prompt_sections(recipe, recipe_section_inputs, action)
+    expression = (
+        bound_expression["expression_text"]
+        if bound_expression is not None
+        else UNBOUND_EXPRESSION_PLACEHOLDER
+    )
+    return _assemble_structured_prompt_sections(
+        recipe,
+        recipe_section_inputs,
+        action,
+        expression,
+    )
 
 
 def build_structured_kling_prompt(
     recipe,
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
+    expression_binding=None,
 ):
     if max_chars != prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
         raise prompt_limits.PromptExecutionPolicyError(
@@ -408,7 +469,11 @@ def build_structured_kling_prompt(
                 f"{prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}"
             ),
         )
-    sections = build_structured_prompt_sections(recipe, pose_binding=pose_binding)
+    sections = build_structured_prompt_sections(
+        recipe,
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
+    )
     sections = [
         (label, body)
         for label, body in sections
@@ -689,11 +754,13 @@ def build_compact_kling_prompt(
     recipe,
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
+    expression_binding=None,
 ):
     return build_structured_kling_prompt(
         recipe,
         max_chars=max_chars,
         pose_binding=pose_binding,
+        expression_binding=expression_binding,
     )
 
 
@@ -772,6 +839,7 @@ def build_packet(
     prompt_budget=None,
     expansion_matrix=None,
     pose_binding=None,
+    expression_binding=None,
 ):
     recipe_id = recipe["id"]
     packet_id = f"cpkt_{run_date.replace('-', '')}_{recipe_id}"
@@ -794,13 +862,25 @@ def build_packet(
         if pose_binding is not None
         else None
     )
+    bound_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (bound_pose is None) != (bound_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "content packets require pose and expression authority together",
+        )
     kling_prompt = build_compact_kling_prompt(
         recipe,
         max_chars=prompt_budget,
         pose_binding=bound_pose,
+        expression_binding=bound_expression,
     )
     if bound_pose is not None:
         pose_provenance.require_pose_bound_prompt(kling_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(kling_prompt, bound_expression)
     provider_prompt_blocked_terms = check_packet_blocked_terms(kling_prompt)
     provider_prompt_contract = {
         "surface_status": "quarantined_provider_neutral_dry_run_packet",
@@ -820,6 +900,12 @@ def build_packet(
         "pose_binding_status": "bound" if bound_pose is not None else "unbound",
         "pose_authority_source": (
             pose_provenance.AUTHORITY_SOURCE if bound_pose is not None else "selected_candidate_required"
+        ),
+        "expression_binding_status": "bound" if bound_expression is not None else "unbound",
+        "expression_authority_source": (
+            pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+            if bound_expression is not None
+            else "selected_candidate_required"
         ),
     }
     provider_prompt_sha256 = hashlib.sha256(
@@ -900,6 +986,11 @@ def build_packet(
             "subject_pose": recipe.get("subject_pose", ""),
             "subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
             "provider_action_pose": bound_pose["pose_text"] if bound_pose is not None else "",
+            "provider_expression": (
+                bound_expression["expression_text"]
+                if bound_expression is not None
+                else ""
+            ),
             "fashion_accessories": recipe.get("fashion_accessories", ""),
             "setting_background": recipe.get("setting_background", ""),
             "technical_keywords": recipe.get("technical_keywords", ""),
@@ -944,16 +1035,43 @@ def build_packet(
             "recipe_subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
         },
         "pose_provenance": bound_pose,
+        "generation_expression_contract": {
+            "status": (
+                "bound"
+                if bound_expression is not None
+                else "unbound_until_selected_candidate_handoff"
+            ),
+            "authority_source": (
+                pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+                if bound_expression is not None
+                else "selected_candidate_required"
+            ),
+        },
+        "expression_provenance": bound_expression,
         "safety_flags": {},
     }
 
 
-def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
+def rebuild_packet_from_authoritative_sources(
+    packet,
+    pose_binding=None,
+    expression_binding=None,
+):
     supplied_pose = (
         pose_provenance.validate_pose_provenance(pose_binding)
         if pose_binding is not None
         else None
     )
+    supplied_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (supplied_pose is None) != (supplied_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "packet reconstruction requires pose and expression authority together",
+        )
     existing_pose_value = packet.get("pose_provenance")
     existing_contract = packet.get("generation_pose_contract")
     if existing_pose_value is not None:
@@ -1038,6 +1156,59 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
             "content packet claims a bound generation pose without pose provenance",
         )
 
+    existing_expression_value = packet.get("expression_provenance")
+    existing_expression_contract = packet.get("generation_expression_contract")
+    if existing_expression_value is not None:
+        existing_expression = pose_provenance.validate_expression_provenance(
+            existing_expression_value
+        )
+        if supplied_expression is not None and existing_expression != supplied_expression:
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_conflict",
+                "already-bound content packet expression provenance differs from the supplied candidate authority",
+            )
+        expected_expression_contract = {
+            "status": "bound",
+            "authority_source": pose_provenance.EXPRESSION_AUTHORITY_SOURCE,
+        }
+        if existing_expression_contract != expected_expression_contract:
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_contract_mismatch",
+                "already-bound content packet generation expression contract is incomplete or inconsistent",
+            )
+        source_sections = packet.get("high_caliber_source_sections")
+        if not isinstance(source_sections, dict) or (
+            source_sections.get("provider_expression")
+            != existing_expression["expression_text"]
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_source_mismatch",
+                "already-bound content packet provider expression disagrees with its expression provenance",
+            )
+        pose_provenance.require_expression_bound_prompt(
+            str(packet.get("compact_provider_prompt_preview") or ""),
+            existing_expression,
+        )
+        provider_contract = packet.get("provider_prompt_contract")
+        if (
+            not isinstance(provider_contract, dict)
+            or provider_contract.get("expression_binding_status") != "bound"
+            or provider_contract.get("expression_authority_source")
+            != pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_provider_contract_mismatch",
+                "already-bound provider prompt contract disagrees with its expression-bound prompt",
+            )
+    elif (
+        isinstance(existing_expression_contract, dict)
+        and existing_expression_contract.get("status") == "bound"
+    ):
+        raise pose_provenance.PoseProvenanceError(
+            "expression_bound_packet_provenance_missing",
+            "content packet claims a bound generation expression without expression provenance",
+        )
+
     recipe_bank = load_json(RECIPE_BANK)
     hook_bank = load_json(HOOK_BANK)
     wardrobe_catalog = load_json(WARDROBE_CATALOG)
@@ -1089,6 +1260,12 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
     effective_pose_binding = supplied_pose
     if effective_pose_binding is None and packet.get("pose_provenance") is not None:
         effective_pose_binding = packet["pose_provenance"]
+    effective_expression_binding = supplied_expression
+    if (
+        effective_expression_binding is None
+        and packet.get("expression_provenance") is not None
+    ):
+        effective_expression_binding = packet["expression_provenance"]
     rebuilt = build_packet(
         recipe,
         hook,
@@ -1097,8 +1274,11 @@ def rebuild_packet_from_authoritative_sources(packet, pose_binding=None):
         prompt_budget=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         expansion_matrix=expansion_matrix,
         pose_binding=effective_pose_binding,
+        expression_binding=effective_expression_binding,
     )
-    if existing_pose_value is not None and packet != rebuilt:
+    if (
+        existing_pose_value is not None or existing_expression_value is not None
+    ) and packet != rebuilt:
         raise pose_provenance.PoseProvenanceError(
             "pose_bound_packet_integrity_mismatch",
             "already-bound content packet differs from deterministic authoritative reconstruction",

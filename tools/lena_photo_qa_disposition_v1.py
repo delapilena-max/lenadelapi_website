@@ -584,12 +584,23 @@ def _validate_manifest_pose_contract(
 ) -> dict[str, Any]:
     try:
         bound_pose = pose_provenance.validate_pose_provenance(manifest.get("pose_provenance"))
+        bound_expression = pose_provenance.validate_expression_provenance(
+            manifest.get("expression_provenance")
+        )
         candidate_path = _resolve_pose_repo_path(
             bound_pose["selected_candidate_artifact_path"],
             label="pose selected candidate artifact",
         )
         derived_pose = pose_provenance.build_candidate_pose_provenance(candidate_path, root=ROOT)
+        derived_expression = pose_provenance.build_candidate_expression_provenance(
+            candidate_path,
+            root=ROOT,
+        )
         pose_provenance.require_pose_bound_prompt(manifest["image_prompt"], bound_pose)
+        pose_provenance.require_expression_bound_prompt(
+            manifest["image_prompt"],
+            bound_expression,
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise BoundaryError("provenance_mismatch", f"{exc.code}: {exc.detail}") from exc
     if bound_pose != derived_pose:
@@ -597,10 +608,20 @@ def _validate_manifest_pose_contract(
             "provenance_mismatch",
             "manifest pose provenance does not match the SHA-bound selected candidate and committed pose bank",
         )
+    if bound_expression != derived_expression:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest expression provenance does not match the SHA-bound selected candidate, committed expression bank, and prompt-brain derivation",
+        )
     if bound_pose["selected_candidate_authority_commit"] != decision["authority_commit"]:
         raise BoundaryError(
             "provenance_mismatch",
             "manifest pose authority commit does not match the active generation decision",
+        )
+    if bound_expression["selected_candidate_authority_commit"] != decision["authority_commit"]:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest expression authority commit does not match the active generation decision",
         )
     candidate_label = candidate.get("pose_body_language_label") or candidate.get("pose")
     if (
@@ -617,10 +638,41 @@ def _validate_manifest_pose_contract(
                 "provenance_mismatch",
                 f"manifest flat {field} does not match nested pose provenance",
             )
+    for field in (
+        "expression_gaze_id",
+        "expression_gaze_label",
+        "expression_text",
+        "expression_safe_fallback_used",
+        "expression_safe_fallback_reason",
+        "expression_scene_conflict_terms",
+    ):
+        if manifest.get(field) != bound_expression[field]:
+            raise BoundaryError(
+                "provenance_mismatch",
+                f"manifest flat {field} does not match nested expression provenance",
+            )
 
     packet_path_value = manifest.get("pose_bound_content_packet_artifact_path")
     packet_sha = manifest.get("pose_bound_content_packet_artifact_sha256")
     packet_bound_sha = manifest.get("pose_bound_content_packet_sha256")
+    expression_packet_path_value = manifest.get(
+        "expression_bound_content_packet_artifact_path"
+    )
+    expression_packet_sha = manifest.get(
+        "expression_bound_content_packet_artifact_sha256"
+    )
+    expression_packet_bound_sha = manifest.get(
+        "expression_bound_content_packet_sha256"
+    )
+    if (
+        expression_packet_path_value != packet_path_value
+        or expression_packet_sha != packet_sha
+        or expression_packet_bound_sha != packet_bound_sha
+    ):
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest pose and expression content-packet bindings disagree",
+        )
     if not isinstance(packet_sha, str) or not SHA256_RE.fullmatch(packet_sha):
         raise BoundaryError("provenance_mismatch", "manifest content packet artifact SHA is missing or invalid")
     if not isinstance(packet_bound_sha, str) or not SHA256_RE.fullmatch(packet_bound_sha):
@@ -633,6 +685,7 @@ def _validate_manifest_pose_contract(
         rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(
             packet,
             pose_binding=bound_pose,
+            expression_binding=bound_expression,
         )
     except (pose_provenance.PoseProvenanceError, SystemExit) as exc:
         raise BoundaryError("provenance_mismatch", f"content packet pose reconstruction failed: {exc}") from exc
@@ -658,6 +711,10 @@ def _validate_manifest_pose_contract(
             "provider_prompt_sha256": manifest["prompt_sha256"],
             "pose_bound_content_packet_sha256": packet_bound_sha,
             "pose_provenance_fingerprint_sha256": bound_pose["pose_provenance_fingerprint_sha256"],
+            "expression_bound_content_packet_sha256": packet_bound_sha,
+            "expression_provenance_fingerprint_sha256": bound_expression[
+                "expression_provenance_fingerprint_sha256"
+            ],
         }
         mismatches = [
             key
@@ -669,7 +726,10 @@ def _validate_manifest_pose_contract(
                 "provenance_mismatch",
                 "manifest pose packet binding disagrees with approved handoff: " + ", ".join(mismatches),
             )
-    return bound_pose
+    return {
+        "pose_provenance": bound_pose,
+        "expression_provenance": bound_expression,
+    }
 
 
 def _validate_manifest(
@@ -781,9 +841,16 @@ def _validate_manifest(
             "source_pose_bound_content_packet_sha256": decision[
                 "source_pose_bound_content_packet_sha256"
             ],
+            "source_expression_bound_content_packet_sha256": decision[
+                "source_expression_bound_content_packet_sha256"
+            ],
             "pose_provenance": decision["pose_provenance"],
             "pose_provenance_fingerprint_sha256": decision[
                 "pose_provenance_fingerprint_sha256"
+            ],
+            "expression_provenance": decision["expression_provenance"],
+            "expression_provenance_fingerprint_sha256": decision[
+                "expression_provenance_fingerprint_sha256"
             ],
             "source_original_provider_job_evidence": decision["source_original_provider_job_evidence"],
             "source_valid_human_rejection_artifact_path": decision["source_valid_human_rejection_artifact_path"],
@@ -858,7 +925,7 @@ def _validate_manifest_bank_context(
     if not expression or expression.get("label") != manifest["expression_gaze_label"]:
         raise BoundaryError("provenance_mismatch", "manifest expression ID and label do not match committed expression authority")
     expected_expression = lena_prompt_brain._higgsfield_safe_expression_text(
-        str(candidate.get("activity") or ""), expression
+        str(candidate.get("expression_derivation_scene_action") or ""), expression
     )
     expression_exact = {
         "expression_text": expected_expression["text"],

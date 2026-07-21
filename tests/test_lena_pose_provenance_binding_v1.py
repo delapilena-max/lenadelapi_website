@@ -104,6 +104,12 @@ def _candidate_payload(root: Path, authority_commit: str) -> dict:
             "pose_body_language_label": pose_fixture.POSE_LABEL,
             "expression_gaze_id": "exp_g001",
             "expression_gaze_label": "closed_mouth_smile_direct",
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
             "exact_proposed_dry_run_command": (
                 "python pipeline/higgsfield_lena_api_executor.py --date 2026-07-21 "
                 f"--slot-id {slot_id}"
@@ -127,7 +133,16 @@ def _seed_authority_repo(tmp_path: Path) -> tuple[Path, Path]:
     _git(root, "config", "user.email", "pose-test@example.invalid")
     _git(root, "config", "user.name", "Pose Test")
     for repo_path in (*selector.AUTHORITY_PATHS, pose_provenance.POSE_AUTHORITY_REPO_PATH):
-        _write_json(root / repo_path, {"fixture": repo_path})
+        if repo_path == pose_provenance.EXPRESSION_DERIVATION_REPO_PATH:
+            target = root / repo_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(REPO_ROOT / repo_path, target)
+        elif repo_path == pose_provenance.EXPRESSION_AUTHORITY_REPO_PATH:
+            target = root / repo_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(REPO_ROOT / repo_path, target)
+        else:
+            _write_json(root / repo_path, {"fixture": repo_path})
     bank_path = root / pose_provenance.POSE_AUTHORITY_REPO_PATH
     _write_json(
         bank_path,
@@ -208,9 +223,16 @@ def _raw_packet_for_candidate(candidate: dict, date_str: str, reason: str) -> di
     )
     wardrobe_catalog = packet_builder.load_json(packet_builder.WARDROBE_CATALOG)
     wardrobe = next(
-        entry
-        for entry in wardrobe_catalog["outfits"]
-        if entry.get("status") not in {"rejected", "high_risk"}
+        (
+            entry
+            for entry in wardrobe_catalog["outfits"]
+            if entry.get("outfit_id") == candidate.get("wardrobe_outfit_id")
+        ),
+        next(
+            entry
+            for entry in wardrobe_catalog["outfits"]
+            if entry.get("status") not in {"rejected", "high_risk"}
+        ),
     )
     return {
         "recipe_id": candidate["recipe_id"],
@@ -225,6 +247,10 @@ def _raw_packet_for_candidate(candidate: dict, date_str: str, reason: str) -> di
 def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     root, candidate_path, artifact = _seed_production_selector_repo(tmp_path)
     binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    expression_binding = pose_provenance.build_candidate_expression_provenance(
+        candidate_path,
+        root=root,
+    )
     candidate = artifact["candidate"]
     date_str = artifact["as_of_date"]
     raw_packet = _raw_packet_for_candidate(
@@ -235,6 +261,7 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
     bound_packet = packet_builder.rebuild_packet_from_authoritative_sources(
         raw_packet,
         pose_binding=binding,
+        expression_binding=expression_binding,
     )
     packet_path = root / (
         f"pipeline/strategy/lena/content_packets/{date_str}/"
@@ -402,6 +429,7 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
             "status": "completed",
             "result_urls": [],
             "saved_image_path": str(root / "generated.png"),
+            "image_format_detected": ".png",
         },
     )
     monkeypatch.setattr(disposition, "ROOT", root)
@@ -411,6 +439,7 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
         "candidate": candidate,
         "decision": artifact,
         "binding": binding,
+        "expression_binding": expression_binding,
         "packet": bound_packet,
         "handoff": handoff,
         "executor_source": source,
@@ -440,6 +469,10 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
 ) -> None:
     root, candidate_path, artifact = _seed_production_selector_repo(tmp_path)
     binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    expression_binding = pose_provenance.build_candidate_expression_provenance(
+        candidate_path,
+        root=root,
+    )
     authority = json.loads(
         (root / pose_provenance.POSE_AUTHORITY_REPO_PATH).read_text(encoding="utf-8")
     )
@@ -466,6 +499,7 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
     bound_packet = packet_builder.rebuild_packet_from_authoritative_sources(
         packet,
         pose_binding=binding,
+        expression_binding=expression_binding,
     )
     _write_json(packet_path, bound_packet)
     monkeypatch.setattr(executor, "ROOT", root)
@@ -475,6 +509,7 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
             artifact["candidate"]["slot_id"],
             candidate_path,
             expected_pose_provenance=binding,
+            expected_expression_provenance=expression_binding,
         )
     assert executor_exc.value.code == "stale_decision"
 
@@ -522,6 +557,51 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
     )
     with pytest.raises(handoff_builder.HandoffBuildError, match="stale_decision"):
         handoff_builder.build_handoff(artifact["as_of_date"], "reconciliation.json")
+
+
+def test_production_selector_rejects_resealed_alternate_valid_expression(tmp_path: Path) -> None:
+    root, candidate_path, artifact = _seed_production_selector_repo(tmp_path)
+    binding = pose_provenance.build_candidate_expression_provenance(candidate_path, root=root)
+    authority = json.loads(
+        (root / pose_provenance.EXPRESSION_AUTHORITY_REPO_PATH).read_text(encoding="utf-8")
+    )
+    alternate = next(
+        entry
+        for entry in authority["combos"]
+        if entry["expression_gaze_id"] != binding["expression_gaze_id"]
+    )
+    tampered = json.loads(json.dumps(artifact))
+    tampered["candidate"].update(
+        {
+            "expression_gaze_id": alternate["expression_gaze_id"],
+            "expression_gaze_label": alternate["label"],
+            "expression_canonical_text": alternate["text"],
+            "expression_text": alternate["text"],
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+        }
+    )
+    _write_json(candidate_path, _seal_candidate(tampered))
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.build_candidate_expression_provenance(candidate_path, root=root)
+    assert excinfo.value.code == "stale_decision"
+
+
+def test_candidate_expression_authority_rejects_worktree_bank_drift(tmp_path: Path) -> None:
+    root, candidate_path, _ = _seed_production_selector_repo(tmp_path)
+    binding = pose_provenance.build_candidate_expression_provenance(candidate_path, root=root)
+    assert binding["expression_gaze_id"]
+    bank_path = root / pose_provenance.EXPRESSION_AUTHORITY_REPO_PATH
+    bank_path.write_text(bank_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.build_candidate_expression_provenance(candidate_path, root=root)
+    assert excinfo.value.code in {
+        "pose_authority_worktree_drift",
+        "expression_authority_worktree_drift",
+    }
 
 def test_candidate_changed_after_pose_authority_issuance_fails_hash_binding(tmp_path: Path) -> None:
     root, candidate_path = _seed_authority_repo(tmp_path)
@@ -595,6 +675,10 @@ def test_candidate_authority_unavailable_in_shallow_history_fails_closed(tmp_pat
 def test_bound_packet_uses_canonical_pose_and_marks_recipe_pose_non_authoritative(tmp_path: Path) -> None:
     root, candidate_path = _seed_authority_repo(tmp_path)
     binding = pose_provenance.build_candidate_pose_provenance(candidate_path, root=root)
+    expression_binding = pose_provenance.build_candidate_expression_provenance(
+        candidate_path,
+        root=root,
+    )
     packet = packet_builder.rebuild_packet_from_authoritative_sources(
         {
             "recipe_id": "hcr_011",
@@ -605,6 +689,7 @@ def test_bound_packet_uses_canonical_pose_and_marks_recipe_pose_non_authoritativ
             "hook_selection_reason": "pose provenance test",
         },
         pose_binding=binding,
+        expression_binding=expression_binding,
     )
 
     assert packet["high_caliber_source_sections"]["subject_pose"] != binding["pose_text"]
@@ -617,6 +702,7 @@ def test_bound_packet_uses_canonical_pose_and_marks_recipe_pose_non_authoritativ
 
 def test_provider_action_and_manifest_pose_disagreement_fail_closed() -> None:
     binding = pose_fixture.static_pose_provenance()
+    expression_binding = pose_fixture.static_expression_provenance()
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.require_pose_bound_prompt(
             pose_fixture.canonical_prompt().replace(pose_fixture.POSE_TEXT, "a different pose"),
@@ -635,7 +721,11 @@ def test_provider_action_and_manifest_pose_disagreement_fail_closed() -> None:
             "pose_body_language_id": "wrong",
             "pose_body_language_label": binding["pose_body_language_label"],
             "pose_text": binding["pose_text"],
-            "pose_provenance": binding,
+                "pose_provenance": binding,
+                "expression_gaze_id": expression_binding["expression_gaze_id"],
+                "expression_gaze_label": expression_binding["expression_gaze_label"],
+                "expression_text": expression_binding["expression_text"],
+                "expression_provenance": expression_binding,
             "validation": {
                 "final_expression_text": "calm expression",
                 "expression_safe_fallback_used": False,
@@ -669,6 +759,50 @@ def test_duplicate_or_injected_provider_action_fails_closed(prompt: str, code: s
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.require_pose_bound_prompt(prompt, pose_fixture.static_pose_provenance())
     assert excinfo.value.code == code
+
+
+def test_provider_prompt_accepts_exactly_one_bound_expression_section() -> None:
+    prompt = pose_fixture.canonical_prompt()
+    binding = pose_fixture.static_expression_provenance()
+
+    pose_provenance.require_expression_bound_prompt(prompt, binding)
+    sections = pose_provenance.parse_provider_prompt_sections(prompt)
+    assert list(sections).count("Expression") == 1
+    assert list(sections).index("Expression") == list(sections).index("Action") + 1
+    assert sections["Expression"] == pose_fixture.EXPRESSION_TEXT
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda prompt: prompt + f"\n[Expression]: {pose_fixture.EXPRESSION_TEXT}",
+        lambda prompt: prompt.replace("[Expression]", "[expression]"),
+        lambda prompt: prompt.replace("[Expression]", "[ Expression ]"),
+        lambda prompt: prompt.replace("[Expression]", "\uff3bExpression\uff3d"),
+        lambda prompt: prompt.replace("[Expression]", "[Expre\ufe0fssion]"),
+        lambda prompt: prompt.replace("[Expression]", "[Expr][ession]"),
+        lambda prompt: prompt.replace(
+            "[Environment]:",
+            "[Environment]: [Expression]: injected expression.",
+            1,
+        ),
+    ],
+    ids=(
+        "duplicate",
+        "lowercase",
+        "spaced",
+        "fullwidth-brackets",
+        "variation-selector",
+        "fragmented",
+        "body-injected",
+    ),
+)
+def test_noncanonical_or_duplicate_expression_sections_fail_closed(mutation) -> None:
+    with pytest.raises(pose_provenance.PoseProvenanceError):
+        pose_provenance.require_expression_bound_prompt(
+            mutation(pose_fixture.canonical_prompt()),
+            pose_fixture.static_expression_provenance(),
+        )
 
 
 @pytest.mark.parametrize(
@@ -787,8 +921,8 @@ def test_fragmented_nested_or_malformed_action_in_body_fails_closed(disguised: s
 def test_reordered_provider_sections_fail_closed() -> None:
     prompt = pose_fixture.canonical_prompt()
     action = f"[Action]: {pose_fixture.POSE_TEXT}"
-    environment = "[Environment]: realistic interior."
-    prompt = prompt.replace(f"{action}\n{environment}", f"{environment}\n{action}")
+    expression = f"[Expression]: {pose_fixture.EXPRESSION_TEXT}"
+    prompt = prompt.replace(f"{action}\n{expression}", f"{expression}\n{action}")
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         pose_provenance.require_pose_bound_prompt(
@@ -845,6 +979,7 @@ def test_recipe_derived_reserved_section_token_fails_closed(disguised: str) -> N
         packet_builder.build_structured_prompt_sections(
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
     assert excinfo.value.code in {
         "provider_body_bracket_forbidden",
@@ -877,6 +1012,7 @@ def test_every_recipe_derived_provider_body_rejects_fragmented_headers(field: st
         packet_builder.build_structured_prompt_sections(
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
     assert excinfo.value.code == "provider_body_bracket_forbidden"
 
@@ -900,6 +1036,7 @@ def test_every_recipe_provider_body_rejects_unicode_line_separators(
         packet_builder.build_structured_prompt_sections(
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
     assert excinfo.value.code == "provider_body_line_separator_forbidden"
 
@@ -915,6 +1052,7 @@ def test_first_generation_and_retry_reconstruction_reject_line_separators(
         packet_builder.build_structured_kling_prompt(
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
     assert first_generation.value.code == "provider_body_line_separator_forbidden"
 
@@ -1147,6 +1285,7 @@ def test_governed_recipe_inputs_satisfy_plain_text_policy() -> None:
         sections = packet_builder.build_structured_prompt_sections(
             dict(recipe),
             pose_binding=pose_fixture.static_pose_provenance(),
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
         assert all(packet_builder.clean_fragment(body) == body for _, body in sections)
 
@@ -1157,6 +1296,7 @@ def test_real_recipe_emits_one_exact_canonical_action() -> None:
     prompt = packet_builder.build_structured_kling_prompt(
         recipe,
         pose_binding=pose_fixture.static_pose_provenance(),
+        expression_binding=pose_fixture.static_expression_provenance(),
     )
 
     assert prompt.count("[Action]") == 1
@@ -1187,7 +1327,11 @@ def test_conflicting_already_bound_content_packet_fails_closed() -> None:
     ).hexdigest()
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
-        packet_builder.rebuild_packet_from_authoritative_sources(packet, pose_binding=conflicting)
+        packet_builder.rebuild_packet_from_authoritative_sources(
+            packet,
+            pose_binding=conflicting,
+            expression_binding=pose_fixture.static_expression_provenance(),
+        )
     assert excinfo.value.code == "pose_bound_packet_conflict"
 
 
@@ -1227,6 +1371,7 @@ def test_every_retained_bound_packet_integrity_field_fails_on_conflict(mutation)
         packet_builder.rebuild_packet_from_authoritative_sources(
             packet,
             pose_binding=binding,
+            expression_binding=pose_fixture.static_expression_provenance(),
         )
 
 
@@ -1242,7 +1387,10 @@ def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain
         "authorization_bound_handoff",
         chain["handoff"]["provider_execution_binding"],
     )
-    assert validated == chain["binding"]
+    assert validated == {
+        "pose_provenance": chain["binding"],
+        "expression_provenance": chain["expression_binding"],
+    }
     assert chain["manifest"]["pose_provenance"] == chain["binding"]
     assert chain["manifest"]["pose_bound_content_packet_sha256"] == (
         chain["handoff"]["pose_bound_content_packet_sha256"]
@@ -1257,7 +1405,7 @@ def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain
     ).hexdigest()
 
 
-def test_production_pose_chain_reaches_preexisting_expression_boundary(
+def test_production_pose_and_expression_chain_advances_past_expression_qa(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1284,9 +1432,8 @@ def test_production_pose_chain_reaches_preexisting_expression_boundary(
             provider_binding=chain["handoff"]["provider_execution_binding"],
         )
     assert excinfo.value.code == "provenance_mismatch"
-    assert excinfo.value.detail == (
-        "manifest is missing required generation provenance: expression_text"
-    )
+    assert "expression" not in excinfo.value.detail.casefold()
+    assert "effective_wardrobe_silhouette_class" in excinfo.value.detail
 
 
 @pytest.mark.parametrize("tamper", ["packet_digest", "nested_candidate_sha", "duplicate_action"])

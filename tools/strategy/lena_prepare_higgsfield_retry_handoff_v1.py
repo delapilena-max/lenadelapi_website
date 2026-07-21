@@ -353,16 +353,32 @@ def build_retry_handoff(
     )
     try:
         bound_pose = pose_provenance.validate_pose_provenance(handoff_report.get("pose_provenance"))
+        bound_expression = pose_provenance.validate_expression_provenance(
+            handoff_report.get("expression_provenance")
+        )
         candidate_path = approval_contract.resolve_repo_path(
             bound_pose["selected_candidate_artifact_path"],
             code="pose_candidate_path_missing",
             label="pose selected candidate artifact path",
         )
         derived_pose = pose_provenance.build_candidate_pose_provenance(candidate_path, root=ROOT)
+        derived_expression = pose_provenance.build_candidate_expression_provenance(
+            candidate_path,
+            root=ROOT,
+        )
         pose_provenance.require_pose_bound_prompt(original_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(
+            original_prompt,
+            bound_expression,
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(derived_pose == bound_pose, "pose_provenance_mismatch", "source handoff pose provenance no longer matches its candidate authority")
+    _require(
+        derived_expression == bound_expression,
+        "expression_provenance_mismatch",
+        "source handoff expression provenance no longer matches its candidate authority",
+    )
     prompt_budget = int(packet_report.get("compact_provider_prompt_budget") or 0)
     _require(
         prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
@@ -407,10 +423,14 @@ def build_retry_handoff(
         prompt_mutation = {
             "mode": "section_rewrite_preserving_subject_and_lighting_identity",
             "replaced_sections": ["Environment", "Cinematography", "Technical"],
-            "preserved_sections": ["Subject", "Action", "Lighting/Style"],
+            "preserved_sections": ["Subject", "Action", "Expression", "Lighting/Style"],
         }
     try:
         pose_provenance.require_pose_bound_prompt(retry_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(
+            retry_prompt,
+            bound_expression,
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
     if hair_retry:
@@ -456,6 +476,9 @@ def build_retry_handoff(
         "source_selected_prompt_input_artifact_path": repo_relative_path(packet_path),
         "source_selected_prompt_input_artifact_sha256": packet_sha,
         "source_pose_bound_content_packet_sha256": handoff_report["pose_bound_content_packet_sha256"],
+        "source_expression_bound_content_packet_sha256": handoff_report[
+            "expression_bound_content_packet_sha256"
+        ],
         "source_execution_receipt_path": approval_contract.repo_relative_path(receipt_path),
         "source_execution_receipt_sha256": _sha256_file(receipt_path),
         "source_manifest_path": approval_contract.repo_relative_path(manifest_path),
@@ -465,6 +488,10 @@ def build_retry_handoff(
         "source_original_prompt_sha256": handoff_facts["prompt_sha256"],
         "pose_provenance": bound_pose,
         "pose_provenance_fingerprint_sha256": bound_pose["pose_provenance_fingerprint_sha256"],
+        "expression_provenance": bound_expression,
+        "expression_provenance_fingerprint_sha256": bound_expression[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "source_provider_job_evidence": {
             "provider_job_id": receipt.get("provider_job_id"),
             "provider_status": receipt.get("provider_status"),
@@ -567,9 +594,20 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
     try:
         bound_pose = pose_provenance.validate_pose_provenance(artifact.get("pose_provenance"))
         source_pose = pose_provenance.validate_pose_provenance(handoff_facts["report"].get("pose_provenance"))
+        bound_expression = pose_provenance.validate_expression_provenance(
+            artifact.get("expression_provenance")
+        )
+        source_expression = pose_provenance.validate_expression_provenance(
+            handoff_facts["report"].get("expression_provenance")
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(bound_pose == source_pose, "pose_provenance_mismatch", "retry handoff pose provenance differs from the source handoff")
+    _require(
+        bound_expression == source_expression,
+        "expression_provenance_mismatch",
+        "retry handoff expression provenance differs from the source handoff",
+    )
     _require(
         artifact.get("source_pose_bound_content_packet_sha256")
         == handoff_facts["report"].get("pose_bound_content_packet_sha256"),
@@ -614,6 +652,24 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         prompt_budget == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "packet_prompt_budget_policy_mismatch",
         "selected prompt packet must record the current Higgsfield repository execution policy",
+    )
+    _require(
+        artifact.get("source_expression_bound_content_packet_sha256")
+        == handoff_facts["report"].get("expression_bound_content_packet_sha256"),
+        "expression_bound_packet_sha_mismatch",
+        "retry handoff expression packet digest differs from the source generation handoff",
+    )
+    _require(
+        artifact.get("source_expression_bound_content_packet_sha256")
+        == artifact.get("source_pose_bound_content_packet_sha256"),
+        "provider_authority_packet_sha_mismatch",
+        "retry handoff pose and expression packet digests disagree",
+    )
+    _require(
+        artifact.get("expression_provenance_fingerprint_sha256")
+        == bound_expression["expression_provenance_fingerprint_sha256"],
+        "expression_provenance_fingerprint_mismatch",
+        "retry expression fingerprint does not match the bound expression provenance",
     )
 
     receipt_path = approval_contract.resolve_repo_path(
@@ -710,6 +766,10 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
     _require(retry_prompt == expected_prompt, "retry_prompt_mutation_invalid", "retry_prompt_text does not match the canonical retry mutation")
     try:
         pose_provenance.require_pose_bound_prompt(retry_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(
+            retry_prompt,
+            bound_expression,
+        )
     except pose_provenance.PoseProvenanceError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
