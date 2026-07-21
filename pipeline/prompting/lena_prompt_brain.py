@@ -4709,11 +4709,9 @@ def _higgsfield_sanitize_scene_action(scene_action: str) -> str:
 # expression_gaze_label varied in metadata but never reached the real prompt,
 # and the fixed "direct eye contact" line directly contradicted scene actions
 # like "looking down at the flowers" or "studying [a painting]" in a real
-# sample. This constant is kept (still referenced by
-# HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO's swap logic and by other
-# diagnostic tools outside this patch's scope) but is no longer the default
-# Expression: text -- see _higgsfield_safe_expression_text() below, which now
-# supplies the real per-render text.
+# sample. This constant is retained for diagnostic compatibility but is no
+# longer the default Expression: text -- see _higgsfield_safe_expression_text()
+# below, which supplies the real per-render text.
 HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE = (
     "faint smirk, relaxed eyes, composed confident look, direct eye contact"
 )
@@ -4889,22 +4887,6 @@ def _higgsfield_safe_expression_text(scene_action: str, expression_gaze_entry: d
         "conflict_terms": [],
     }
 
-# Motorsport/heritage-motorcycle expression pool (2026-07-09, Nicolas
-# correction): the single global Expression line above is shared by every
-# prompt in the system, not lane-specific, and reads as too neutral for the
-# skin-forward/seductive direction this pillar needs. Swapped in for moto-
-# lane images only, in generate_higgsfield_photo_dump_pack() below, the same
-# way HIGGSFIELD_PHOTO_DUMP_POSE_VARIANTS_MOTO already replaces the fixed
-# Pose line -- a proven pattern, not a new mechanism. Still editorial, not
-# pornographic: no wording implies an explicit act.
-HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO = (
-    "confident pinup smile, chin lightly lowered, eyes up toward the camera",
-    "faint smirk, detached seductive gaze, direct eye contact",
-    "chin turned back over one shoulder toward the camera, seductive "
-    "unbothered look",
-    "composed, sultry half-smile, direct confident eye contact",
-)
-
 # Reversed 2026-07-08 (Nicolas direction change, same day), then reinstated
 # 2026-07-09 (Nicolas correction, new evidence): an earlier version of this
 # patch added a separate, heavier "Silhouette:" prompt block (explicit
@@ -4944,14 +4926,12 @@ def generate_higgsfield_prompt_package(
     right after the framing line (see the comment above this function for
     why it was reinstated 2026-07-09). Wardrobe text is additionally
     sanitized to a fitted/hip-hugging high-hook silhouette
-    (see _higgsfield_safe_wardrobe_text) as a second, wardrobe-embedded cue;
-    pose and expression text are fixed reinforcement
-    lines (HIGGSFIELD_POSE_REINFORCEMENT_LINE,
-    HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE), not the raw pose/expression
-    bank text; scene-action text is sanitized against known Higgsfield-glam
-    conflicts (see _higgsfield_sanitize_scene_action). See module-level
-    comment above for the full rationale. Does not touch or call any Kling
-    executor code."""
+    (see _higgsfield_safe_wardrobe_text) as a second, wardrobe-embedded cue.
+    Motorcycle poses retain their fixed reinforcement line; expression text
+    comes from the selected bank entry or the narrow documented safe fallback
+    and is not rewritten by lane. Scene-action text is sanitized against known
+    Higgsfield-glam conflicts (see _higgsfield_sanitize_scene_action). Does not
+    touch or call any Kling executor code."""
     rng = random.Random(
         _seed(date_str, slot_id, media_type, str(sequence_index or ""), "higgsfield")
     )
@@ -5113,10 +5093,8 @@ def generate_higgsfield_prompt_package(
         "expression_gaze_label": expression_gaze_entry.get("label"),
         # The actual Expression: text used in this render (real selected bank
         # text, or HIGGSFIELD_EXPRESSION_SAFE_FALLBACK for the narrow
-        # HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set) -- exposed so callers
-        # like generate_higgsfield_photo_dump_pack() can find-and-replace the
-        # real current Expression: line (e.g. for the moto expression swap)
-        # instead of assuming it's always HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE.
+        # HIGGSFIELD_EXPRESSION_POSE_CONFLICT_IDS set). Callers retain this
+        # value unchanged so prompt text remains aligned with its metadata.
         "expression_text": expression_text,
         # Structural fallback metadata (2026-07-09, scene-vs-expression
         # compatibility patch) -- exposed so diagnostics can verify actual
@@ -5549,29 +5527,6 @@ def generate_higgsfield_photo_dump_pack(
         else:
             pose_variant = chosen_package.get("pose_body_language_id")
         chosen_package["photo_dump_pose_variant"] = pose_variant
-
-        # Photo-dump-only expression substitution (2026-07-09, Nicolas
-        # correction), same pattern as the pose swap above: motorcycle-lane
-        # images only get a seductive/pinup expression variant instead of
-        # the single global neutral Expression line every other lane keeps.
-        # Deterministic rotation by image index, same as pose.
-        if lane_lower in HIGGSFIELD_MOTO_LANES:
-            expression_variant = HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO[
-                i % len(HIGGSFIELD_PHOTO_DUMP_EXPRESSION_VARIANTS_MOTO)
-            ]
-            # 2026-07-09: match whatever the real current Expression: text is
-            # (bank-selected or safe-fallback), not the retired always-on
-            # constant -- see the "expression_text" field comment above.
-            current_expression_text = chosen_package.get(
-                "expression_text", HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE
-            )
-            old_expression_line = f"Expression: {current_expression_text}."
-            new_expression_line = f"Expression: {expression_variant}."
-            for text_key in ("image_prompt", "prompt", "positive_prompt"):
-                chosen_package[text_key] = chosen_package[text_key].replace(
-                    old_expression_line, new_expression_line
-                )
-            chosen_package["photo_dump_expression_variant"] = expression_variant
 
         # Re-derive the hook/low-hook/mood fields against the final,
         # pose-substituted prompt text -- what gets reported must match what

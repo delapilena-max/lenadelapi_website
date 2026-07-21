@@ -155,19 +155,9 @@ def _fake_text_avoidance_present(lane: str, prompt_text: str) -> bool | None:
     return FAKE_TEXT_AVOIDANCE_SIGNATURE in prompt_text.lower()
 
 
-# Corrected again (2026-07-09, expression/gaze wiring fix): the carve-out
-# below that used to recompute "expression_reinforcement_present" separately
-# (via a local _expression_reinforcement_present() checking only the retired
-# fixed HIGGSFIELD_EXPRESSION_REINFORCEMENT_LINE plus the moto variants) has
-# been removed. It is no longer needed: build_report() in
-# lena_higgsfield_photo_dump_dryrun.py now computes this key correctly per
-# image -- it compares the actual final "Expression:" text against the real
-# selected expression_gaze_entry["text"] (or the documented safe fallback for
-# a known pose-conflict ID), via real package metadata, not keyword matching
-# -- and already accounts for the moto expression-variant swap. This tool
-# reuses that per-image validation dict for every other key already (see the
-# aggregation loop below); "expression_reinforcement_present" now follows the
-# exact same path instead of a separate, stale recomputation.
+# The prompt-library aggregate reuses the per-image validation dict emitted by
+# lena_higgsfield_photo_dump_dryrun.build_report(). Expression reporting follows
+# that shared path instead of maintaining a separate local recomputation.
 
 # The validation-count keys reported by build_report(), reused verbatim here
 # so the library aggregate matches the single-pack tool's own definitions.
