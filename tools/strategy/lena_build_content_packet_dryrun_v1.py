@@ -349,30 +349,36 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
     }, field_limits=PROVIDER_RECIPE_FIELD_LIMITS, aggregate_max_chars=PROVIDER_RECIPE_AGGREGATE_MAX_CHARS)
 
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
-    fashion = clean_fragment(recipe_section_inputs["fashion_accessories"])
+    fashion = recipe_section_inputs["fashion_accessories"]
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
-    subject = clean_fragment(" ".join(subject_parts))
+    subject = " ".join(subject_parts)
     subject_presence = build_hpe_subject_presence(recipe)
-    action = clean_fragment(
-        bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
-    )
+    action = bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
     environment_note = recipe_section_inputs["environment_realism_notes"]
     environment_parts = [recipe_section_inputs["setting_background"]]
     if environment_note:
         environment_parts.append(f"Realism cues: {environment_note}")
-    environment = clean_fragment(" ".join(part for part in environment_parts if part))
-    cinematography = clean_fragment(recipe_section_inputs["technical_keywords"])
-    lighting = clean_fragment(recipe_section_inputs["style_lighting"])
+    environment = " ".join(part for part in environment_parts if part)
+    cinematography = recipe_section_inputs["technical_keywords"]
+    lighting = recipe_section_inputs["style_lighting"]
     technical_parts = [
         STRUCTURED_TECHNICAL_REALISM,
         recipe_section_inputs["negative_constraints"],
     ]
-    technical = clean_fragment(" ".join(part for part in technical_parts if part))
-    return list(zip(
+    technical = " ".join(part for part in technical_parts if part)
+    sections = list(zip(
         pose_provenance.PROVIDER_SECTION_ORDER,
         (subject, subject_presence, action, environment, cinematography, lighting, technical),
     ))
+    for label, body in sections:
+        if body:
+            pose_provenance.validate_provider_body_text(
+                body,
+                label=f"provider section {label}",
+                max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+            )
+    return sections
 
 
 def build_structured_kling_prompt(recipe, max_chars=2499, pose_binding=None):

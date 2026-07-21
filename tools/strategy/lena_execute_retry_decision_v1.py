@@ -145,10 +145,16 @@ def _preserves_for_mutation(mutation_type: str) -> list[str]:
 
 
 def _mutate_prompt_for_retry(original_prompt: str, mutation_type: str = MUTATION_REASON) -> str:
-    constraint = _constraint_for_mutation(mutation_type)
-    if constraint in original_prompt:
-        raise RetryDecisionError("prompt_already_mutated", "original prompt already contains the retry correction constraint")
-    return f"{original_prompt} {constraint}"
+    try:
+        pose_provenance.parse_provider_prompt_sections(original_prompt)
+        constraint = _constraint_for_mutation(mutation_type)
+        if constraint in original_prompt:
+            raise RetryDecisionError("prompt_already_mutated", "original prompt already contains the retry correction constraint")
+        retry_prompt = f"{original_prompt} {constraint}"
+        pose_provenance.parse_provider_prompt_sections(retry_prompt)
+        return retry_prompt
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryDecisionError(exc.code, exc.detail) from exc
 
 
 def _validate_original_decision_artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:

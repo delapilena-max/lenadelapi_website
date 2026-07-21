@@ -88,11 +88,27 @@ def validate_provider_body_text(
             "provider_body_default_ignorable_forbidden",
             f"{label} contains forbidden default-ignorable character {codepoint}",
         )
+        category = unicodedata.category(char)
         _require(
-            not unicodedata.category(char).startswith("C"),
+            category not in {"Zl", "Zp"},
+            "provider_body_line_separator_forbidden",
+            f"{label} contains forbidden Unicode line or paragraph separator {codepoint}",
+        )
+        _require(
+            not category.startswith("C"),
             "provider_body_control_forbidden",
             f"{label} contains forbidden control character {codepoint}",
         )
+        _require(
+            char == " " or not char.isspace(),
+            "provider_body_whitespace_noncanonical",
+            f"{label} contains noncanonical whitespace character {codepoint}",
+        )
+    _require(
+        value == value.strip(" ") and "  " not in value,
+        "provider_body_whitespace_noncanonical",
+        f"{label} must use single ASCII spaces without surrounding whitespace",
+    )
     detection_text = _normalize_provider_body_for_detection(value)
     _require(
         "[" not in detection_text and "]" not in detection_text,
@@ -421,12 +437,13 @@ def serialize_provider_prompt_sections(sections: Any) -> str:
 
 
 def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
-    _require(isinstance(prompt, str) and bool(prompt.strip()), "provider_prompt_missing", "provider prompt is required")
+    _require(isinstance(prompt, str), "provider_prompt_missing", "provider prompt is required")
     _require(
         len(prompt) <= PROVIDER_PROMPT_MAX_CHARS,
         "provider_prompt_too_long",
         f"provider prompt exceeds its {PROVIDER_PROMPT_MAX_CHARS}-character limit",
     )
+    _require(bool(prompt.strip()), "provider_prompt_missing", "provider prompt is required")
     _require(
         "\r" not in prompt.replace("\r\n", ""),
         "provider_section_grammar_invalid",

@@ -299,11 +299,16 @@ def _build_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, 
 
 
 def _build_hair_crown_retry_prompt(original_prompt: str, prompt_budget: int) -> tuple[str, str]:
-    if HAIR_CROWN_CONSTRAINT in original_prompt:
-        raise RetryHandoffError("retry_prompt_already_mutated", "original prompt already contains the hair-crown correction")
-    retry_prompt = f"{original_prompt} {HAIR_CROWN_CONSTRAINT}"
-    _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
-    return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
+    try:
+        pose_provenance.parse_provider_prompt_sections(original_prompt)
+        if HAIR_CROWN_CONSTRAINT in original_prompt:
+            raise RetryHandoffError("retry_prompt_already_mutated", "original prompt already contains the hair-crown correction")
+        retry_prompt = f"{original_prompt} {HAIR_CROWN_CONSTRAINT}"
+        pose_provenance.parse_provider_prompt_sections(retry_prompt)
+        _require(len(retry_prompt) <= prompt_budget, "retry_prompt_budget_exceeded", f"retry prompt length {len(retry_prompt)} exceeds budget {prompt_budget}")
+        return retry_prompt, _sha256_bytes(retry_prompt.encode("utf-8"))
+    except pose_provenance.PoseProvenanceError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
 
 
 def build_retry_handoff(

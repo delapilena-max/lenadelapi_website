@@ -14,9 +14,11 @@ from tools import lena_higgsfield_generation_approval_v1 as generation_approval
 from tools import lena_photo_qa_disposition_v1 as disposition
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
 from tools.strategy import lena_build_next_live_image_handoff_v1 as handoff_builder
+from tools.strategy import lena_execute_retry_decision_v1 as legacy_retry
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
 
@@ -877,6 +879,74 @@ def test_every_recipe_derived_provider_body_rejects_fragmented_headers(field: st
     assert excinfo.value.code == "provider_body_bracket_forbidden"
 
 
+@pytest.mark.parametrize("field", tuple(packet_builder.PROVIDER_RECIPE_FIELD_LIMITS))
+@pytest.mark.parametrize("separator", ["\u2028", "\u2029", "left\u2028middle\u2029right"])
+def test_every_recipe_provider_body_rejects_unicode_line_separators(
+    field: str,
+    separator: str,
+) -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    value = f"ordinary text {separator} ordinary text"
+    if field == "environment_realism_notes":
+        recipe["scene_logic_contract"] = dict(recipe.get("scene_logic_contract") or {})
+        recipe["scene_logic_contract"][field] = value
+    else:
+        recipe[field] = value
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        packet_builder.build_structured_prompt_sections(
+            recipe,
+            pose_binding=pose_fixture.static_pose_provenance(),
+        )
+    assert excinfo.value.code == "provider_body_line_separator_forbidden"
+
+
+@pytest.mark.parametrize("separator", ["\u2028", "\u2029", "\u2028middle\u2029"])
+def test_first_generation_and_retry_reconstruction_reject_line_separators(
+    separator: str,
+) -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    recipe["setting_background"] = f"left{separator}right"
+    with pytest.raises(pose_provenance.PoseProvenanceError) as first_generation:
+        packet_builder.build_structured_kling_prompt(
+            recipe,
+            pose_binding=pose_fixture.static_pose_provenance(),
+        )
+    assert first_generation.value.code == "provider_body_line_separator_forbidden"
+
+    unsafe_prompt = pose_fixture.canonical_prompt().replace(
+        "[Environment]: realistic interior.",
+        f"[Environment]: realistic{separator}interior.",
+    )
+    with pytest.raises(retry_handoff.RetryHandoffError) as ordinary_retry:
+        retry_handoff._replace_sections(unsafe_prompt)
+    assert ordinary_retry.value.code == "provider_body_line_separator_forbidden"
+
+    with pytest.raises(retry_handoff.RetryHandoffError) as hair_retry:
+        retry_handoff._build_hair_crown_retry_prompt(unsafe_prompt, 4096)
+    assert hair_retry.value.code == "provider_body_line_separator_forbidden"
+
+    with pytest.raises(legacy_retry.RetryDecisionError) as legacy_retry_error:
+        legacy_retry._mutate_prompt_for_retry(unsafe_prompt)
+    assert legacy_retry_error.value.code == "provider_body_line_separator_forbidden"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [" leading", "trailing ", "two  spaces", "nonbreaking\u00a0space", "em\u2003space"],
+)
+def test_provider_body_rejects_whitespace_that_construction_would_rewrite(value: str) -> None:
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.validate_provider_body_text(
+            value,
+            label="fixture body",
+            max_chars=100,
+        )
+    assert excinfo.value.code == "provider_body_whitespace_noncanonical"
+
+
 def test_over_limit_recipe_body_rejects_before_unicode_normalization(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -956,23 +1026,127 @@ def test_extremely_long_nested_prompt_rejects_before_body_normalization(
     assert excinfo.value.code == "provider_prompt_too_long"
 
 
+def test_over_limit_prompt_checks_length_before_any_scan_or_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class InstrumentedPrompt(str):
+        def __len__(self) -> int:
+            events.append("len")
+            return super().__len__()
+
+        def strip(self, *args, **kwargs):
+            events.append("strip")
+            return super().strip(*args, **kwargs)
+
+        def replace(self, *args, **kwargs):
+            events.append("replace")
+            return super().replace(*args, **kwargs)
+
+        def split(self, *args, **kwargs):
+            events.append("split")
+            return super().split(*args, **kwargs)
+
+    monkeypatch.setattr(
+        pose_provenance,
+        "_normalize_provider_body_for_detection",
+        lambda *args, **kwargs: pytest.fail("over-limit prompt reached normalization"),
+    )
+    prompt = InstrumentedPrompt(" " * (pose_provenance.PROVIDER_PROMPT_MAX_CHARS + 904))
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.parse_provider_prompt_sections(prompt)
+    assert excinfo.value.code == "provider_prompt_too_long"
+    assert events == ["len"]
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        " " * (pose_provenance.PROVIDER_PROMPT_MAX_CHARS + 1),
+        "[" * (pose_provenance.PROVIDER_PROMPT_MAX_CHARS + 1),
+        "\ufdfa" * (pose_provenance.PROVIDER_PROMPT_MAX_CHARS + 1),
+    ],
+    ids=("whitespace", "malformed", "nfkc-expanding"),
+)
+def test_all_over_limit_prompt_shapes_reject_before_normalization(
+    prompt: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        pose_provenance,
+        "_normalize_provider_body_for_detection",
+        lambda *args, **kwargs: pytest.fail("over-limit prompt reached normalization"),
+    )
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.parse_provider_prompt_sections(prompt)
+    assert excinfo.value.code == "provider_prompt_too_long"
+
+
+def test_exact_prompt_limit_and_bounded_whitespace_follow_normal_validation() -> None:
+    exactly_at_limit = "x" * pose_provenance.PROVIDER_PROMPT_MAX_CHARS
+    with pytest.raises(pose_provenance.PoseProvenanceError) as malformed:
+        pose_provenance.parse_provider_prompt_sections(exactly_at_limit)
+    assert malformed.value.code == "provider_section_grammar_invalid"
+
+    bounded_whitespace = " " * pose_provenance.PROVIDER_PROMPT_MAX_CHARS
+    with pytest.raises(pose_provenance.PoseProvenanceError) as missing:
+        pose_provenance.parse_provider_prompt_sections(bounded_whitespace)
+    assert missing.value.code == "provider_prompt_missing"
+
+
 def test_body_nfkc_is_detection_only() -> None:
     original = "Cafe\u0301 portrait"
-    assert pose_provenance.validate_provider_body_text(
+    validated = pose_provenance.validate_provider_body_text(
         original,
         label="fixture body",
         max_chars=100,
-    ) == original
+    )
+    assert validated == original
+    prompt = pose_provenance.serialize_provider_prompt_sections([
+        (label, validated if label == "Action" else "canonical body")
+        for label in pose_provenance.PROVIDER_SECTION_ORDER
+    ])
+    assert f"[Action]: {original}" in prompt
+    assert pose_provenance.parse_provider_prompt_sections(prompt)["Action"] == original
+
+
+def test_recipe_fields_reach_section_serialization_without_whitespace_rewrite() -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    recipe["scene_logic_contract"] = dict(recipe.get("scene_logic_contract") or {})
+    expected = {
+        "subject_pose": "Pose Cafe\u0301 exactly",
+        "fashion_accessories": "Accessory Cafe\u0301 exactly",
+        "setting_background": "Setting Cafe\u0301 exactly",
+        "environment_realism_notes": "Realism Cafe\u0301 exactly",
+        "technical_keywords": "Camera Cafe\u0301 exactly",
+        "style_lighting": "Lighting Cafe\u0301 exactly",
+        "negative_constraints": "Constraint Cafe\u0301 exactly",
+    }
+    for field, value in expected.items():
+        if field == "environment_realism_notes":
+            recipe["scene_logic_contract"][field] = value
+        else:
+            recipe[field] = value
+
+    sections = packet_builder.build_structured_prompt_sections(recipe)
+    assert all(packet_builder.clean_fragment(body) == body for _, body in sections)
+    serialized = pose_provenance.serialize_provider_prompt_sections(sections)
+    for value in expected.values():
+        assert value in serialized
 
 
 def test_governed_recipe_inputs_satisfy_plain_text_policy() -> None:
     recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
     recipes = recipe_bank.get("recipes") or recipe_bank.get("prompt_recipes") or []
     for recipe in recipes:
-        packet_builder.build_structured_prompt_sections(
+        sections = packet_builder.build_structured_prompt_sections(
             dict(recipe),
             pose_binding=pose_fixture.static_pose_provenance(),
         )
+        assert all(packet_builder.clean_fragment(body) == body for _, body in sections)
 
 
 def test_real_recipe_emits_one_exact_canonical_action() -> None:
