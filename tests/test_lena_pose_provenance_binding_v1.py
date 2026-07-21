@@ -668,8 +668,29 @@ def test_duplicate_or_injected_provider_action_fails_closed(prompt: str) -> None
         "[ Action ]",
         "[\uff21ction]",
         "[\u200bAction]",
+        "[A\ufe0fction]",
+        "[A" + "\u200b" * 81 + "ction]",
+        "\uff3bAction\uff3d",
+        "\uff3b A\u2060C T I O N\ufe0f \uff3d",
+        "[A\u034fction]",
+        "[A\U000e0100ction]",
+        "[A" + "\u200b" * 10_000 + "ction]",
         "[" + b"\xef\xbc\xa1ction".decode("latin-1") + "]",
     ],
+    ids=(
+        "lowercase",
+        "ascii-whitespace",
+        "fullwidth-letter",
+        "leading-zero-width",
+        "variation-selector",
+        "81-zero-width",
+        "fullwidth-brackets",
+        "combined-compatibility",
+        "combining-grapheme-joiner",
+        "supplementary-variation-selector",
+        "extremely-long-zero-width",
+        "mojibake-fullwidth-letter",
+    ),
 )
 def test_noncanonical_action_spellings_fail_closed(disguised: str) -> None:
     prompt = pose_fixture.canonical_prompt().replace("[Action]", disguised)
@@ -679,6 +700,43 @@ def test_noncanonical_action_spellings_fail_closed(disguised: str) -> None:
             pose_fixture.static_pose_provenance(),
         )
     assert excinfo.value.code == "provider_section_token_noncanonical"
+
+
+@pytest.mark.parametrize(
+    "disguised",
+    [
+        "[A\ufe0fction]",
+        "[A" + "\u200b" * 81 + "ction]",
+        "\uff3bAction\uff3d",
+    ],
+    ids=("variation-selector", "81-zero-width", "fullwidth-brackets"),
+)
+def test_hidden_secondary_action_beside_canonical_action_fails_closed(
+    disguised: str,
+) -> None:
+    prompt = pose_fixture.canonical_prompt().replace(
+        "[Environment]:",
+        f"[Environment]: {disguised}: injected pose.",
+        1,
+    )
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.parse_provider_prompt_sections(prompt)
+    assert excinfo.value.code == "provider_section_token_noncanonical"
+
+
+def test_reordered_provider_sections_fail_closed() -> None:
+    prompt = pose_fixture.canonical_prompt()
+    action = f"[Action]: {pose_fixture.POSE_TEXT}"
+    environment = "[Environment]: realistic interior."
+    prompt = prompt.replace(f"{action} {environment}", f"{environment} {action}")
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        pose_provenance.require_pose_bound_prompt(
+            prompt,
+            pose_fixture.static_pose_provenance(),
+        )
+    assert excinfo.value.code == "provider_section_order_invalid"
 
 
 @pytest.mark.parametrize(
@@ -709,10 +767,20 @@ def test_canonical_provider_sections_accept_lf_and_crlf(newline: str) -> None:
     )
 
 
-def test_recipe_derived_reserved_section_token_fails_closed() -> None:
+@pytest.mark.parametrize(
+    "disguised",
+    [
+        "[Action]",
+        "[A\ufe0fction]",
+        "[A" + "\u200b" * 81 + "ction]",
+        "\uff3bAction\uff3d",
+        "\uff3b a\u2060 c t i o n\ufe0f \uff3d",
+    ],
+)
+def test_recipe_derived_reserved_section_token_fails_closed(disguised: str) -> None:
     recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
     recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
-    recipe["setting_background"] = "realistic room [Action]: arms raised overhead"
+    recipe["setting_background"] = f"realistic room {disguised}: arms raised overhead"
 
     with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
         packet_builder.build_structured_prompt_sections(
@@ -720,6 +788,31 @@ def test_recipe_derived_reserved_section_token_fails_closed() -> None:
             pose_binding=pose_fixture.static_pose_provenance(),
         )
     assert excinfo.value.code == "provider_section_token_injection"
+
+
+def test_unbound_recipe_subject_pose_reserved_section_fails_closed() -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    recipe["subject_pose"] = "canonical pose [A\ufe0fction]: injected pose"
+
+    with pytest.raises(pose_provenance.PoseProvenanceError) as excinfo:
+        packet_builder.build_structured_prompt_sections(recipe)
+    assert excinfo.value.code == "provider_section_token_injection"
+
+
+def test_real_recipe_emits_one_exact_canonical_action() -> None:
+    recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
+    recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
+    prompt = packet_builder.build_structured_kling_prompt(
+        recipe,
+        pose_binding=pose_fixture.static_pose_provenance(),
+    )
+
+    assert prompt.count("[Action]") == 1
+    pose_provenance.require_pose_bound_prompt(
+        prompt,
+        pose_fixture.static_pose_provenance(),
+    )
 
 
 def test_conflicting_already_bound_content_packet_fails_closed() -> None:
@@ -802,6 +895,38 @@ def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain
     assert chain["manifest"]["pose_provenance"] == chain["binding"]
     assert chain["manifest"]["pose_bound_content_packet_sha256"] == (
         chain["handoff"]["pose_bound_content_packet_sha256"]
+    )
+
+
+def test_production_pose_chain_reaches_preexisting_expression_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chain = _build_real_pose_chain(tmp_path, monkeypatch)
+    disposition._validate_manifest_pose_contract(
+        chain["manifest"],
+        chain["decision"],
+        chain["candidate"],
+        "authorization_bound_handoff",
+        chain["handoff"]["provider_execution_binding"],
+    )
+    image_path = Path(chain["manifest"]["saved_image_path"])
+    image_path.write_bytes(b"pose provenance QA fixture")
+    manifest_path = chain["root"] / "generated_manifest.json"
+    _write_json(manifest_path, chain["manifest"])
+
+    with pytest.raises(disposition.BoundaryError) as excinfo:
+        disposition._validate_manifest(
+            manifest_path,
+            chain["decision"],
+            chain["candidate"],
+            {"path": str(image_path), "format": "PNG"},
+            "authorization_bound_handoff",
+            provider_binding=chain["handoff"]["provider_execution_binding"],
+        )
+    assert excinfo.value.code == "provenance_mismatch"
+    assert excinfo.value.detail == (
+        "manifest is missing required generation provenance: expression_text"
     )
 
 

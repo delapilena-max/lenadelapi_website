@@ -24,18 +24,51 @@ PROVIDER_SECTION_ORDER = (
     "Lighting/Style",
     "Technical",
 )
-BRACKETED_TOKEN_RE = re.compile(r"\[([^\[\]\r\n]{1,80})\]")
+
+
+DEFAULT_IGNORABLE_RANGES = (
+    (0x00AD, 0x00AD),
+    (0x034F, 0x034F),
+    (0x061C, 0x061C),
+    (0x115F, 0x1160),
+    (0x17B4, 0x17B5),
+    (0x180B, 0x180F),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x206F),
+    (0x3164, 0x3164),
+    (0xFE00, 0xFE0F),
+    (0xFEFF, 0xFEFF),
+    (0xFFA0, 0xFFA0),
+    (0xFFF0, 0xFFF8),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0000, 0xE0FFF),
+)
+
+
+def _is_default_ignorable_for_detection(char: str) -> bool:
+    codepoint = ord(char)
+    return unicodedata.category(char) == "Cf" or any(
+        start <= codepoint <= end for start, end in DEFAULT_IGNORABLE_RANGES
+    )
+
+
+def _compatibility_bracket(char: str) -> str | None:
+    normalized = unicodedata.normalize("NFKC", char)
+    return normalized if normalized in {"[", "]"} else None
 
 
 def _normalized_section_detection_name(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value)
-    without_format_chars = "".join(
-        char for char in normalized if unicodedata.category(char) != "Cf"
+    detection_chars = "".join(
+        char
+        for char in normalized
+        if not _is_default_ignorable_for_detection(char)
+        and not char.isspace()
+        and char not in "[]"
     )
-    without_whitespace = "".join(
-        char for char in without_format_chars if not char.isspace()
-    )
-    return without_whitespace.strip(":").casefold()
+    return detection_chars.strip(":").casefold()
 
 
 RESERVED_SECTION_DETECTION_NAMES = {
@@ -54,21 +87,32 @@ def _section_detection_variants(value: str) -> set[str]:
     return variants
 
 
-def _scan_reserved_provider_tokens(value: str) -> list[tuple[re.Match[str], str]]:
-    reserved: list[tuple[re.Match[str], str]] = []
-    for match in BRACKETED_TOKEN_RE.finditer(value):
+def _iter_bracketed_provider_tokens(value: str):
+    openings: list[int] = []
+    for index, char in enumerate(value):
+        bracket = _compatibility_bracket(char)
+        if bracket == "[":
+            openings.append(index)
+        elif bracket == "]" and openings:
+            start = openings.pop()
+            yield start, index + 1, value[start:index + 1], value[start + 1:index]
+
+
+def _scan_reserved_provider_tokens(value: str) -> list[tuple[int, int, str, str]]:
+    reserved: list[tuple[int, int, str, str]] = []
+    for start, end, token, token_name in _iter_bracketed_provider_tokens(value):
         names = {
             RESERVED_SECTION_DETECTION_NAMES[variant]
-            for variant in _section_detection_variants(match.group(1))
+            for variant in _section_detection_variants(token_name)
             if variant in RESERVED_SECTION_DETECTION_NAMES
         }
         if names:
             _require(
                 len(names) == 1,
                 "provider_section_token_ambiguous",
-                f"provider section token is ambiguous after normalization: {match.group(0)!r}",
+                f"provider section token is ambiguous after normalization: {token!r}",
             )
-            reserved.append((match, names.pop()))
+            reserved.append((start, end, token, names.pop()))
     return reserved
 
 
@@ -293,7 +337,7 @@ def reject_reserved_provider_section_tokens(value: str, *, label: str) -> None:
     _require(
         not tokens,
         "provider_section_token_injection",
-        f"{label} contains reserved provider section token {tokens[0][0].group(0)!r}"
+        f"{label} contains reserved provider section token {tokens[0][2]!r}"
         if tokens
         else label,
     )
@@ -302,17 +346,17 @@ def reject_reserved_provider_section_tokens(value: str, *, label: str) -> None:
 def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
     _require(isinstance(prompt, str) and bool(prompt.strip()), "provider_prompt_missing", "provider prompt is required")
     scanned = _scan_reserved_provider_tokens(prompt)
-    for match, label in scanned:
+    for _, _, token, label in scanned:
         _require(
-            match.group(0) == f"[{label}]",
+            token == f"[{label}]",
             "provider_section_token_noncanonical",
-            f"reserved provider section token must use exact ASCII spelling [{label}]: {match.group(0)!r}",
+            f"reserved provider section token must use exact ASCII spelling [{label}]: {token!r}",
         )
-    tokens = [match for match, _ in scanned]
+    tokens = [(start, end) for start, end, _, _ in scanned]
     _require(tokens, "provider_section_grammar_invalid", "provider prompt contains no canonical sections")
-    labels = [label for _, label in scanned]
+    labels = [label for _, _, _, label in scanned]
     _require(
-        tokens[0].start() == 0,
+        tokens[0][0] == 0,
         "provider_section_grammar_invalid",
         "provider prompt must begin with the canonical [Subject] section",
     )
@@ -343,14 +387,14 @@ def parse_provider_prompt_sections(prompt: str) -> dict[str, str]:
     )
 
     sections: dict[str, str] = {}
-    for index, (match, label) in enumerate(scanned):
+    for index, (start, end, _, label) in enumerate(scanned):
         _require(
-            prompt[match.end():match.end() + 1] == ":",
+            prompt[end:end + 1] == ":",
             "provider_section_grammar_invalid",
             f"reserved provider section [{label}] must be followed immediately by a colon",
         )
-        body_start = match.end() + 1
-        body_end = tokens[index + 1].start() if index + 1 < len(tokens) else len(prompt)
+        body_start = end + 1
+        body_end = tokens[index + 1][0] if index + 1 < len(tokens) else len(prompt)
         body = prompt[body_start:body_end].strip()
         _require(
             bool(body),

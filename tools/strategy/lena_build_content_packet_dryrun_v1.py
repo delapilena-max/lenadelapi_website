@@ -323,6 +323,7 @@ def build_structured_prompt_sections(recipe, pose_binding=None):
         else None
     )
     recipe_section_inputs = {
+        "subject_pose": recipe.get("subject_pose", ""),
         "fashion_accessories": recipe.get("fashion_accessories", ""),
         "setting_background": recipe.get("setting_background", ""),
         "environment_realism_notes": recipe.get("scene_logic_contract", {}).get(
