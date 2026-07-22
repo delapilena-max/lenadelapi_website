@@ -17,6 +17,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+MODULE_ROOT = Path(__file__).resolve().parents[2]
+if str(MODULE_ROOT) not in sys.path:
+    sys.path.insert(0, str(MODULE_ROOT))
+
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 ROOT = Path("C:/projects/ai/content_bot")
 sys.path.insert(0, str(ROOT))
 
@@ -185,12 +191,15 @@ def build_final_prompt(
 ) -> tuple[str, str]:
     wardrobe = format_style_override(style)
     combined = f"{base} {wardrobe}".strip()
-    if len(combined) > 2499:
-        combined = combined[:2499]
+    if len(combined) > prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS:
+        combined = combined[:prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS]
     return combined, wardrobe
 
 
-def fit_prompt_parts(parts: list[str], max_chars: int = 2499) -> str:
+def fit_prompt_parts(
+    parts: list[str],
+    max_chars: int = prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS,
+) -> str:
     current = ""
     for raw_part in parts:
         part = (raw_part or "").strip()
@@ -334,7 +343,7 @@ def print_summary(
     style = envelope["wardrobe_style_used"]
     chars = envelope["prompt_chars"]
     all_ok = (
-        chars < 2500
+        chars <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
         and envelope["master_identity_body_present"]
         and envelope["from_element_id_present"]
         and envelope["element_version_present"]
@@ -351,7 +360,10 @@ def print_summary(
     print(f"  recipe          : {envelope['source_recipe_id']}")
     print()
     print(f"  prompt chars    : {chars}")
-    print(f"  under 2500      : {chars < 2500}")
+    print(
+        f"  maximum {prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS}: "
+        f"{chars <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS}"
+    )
     print()
     if style.get("source") == "catalog_v1":
         print(f"  wardrobe source : catalog_v1")
@@ -469,7 +481,10 @@ def main() -> int:
         prompt_parts = [base, wardrobe_text]
         if env_ctx:
             prompt_parts.append(env_ctx)
-        final_prompt = fit_prompt_parts(prompt_parts, max_chars=2499)
+        final_prompt = fit_prompt_parts(
+            prompt_parts,
+            max_chars=prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS,
+        )
         if wardrobe_text not in final_prompt:
             raise SystemExit(
                 "[ABORT] wardrobe override did not fit into final Kling prompt; "
@@ -494,7 +509,10 @@ def main() -> int:
         style = pick_style_production(rng)
         wardrobe_text = format_style_override(style)
         prompt_parts = [packet["compact_kling_prompt_preview"], wardrobe_text]
-        final_prompt = fit_prompt_parts(prompt_parts, max_chars=2499)
+        final_prompt = fit_prompt_parts(
+            prompt_parts,
+            max_chars=prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS,
+        )
         if wardrobe_text not in final_prompt:
             raise SystemExit(
                 "[ABORT] style-bank wardrobe override did not fit into final "

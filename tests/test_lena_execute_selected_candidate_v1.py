@@ -286,7 +286,11 @@ def test_authority_commit_must_be_full_real_commit(canonical_decision, tmp_path)
 
 def test_authority_commit_ancestor_rule_is_fail_closed(canonical_decision, monkeypatch):
     artifact = canonical_decision[1]
-    monkeypatch.setattr(consumer, "_git_bytes", lambda *args: b"")
+    monkeypatch.setattr(
+        consumer,
+        "_git_bytes",
+        lambda *args: b"commit\n" if args[:2] == ("cat-file", "-t") else (artifact["authority_commit"] + "\n").encode(),
+    )
 
     class Result:
         returncode = 1
@@ -514,7 +518,13 @@ def test_no_provider_generation_retry_fallback_or_downstream_side_effect_path_ex
     assert "learning" not in source
     assert "dotenv" not in source
     assert "retry" not in source.lower().replace("no retry", "")
-    assert "fallback" not in source.lower().replace("no retry, fallback", "")
+    fallback_scan = source.lower().replace("no retry, fallback", "")
+    for provenance_field in (
+        "expression_safe_fallback_used",
+        "expression_safe_fallback_reason",
+    ):
+        fallback_scan = fallback_scan.replace(provenance_field, "")
+    assert "fallback" not in fallback_scan
 
 
 def test_cli_emits_one_machine_readable_blocked_report(monkeypatch, capsys, tmp_path):

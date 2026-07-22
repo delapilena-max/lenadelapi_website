@@ -7,10 +7,12 @@ from pathlib import Path
 from PIL import Image
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tools import lena_record_human_rejection_v1 as record
 from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_consumer
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -40,6 +42,22 @@ def _retry_execution_contract(artifact: dict) -> dict:
         "source_original_decision_fingerprint_sha256": artifact["source_original_decision_fingerprint_sha256"],
         "source_original_manifest_path": artifact["source_original_manifest_path"],
         "source_original_manifest_sha256": artifact["source_original_manifest_sha256"],
+        "source_execution_receipt_path": artifact["source_execution_receipt_path"],
+        "source_execution_receipt_sha256": artifact["source_execution_receipt_sha256"],
+        "source_handoff_artifact_path": artifact["source_handoff_artifact_path"],
+        "source_handoff_artifact_sha256": artifact["source_handoff_artifact_sha256"],
+        "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
+        "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
+        "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
+        "source_expression_bound_content_packet_sha256": artifact[
+            "source_expression_bound_content_packet_sha256"
+        ],
+        "pose_provenance": artifact["pose_provenance"],
+        "pose_provenance_fingerprint_sha256": artifact["pose_provenance_fingerprint_sha256"],
+        "expression_provenance": artifact["expression_provenance"],
+        "expression_provenance_fingerprint_sha256": artifact[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "source_original_provider_job_evidence": artifact["source_original_provider_job_evidence"],
         "source_valid_human_rejection_artifact_path": artifact["source_valid_human_rejection_artifact_path"],
         "source_valid_human_rejection_artifact_sha256": artifact["source_valid_human_rejection_artifact_sha256"],
@@ -65,11 +83,7 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image)
     image_sha = hashlib.sha256(image.read_bytes()).hexdigest()
 
-    prompt = (
-        "Exact synthetic Lena prompt. Scene: blue-hour street pause outside the restaurant. "
-        "Wardrobe: fitted red dress. Pose: weight shifted onto one hip, stance easy and unforced. "
-        "Expression: calm expression."
-    )
+    prompt = "Exact synthetic selector prompt bytes."
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     candidate = {
         "candidate_id": f"{slot}::{recipe_id}::{hook_id}",
@@ -82,6 +96,14 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "caption_seed": "The mirror version of me would have stayed home.",
         "pose": "weight_shift_one_hip",
         "pose_body_language_id": "pose_p001",
+        "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+        "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+        "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+        "expression_text": pose_fixture.EXPRESSION_TEXT,
+        "expression_safe_fallback_used": False,
+        "expression_safe_fallback_reason": None,
+        "expression_scene_conflict_terms": [],
+        "expression_derivation_scene_action": "blue-hour street pause outside the restaurant",
         "wardrobe_outfit_id": "wc_fixture",
         "visual_style": "fitted_dress",
         "camera_text": "50mm candid vertical",
@@ -112,6 +134,112 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
     decision_path = root / "decision.json"
     _write_json(decision_path, decision)
 
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path="decision.json",
+        candidate_sha256=hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+    )
+    expression_binding = pose_fixture.static_expression_provenance(
+        candidate_path="decision.json",
+        candidate_sha256=hashlib.sha256(decision_path.read_bytes()).hexdigest(),
+    )
+    source_prompt = pose_fixture.canonical_prompt()
+    source_prompt_sha = hashlib.sha256(source_prompt.encode("utf-8")).hexdigest()
+    packet_path = root / "source_content_packet.json"
+    packet = pose_fixture.authoritatively_bind_packet(
+        {
+            "recipe_id": "hcr_011",
+            "strong_hook_id": "mf_001",
+            "generated_date": date,
+            "wardrobe_outfit_id": "wc_p020",
+            "environment_id": "env_v008",
+            "hook_selection_reason": "legacy retry source fixture",
+        },
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
+    )
+    _write_json(packet_path, packet)
+    packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+    packet_digest = hashlib.sha256(
+        json.dumps(packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    handoff_path = root / "source_handoff.json"
+    handoff = {
+        "date": date,
+        "selected_slot_id": slot,
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": packet_digest,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": packet_digest,
+        "selected_candidate": {
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+        },
+        "candidate_selection_binding": {
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_body_language_label": pose_binding["pose_body_language_label"],
+            "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_gaze_label": expression_binding["expression_gaze_label"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+        },
+        "selected_prompt_input_artifact_path": "source_content_packet.json",
+        "selected_prompt_input_artifact_sha256": packet_sha,
+        "selected_prompt_input": {
+            "artifact_path": "source_content_packet.json",
+            "artifact_sha256": packet_sha,
+            "prompt_sha256": source_prompt_sha,
+            "prompt_text": source_prompt,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": packet_digest,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_digest,
+        },
+        "structured_executor_inputs": {
+            "selected_prompt_sha256": source_prompt_sha,
+            "selected_prompt_text": source_prompt,
+            "selected_prompt_input_artifact_sha256": packet_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": packet_digest,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_digest,
+        },
+        "provider_execution_binding": {
+            "content_packet_artifact_path": "source_content_packet.json",
+            "content_packet_artifact_sha256": packet_sha,
+            "provider_prompt_sha256": source_prompt_sha,
+            "pose_bound_content_packet_sha256": packet_digest,
+            "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_bound_content_packet_sha256": packet_digest,
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+        },
+        "binding_linkage": {
+            "content_packet_artifact_path": "source_content_packet.json",
+            "content_packet_artifact_sha256": packet_sha,
+            "pose_body_language_id": pose_binding["pose_body_language_id"],
+            "pose_bound_content_packet_sha256": packet_digest,
+            "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+            "expression_gaze_id": expression_binding["expression_gaze_id"],
+            "expression_provenance_fingerprint_sha256": expression_binding[
+                "expression_provenance_fingerprint_sha256"
+            ],
+            "expression_bound_content_packet_sha256": packet_digest,
+        },
+    }
+    _write_json(handoff_path, handoff)
+    handoff_sha = hashlib.sha256(handoff_path.read_bytes()).hexdigest()
+    receipt_path = root / "source_receipt.json"
+    receipt = {
+        "handoff_artifact_path": "source_handoff.json",
+        "handoff_artifact_sha256": handoff_sha,
+    }
+    _write_json(receipt_path, receipt)
+
     manifest_path = root / "manifest.json"
     provider_job_id = "job-1"
     manifest = {
@@ -119,8 +247,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "date": date,
         "slot_id": slot,
         "lane": lane,
-        "prompt_sha256": prompt_sha,
-        "image_prompt": prompt,
+        "prompt_sha256": source_prompt_sha,
+        "image_prompt": source_prompt,
         "provider_job_id": provider_job_id,
         "provider_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
@@ -129,9 +257,19 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "pose_body_language_id": candidate["pose_body_language_id"],
         "pose_body_language_label": candidate["pose"],
         "pose_text": "weight shifted onto one hip, stance easy and unforced",
-        "expression_gaze_id": "exp_fixture",
-        "expression_gaze_label": "calm expression",
-        "expression_text": "calm expression",
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_artifact_path": "source_content_packet.json",
+        "pose_bound_content_packet_artifact_sha256": packet_sha,
+        "pose_bound_content_packet_sha256": packet_digest,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_artifact_path": "source_content_packet.json",
+        "expression_bound_content_packet_artifact_sha256": packet_sha,
+        "expression_bound_content_packet_sha256": packet_digest,
+        "generation_execution_receipt_path": "source_receipt.json",
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_text": expression_binding["expression_text"],
+        "expression_provenance": expression_binding,
         "expression_safe_fallback_used": False,
         "expression_safe_fallback_reason": None,
         "expression_scene_conflict_terms": [],
@@ -162,7 +300,7 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "image_sha256": image_sha,
         "decision_artifact_path": str(decision_path.resolve()),
         "decision_fingerprint_sha256": decision["decision_fingerprint_sha256"],
-        "prompt_sha256": prompt_sha,
+        "prompt_sha256": source_prompt_sha,
         "disposition": "accept",
         "reviewer_type": "bounded_visual_provider",
         "provider_called": True,
@@ -226,10 +364,21 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "image": {
                 "slot_id": slot,
                 "lane": lane,
-                "image_prompt": prompt,
-                "prompt_sha256": prompt_sha,
+                "image_prompt": source_prompt,
+                "prompt_sha256": source_prompt_sha,
                 "pose_body_language_id": candidate["pose_body_language_id"],
                 "pose_body_language_label": candidate["pose"],
+                "pose_provenance": pose_binding,
+                "pose_bound_content_packet_artifact_path": "source_content_packet.json",
+                "pose_bound_content_packet_artifact_sha256": packet_sha,
+                "pose_bound_content_packet_sha256": packet_digest,
+                "expression_gaze_id": expression_binding["expression_gaze_id"],
+                "expression_gaze_label": expression_binding["expression_gaze_label"],
+                "expression_text": expression_binding["expression_text"],
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_artifact_path": "source_content_packet.json",
+                "expression_bound_content_packet_artifact_sha256": packet_sha,
+                "expression_bound_content_packet_sha256": packet_digest,
                 "wardrobe_outfit_id": candidate["wardrobe_outfit_id"],
                 "effective_wardrobe_silhouette_class": candidate["visual_style"],
                 "camera_text": candidate["camera_text"],
@@ -237,8 +386,53 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             },
         }
 
-    monkeypatch.setattr(retry_consumer.selected_consumer, "_validate_authority", lambda artifact: None)
+    monkeypatch.setattr(retry_consumer, "ROOT", root)
+    monkeypatch.setattr(retry_handoff, "ROOT", root)
+    monkeypatch.setattr(
+        retry_consumer.selected_consumer,
+        "validate_selected_candidate_issuance",
+        lambda artifact, root=None: {
+            "candidate": artifact["candidate"],
+            "stored_core": selected_consumer._decision_core(artifact),
+            "recomputed_fingerprint_sha256": artifact["decision_fingerprint_sha256"],
+            "fresh_fingerprint_sha256": artifact["decision_fingerprint_sha256"],
+            "executor_validation": {"ok": True},
+        },
+    )
+    monkeypatch.setattr(
+        retry_consumer.pose_provenance,
+        "build_candidate_pose_provenance",
+        lambda path, root=None: pose_binding,
+    )
+    monkeypatch.setattr(
+        retry_consumer.pose_provenance,
+        "build_candidate_expression_provenance",
+        lambda path, root=None: expression_binding,
+    )
+    monkeypatch.setattr(
+        retry_consumer.generation_approval,
+        "inspect_handoff_artifact",
+        lambda path: {
+            "handoff_repo_path": "source_handoff.json",
+            "handoff_sha256": handoff_sha,
+            "report": handoff,
+            "date": date,
+            "slot_id": slot,
+            "prompt_sha256": source_prompt_sha,
+            "custom_reference_id": next(iter(identity.APPROVED_CUSTOM_REFERENCE_IDS)),
+        },
+    )
+    monkeypatch.setattr(
+        retry_handoff,
+        "_validate_execution_receipt",
+        lambda path, facts: (receipt, image, manifest, manifest_path, receipt_path, image_sha),
+    )
     monkeypatch.setattr(retry_consumer.executor, "resolve_prompt_source", synthetic_source)
+    monkeypatch.setattr(
+        retry_consumer.executor,
+        "_validate_handoff_packet",
+        lambda path: (handoff, synthetic_source(date, slot), {"ok": True}, {}),
+    )
     monkeypatch.setattr(
         retry_consumer.executor,
         "validate_candidate",
@@ -338,6 +532,9 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "image_sha": image_sha,
         "decision_path": decision_path,
         "manifest_path": manifest_path,
+        "source_handoff_path": handoff_path,
+        "source_receipt_path": receipt_path,
+        "source_packet_path": packet_path,
         "retry_manifest_path": retry_manifest_path,
         "retry_decision_path": retry_decision_path,
         "retry_decision": retry_decision,

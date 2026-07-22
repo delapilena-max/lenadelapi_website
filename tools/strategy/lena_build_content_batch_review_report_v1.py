@@ -18,6 +18,11 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 OUTPUT_BASE = os.path.join(
     ROOT, "pipeline", "strategy", "lena", "content_packets"
 )
@@ -121,7 +126,10 @@ def prompt_char_stats(manifest_packets):
         "min": min(chars),
         "max": max(chars),
         "avg": round(statistics.mean(chars), 1),
-        "all_under_2500": all(c < 2500 for c in chars),
+        "all_under_2500": all(
+            c <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
+            for c in chars
+        ),
     }
 
 

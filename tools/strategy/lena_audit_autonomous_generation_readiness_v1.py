@@ -6,6 +6,8 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RECIPE_BANK = (
@@ -42,8 +44,13 @@ FACE_SKIN_NEGATIVE_MARKERS = (
     "airbrushed",
     "plastic",
 )
-PAYLOAD_HEADROOM_HARD_BLOCK_BELOW = 30
-PAYLOAD_HEADROOM_WARNING_BELOW = 70
+# Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
+PAYLOAD_HEADROOM_HARD_BLOCK_BELOW = (
+    prompt_limits.RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW
+)
+PAYLOAD_HEADROOM_WARNING_BELOW = (
+    prompt_limits.RETRY_PROMPT_HEADROOM_WARNING_BELOW
+)
 
 
 def utc_date() -> str:
@@ -178,13 +185,23 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
         "packet_present": packet_path is not None,
         "packet_path": str(packet_path) if packet_path else "",
         "packet_compact_chars": packet_chars,
-        "packet_compact_headroom": (2499 - packet_chars) if isinstance(packet_chars, int) else None,
+        "packet_compact_headroom": (
+            prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+            - packet_chars
+            if isinstance(packet_chars, int)
+            else None
+        ),
         "payload_present": bool(packet_path and provider_prompt_contract),
         "payload_path": str(packet_path) if packet_path else "",
         "payload_chars": payload_chars,
         "payload_headroom": provider_prompt_contract.get(
             "prompt_headroom",
-            (2499 - payload_chars) if isinstance(payload_chars, int) else None,
+            (
+                prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+                - payload_chars
+                if isinstance(payload_chars, int)
+                else None
+            ),
         ),
         "payload_scene_contract_present": provider_prompt_contract.get("scene_logic_contract_present", False),
         "master_identity_body_present": provider_prompt_contract.get("master_identity_body_present", False),

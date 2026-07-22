@@ -11,6 +11,7 @@ from PIL import Image
 import pipeline.higgsfield_lena_api_executor as executor
 import tools.lena_higgsfield_generation_approval_v1 as approval
 import tools.strategy.lena_execute_approved_live_generation_v1 as wrapper
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 
 
 DATE = "2026-07-15"
@@ -61,72 +62,31 @@ def _write_reference_authority(tmp_path: Path, reference_path: Path) -> None:
     )
 
 
-def _approval_result(tmp_path: Path) -> dict[str, object]:
-    handoff_repo_path = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
-    approval_repo_path = f"pipeline/approvals/lena/generation/{DATE}/{SLOT_ID}_higgsfield_generation_approval.json"
-    claim_path = approval.claim_output_path(DATE, SLOT_ID)
-    receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
-    approval_record = {
-        "report_type": "lena_higgsfield_generation_approval",
-        "schema_version": "v1",
-        "approval_type": "higgsfield_single_generation",
-        "operator_id": "nicolas",
-        "approved_at_utc": "2099-07-15T12:00:00+00:00",
-        "expires_at_utc": "2099-07-15T12:30:00+00:00",
-        "handoff_artifact_path": handoff_repo_path,
-        "handoff_artifact_sha256": "a" * 64,
-        "handoff_report_type": "lena_next_live_image_handoff",
-        "handoff_schema_version": "v1",
-        "date": DATE,
-        "slot_id": SLOT_ID,
-        "prompt_sha256": "b" * 64,
-        "provider": "Higgsfield",
-        "executor": "Higgsfield CLI repo adapter",
-        "model": "text2image_soul_v2",
-        "aspect_ratio": "9:16",
-        "soul_name": "Lena",
-        "soul_type": "Soul 2.0",
-        "custom_reference_id": CUSTOM_REFERENCE_ID,
-        "confirmation_statement": approval.confirmation_phrase(SLOT_ID),
-        "credits_may_be_spent_acknowledged": True,
-        "authorized_attempts": 1,
-        "upload_authorized": False,
-        "queue_promotion_authorized": False,
-        "publish_authorized": False,
-        "analytics_mutation_authorized": False,
-    }
-    return {
-        "approval": approval_record,
-        "approval_path": tmp_path / approval_repo_path,
-        "approval_repo_path": approval_repo_path,
-        "approval_sha256": "c" * 64,
-        "handoff_facts": {
-            "date": DATE,
-            "slot_id": SLOT_ID,
-            "handoff_repo_path": handoff_repo_path,
-            "handoff_sha256": "a" * 64,
-            "prompt_sha256": "b" * 64,
-            "custom_reference_id": CUSTOM_REFERENCE_ID,
-            "soul_name": "Lena",
-            "soul_type": "Soul 2.0",
-        },
-        "approved_at_utc": "2026-07-15T12:00:00+00:00",
-        "expires_at_utc": "2026-07-15T12:30:00+00:00",
-        "is_expired": False,
-        "scope_summary": {
-            "authorized_attempts": 1,
-            "upload_authorized": False,
-            "queue_promotion_authorized": False,
-            "publish_authorized": False,
-            "analytics_mutation_authorized": False,
-        },
-        "claim_path": claim_path,
-        "receipt_path": receipt_path,
-    }
+def _approval_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    monkeypatch.setattr(approval_fixture, "DATE", DATE)
+    monkeypatch.setattr(approval_fixture, "SLOT_ID", SLOT_ID)
+    monkeypatch.setattr(
+        approval_fixture,
+        "RECONCILIATION_PATH",
+        f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json",
+    )
+    approval_fixture._patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    approval_path = approval_fixture._record_and_write(tmp_path, handoff_path)
+    result = approval.validate_generation_approval_artifact(approval_path)
+    result["claim_path"] = approval.claim_output_path(DATE, SLOT_ID)
+    result["receipt_path"] = approval.receipt_output_path(DATE, SLOT_ID)
+    return result
 
 
-def _context_loader(tmp_path: Path) -> dict[str, object]:
-    approval_result = _approval_result(tmp_path)
+def _context_loader(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    approval_result = _approval_result(tmp_path, monkeypatch)
     manifest_path = executor.manifest_path(DATE, SLOT_ID)
     return {
         "date": DATE,
@@ -140,12 +100,7 @@ def _context_loader(tmp_path: Path) -> dict[str, object]:
         "claim_path": approval_result["claim_path"],
         "receipt_path": approval_result["receipt_path"],
         "manifest_path": manifest_path,
-        "handoff_artifact": approval_result["approval_path"].parent.parent.parent
-        / "strategy"
-        / "lena"
-        / "next_actions"
-        / DATE
-        / f"lena_next_live_image_handoff_{DATE}.json",
+        "handoff_artifact": approval_result["handoff_facts"]["handoff_path"],
         "approval_artifact": approval_result["approval_path"],
         "custom_reference_id": CUSTOM_REFERENCE_ID,
     }
@@ -299,7 +254,7 @@ def test_dry_run_reports_no_publish_authority(tmp_path: Path, monkeypatch: pytes
         handoff_path,
         approval_path,
         live=False,
-        context_loader=lambda *_args: _context_loader(tmp_path),
+        context_loader=lambda *_args: _context_loader(tmp_path, monkeypatch),
     )
 
     assert report["publish_authorized"] is False
@@ -329,7 +284,7 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     _write_reference_authority(tmp_path, reference_path)
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["receipt_path"] = receipt_path
         ctx["manifest_path"] = manifest_path
@@ -475,7 +430,7 @@ def test_identity_evidence_manifest_validation_failures_do_not_write_accounting(
     state = {"provider_calls": 0}
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["receipt_path"] = receipt_path
         ctx["manifest_path"] = manifest_path
@@ -560,7 +515,7 @@ def test_failure_before_provider_submission_is_accounted(
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["receipt_path"] = receipt_path
         ctx["approval_artifact"] = approval_path
@@ -619,7 +574,7 @@ def test_success_without_reference_authority_does_not_write_accounting(
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["receipt_path"] = receipt_path
         ctx["manifest_path"] = manifest_path
@@ -695,7 +650,7 @@ def test_failure_after_provider_submission_is_accounted(
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["receipt_path"] = receipt_path
         ctx["approval_artifact"] = approval_path
@@ -755,7 +710,7 @@ def test_failure_when_receipt_write_itself_fails_is_accounted(
     claim_path = approval.claim_output_path(DATE, SLOT_ID)
 
     def fake_context_loader(*_args: object) -> dict[str, object]:
-        ctx = _context_loader(tmp_path)
+        ctx = _context_loader(tmp_path, monkeypatch)
         ctx["claim_path"] = claim_path
         ctx["approval_artifact"] = approval_path
         ctx["handoff_artifact"] = handoff_path

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
@@ -46,6 +48,12 @@ SOUL_TYPE = "Soul 2.0"
 APPROVAL_TTL_MINUTES = 30
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+AUTHORITY_BLOCK_KEYS = (
+    "candidate_selection_binding",
+    "provider_execution_binding",
+    "binding_linkage",
+)
+_AUTHORITY_VALIDATION_SEAL = object()
 
 
 class HiggsfieldGenerationApprovalError(RuntimeError):
@@ -57,13 +65,24 @@ class HiggsfieldGenerationApprovalError(RuntimeError):
         self.detail = detail
 
 
+@dataclass(frozen=True)
+class _ValidatedApprovalAuthority:
+    seal: object
+    approval_path: Path
+    approval_sha256: str
+    handoff_path: Path
+    handoff_sha256: str
+    candidate_selection_binding_json: str
+    provider_execution_binding_json: str
+    binding_linkage_json: str
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def approval_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
-    base = out_root if out_root is not None else DEFAULT_APPROVAL_ROOT
-    return base / date_str / f"{slot_id}_higgsfield_generation_approval.json"
+def approval_output_path(date_str: str, slot_id: str) -> Path:
+    return DEFAULT_APPROVAL_ROOT / date_str / f"{slot_id}_higgsfield_generation_approval.json"
 
 
 def claim_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
@@ -157,6 +176,139 @@ def require_sha256(raw: Any, *, code: str, label: str) -> str:
     if not SHA256_RE.fullmatch(value):
         raise HiggsfieldGenerationApprovalError(code, f"{label} must be exactly 64 lowercase hexadecimal characters")
     return value
+
+
+def _require_named_authority_blocks(
+    container: Any,
+    *,
+    owner: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    require(
+        isinstance(container, dict),
+        f"{owner}_authority_contract_missing",
+        f"{owner} authority contract must be a JSON object",
+    )
+    blocks: list[dict[str, Any]] = []
+    for key in AUTHORITY_BLOCK_KEYS:
+        value = container.get(key)
+        require(
+            isinstance(value, dict) and bool(value),
+            f"{owner}_{key}_missing",
+            f"{owner} {key} must be a nonempty JSON object",
+        )
+        blocks.append(value)
+    return blocks[0], blocks[1], blocks[2]
+
+
+def require_authority_blocks(container: Any) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return _require_named_authority_blocks(container, owner="handoff")
+
+
+def require_approval_authority_blocks(
+    container: Any,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return _require_named_authority_blocks(container, owner="approval")
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _copy_authority_blocks(
+    blocks: tuple[dict[str, Any], dict[str, Any], dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return tuple(json.loads(_canonical_json(block)) for block in blocks)  # type: ignore[return-value]
+
+
+def validate_authority_snapshots_against_handoff(
+    container: Any,
+    handoff_facts: dict[str, Any],
+    *,
+    owner: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    if owner == "handoff":
+        blocks = require_authority_blocks(container)
+    elif owner == "approval":
+        blocks = require_approval_authority_blocks(container)
+    else:
+        blocks = _require_named_authority_blocks(container, owner=owner)
+    authoritative_blocks = require_authority_blocks(handoff_facts)
+    for key, actual, expected in zip(AUTHORITY_BLOCK_KEYS, blocks, authoritative_blocks):
+        require(
+            actual == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must exactly match the validated handoff authority snapshot",
+        )
+    return _copy_authority_blocks(blocks)
+
+
+def _validate_bound_provider_prompt_copies(
+    *,
+    selected_prompt: dict[str, Any],
+    structured: dict[str, Any],
+    expected_prompt_sha256: str,
+    bound_pose: dict[str, Any],
+    bound_expression: dict[str, Any],
+) -> str:
+    copies = (
+        (
+            "selected_prompt_input",
+            selected_prompt.get("prompt_text"),
+            selected_prompt.get("prompt_sha256"),
+        ),
+        (
+            "structured_executor_inputs",
+            structured.get("selected_prompt_text"),
+            structured.get("selected_prompt_sha256"),
+        ),
+    )
+    validated: list[tuple[str, str, str, str]] = []
+    for label, prompt_text, recorded_sha in copies:
+        require(
+            isinstance(prompt_text, str) and bool(prompt_text),
+            "handoff_prompt_text_missing",
+            f"handoff {label} prompt text is missing",
+        )
+        prompt_sha = require_sha256(
+            recorded_sha,
+            code="handoff_prompt_sha_missing_or_invalid",
+            label=f"handoff {label} prompt SHA",
+        )
+        validated.append(
+            (
+                label,
+                prompt_text,
+                prompt_sha,
+                hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+            )
+        )
+
+    require(
+        validated[0][1] == validated[1][1],
+        "handoff_prompt_text_mismatch",
+        "handoff selected_prompt_input and structured_executor_inputs prompt text must match byte-for-byte",
+    )
+    for label, prompt_text, recorded_sha, actual_sha in validated:
+        require(
+            recorded_sha == expected_prompt_sha256,
+            "handoff_prompt_sha_binding_mismatch",
+            f"handoff {label} prompt SHA differs from the shared provider prompt SHA",
+        )
+        require(
+            actual_sha == recorded_sha,
+            "handoff_prompt_text_sha_mismatch",
+            f"handoff {label} prompt text does not match its recorded SHA",
+        )
+        try:
+            pose_provenance.parse_provider_prompt_sections(prompt_text)
+            pose_provenance.require_pose_bound_prompt(prompt_text, bound_pose)
+            pose_provenance.require_expression_bound_prompt(
+                prompt_text,
+                bound_expression,
+            )
+        except pose_provenance.PoseProvenanceError as exc:
+            raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    return validated[0][1]
 
 
 def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
@@ -253,6 +405,53 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
     selected_candidate_sha_value = selected_candidate_binding["selected_candidate_sha256"]
     selected_candidate = selected_candidate_binding["selected_candidate"]
     selected_candidate_path_value = str(report.get("source_selected_candidate_artifact_path") or "").strip()
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        require_authority_blocks(report)
+    )
+    try:
+        bound_pose, pose_bound_packet_sha256 = pose_provenance.validate_handoff_pose_copies(report)
+        bound_expression, expression_bound_packet_sha256 = (
+            pose_provenance.validate_handoff_expression_copies(report)
+        )
+        pose_provenance.validate_pose_provenance(
+            bound_pose,
+            expected_candidate_path=selected_candidate_path_value,
+            expected_candidate_sha256=selected_candidate_sha_value,
+            expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
+        )
+        pose_provenance.validate_expression_provenance(
+            bound_expression,
+            expected_candidate_path=selected_candidate_path_value,
+            expected_candidate_sha256=selected_candidate_sha_value,
+            expected_authority_commit=str(selected_candidate.get("authority_commit") or ""),
+        )
+        derived_pose = pose_provenance.build_candidate_pose_provenance(
+            selected_candidate_path,
+            root=ROOT,
+        )
+        derived_expression = pose_provenance.build_candidate_expression_provenance(
+            selected_candidate_path,
+            root=ROOT,
+        )
+        pose_provenance.validate_pose_provenance(derived_pose)
+        pose_provenance.validate_expression_provenance(derived_expression)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    require(
+        bound_pose == derived_pose,
+        "handoff_candidate_pose_provenance_mismatch",
+        "handoff pose provenance does not match independently derived selected-candidate authority",
+    )
+    require(
+        bound_expression == derived_expression,
+        "handoff_candidate_expression_provenance_mismatch",
+        "handoff expression provenance does not match independently derived selected-candidate authority",
+    )
+    require(
+        pose_bound_packet_sha256 == expression_bound_packet_sha256,
+        "handoff_provider_authority_packet_mismatch",
+        "handoff pose and expression packet digests must match",
+    )
     reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
         report,
         selected_candidate_binding,
@@ -365,61 +564,19 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "handoff_prompt_sha_binding_mismatch",
         "handoff selected_prompt_input.prompt_sha256 does not match structured selected_prompt_sha256",
     )
+    _validate_bound_provider_prompt_copies(
+        selected_prompt=selected_prompt,
+        structured=structured,
+        expected_prompt_sha256=prompt_sha,
+        bound_pose=bound_pose,
+        bound_expression=bound_expression,
+    )
     require_sha256(
         report.get("selected_prompt_input_artifact_sha256"),
         code="handoff_candidate_artifact_sha_missing_or_invalid",
         label="handoff selected_prompt_input_artifact_sha256",
     )
 
-    candidate_selection_binding = report.get("candidate_selection_binding")
-    provider_execution_binding = report.get("provider_execution_binding")
-    binding_linkage = report.get("binding_linkage")
-    if not (
-        isinstance(candidate_selection_binding, dict)
-        and isinstance(provider_execution_binding, dict)
-        and isinstance(binding_linkage, dict)
-    ):
-        return {
-            "report": report,
-            "handoff_path": handoff_path,
-            "handoff_repo_path": handoff_repo_path,
-            "handoff_sha256": sha256_file(handoff_path),
-            "date": date_str,
-            "slot_id": slot_id,
-            "prompt_sha256": prompt_sha,
-            "custom_reference_id": custom_reference_id,
-            "soul_name": soul.get("name"),
-            "soul_type": soul.get("type"),
-            "selected_candidate_path": selected_candidate_path,
-            "selected_candidate_repo_path": repo_relative_path(selected_candidate_path) if selected_candidate_path else "",
-            "selected_candidate_sha256": selected_candidate_sha_value,
-            "selected_candidate": selected_candidate,
-            "selected_candidate_id": selected_candidate_binding["selected_candidate_id"],
-            "selected_candidate_slot_id": selected_candidate_binding["selected_candidate_slot_id"],
-            "selected_candidate_recipe_id": selected_candidate_binding["selected_candidate_recipe_id"],
-            "selected_candidate_prompt_sha256": selected_candidate_binding["selected_candidate_prompt_sha256"],
-            "candidate_selection_binding": candidate_selection_binding or {},
-            "provider_execution_binding": provider_execution_binding or {},
-            "binding_linkage": binding_linkage or {},
-            "reconciliation": reconciliation_facts["reconciliation"],
-            "reconciled_candidate": reconciliation_facts["final_candidate"],
-            "reconciliation_decision": reconciliation_facts["decision"],
-        }
-    require(
-        isinstance(candidate_selection_binding, dict),
-        "handoff_candidate_selection_binding_missing",
-        "handoff candidate_selection_binding must be a JSON object",
-    )
-    require(
-        isinstance(provider_execution_binding, dict),
-        "handoff_provider_execution_binding_missing",
-        "handoff provider_execution_binding must be a JSON object",
-    )
-    require(
-        isinstance(binding_linkage, dict),
-        "handoff_binding_linkage_missing",
-        "handoff binding_linkage must be a JSON object",
-    )
     require(
         candidate_selection_binding.get("source_prompt_family") == "prompt_library_candidate",
         "handoff_candidate_selection_source_family_invalid",
@@ -599,10 +756,107 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         "candidate_selection_binding": candidate_selection_binding,
         "provider_execution_binding": provider_execution_binding,
         "binding_linkage": binding_linkage,
+        "pose_provenance": bound_pose,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+        "expression_provenance": bound_expression,
+        "expression_bound_content_packet_sha256": expression_bound_packet_sha256,
         "reconciliation": reconciliation_facts["reconciliation"],
         "reconciled_candidate": reconciliation_facts["final_candidate"],
         "reconciliation_decision": reconciliation_facts["decision"],
     }
+
+
+def _reinspect_authoritative_handoff_facts(handoff_facts: Any) -> dict[str, Any]:
+    require(
+        isinstance(handoff_facts, dict),
+        "approval_handoff_facts_unvalidated",
+        "approval handoff facts must be the result of authoritative handoff inspection",
+    )
+    handoff_path = handoff_facts.get("handoff_path")
+    require(
+        isinstance(handoff_path, Path),
+        "approval_handoff_facts_unvalidated",
+        "approval handoff facts are missing the inspected handoff path",
+    )
+    authoritative = inspect_handoff_artifact(handoff_path)
+    for key in (
+        "report",
+        "handoff_repo_path",
+        "handoff_sha256",
+        "date",
+        "slot_id",
+        "prompt_sha256",
+        "custom_reference_id",
+        "selected_candidate_path",
+        "selected_candidate_sha256",
+        "selected_candidate",
+        *AUTHORITY_BLOCK_KEYS,
+        "pose_provenance",
+        "pose_bound_content_packet_sha256",
+        "expression_provenance",
+        "expression_bound_content_packet_sha256",
+    ):
+        require(
+            handoff_facts.get(key) == authoritative.get(key),
+            "approval_handoff_facts_authority_mismatch",
+            f"approval handoff facts field {key!r} differs from authoritative re-inspection",
+        )
+    return authoritative
+
+
+def _validate_approval_record_authority(
+    approval: Any,
+) -> tuple[
+    dict[str, Any],
+    tuple[dict[str, Any], dict[str, Any], dict[str, Any]],
+]:
+    require(
+        isinstance(approval, dict),
+        "approval_authority_contract_missing",
+        "approval authority contract must be a JSON object",
+    )
+    require(
+        approval.get("report_type") == APPROVAL_REPORT_TYPE,
+        "approval_report_type_mismatch",
+        f"approval report_type must be {APPROVAL_REPORT_TYPE!r}",
+    )
+    require(
+        approval.get("schema_version") == APPROVAL_SCHEMA_VERSION,
+        "approval_schema_version_mismatch",
+        f"approval schema_version must be {APPROVAL_SCHEMA_VERSION!r}",
+    )
+    require(
+        approval.get("approval_type") == APPROVAL_TYPE,
+        "approval_type_mismatch",
+        f"approval approval_type must be {APPROVAL_TYPE!r}",
+    )
+    handoff_path = resolve_repo_path(
+        str(approval.get("handoff_artifact_path") or ""),
+        code="approval_handoff_path_missing",
+        label="approval handoff_artifact_path",
+    )
+    handoff_facts = inspect_handoff_artifact(handoff_path)
+    require(
+        approval.get("handoff_artifact_path") == handoff_facts["handoff_repo_path"],
+        "approval_handoff_path_binding_mismatch",
+        "approval handoff_artifact_path does not match the exact handoff repo-relative path",
+    )
+    handoff_sha = require_sha256(
+        approval.get("handoff_artifact_sha256"),
+        code="approval_handoff_sha_missing_or_invalid",
+        label="approval handoff_artifact_sha256",
+    )
+    require(
+        handoff_sha == handoff_facts["handoff_sha256"],
+        "approval_handoff_sha_mismatch",
+        "approval handoff_artifact_sha256 does not match the current handoff bytes",
+    )
+    blocks = validate_authority_snapshots_against_handoff(
+        approval,
+        handoff_facts,
+        owner="approval",
+    )
+    return handoff_facts, blocks
 
 
 def validate_selected_candidate_binding(report: dict[str, Any]) -> dict[str, Any]:
@@ -773,6 +1027,8 @@ def build_generation_approval_record(
     except autonomy_ladder.AutonomyLadderError as exc:
         raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
 
+    require_authority_blocks(handoff_facts)
+    handoff_facts = _reinspect_authoritative_handoff_facts(handoff_facts)
     require(
         operator_id == CANONICAL_OPERATOR_ID,
         "approval_operator_mismatch",
@@ -795,6 +1051,9 @@ def build_generation_approval_record(
     approved_at = approved_at.astimezone(timezone.utc).replace(microsecond=0)
     expires_at = approved_at + timedelta(minutes=APPROVAL_TTL_MINUTES)
     report = handoff_facts["report"]
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        _copy_authority_blocks(require_authority_blocks(handoff_facts))
+    )
     return {
         "report_type": APPROVAL_REPORT_TYPE,
         "schema_version": APPROVAL_SCHEMA_VERSION,
@@ -809,9 +1068,9 @@ def build_generation_approval_record(
         "date": handoff_facts["date"],
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "provider": APPROVAL_PROVIDER,
         "executor": APPROVAL_EXECUTOR,
         "model": MODEL,
@@ -992,6 +1251,11 @@ def validate_generation_approval_artifact(
         "approval_handoff_sha_mismatch",
         "approval handoff_artifact_sha256 does not match the current handoff bytes",
     )
+    approval_authority_blocks = validate_authority_snapshots_against_handoff(
+        approval,
+        handoff_facts,
+        owner="approval",
+    )
     require(
         approval.get("handoff_report_type") == HANDOFF_REPORT_TYPE,
         "approval_handoff_report_type_mismatch",
@@ -1038,12 +1302,24 @@ def validate_generation_approval_artifact(
         "approval reconciliation decision snapshot does not match the bound handoff reconciliation provenance",
     )
 
+    approval_sha256 = sha256_file(approval_path)
+    validated_authority = _ValidatedApprovalAuthority(
+        seal=_AUTHORITY_VALIDATION_SEAL,
+        approval_path=approval_path,
+        approval_sha256=approval_sha256,
+        handoff_path=handoff_facts["handoff_path"],
+        handoff_sha256=handoff_facts["handoff_sha256"],
+        candidate_selection_binding_json=_canonical_json(approval_authority_blocks[0]),
+        provider_execution_binding_json=_canonical_json(approval_authority_blocks[1]),
+        binding_linkage_json=_canonical_json(approval_authority_blocks[2]),
+    )
     return {
         "approval": approval,
         "approval_path": approval_path,
         "approval_repo_path": repo_relative_path(approval_path),
-        "approval_sha256": sha256_file(approval_path),
+        "approval_sha256": approval_sha256,
         "handoff_facts": handoff_facts,
+        "_validated_authority": validated_authority,
         "approved_at_utc": approved_at.isoformat(),
         "expires_at_utc": expires_at.isoformat(),
         "is_expired": now > expires_at,
@@ -1057,6 +1333,71 @@ def validate_generation_approval_artifact(
     }
 
 
+def _validated_approval_result_authority_blocks(
+    approval_result: Any,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    require(
+        isinstance(approval_result, dict),
+        "approval_result_authority_unvalidated",
+        "approval result must come from approval artifact validation",
+    )
+    validated = approval_result.get("_validated_authority")
+    require(
+        isinstance(validated, _ValidatedApprovalAuthority)
+        and validated.seal is _AUTHORITY_VALIDATION_SEAL,
+        "approval_result_authority_unvalidated",
+        "approval result is missing its in-memory authority validation seal",
+    )
+    approval = approval_result.get("approval")
+    handoff_facts = approval_result.get("handoff_facts")
+    require(
+        isinstance(approval, dict) and isinstance(handoff_facts, dict),
+        "approval_result_authority_unvalidated",
+        "approval result is missing validated approval or handoff facts",
+    )
+    approval_blocks = require_approval_authority_blocks(approval)
+    validate_authority_snapshots_against_handoff(
+        approval,
+        handoff_facts,
+        owner="approval",
+    )
+    require(
+        approval_result.get("approval_path") == validated.approval_path
+        and approval_result.get("approval_sha256") == validated.approval_sha256
+        and validated.approval_path.is_file()
+        and sha256_file(validated.approval_path) == validated.approval_sha256,
+        "approval_result_artifact_mismatch",
+        "validated approval artifact changed after authority validation",
+    )
+    require(
+        handoff_facts.get("handoff_path") == validated.handoff_path
+        and handoff_facts.get("handoff_sha256") == validated.handoff_sha256
+        and validated.handoff_path.is_file()
+        and sha256_file(validated.handoff_path) == validated.handoff_sha256,
+        "approval_result_handoff_mismatch",
+        "validated handoff artifact changed after approval validation",
+    )
+    for actual, expected, label in (
+        (
+            approval_blocks[0],
+            validated.candidate_selection_binding_json,
+            "candidate_selection_binding",
+        ),
+        (
+            approval_blocks[1],
+            validated.provider_execution_binding_json,
+            "provider_execution_binding",
+        ),
+        (approval_blocks[2], validated.binding_linkage_json, "binding_linkage"),
+    ):
+        require(
+            _canonical_json(actual) == expected,
+            "approval_result_authority_mismatch",
+            f"validated approval {label} changed after approval validation",
+        )
+    return _copy_authority_blocks(approval_blocks)
+
+
 def build_generation_claim_record(
     approval_result: dict[str, Any],
     *,
@@ -1066,6 +1407,9 @@ def build_generation_claim_record(
     handoff_facts = approval_result["handoff_facts"]
     date_str = handoff_facts["date"]
     slot_id = handoff_facts["slot_id"]
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        _validated_approval_result_authority_blocks(approval_result)
+    )
     return {
         "report_type": CLAIM_REPORT_TYPE,
         "schema_version": CLAIM_SCHEMA_VERSION,
@@ -1078,9 +1422,9 @@ def build_generation_claim_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "operator_id": approval["operator_id"],
         "provider": approval["provider"],
         "executor": approval["executor"],
@@ -1126,6 +1470,9 @@ def build_generation_execution_receipt_record(
     date_str = handoff_facts["date"]
     slot_id = handoff_facts["slot_id"]
     claim_path = claim_path.resolve()
+    candidate_selection_binding, provider_execution_binding, binding_linkage = (
+        _validated_approval_result_authority_blocks(approval_result)
+    )
     return {
         "report_type": RECEIPT_REPORT_TYPE,
         "schema_version": RECEIPT_SCHEMA_VERSION,
@@ -1140,9 +1487,9 @@ def build_generation_execution_receipt_record(
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": handoff_facts["prompt_sha256"],
-        "candidate_selection_binding": handoff_facts.get("candidate_selection_binding") if isinstance(handoff_facts.get("candidate_selection_binding"), dict) else {},
-        "provider_execution_binding": handoff_facts.get("provider_execution_binding") if isinstance(handoff_facts.get("provider_execution_binding"), dict) else {},
-        "binding_linkage": handoff_facts.get("binding_linkage") if isinstance(handoff_facts.get("binding_linkage"), dict) else {},
+        "candidate_selection_binding": candidate_selection_binding,
+        "provider_execution_binding": provider_execution_binding,
+        "binding_linkage": binding_linkage,
         "outcome": outcome,
         "failure_stage": failure_stage,
         "error_text": error_text,
@@ -1194,17 +1541,300 @@ def _write_immutable_record_atomic(
             temp_path.unlink()
 
 
+def validate_lineage_record_authority(
+    record: Any,
+    *,
+    expected_report_type: str,
+    owner: str,
+) -> dict[str, Any]:
+    require(
+        isinstance(record, dict) and record.get("report_type") == expected_report_type,
+        f"{owner}_report_type_mismatch",
+        f"{owner} report_type must be {expected_report_type!r}",
+    )
+    approval_path = resolve_repo_path(
+        str(record.get("approval_artifact_path") or ""),
+        code=f"{owner}_approval_path_missing",
+        label=f"{owner} approval_artifact_path",
+    )
+    approval_result = validate_generation_approval_artifact(
+        approval_path,
+        require_not_expired=False,
+    )
+    handoff_facts = approval_result["handoff_facts"]
+    expected_approval_path = approval_output_path(
+        handoff_facts["date"],
+        handoff_facts["slot_id"],
+    ).resolve()
+    require(
+        approval_path == expected_approval_path,
+        f"{owner}_approval_path_mismatch",
+        f"{owner} approval_artifact_path must identify the canonical approval for the validated slot",
+    )
+    require(
+        record.get("approval_artifact_path") == approval_result["approval_repo_path"],
+        f"{owner}_approval_path_mismatch",
+        f"{owner} approval_artifact_path must use the canonical repo-relative approval path",
+    )
+    approval_blocks = _validated_approval_result_authority_blocks(approval_result)
+    record_blocks = _require_named_authority_blocks(record, owner=owner)
+    for key, actual, expected in zip(AUTHORITY_BLOCK_KEYS, record_blocks, approval_blocks):
+        require(
+            actual == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must exactly match the validated approval authority snapshot",
+        )
+    approval_sha = require_sha256(
+        record.get("approval_artifact_sha256"),
+        code=f"{owner}_approval_sha_invalid",
+        label=f"{owner} approval_artifact_sha256",
+    )
+    require(
+        approval_sha == approval_result["approval_sha256"],
+        f"{owner}_approval_sha_mismatch",
+        f"{owner} approval_artifact_sha256 must match the validated approval artifact",
+    )
+    for key in ("handoff_artifact_path", "handoff_artifact_sha256", "date", "slot_id", "prompt_sha256"):
+        expected = handoff_facts[
+            {
+                "handoff_artifact_path": "handoff_repo_path",
+                "handoff_artifact_sha256": "handoff_sha256",
+            }.get(key, key)
+        ]
+        require(
+            record.get(key) == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the validated handoff authority",
+        )
+    approval = approval_result["approval"]
+    for key in (
+        "operator_id",
+        "provider",
+        "executor",
+        "model",
+        "aspect_ratio",
+        "soul_name",
+        "soul_type",
+        "custom_reference_id",
+    ):
+        require(
+            record.get(key) == approval.get(key),
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the validated approval authority",
+        )
+    return {
+        "approval_result": approval_result,
+        "handoff_facts": handoff_facts,
+        "authority_blocks": approval_blocks,
+    }
+
+
+def validate_generation_claim_lineage(
+    record: Any,
+    *,
+    claim_path: Path | None = None,
+) -> dict[str, Any]:
+    owner = "generation_claim"
+    lineage = validate_lineage_record_authority(
+        record,
+        expected_report_type=CLAIM_REPORT_TYPE,
+        owner=owner,
+    )
+    require(
+        record.get("schema_version") == CLAIM_SCHEMA_VERSION,
+        f"{owner}_schema_version_mismatch",
+        f"{owner} schema_version must be {CLAIM_SCHEMA_VERSION!r}",
+    )
+    require(
+        record.get("claim_type") == CLAIM_TYPE,
+        f"{owner}_type_mismatch",
+        f"{owner} claim_type must be {CLAIM_TYPE!r}",
+    )
+    parse_iso8601_utc(
+        record.get("claimed_at_utc"),
+        code=f"{owner}_claimed_at_invalid",
+        label=f"{owner} claimed_at_utc",
+    )
+    handoff_facts = lineage["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    if claim_path is not None:
+        resolved_claim_path = claim_path.resolve()
+        require(
+            resolved_claim_path == claim_output_path(date_str, slot_id).resolve(),
+            f"{owner}_path_mismatch",
+            f"{owner} artifact path must be the canonical claim path for the validated slot",
+        )
+    expected_values = {
+        "authorized_attempts": 1,
+        "consumed_attempt_number": 1,
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "expected_output_directory": repo_relative_path(expected_output_directory(date_str)),
+        "expected_output_stem": expected_output_stem(slot_id),
+        "allowed_output_extensions": list(ALLOWED_OUTPUT_EXTENSIONS),
+        "state": "claimed_pending_receipt",
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+    for key, expected in expected_values.items():
+        require(
+            record.get(key) == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the canonical claim contract",
+        )
+    return lineage
+
+
+def validate_generation_execution_receipt_lineage(
+    record: Any,
+    *,
+    receipt_path: Path | None = None,
+) -> dict[str, Any]:
+    owner = "generation_receipt"
+    lineage = validate_lineage_record_authority(
+        record,
+        expected_report_type=RECEIPT_REPORT_TYPE,
+        owner=owner,
+    )
+    require(
+        record.get("schema_version") == RECEIPT_SCHEMA_VERSION,
+        f"{owner}_schema_version_mismatch",
+        f"{owner} schema_version must be {RECEIPT_SCHEMA_VERSION!r}",
+    )
+    require(
+        record.get("receipt_type") == RECEIPT_TYPE,
+        f"{owner}_type_mismatch",
+        f"{owner} receipt_type must be {RECEIPT_TYPE!r}",
+    )
+    parse_iso8601_utc(
+        record.get("receipt_written_at_utc"),
+        code=f"{owner}_written_at_invalid",
+        label=f"{owner} receipt_written_at_utc",
+    )
+    handoff_facts = lineage["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    if receipt_path is not None:
+        resolved_receipt_path = receipt_path.resolve()
+        require(
+            resolved_receipt_path == receipt_output_path(date_str, slot_id).resolve(),
+            f"{owner}_path_mismatch",
+            f"{owner} artifact path must be the canonical receipt path for the validated slot",
+        )
+
+    claim_path = resolve_repo_path(
+        str(record.get("claim_artifact_path") or ""),
+        code=f"{owner}_claim_path_missing",
+        label=f"{owner} claim_artifact_path",
+    )
+    require(
+        record.get("claim_artifact_path") == repo_relative_path(claim_path),
+        f"{owner}_claim_path_noncanonical",
+        f"{owner} claim_artifact_path must use the resolved claim artifact's canonical path",
+    )
+    require(
+        claim_path == claim_output_path(date_str, slot_id).resolve(),
+        f"{owner}_claim_path_mismatch",
+        f"{owner} claim_artifact_path must identify the canonical claim for the validated slot",
+    )
+    claim_sha = require_sha256(
+        record.get("claim_artifact_sha256"),
+        code=f"{owner}_claim_sha_invalid",
+        label=f"{owner} claim_artifact_sha256",
+    )
+    require(
+        claim_path.is_file(),
+        f"{owner}_claim_missing",
+        f"{owner} referenced claim artifact is missing: {claim_path}",
+    )
+    require(
+        sha256_file(claim_path) == claim_sha,
+        f"{owner}_claim_sha_mismatch",
+        f"{owner} claim_artifact_sha256 does not match the referenced claim bytes",
+    )
+    claim = read_json_object(
+        claim_path,
+        code=f"{owner}_claim_invalid",
+        label=f"{owner} claim artifact",
+    )
+    claim_lineage = validate_generation_claim_lineage(claim, claim_path=claim_path)
+    for key in (
+        "approval_artifact_path",
+        "approval_artifact_sha256",
+        "handoff_artifact_path",
+        "handoff_artifact_sha256",
+        "date",
+        "slot_id",
+        "prompt_sha256",
+        "operator_id",
+        "provider",
+        "executor",
+        "model",
+        "aspect_ratio",
+        "soul_name",
+        "soul_type",
+        "custom_reference_id",
+        *AUTHORITY_BLOCK_KEYS,
+    ):
+        require(
+            record.get(key) == claim.get(key),
+            f"{owner}_claim_{key}_mismatch",
+            f"{owner} {key} must exactly match the validated claim lineage",
+        )
+    require(
+        claim_lineage["approval_result"]["approval_sha256"]
+        == lineage["approval_result"]["approval_sha256"],
+        f"{owner}_claim_approval_mismatch",
+        f"{owner} and its claim must bind the same validated approval artifact",
+    )
+    expected_values = {
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+    for key, expected in expected_values.items():
+        require(
+            record.get(key) == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the canonical receipt contract",
+        )
+    return {
+        **lineage,
+        "claim": claim,
+        "claim_path": claim_path,
+        "claim_sha256": claim_sha,
+    }
+
+
 def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    handoff_facts, _ = _validate_approval_record_authority(record)
+    expected_path = approval_output_path(
+        handoff_facts["date"],
+        handoff_facts["slot_id"],
+    ).resolve()
+    require(
+        path.resolve() == expected_path,
+        "approval_path_mismatch",
+        "approval artifact path must be the canonical approval path for the validated slot",
+    )
     if path.exists():
         raise HiggsfieldGenerationApprovalError(
             "approval_already_exists",
             f"refusing to overwrite an existing approval artifact: {path}",
         )
+    path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
     payload = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
     try:
         temp_path.write_text(payload, encoding="utf-8")
+        validate_generation_approval_artifact(
+            temp_path,
+            require_not_expired=False,
+        )
         temp_path.replace(path)
     except Exception:
         if temp_path.exists():
@@ -1213,6 +1843,7 @@ def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
 
 
 def write_generation_claim_atomic(path: Path, record: dict[str, Any]) -> None:
+    validate_generation_claim_lineage(record, claim_path=path)
     _write_immutable_record_atomic(
         path,
         record,
@@ -1222,6 +1853,7 @@ def write_generation_claim_atomic(path: Path, record: dict[str, Any]) -> None:
 
 
 def write_generation_execution_receipt_atomic(path: Path, record: dict[str, Any]) -> None:
+    validate_generation_execution_receipt_lineage(record, receipt_path=path)
     _write_immutable_record_atomic(
         path,
         record,

@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 from lena_build_content_packet_dryrun_v1 import (
-    compute_proof_prompt_budget,
     load_json,
     select_recipe,
     select_environment_entry_for_recipe,
@@ -33,6 +32,7 @@ from lena_build_content_packet_dryrun_v1 import (
     HOOK_BANK,
     OUTPUT_BASE,
 )
+from lena_provider_prompt_limits_v1 import HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
 
 MANIFEST_PREFIX = "lena_content_packet_batch_manifest_dryrun_"
 
@@ -140,10 +140,8 @@ def compute_recipe_prompt_budget(recipe, wardrobe_catalog, env_catalog):
             env_id,
             recipe,
         )
-    return compute_proof_prompt_budget(
-        wardrobe_entry=wardrobe_entry,
-        env_entry=env_entry,
-    )
+    _ = wardrobe_entry, env_entry
+    return HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
 
 
 def save_manifest(manifest, run_date):

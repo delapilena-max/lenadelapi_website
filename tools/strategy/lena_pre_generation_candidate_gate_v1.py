@@ -34,13 +34,16 @@ from tools.strategy.lena_human_presence_profile_v1 import build_lena_presence_co
 
 SCHEMA_VERSION = "lena_pre_generation_candidate_gate_v1"
 CANONICAL_NICHE = "Glamour, Choices, And Beautiful Trouble"
-AUTHORITY_PATHS = (
+JSON_AUTHORITY_PATHS = (
     "pipeline/influencer_nodes/lena/persona.json",
     "pipeline/influencer_nodes/lena/lena_content_strategy_v1.json",
     "pipeline/prompt_banks/lena/lena_photo_scene_bank_v1.json",
     "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json",
     "pipeline/prompt_banks/lena/strong_hook_bank_v1.json",
+    "pipeline/prompt_banks/lena/lena_expression_gaze_bank_v1.json",
 )
+EXPRESSION_DERIVATION_REPO_PATH = "pipeline/prompting/lena_prompt_brain.py"
+AUTHORITY_PATHS = JSON_AUTHORITY_PATHS + (EXPRESSION_DERIVATION_REPO_PATH,)
 OUTPUT_ROOT = ROOT / "pipeline" / "strategy" / "lena" / "pre_generation_candidates"
 DEFAULT_PRESENCE_PROFILE = "lena-default"
 UNSUPPORTED_HOOK_CATEGORIES = {
@@ -183,8 +186,8 @@ def verify_authority_inputs_clean(paths: Iterable[str] = AUTHORITY_PATHS) -> Non
 
 
 def load_authorities(root: Path = ROOT) -> dict[str, Any]:
-    loaded = {relative: _read_json(root / relative) for relative in AUTHORITY_PATHS}
-    persona, strategy, scene_bank, recipe_bank, hook_bank = loaded.values()
+    loaded = {relative: _read_json(root / relative) for relative in JSON_AUTHORITY_PATHS}
+    persona, strategy, scene_bank, recipe_bank, hook_bank, expression_bank = loaded.values()
     if persona.get("canonical_niche") != CANONICAL_NICHE or strategy.get("canonical_niche") != CANONICAL_NICHE:
         raise GateError("invalid_canonical_authority", "persona and strategy canonical niches must agree")
     if persona.get("node_name") != "lena" or not persona.get("identity_rule") or not persona.get("core_standard"):
@@ -228,6 +231,7 @@ def load_authorities(root: Path = ROOT) -> dict[str, Any]:
         "scene_bank": scene_bank,
         "recipe_bank": recipe_bank,
         "hook_bank": hook_bank,
+        "expression_bank": expression_bank,
         "scenes": scenes,
         "recipes": recipes,
         "hooks": hooks,
@@ -678,6 +682,16 @@ def select_candidate(
             "payoff_claimed": False,
             "pose": image.get("pose_body_language_label"),
             "pose_body_language_id": image.get("pose_body_language_id"),
+            "expression_gaze_id": image.get("expression_gaze_id"),
+            "expression_gaze_label": image.get("expression_gaze_label"),
+            "expression_canonical_text": image.get("expression_canonical_text"),
+            "expression_text": image.get("expression_text"),
+            "expression_safe_fallback_used": image.get("expression_safe_fallback_used"),
+            "expression_safe_fallback_reason": image.get("expression_safe_fallback_reason"),
+            "expression_scene_conflict_terms": image.get("expression_scene_conflict_terms"),
+            "expression_derivation_scene_action": image.get(
+                "expression_derivation_scene_action"
+            ),
             "visual_style": image.get("effective_wardrobe_silhouette_class"),
             "wardrobe_outfit_id": image.get("wardrobe_outfit_id"),
             "environment_id": generated_environment_id,

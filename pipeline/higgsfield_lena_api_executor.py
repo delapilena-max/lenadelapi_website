@@ -393,6 +393,8 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     queue_loaded_path, queue_report = load_queue_report(date_str)
     packet_report = load_content_packet_report(packet_path, date_str)
     from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
+        HiggsfieldGenerationApprovalError,
+        require_authority_blocks,
         validate_selected_candidate_binding,
     )
 
@@ -423,6 +425,43 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         "selected_candidate_recommendation_mismatch",
         f"{handoff_path} selected prompt input recipe mismatch",
     )
+    try:
+        require_authority_blocks(report)
+    except HiggsfieldGenerationApprovalError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+    from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+
+    try:
+        expected_pose_provenance, expected_pose_bound_packet_sha256 = (
+            pose_provenance.validate_handoff_pose_copies(report)
+        )
+        expected_expression_provenance, expected_expression_bound_packet_sha256 = (
+            pose_provenance.validate_handoff_expression_copies(report)
+        )
+        pose_provenance.validate_pose_provenance(
+            expected_pose_provenance,
+            expected_candidate_path=str(report.get("source_selected_candidate_artifact_path") or ""),
+            expected_candidate_sha256=str(report.get("source_selected_candidate_artifact_sha256") or ""),
+            expected_authority_commit=str(
+                selected_candidate_binding["selected_candidate"].get("authority_commit") or ""
+            ),
+        )
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+    _require_handoff(
+        expected_pose_bound_packet_sha256 == expected_expression_bound_packet_sha256,
+        "handoff_provider_authority_packet_mismatch",
+        f"{handoff_path} pose and expression packet digests disagree",
+    )
+    for label, value in (
+        ("selected_prompt_input", (report.get("selected_prompt_input") or {}).get("pose_provenance")),
+        ("structured_executor_inputs", structured.get("pose_provenance")),
+    ):
+        _require_handoff(
+            value == expected_pose_provenance,
+            "handoff_pose_provenance_mismatch",
+            f"{handoff_path} {label} pose provenance disagrees with the authoritative handoff binding",
+        )
     _require_handoff(packet_report.get("packet_id") == report.get("selected_prompt_input", {}).get("packet_id"), "handoff_candidate_id_mismatch", f"{handoff_path} selected prompt input packet id mismatch")
     _require_handoff(packet_report.get("strong_hook_id") == report.get("selected_prompt_input", {}).get("hook_id"), "handoff_hook_id_mismatch", f"{handoff_path} selected prompt input hook id mismatch")
     _require_handoff(packet_report.get("hook_text") == report.get("selected_prompt_input", {}).get("hook_text"), "handoff_hook_text_mismatch", f"{handoff_path} selected prompt input hook text mismatch")
@@ -434,14 +473,47 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         or ""
     )
     _cand_path = _resolve_repo_path(_cand_rel) if _cand_rel else None
-    rebuilt_packet, source = _rebuild_packet_prompt_source(packet_path, slot_id, _cand_path)
+    rebuilt_packet, source = _rebuild_packet_prompt_source(
+        packet_path,
+        slot_id,
+        _cand_path,
+        expected_pose_provenance=expected_pose_provenance,
+        expected_expression_provenance=expected_expression_provenance,
+    )
     image = source.get("image", {})
+    _require_handoff(
+        image.get("pose_provenance") == expected_pose_provenance,
+        "handoff_executor_pose_provenance_mismatch",
+        f"{handoff_path} executor source pose provenance differs from the handoff binding",
+    )
+    _require_handoff(
+        image.get("expression_provenance") == expected_expression_provenance,
+        "handoff_executor_expression_provenance_mismatch",
+        f"{handoff_path} executor source expression provenance differs from the handoff binding",
+    )
     prompt = image.get("image_prompt")
     _require_handoff(isinstance(prompt, str) and bool(prompt), "handoff_prompt_missing", f"{handoff_path} executor could not regenerate prompt bytes")
     regenerated_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     expected_sha = str(report.get("selected_prompt_input", {}).get("prompt_sha256", ""))
     _require_handoff(expected_sha and regenerated_sha == expected_sha, "handoff_prompt_sha_mismatch", f"{handoff_path} regenerated prompt SHA does not match packet expectation")
-    _require_handoff(str(packet_report.get("compact_provider_prompt_sha256", "")).strip() == regenerated_sha, "handoff_prompt_candidate_sha_mismatch", f"{handoff_path} prompt input sha mismatch")
+    _require_handoff(
+        image.get("pose_bound_content_packet_artifact_path")
+        == report.get("selected_prompt_input_artifact_path")
+        and image.get("pose_bound_content_packet_artifact_sha256")
+        == report.get("selected_prompt_input_artifact_sha256")
+        and image.get("pose_bound_content_packet_sha256")
+        == expected_pose_bound_packet_sha256,
+        "handoff_executor_pose_bound_packet_mismatch",
+        f"{handoff_path} executor source packet binding differs from the handoff binding",
+    )
+    _require_handoff(
+        expected_pose_bound_packet_sha256
+        == hashlib.sha256(
+            json.dumps(rebuilt_packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest(),
+        "handoff_pose_bound_packet_sha_mismatch",
+        f"{handoff_path} pose-bound packet digest mismatch",
+    )
     _require_handoff(image.get("slot_id") == slot_id, "handoff_slot_mismatch", f"{handoff_path} regenerated slot mismatch")
     _require_handoff(image.get("lane") == report.get("selected_prompt_input", {}).get("lane"), "handoff_lane_mismatch", f"{handoff_path} regenerated lane mismatch")
     _require_handoff(image.get("soul_name") == CONFIRMED_LENA_SOUL_NAME, "handoff_soul_name_mismatch", f"{handoff_path} regenerated soul name mismatch")
@@ -449,7 +521,8 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     _require_handoff(image.get("soul_selection_mode") == "provider_config_not_prompt_text", "handoff_soul_selection_mode_mismatch", f"{handoff_path} regenerated soul selection mode mismatch")
     _require_handoff(image.get("negative_prompt_enabled") is False, "handoff_negative_prompt_enabled", f"{handoff_path} regenerated prompt must keep negative_prompt disabled")
     _require_handoff(report.get("selected_prompt_input", {}).get("artifact_sha256") == _sha256_file(packet_path), "handoff_candidate_artifact_sha_mismatch", f"{handoff_path} selected prompt input artifact sha mismatch")
-    _require_handoff(packet_report.get("compact_provider_prompt_preview") == prompt, "handoff_prompt_text_mismatch", f"{handoff_path} selected prompt input text mismatch")
+    _require_handoff(report.get("selected_prompt_input", {}).get("prompt_text") == prompt, "handoff_prompt_text_mismatch", f"{handoff_path} selected prompt input text mismatch")
+    _require_handoff(structured.get("selected_prompt_text") == prompt, "handoff_structured_prompt_text_mismatch", f"{handoff_path} structured prompt text mismatch")
     _require_handoff(rebuilt_packet.get("compact_provider_prompt_preview") == prompt, "handoff_rebuilt_prompt_text_mismatch", f"{handoff_path} rebuilt prompt text mismatch")
     validation = validate_candidate(source, None)
     _require_handoff(validation["ok"], "handoff_prompt_validation_failed", f"{handoff_path} regenerated prompt does not satisfy the existing dry-run validation gates")
@@ -1073,15 +1146,63 @@ def _rebuild_packet_prompt_source(
     packet_path: Path,
     slot_id_override: str | None = None,
     candidate_path: "Path | None" = None,
+    *,
+    expected_pose_provenance: "dict[str, Any] | None" = None,
+    expected_expression_provenance: "dict[str, Any] | None" = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     from pipeline.prompting.lena_prompt_brain import catalog_outfit_silhouette_class  # noqa: E402
     from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
+    from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
     packet_report = load_content_packet_report(
         packet_path,
         str(json.loads(packet_path.read_text(encoding="utf-8")).get("generated_date", "")).strip(),
     )
-    rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(packet_report)
+    _require_handoff(
+        candidate_path is not None and candidate_path.is_file(),
+        "handoff_candidate_pose_missing",
+        "a selected candidate artifact is required to reconstruct provider pose authority",
+    )
+    try:
+        derived_pose_provenance = pose_provenance.build_candidate_pose_provenance(
+            candidate_path,
+            root=ROOT,
+        )
+        derived_expression_provenance = (
+            pose_provenance.build_candidate_expression_provenance(
+                candidate_path,
+                root=ROOT,
+            )
+        )
+        pose_provenance.validate_pose_provenance(expected_pose_provenance)
+        pose_provenance.validate_expression_provenance(
+            expected_expression_provenance
+        )
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+    _require_handoff(
+        derived_pose_provenance == expected_pose_provenance,
+        "handoff_pose_provenance_mismatch",
+        "executor-derived pose provenance disagrees with the handoff authority",
+    )
+    _require_handoff(
+        derived_expression_provenance == expected_expression_provenance,
+        "handoff_expression_provenance_mismatch",
+        "executor-derived expression provenance disagrees with the handoff authority",
+    )
+    rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(
+        packet_report,
+        pose_binding=derived_pose_provenance,
+        expression_binding=derived_expression_provenance,
+    )
+    pose_bound_packet_sha256 = hashlib.sha256(
+        json.dumps(
+            rebuilt_packet,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+    ).hexdigest()
     prompt = str(rebuilt_packet.get("compact_provider_prompt_preview", "")).strip()
     _require_handoff(
         bool(prompt),
@@ -1093,41 +1214,6 @@ def _rebuild_packet_prompt_source(
         if isinstance(slot_id_override, str) and slot_id_override.strip()
         else f"higgsfield-{packet_report['generated_date'].replace('-', '')}-{packet_report['recipe_id']}-photo"
     )
-
-    # Load candidate provenance fields from the pre-generation candidate artifact.
-    pose_body_language_id: Any = None
-    expression_gaze_id: Any = None
-    expression_gaze_label: Any = None
-    if candidate_path is not None and candidate_path.is_file():
-        try:
-            cand_data = json.loads(candidate_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            raise HandoffArtifactError(
-                "handoff_candidate_unreadable",
-                f"candidate artifact unreadable: {candidate_path}: {exc}",
-            ) from exc
-        cand = cand_data.get("candidate") or {}
-        pose_body_language_id = cand.get("pose_body_language_id")
-        expression_gaze_id = cand.get("expression_gaze_id")
-        expression_gaze_label = cand.get("expression_gaze_label")
-        pose_body_language_label = cand.get("pose_body_language_label") or cand.get("pose")
-        _require_handoff(
-            pose_body_language_id,
-            "handoff_candidate_pose_missing",
-            f"candidate artifact {candidate_path} is missing required pose_body_language_id",
-        )
-        _require_handoff(
-            pose_body_language_label,
-            "handoff_candidate_pose_label_missing",
-            f"candidate artifact {candidate_path} is missing required pose label",
-        )
-        _require_handoff(
-            expression_gaze_id and expression_gaze_label,
-            "handoff_candidate_expression_missing",
-            f"candidate artifact {candidate_path} is missing required expression_gaze provenance",
-        )
-    else:
-        pose_body_language_label = None
 
     # Derive wardrobe name and silhouette class from the catalog.
     wardrobe_outfit_id = packet_report.get("wardrobe_outfit_id")
@@ -1155,10 +1241,29 @@ def _rebuild_packet_prompt_source(
             "wardrobe_outfit_name": wardrobe_outfit_name,
             "wardrobe_silhouette_class": wardrobe_silhouette_class,
             "environment_id": packet_report.get("environment_id"),
-            "pose_body_language_id": pose_body_language_id,
-            "pose_body_language_label": pose_body_language_label,
-            "expression_gaze_id": expression_gaze_id,
-            "expression_gaze_label": expression_gaze_label,
+            "pose_body_language_id": derived_pose_provenance["pose_body_language_id"],
+            "pose_body_language_label": derived_pose_provenance["pose_body_language_label"],
+            "pose_text": derived_pose_provenance["pose_text"],
+            "pose_provenance": derived_pose_provenance,
+            "pose_bound_content_packet_artifact_path": _repo_relative_path(packet_path),
+            "pose_bound_content_packet_artifact_sha256": _sha256_file(packet_path),
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha256,
+            "expression_gaze_id": derived_expression_provenance["expression_gaze_id"],
+            "expression_gaze_label": derived_expression_provenance["expression_gaze_label"],
+            "expression_text": derived_expression_provenance["expression_text"],
+            "expression_safe_fallback_used": derived_expression_provenance[
+                "expression_safe_fallback_used"
+            ],
+            "expression_safe_fallback_reason": derived_expression_provenance[
+                "expression_safe_fallback_reason"
+            ],
+            "expression_scene_conflict_terms": derived_expression_provenance[
+                "expression_scene_conflict_terms"
+            ],
+            "expression_provenance": derived_expression_provenance,
+            "expression_bound_content_packet_artifact_path": _repo_relative_path(packet_path),
+            "expression_bound_content_packet_artifact_sha256": _sha256_file(packet_path),
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
             "effective_wardrobe_silhouette_class": wardrobe_silhouette_class,
             "soul_name": CONFIRMED_LENA_SOUL_NAME,
             "soul_version": CONFIRMED_LENA_SOUL_TYPE,
@@ -1184,14 +1289,20 @@ def _rebuild_packet_prompt_source(
                 "pose_scene_match_pass": True,
                 "pose_scene_mismatch_terms_found": [],
                 "low_hook_terms_found": [],
-                "final_expression_text": "",
-                "expression_safe_fallback_used": False,
-                "expression_safe_fallback_reason": "",
-                "expression_scene_gaze_conflict_terms_found": [],
+                "final_expression_text": derived_expression_provenance["expression_text"],
+                "expression_safe_fallback_used": derived_expression_provenance[
+                    "expression_safe_fallback_used"
+                ],
+                "expression_safe_fallback_reason": derived_expression_provenance[
+                    "expression_safe_fallback_reason"
+                ],
+                "expression_scene_gaze_conflict_terms_found": derived_expression_provenance[
+                    "expression_scene_conflict_terms"
+                ],
             },
         },
     }
-    return packet_report, source
+    return rebuilt_packet, source
 
 
 def _load_handoff_report(handoff_path: Path) -> dict[str, Any]:
@@ -1364,6 +1475,61 @@ def build_manifest(
     image = source["image"]
     prompt = image["image_prompt"]
     prompt_bytes = prompt.encode("utf-8")
+    from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+
+    try:
+        bound_pose = pose_provenance.validate_pose_provenance(image.get("pose_provenance"))
+        bound_expression = pose_provenance.validate_expression_provenance(
+            image.get("expression_provenance")
+        )
+        pose_provenance.require_pose_bound_prompt(prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(prompt, bound_expression)
+    except pose_provenance.PoseProvenanceError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+    _require_handoff(
+        image.get("pose_body_language_id") == bound_pose["pose_body_language_id"]
+        and image.get("pose_body_language_label") == bound_pose["pose_body_language_label"]
+        and image.get("pose_text") == bound_pose["pose_text"],
+        "manifest_pose_provenance_mismatch",
+        "manifest pose fields must equal the validated provider pose authority",
+    )
+    _require_handoff(
+        image.get("expression_gaze_id") == bound_expression["expression_gaze_id"]
+        and image.get("expression_gaze_label")
+        == bound_expression["expression_gaze_label"]
+        and image.get("expression_text") == bound_expression["expression_text"],
+        "manifest_expression_provenance_mismatch",
+        "manifest expression fields must equal the validated provider expression authority",
+    )
+    packet_path_value = image.get("pose_bound_content_packet_artifact_path")
+    packet_artifact_sha256 = image.get("pose_bound_content_packet_artifact_sha256")
+    packet_bound_sha256 = image.get("pose_bound_content_packet_sha256")
+    _require_handoff(
+        isinstance(packet_path_value, str) and bool(packet_path_value.strip()),
+        "manifest_pose_bound_packet_path_missing",
+        "manifest source must identify the pose-bound content packet artifact",
+    )
+    _require_handoff(
+        isinstance(packet_artifact_sha256, str)
+        and bool(pose_provenance.SHA256_RE.fullmatch(packet_artifact_sha256)),
+        "manifest_pose_bound_packet_artifact_sha_invalid",
+        "manifest source content packet artifact SHA must be a lowercase SHA-256",
+    )
+    _require_handoff(
+        isinstance(packet_bound_sha256, str)
+        and bool(pose_provenance.SHA256_RE.fullmatch(packet_bound_sha256)),
+        "manifest_pose_bound_packet_sha_invalid",
+        "manifest source pose-bound content packet digest must be a lowercase SHA-256",
+    )
+    _require_handoff(
+        image.get("expression_bound_content_packet_artifact_path") == packet_path_value
+        and image.get("expression_bound_content_packet_artifact_sha256")
+        == packet_artifact_sha256
+        and image.get("expression_bound_content_packet_sha256")
+        == packet_bound_sha256,
+        "manifest_expression_bound_packet_mismatch",
+        "manifest source expression packet binding must equal the pose-bound packet bytes",
+    )
 
     manifest = {
         "provider": "higgsfield",
@@ -1393,7 +1559,21 @@ def build_manifest(
         "text_surface_risk_terms_found": image.get("text_surface_risk_terms_found", []),
         "pose_body_language_id": image.get("pose_body_language_id"),
         "pose_body_language_label": image.get("pose_body_language_label"),
-        "pose_text": _canonical_pose_text(image),
+        "pose_text": bound_pose["pose_text"],
+        "pose_provenance": bound_pose,
+        "pose_bound_content_packet_artifact_path": packet_path_value,
+        "pose_bound_content_packet_artifact_sha256": packet_artifact_sha256,
+        "pose_bound_content_packet_sha256": packet_bound_sha256,
+        "expression_provenance": bound_expression,
+        "expression_bound_content_packet_artifact_path": image.get(
+            "expression_bound_content_packet_artifact_path"
+        ),
+        "expression_bound_content_packet_artifact_sha256": image.get(
+            "expression_bound_content_packet_artifact_sha256"
+        ),
+        "expression_bound_content_packet_sha256": image.get(
+            "expression_bound_content_packet_sha256"
+        ),
         # Persisted (2026-07-10) so a real, non-fabricated visual_style
         # (f"{camera_text}; {lighting_text}", matching the Kling package
         # builder's own convention) can be built later without re-parsing
@@ -1403,13 +1583,17 @@ def build_manifest(
         # language_id/expression_gaze_id above.
         "camera_text": image.get("camera_text"),
         "lighting_text": image.get("lighting_text"),
-        "expression_gaze_id": image.get("expression_gaze_id"),
-        "expression_gaze_label": image.get("expression_gaze_label"),
-        "expression_text": image["validation"]["final_expression_text"],
-        "expression_safe_fallback_used": image["validation"]["expression_safe_fallback_used"],
-        "expression_safe_fallback_reason": image["validation"]["expression_safe_fallback_reason"],
-        "expression_scene_conflict_terms": image["validation"][
-            "expression_scene_gaze_conflict_terms_found"
+        "expression_gaze_id": bound_expression["expression_gaze_id"],
+        "expression_gaze_label": bound_expression["expression_gaze_label"],
+        "expression_text": bound_expression["expression_text"],
+        "expression_safe_fallback_used": bound_expression[
+            "expression_safe_fallback_used"
+        ],
+        "expression_safe_fallback_reason": bound_expression[
+            "expression_safe_fallback_reason"
+        ],
+        "expression_scene_conflict_terms": bound_expression[
+            "expression_scene_conflict_terms"
         ],
         "hard_exclude_reasons": _hard_exclude_reasons(image),
         "pack_variety_warnings": source["pack_variety_warnings"],
@@ -1471,6 +1655,31 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
         retry_source["image"]["slot_id"] = artifact["retry_slot_id"]
         retry_source["image"]["image_prompt"] = artifact["retry_prompt_text"]
         retry_source["image"]["prompt_sha256"] = artifact["retry_prompt_sha256"]
+        from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+
+        try:
+            retry_pose = pose_provenance.validate_pose_provenance(artifact.get("pose_provenance"))
+            retry_expression = pose_provenance.validate_expression_provenance(
+                artifact.get("expression_provenance")
+            )
+            pose_provenance.require_pose_bound_prompt(artifact["retry_prompt_text"], retry_pose)
+            pose_provenance.require_expression_bound_prompt(
+                artifact["retry_prompt_text"],
+                retry_expression,
+            )
+        except pose_provenance.PoseProvenanceError as exc:
+            raise HandoffArtifactError(exc.code, exc.detail) from exc
+        _require_handoff(
+            retry_source["image"].get("pose_provenance") == retry_pose,
+            "retry_pose_provenance_mismatch",
+            "retry source pose provenance differs from the original generation handoff",
+        )
+        _require_handoff(
+            retry_source["image"].get("expression_provenance")
+            == retry_expression,
+            "retry_expression_provenance_mismatch",
+            "retry source expression provenance differs from the original generation handoff",
+        )
         retry_source["image"]["retry_execution_contract"] = {
             "schema_version": schema_version,
             "retry_handoff_fingerprint_sha256": artifact["retry_handoff_fingerprint_sha256"],
@@ -1483,6 +1692,14 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
             "source_handoff_artifact_sha256": artifact["source_handoff_artifact_sha256"],
             "source_selected_prompt_input_artifact_path": artifact["source_selected_prompt_input_artifact_path"],
             "source_selected_prompt_input_artifact_sha256": artifact["source_selected_prompt_input_artifact_sha256"],
+            "source_pose_bound_content_packet_sha256": artifact["source_pose_bound_content_packet_sha256"],
+            "source_expression_bound_content_packet_sha256": artifact[
+                "source_expression_bound_content_packet_sha256"
+            ],
+            "expression_provenance": retry_expression,
+            "expression_provenance_fingerprint_sha256": retry_expression[
+                "expression_provenance_fingerprint_sha256"
+            ],
             "source_execution_receipt_path": artifact["source_execution_receipt_path"],
             "source_execution_receipt_sha256": artifact["source_execution_receipt_sha256"],
             "source_manifest_path": artifact["source_manifest_path"],
@@ -1877,6 +2094,9 @@ def main() -> int:
 
     if args.retry_decision_artifact is not None:
         print_dry_run_report(date_str, slot_id, source, args.custom_reference_id, validation)
+        if not validation["ok"]:
+            print("[ABORT] retry prompt failed validation before approval consumption or provider execution.")
+            return 1
         retry_approval_result = None
         retry_approval_error: Optional[HandoffArtifactError] = None
         if args.retry_approval_artifact is not None:

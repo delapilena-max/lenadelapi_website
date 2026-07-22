@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -45,9 +46,22 @@ def _sha256_file(path: Path) -> str:
     return _sha256_bytes(path.read_bytes())
 
 
-def _git_bytes(*args: str) -> bytes:
+def _git_environment() -> dict[str, str]:
+    return {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+
+
+def _effective_root(root: Path | None) -> Path:
+    return (root or ROOT).resolve()
+
+
+def _git_bytes(*args: str, root: Path | None = None) -> bytes:
+    effective_root = _effective_root(root)
     result = subprocess.run(
-        ["git", *args], cwd=ROOT, check=False, capture_output=True
+        ["git", *args],
+        cwd=effective_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
     )
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
@@ -55,20 +69,32 @@ def _git_bytes(*args: str) -> bytes:
     return result.stdout
 
 
-def _worktree_bytes_match_commit(commit: str, relative: str, current: bytes) -> bool:
+def _worktree_bytes_match_commit(
+    commit: str,
+    relative: str,
+    current: bytes,
+    *,
+    root: Path | None = None,
+) -> bool:
     # The selector hashes raw checkout bytes, which may be LF or CRLF even
     # when Git sees the file as unchanged. Compare Git-cleaned content to the
     # commit blob while retaining the artifact's exact raw-byte SHA check.
+    effective_root = _effective_root(root)
     cleaned = subprocess.run(
         ["git", "hash-object", f"--path={relative}", "--stdin"],
-        cwd=ROOT,
+        cwd=effective_root,
         check=False,
         input=current,
         capture_output=True,
+        env=_git_environment(),
     )
     if cleaned.returncode != 0:
         raise ConsumerError("authority_commit_invalid", f"git could not clean authority input: {relative}")
-    committed_blob = _git_bytes("rev-parse", f"{commit}:{relative}").strip()
+    committed_blob = _git_bytes(
+        "rev-parse",
+        f"{commit}:{relative}",
+        root=effective_root,
+    ).strip()
     return cleaned.stdout.strip() == committed_blob
 
 
@@ -116,7 +142,10 @@ def _validate_shape(artifact: dict[str, Any]) -> dict[str, Any]:
         date.fromisoformat(as_of_date)
     except ValueError as exc:
         raise ConsumerError("decision_date_invalid", "as_of_date must be a valid ISO date") from exc
-    required = ("candidate_id", "slot_id", "lane", "recipe_id", "hook_id", "prompt_sha256", "exact_proposed_dry_run_command")
+    required = (
+        "candidate_id", "slot_id", "lane", "recipe_id", "hook_id",
+        "prompt_sha256", "exact_proposed_dry_run_command",
+    )
     missing = [key for key in required if not candidate.get(key)]
     if missing:
         raise ConsumerError("candidate_identity_missing", f"candidate is missing required fields: {', '.join(missing)}")
@@ -152,16 +181,34 @@ def _validate_fingerprint(artifact: dict[str, Any]) -> tuple[dict[str, Any], str
     return core, recomputed
 
 
-def _validate_authority(artifact: dict[str, Any]) -> None:
+def _validate_authority(artifact: dict[str, Any], *, root: Path | None = None) -> None:
+    effective_root = _effective_root(root)
+    git_bytes = (
+        (lambda *args: _git_bytes(*args))
+        if root is None
+        else (lambda *args: _git_bytes(*args, root=effective_root))
+    )
     commit = artifact.get("authority_commit")
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ConsumerError("authority_commit_invalid", "authority_commit must be a full commit hash")
-    _git_bytes("cat-file", "-e", f"{commit}^{{commit}}")
+    object_type = git_bytes("cat-file", "-t", commit).decode(
+        "ascii", errors="replace"
+    ).strip()
+    if object_type != "commit":
+        raise ConsumerError("authority_commit_invalid", "authority_commit must identify a commit object exactly")
+    resolved_commit = git_bytes(
+        "rev-parse",
+        "--verify",
+        f"{commit}^{{commit}}",
+    ).decode("ascii", errors="replace").strip()
+    if resolved_commit != commit:
+        raise ConsumerError("authority_commit_invalid", "authority_commit did not resolve to the exact commit")
     ancestor = subprocess.run(
         ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
-        cwd=ROOT,
+        cwd=effective_root,
         check=False,
         capture_output=True,
+        env=_git_environment(),
     )
     if ancestor.returncode != 0:
         raise ConsumerError("authority_commit_not_ancestor", "decision authority commit is not an ancestor of current HEAD")
@@ -176,20 +223,35 @@ def _validate_authority(artifact: dict[str, Any]) -> None:
         recorded = matches[0].get("sha256")
         if not isinstance(recorded, str) or not SHA256_RE.fullmatch(recorded):
             raise ConsumerError("authority_provenance_invalid", f"invalid recorded SHA for {relative}")
-        current_path = ROOT / relative
+        current_path = effective_root / relative
         if not current_path.is_file():
             raise ConsumerError("stale_canonical_authority", f"canonical authority is missing: {relative}")
         current = current_path.read_bytes()
         if _sha256_bytes(current) != recorded:
             raise ConsumerError("stale_canonical_authority", f"canonical authority changed; fresh selection required: {relative}")
-        if not _worktree_bytes_match_commit(commit, relative, current):
+        worktree_matches = (
+            _worktree_bytes_match_commit(commit, relative, current)
+            if root is None
+            else _worktree_bytes_match_commit(
+                commit,
+                relative,
+                current,
+                root=effective_root,
+            )
+        )
+        if not worktree_matches:
             raise ConsumerError("authority_commit_hash_mismatch", f"canonical authority content does not match {commit}: {relative}")
 
 
-def _rebuild_current_decision(artifact: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _rebuild_current_decision(
+    artifact: dict[str, Any],
+    *,
+    root: Path | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    effective_root = _effective_root(root)
     try:
-        authorities = selector.load_authorities()
-        recent = selector.load_recent_content()
+        authorities = selector.load_authorities(effective_root)
+        recent = selector.load_recent_content(effective_root)
         prompt_candidates, prompt_meta = selector.build_prompt_candidates(
             artifact["as_of_date"], artifact["authority_commit"][:8]
         )
@@ -211,9 +273,17 @@ def _rebuild_current_decision(artifact: dict[str, Any]) -> tuple[dict[str, Any],
 
 
 def _validate_regenerated_candidate(
-    artifact: dict[str, Any], stored_core: dict[str, Any], candidate: dict[str, Any]
+    artifact: dict[str, Any],
+    stored_core: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    root: Path | None = None,
 ) -> tuple[dict[str, Any], str]:
-    fresh_core, selected = _rebuild_current_decision(artifact)
+    fresh_core, selected = (
+        _rebuild_current_decision(artifact)
+        if root is None
+        else _rebuild_current_decision(artifact, root=root)
+    )
     fresh_fingerprint = _sha256_bytes(selector._canonical_bytes(fresh_core))
     # Selector internals may contain tuples that JSON persists as arrays.
     # Its canonical-byte contract, not Python container identity, is authoritative.
@@ -223,7 +293,13 @@ def _validate_regenerated_candidate(
     ):
         raise ConsumerError("stale_decision", "current decision-critical evidence does not reproduce the stored decision")
 
-    for field in ("candidate_id", "slot_id", "lane", "recipe_id", "hook_id", "prompt_sha256"):
+    for field in (
+        "candidate_id", "slot_id", "lane", "recipe_id", "hook_id",
+        "prompt_sha256", "expression_gaze_id", "expression_gaze_label",
+        "expression_canonical_text", "expression_text",
+        "expression_safe_fallback_used", "expression_safe_fallback_reason",
+        "expression_scene_conflict_terms", "expression_derivation_scene_action",
+    ):
         if candidate.get(field) != selected.get(field):
             raise ConsumerError(f"{field}_mismatch", f"stored {field} does not match current deterministic selection")
 
@@ -252,6 +328,37 @@ def _validate_regenerated_candidate(
     if argv.count(prompt) != 1 or "--wait" not in argv or "--json" not in argv:
         raise ConsumerError("executor_contract_mismatch", "executor provider action could not be reconstructed exactly")
     return validation, fresh_fingerprint
+
+
+def validate_selected_candidate_issuance(
+    artifact: dict[str, Any],
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    candidate = _validate_shape(artifact)
+    stored_core, recomputed = _validate_fingerprint(artifact)
+    if root is None:
+        _validate_authority(artifact)
+        executor_validation, fresh_fingerprint = _validate_regenerated_candidate(
+            artifact,
+            stored_core,
+            candidate,
+        )
+    else:
+        _validate_authority(artifact, root=root)
+        executor_validation, fresh_fingerprint = _validate_regenerated_candidate(
+            artifact,
+            stored_core,
+            candidate,
+            root=root,
+        )
+    return {
+        "candidate": candidate,
+        "stored_core": stored_core,
+        "recomputed_fingerprint_sha256": recomputed,
+        "fresh_fingerprint_sha256": fresh_fingerprint,
+        "executor_validation": executor_validation,
+    }
 
 
 def _delegate_executor_dry_run(as_of_date: str, slot_id: str) -> dict[str, Any]:
@@ -349,10 +456,11 @@ def evaluate_decision(
         raise ConsumerError(exc.code, exc.detail) from exc
 
     artifact = _read_artifact(artifact_path)
-    candidate = _validate_shape(artifact)
-    stored_core, recomputed = _validate_fingerprint(artifact)
-    _validate_authority(artifact)
-    executor_validation, fresh_fingerprint = _validate_regenerated_candidate(artifact, stored_core, candidate)
+    issuance = validate_selected_candidate_issuance(artifact)
+    candidate = issuance["candidate"]
+    recomputed = issuance["recomputed_fingerprint_sha256"]
+    executor_validation = issuance["executor_validation"]
+    fresh_fingerprint = issuance["fresh_fingerprint_sha256"]
 
     validation_results = {
         "shape_valid": True,

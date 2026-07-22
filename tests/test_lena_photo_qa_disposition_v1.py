@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.identity import lena_higgsfield_identity as identity
+from tests.fixtures import lena_pose_provenance as pose_fixture
 from tests.fixtures.lena_retry_lineage import build_retry_lineage
 from tests.test_lena_bounded_live_cycle_v1 import _build_bundle as build_live_cycle_bundle
 from tests.test_lena_bounded_live_cycle_v1 import _patch_clock as patch_live_cycle_clock
@@ -162,6 +163,7 @@ def retry_lineage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         },
     )
     monkeypatch.setattr(disposition, "_validate_manifest_bank_context", lambda manifest, candidate, commit: None)
+    monkeypatch.setattr(disposition, "_validate_manifest_pose_contract", lambda *args, **kwargs: None)
     lineage["reference_set_sha"] = reference_set_sha
     return lineage
 
@@ -208,6 +210,23 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     decision_path = tmp_path / "decision.json"
     _write_json(decision_path, decision)
     monkeypatch.setattr(handoff, "_validate_authority", lambda artifact: None)
+
+    def validate_fixture_issuance(artifact, root=None):
+        candidate_value = handoff._validate_shape(artifact)
+        stored_core, recomputed = handoff._validate_fingerprint(artifact)
+        return {
+            "candidate": candidate_value,
+            "stored_core": stored_core,
+            "recomputed_fingerprint_sha256": recomputed,
+            "fresh_fingerprint_sha256": recomputed,
+            "executor_validation": {"ok": True},
+        }
+
+    monkeypatch.setattr(
+        handoff,
+        "validate_selected_candidate_issuance",
+        validate_fixture_issuance,
+    )
 
     image_path = tmp_path / "generated.png"
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
@@ -316,6 +335,7 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "authority_commit": commit, "required_semantic_dimensions": {"identity": ["face"], "character_fit": ["confident"], "reject_character_traits": ["fake-rich signaling", "melodramatic", "audience-controlled identity"], "sexuality_and_safety": ["no sexual-signal stacking"], "aesthetic_quality": ["premium visual discipline"]},
     })
     monkeypatch.setattr(disposition, "_validate_manifest_bank_context", lambda manifest, candidate, commit: None)
+    monkeypatch.setattr(disposition, "_validate_manifest_pose_contract", lambda *args, **kwargs: None)
     return {
         "kwargs": kwargs,
         "decision": decision,
@@ -373,7 +393,6 @@ def _production_dual_binding_fixture(
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(image_path)
     handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
-    selected_prompt_text = "provider prompt preview"
     canonical_pose_text = "weight shifted onto one hip, stance easy and unforced"
     canonical_expression = disposition.lena_prompt_brain._higgsfield_safe_expression_text(
         "",
@@ -385,7 +404,9 @@ def _production_dual_binding_fixture(
     wardrobe_catalog = json.loads(
         (ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json").read_text(encoding="utf-8")
     )
-    wardrobe_prompt = next(item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050")
+    wardrobe_prompt = next(
+        item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050"
+    )
     reference_authority_commit = disposition.subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=ROOT,
@@ -393,9 +414,9 @@ def _production_dual_binding_fixture(
         check=True,
         text=True,
     ).stdout.strip()
-    provider_prompt_text = (
-        f"{selected_prompt_text} Pose: {canonical_pose_text}. "
-        f"Expression: {canonical_expression['text']}. Wardrobe: {wardrobe_prompt}"
+    provider_prompt_text = pose_fixture.canonical_prompt().replace(
+        "Lena in a controlled fashion portrait with a calm expression.",
+        f"Lena in a controlled fashion portrait with a calm expression. Wardrobe: {wardrobe_prompt}",
     )
     provider_prompt_sha = hashlib.sha256(provider_prompt_text.encode("utf-8")).hexdigest()
     auth["influencer_id"] = "lena"
@@ -411,6 +432,11 @@ def _production_dual_binding_fixture(
         "expression_text": canonical_expression["text"],
         "expression_gaze_id": "exp_g001",
         "expression_gaze_label": "closed_mouth_smile_direct",
+        "expression_canonical_text": canonical_expression["text"],
+        "expression_safe_fallback_used": False,
+        "expression_safe_fallback_reason": None,
+        "expression_scene_conflict_terms": [],
+        "expression_derivation_scene_action": "",
         "wardrobe_outfit_id": "wc_p050",
         "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
         "wardrobe_silhouette_class": "fitted_top_and_jeans",
@@ -439,7 +465,44 @@ def _production_dual_binding_fixture(
     candidate_file["generated_at_utc"] = "2026-07-19T00:00:00Z"
     candidate_file["decision_fingerprint_sha256"] = hashlib.sha256(selector._canonical_bytes(candidate_file_core)).hexdigest()
     _write_json(candidate_path, candidate_file)
+
+    def validate_fixture_issuance(artifact, root=None):
+        candidate_value = disposition.handoff._validate_shape(artifact)
+        stored_core, recomputed = disposition.handoff._validate_fingerprint(artifact)
+        return {
+            "candidate": candidate_value,
+            "stored_core": stored_core,
+            "recomputed_fingerprint_sha256": recomputed,
+            "fresh_fingerprint_sha256": recomputed,
+            "executor_validation": {"ok": True},
+        }
+
+    monkeypatch.setattr(
+        disposition.handoff,
+        "validate_selected_candidate_issuance",
+        validate_fixture_issuance,
+    )
     candidate_sha = _sha(candidate_path)
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=resolved_candidate_path,
+        candidate_sha256=candidate_sha,
+        authority_commit=reference_authority_commit,
+    )
+    expression_binding = pose_fixture.static_expression_provenance(
+        candidate_path=resolved_candidate_path,
+        candidate_sha256=candidate_sha,
+        authority_commit=reference_authority_commit,
+    )
+    monkeypatch.setattr(
+        disposition.approval.pose_provenance,
+        "build_candidate_pose_provenance",
+        lambda candidate_path, *, root: dict(pose_binding),
+    )
+    monkeypatch.setattr(
+        disposition.approval.pose_provenance,
+        "build_candidate_expression_provenance",
+        lambda candidate_path, *, root: dict(expression_binding),
+    )
     handoff["repo_executor_path"] = "pipeline/higgsfield_lena_api_executor.py"
     handoff["created_at"] = "2026-07-19T00:00:00Z"
     handoff["influencer_id"] = "lena"
@@ -453,6 +516,14 @@ def _production_dual_binding_fixture(
     selected_candidate["schema_version"] = "lena_pre_generation_candidate_gate_v1"
     selected_candidate["candidate_status"] = "selected"
     handoff["selected_candidate"] = selected_candidate
+    handoff["selected_candidate"]["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    handoff["selected_candidate"]["pose_body_language_label"] = pose_binding["pose_body_language_label"]
+    handoff["selected_candidate"]["expression_gaze_id"] = expression_binding["expression_gaze_id"]
+    handoff["selected_candidate"]["expression_gaze_label"] = expression_binding["expression_gaze_label"]
+    handoff["pose_provenance"] = pose_binding
+    handoff["pose_bound_content_packet_sha256"] = "4" * 64
+    handoff["expression_provenance"] = expression_binding
+    handoff["expression_bound_content_packet_sha256"] = "4" * 64
     selected_prompt_input = dict(handoff["selected_prompt_input"])
     selected_prompt_input["slot_id"] = str(handoff["selected_slot_id"])
     selected_prompt_input["selected_candidate_artifact_path"] = resolved_candidate_path
@@ -460,6 +531,10 @@ def _production_dual_binding_fixture(
     selected_prompt_input["prompt_text"] = provider_prompt_text
     selected_prompt_input["selected_prompt_text"] = provider_prompt_text
     selected_prompt_input["prompt_sha256"] = provider_prompt_sha
+    selected_prompt_input["pose_provenance"] = pose_binding
+    selected_prompt_input["pose_bound_content_packet_sha256"] = "4" * 64
+    selected_prompt_input["expression_provenance"] = expression_binding
+    selected_prompt_input["expression_bound_content_packet_sha256"] = "4" * 64
     handoff["selected_prompt_input"] = selected_prompt_input
     structured_executor_inputs = dict(handoff["structured_executor_inputs"])
     structured_executor_inputs["slot_id"] = str(handoff["selected_slot_id"])
@@ -468,6 +543,10 @@ def _production_dual_binding_fixture(
     structured_executor_inputs["selected_candidate_artifact_sha256"] = candidate_sha
     structured_executor_inputs["selected_prompt_text"] = provider_prompt_text
     structured_executor_inputs["selected_prompt_sha256"] = provider_prompt_sha
+    structured_executor_inputs["pose_provenance"] = pose_binding
+    structured_executor_inputs["pose_bound_content_packet_sha256"] = "4" * 64
+    structured_executor_inputs["expression_provenance"] = expression_binding
+    structured_executor_inputs["expression_bound_content_packet_sha256"] = "4" * 64
     structured_executor_inputs["soul_metadata"] = {
         "name": "Lena",
         "type": "Soul 2.0",
@@ -481,11 +560,39 @@ def _production_dual_binding_fixture(
     candidate_selection_binding["selected_candidate_artifact_path"] = resolved_candidate_path
     candidate_selection_binding["selected_candidate_artifact_sha256"] = candidate_sha
     candidate_selection_binding["candidate_prompt_sha256"] = provider_prompt_sha
+    candidate_selection_binding["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    candidate_selection_binding["pose_body_language_label"] = pose_binding["pose_body_language_label"]
+    candidate_selection_binding["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
+    candidate_selection_binding["expression_gaze_id"] = expression_binding["expression_gaze_id"]
+    candidate_selection_binding["expression_gaze_label"] = expression_binding["expression_gaze_label"]
+    candidate_selection_binding["expression_provenance_fingerprint_sha256"] = expression_binding[
+        "expression_provenance_fingerprint_sha256"
+    ]
     handoff["candidate_selection_binding"] = candidate_selection_binding
+    handoff["provider_execution_binding"]["pose_bound_content_packet_sha256"] = "4" * 64
+    handoff["provider_execution_binding"]["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
+    handoff["provider_execution_binding"]["expression_bound_content_packet_sha256"] = "4" * 64
+    handoff["provider_execution_binding"]["expression_provenance_fingerprint_sha256"] = expression_binding[
+        "expression_provenance_fingerprint_sha256"
+    ]
     binding_linkage = dict(handoff["binding_linkage"])
     binding_linkage["selected_candidate_artifact_path"] = resolved_candidate_path
     binding_linkage["selected_candidate_artifact_sha256"] = candidate_sha
     binding_linkage["recommendation_artifact_sha256"] = _sha(recommendation_path)
+    binding_linkage["pose_body_language_id"] = pose_binding["pose_body_language_id"]
+    binding_linkage["pose_provenance_fingerprint_sha256"] = pose_binding[
+        "pose_provenance_fingerprint_sha256"
+    ]
+    binding_linkage["pose_bound_content_packet_sha256"] = "4" * 64
+    binding_linkage["expression_gaze_id"] = expression_binding["expression_gaze_id"]
+    binding_linkage["expression_provenance_fingerprint_sha256"] = expression_binding[
+        "expression_provenance_fingerprint_sha256"
+    ]
+    binding_linkage["expression_bound_content_packet_sha256"] = "4" * 64
     handoff["binding_linkage"] = binding_linkage
     handoff["expected_handoff_artifact_path"] = handoff_path.relative_to(tmp_path).as_posix()
     monkeypatch.setattr(reconciliation_builder, "ROOT", tmp_path)
@@ -730,6 +837,11 @@ def _production_dual_binding_fixture(
 
     monkeypatch.setattr(disposition, "_git_show_bytes", synthetic_git_show_bytes)
     monkeypatch.setattr(disposition, "_git_blob_oid", synthetic_git_blob_oid)
+    monkeypatch.setattr(
+        disposition,
+        "_validate_manifest_pose_contract",
+        lambda *args, **kwargs: pose_binding,
+    )
     _write_json(handoff_path, handoff)
     handoff_sha = _sha(handoff_path)
     auth["consumed"] = True
@@ -770,6 +882,8 @@ def _production_dual_binding_fixture(
         "expression_scene_conflict_terms": [],
         "expression_gaze_id": "exp_g001",
         "expression_gaze_label": "closed_mouth_smile_direct",
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": "4" * 64,
         "wardrobe_outfit_id": "wc_p050",
         "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
         "wardrobe_silhouette_class": "fitted_top_and_jeans",
@@ -934,7 +1048,6 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
         reference_authority_sha256=str(bundle["reference_authority_sha"]),
         expected_image_sha256=_sha(Path(bundle["image_path"])),
     )
-
     assert result["qa_inputs"]["decision_kind"] == "authorization_bound_handoff"
     assert result["provider_called"] is False
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
@@ -2156,7 +2269,10 @@ def _real_manifest_context(expression_id: str, activity: str) -> tuple[dict, dic
         "wardrobe_outfit_id": wardrobe["outfit_id"], "wardrobe_outfit_name": wardrobe["name"],
         "image_prompt": f"Scene: {activity}. Wardrobe: {wardrobe['prompt']}. Expression: {expected['text']}.",
     }
-    return manifest, {"activity": activity}
+    return manifest, {
+        "activity": activity,
+        "expression_derivation_scene_action": activity,
+    }
 
 
 def test_real_canonical_normal_expression_and_wardrobe_relationship_passes() -> None:

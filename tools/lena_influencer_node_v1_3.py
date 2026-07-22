@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+
 NODE_ROOT = ROOT / "pipeline" / "influencer_nodes" / "lena"
 MEMORY_PATH = ROOT / "pipeline" / "state" / "lena_prompt_memory.json"
 VERSION = "v1.3.0_influencer_node_core"
@@ -192,8 +197,8 @@ LENA_PROMPT_QUALITY_STANDARD = (
     "for specificity and realism, not as a mandatory style."
 )
 
-PROMPT_MIN_CHARS = 1900
-PROMPT_MAX_CHARS = 2500
+PROMPT_MIN_CHARS = prompt_limits.LEGACY_KLING_DIRECT_PROMPT_MIN_CHARS
+PROMPT_MAX_CHARS = prompt_limits.LEGACY_KLING_DIRECT_PROMPT_MAX_CHARS
 
 
 def validate_prompt(

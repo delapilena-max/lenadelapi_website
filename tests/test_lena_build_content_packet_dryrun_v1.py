@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pipeline.presence import human_presence_contract_v1 as hpe_contract
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 
 
 def _recipe() -> dict:
@@ -60,7 +61,7 @@ def test_build_packet_is_deterministic_and_safe() -> None:
     assert first["provider_call_enabled"] is False
     assert first["generation_call_performed"] is False
     assert first["publishing_approval"] == "not_approved"
-    assert first["compact_kling_prompt_chars"] < 2500
+    assert first["compact_kling_prompt_chars"] <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     assert first["compact_provider_prompt_chars"] == first["compact_kling_prompt_chars"]
     assert first["provider_prompt_contract"]["provider_route"] == "higgsfield_forward_no_live"
     assert first["provider_prompt_contract"]["live_authority"] is False
@@ -97,7 +98,7 @@ def test_proof_prompt_budget_no_longer_reserves_noninjected_overlay_text() -> No
     }
     env_entry = {"prompt_fragment": "detailed environment " * 120}
 
-    assert packet_builder.compute_proof_prompt_budget(wardrobe_entry, env_entry) == 2499
+    assert packet_builder.compute_proof_prompt_budget(wardrobe_entry, env_entry) == 4096
 
 
 def test_rebuild_packet_from_authoritative_sources_reproduces_prompt_preview(monkeypatch) -> None:
@@ -133,7 +134,7 @@ def test_non_proof_mode_prompt_excludes_subject_presence_section() -> None:
     recipe = _recipe()
     hook = _hook()
 
-    structured = packet_builder.build_structured_kling_prompt(copy.deepcopy(recipe), max_chars=2499)
+    structured = packet_builder.build_structured_kling_prompt(copy.deepcopy(recipe))
     packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
 
     assert "[Subject Presence]:" not in structured
@@ -156,10 +157,10 @@ def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() ->
     recipe_bank = json.loads(Path(packet_builder.RECIPE_BANK).read_text(encoding="utf-8-sig"))
     recipe = next(item for item in recipe_bank["recipes"] if item["id"] == "hcr_011")
 
-    prompt = packet_builder.build_structured_kling_prompt(recipe, max_chars=2499)
+    prompt = packet_builder.build_structured_kling_prompt(recipe)
 
     assert "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio." in prompt
     assert "blue-hour ambient mixed with warm [Lighting/Style]:" not in prompt
-    assert "non-studio. [Lighting/Style]:" in prompt
+    assert "non-studio.\n[Lighting/Style]:" in prompt
     assert "[Lighting/Style]: Face-first available light only." in prompt
-    assert len(prompt) <= 2499
+    assert len(prompt) <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS

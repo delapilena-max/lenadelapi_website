@@ -14,6 +14,8 @@ import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+from tests.fixtures import lena_pose_provenance as pose_fixture
 
 
 DATE = "2026-07-15"
@@ -22,7 +24,7 @@ SELECTED_RECIPE_ID = "hcr_006"
 SLOT_ID = "higgsfield-20260715-hcr_006-photo"
 SELECTED_CANDIDATE_ID = f"{SLOT_ID}::{SELECTED_RECIPE_ID}::cbn_004"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
-PROMPT_TEXT = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
+PROMPT_TEXT = pose_fixture.canonical_prompt()
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -52,6 +54,25 @@ def _patch_roots(tmp_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         decision_mod,
         "DECISIONS_ROOT",
         tmp_root / "pipeline" / "strategy" / "lena" / "reconciliation_decisions",
+    )
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        handoff_builder.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
+    monkeypatch.setattr(
+        handoff_builder.packet_builder,
+        "rebuild_packet_from_authoritative_sources",
+        lambda packet, pose_binding=None, expression_binding=None: pose_fixture.bind_packet(
+            packet,
+            pose_binding=pose_binding,
+            expression_binding=expression_binding,
+        ),
     )
 
 
@@ -162,7 +183,7 @@ def _packet_payload() -> dict:
         },
         "compact_provider_prompt_preview": PROMPT_TEXT,
         "compact_provider_prompt_chars": len(PROMPT_TEXT),
-        "compact_provider_prompt_budget": 2499,
+        "compact_provider_prompt_budget": prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         "compact_provider_prompt_sha256": prompt_sha,
         "strong_hook_id": "cbn_004",
         "hook_text": "Tried To Dress Down. Failed.",
@@ -190,7 +211,7 @@ def _selected_candidate_payload() -> dict:
         "schema_version": "lena_pre_generation_candidate_gate_v1",
         "influencer_id": "lena",
         "as_of_date": DATE,
-        "authority_commit": "2ed48fd29215ffc499b64f15255f6c4038bf484a",
+        "authority_commit": "a" * 40,
         "candidate_status": "selected",
         "candidate": {
             "candidate_id": SELECTED_CANDIDATE_ID,
@@ -199,7 +220,10 @@ def _selected_candidate_payload() -> dict:
             "recipe_id": SELECTED_RECIPE_ID,
             "hook_id": "cbn_004",
             "prompt_sha256": prompt_sha,
-            "pose_body_language_id": "pose_p018",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": "exp_fixture",
+            "expression_gaze_label": "calm expression",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
         },
         "decision_fingerprint_sha256": "5" * 64,
@@ -235,8 +259,9 @@ def _reconciliation_payload(tmp_root: Path) -> tuple[dict, dict[str, Path]]:
         (selected_candidate_path, selected_candidate),
     ):
         _write_json(path, payload)
-    rebuilt_packet, rebuilt_source = executor._rebuild_packet_prompt_source(packet_path)
-    actual_prompt = str(rebuilt_source.get("image", {}).get("image_prompt") or "")
+    pose_binding = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_root)
+    rebuilt_packet = pose_fixture.bind_packet(packet, pose_binding=pose_binding)
+    actual_prompt = str(rebuilt_packet.get("compact_provider_prompt_preview") or "")
     packet["compact_provider_prompt_preview"] = actual_prompt
     packet["compact_provider_prompt_sha256"] = hashlib.sha256(actual_prompt.encode("utf-8")).hexdigest()
     _write_json(packet_path, packet)
@@ -438,7 +463,18 @@ def test_report_only_reconciliation_flow_binds_handoff_and_blocks_live_without_a
     assert handoff_report["reconciled_candidate"]["slot_id"] == SLOT_ID
     assert handoff_report["source_recommendation_artifact_path"] == paths["recommendation_path"].relative_to(tmp_path).as_posix()
     assert handoff_report["source_selected_candidate_artifact_path"] == paths["selected_candidate_path"].relative_to(tmp_path).as_posix()
-    rebuilt_packet, rebuilt_source = executor._rebuild_packet_prompt_source(paths["packet_path"])
+    selected_candidate_path = paths["selected_candidate_path"]
+    expected_pose = pose_fixture.candidate_pose_provenance(selected_candidate_path, root=tmp_path)
+    expected_expression = pose_fixture.candidate_expression_provenance(
+        selected_candidate_path,
+        root=tmp_path,
+    )
+    rebuilt_packet, rebuilt_source = executor._rebuild_packet_prompt_source(
+        paths["packet_path"],
+        candidate_path=selected_candidate_path,
+        expected_pose_provenance=expected_pose,
+        expected_expression_provenance=expected_expression,
+    )
     assert rebuilt_packet["recipe_id"] == SELECTED_RECIPE_ID
     assert rebuilt_source["image"]["slot_id"] == f"higgsfield-{DATE.replace('-', '')}-{SELECTED_RECIPE_ID}-photo"
     assert isinstance(rebuilt_source["image"]["image_prompt"], str)

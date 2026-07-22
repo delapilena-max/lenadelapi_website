@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 from pipeline import higgsfield_lena_api_executor as executor
 from tests.fixtures.lena_retry_lineage import build_retry_lineage
 from tools.strategy import lena_execute_retry_decision_v1 as retry_consumer
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 
 
 DATE = "2026-07-13"
@@ -71,6 +72,9 @@ def test_written_retry_decision_is_distinct_and_duplicate_safe(
     assert artifact["prompt_mutation"]["reason"] == retry_consumer.MUTATION_REASON
     assert retry_consumer.BACKGROUND_IDENTITY_CONSTRAINT in artifact["retry_prompt_text"]
     assert artifact["retry_prompt_text"].count(retry_consumer.BACKGROUND_IDENTITY_CONSTRAINT) == 1
+    assert artifact["pose_provenance"]["pose_body_language_id"] == "pose_p001"
+    assert artifact["pose_provenance"] == retry_consumer._build_retry_source(artifact)["image"]["pose_provenance"]
+    assert artifact["source_pose_bound_content_packet_sha256"] == retry_consumer._build_retry_source(artifact)["image"]["pose_bound_content_packet_sha256"]
 
     replay = retry_consumer.evaluate_retry_correction(
         retry_decision_artifact_path=artifact_path,
@@ -201,6 +205,37 @@ def test_no_write_default_performs_no_provider_or_file_side_effects(
     )
     assert report["state"] == "ready_for_retry_executor_dry_run"
     assert Path(report["retry_decision_artifact_path"]).exists() is False
+
+
+def test_legacy_retry_route_blocks_null_source_pose_before_retry_source(
+    retry_lineage: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = retry_lineage["manifest_path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["pose_provenance"] = None
+    manifest["pose_body_language_id"] = None
+    manifest["pose_body_language_label"] = None
+    manifest["pose_text"] = None
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    receipt = json.loads(retry_lineage["source_receipt_path"].read_text(encoding="utf-8"))
+    image_path = retry_lineage["image_path"]
+    monkeypatch.setattr(
+        retry_handoff,
+        "_validate_execution_receipt",
+        lambda path, facts: (
+            receipt,
+            image_path,
+            manifest,
+            manifest_path,
+            retry_lineage["source_receipt_path"],
+            retry_lineage["image_sha"],
+        ),
+    )
+
+    with pytest.raises(retry_consumer.RetryDecisionError) as excinfo:
+        retry_consumer._validate_source_generation_lineage(manifest_path, manifest)
+    assert excinfo.value.code == "pose_provenance_missing"
 
 
 def test_cli_emits_one_machine_readable_blocked_report(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

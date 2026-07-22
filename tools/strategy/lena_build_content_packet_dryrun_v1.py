@@ -26,6 +26,8 @@ from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
     max_production_style_override_len,
 )
+from tools.strategy import lena_pose_provenance_v1 as pose_provenance
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 
 RECIPE_BANK = os.path.join(
     ROOT, "pipeline", "prompt_banks", "lena",
@@ -165,14 +167,14 @@ STRUCTURED_TECHNICAL_REALISM = (
     "or environment/wardrobe contradictions."
 )
 
-STRUCTURED_SECTION_MAX = {
-    "[Subject]": 540,
-    "[Action]": 330,
-    "[Environment]": 360,
-    "[Cinematography]": 230,
-    "[Lighting/Style]": 300,
-    "[Technical]": 500,
-}
+# Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
+STRUCTURED_SECTION_MAX = (
+    prompt_limits.HIGGSFIELD_STRUCTURED_PROMPT_SECTION_FITTER_MAX_CHARS
+)
+PROVIDER_RECIPE_FIELD_LIMITS = prompt_limits.PROVIDER_RECIPE_FIELD_MAX_CHARS
+PROVIDER_RECIPE_AGGREGATE_MAX_CHARS = (
+    prompt_limits.PROVIDER_RECIPE_INPUT_AGGREGATE_MAX_CHARS
+)
 
 AI_TERMS = re.compile(
     r"\b(ai|bot|virtual|synthetic|fake|generated|prompt|algorithm|"
@@ -315,70 +317,183 @@ def build_hpe_subject_presence(recipe) -> str:
     return HPE_SUBJECT_PRESENCE_COMPACT
 
 
-def build_structured_prompt_sections(recipe):
+def _validate_recipe_provider_inputs(recipe):
+    scene_logic_contract = recipe.get("scene_logic_contract") or {}
+    if not isinstance(scene_logic_contract, dict):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_body_type_invalid",
+            "recipe scene_logic_contract must be a JSON object",
+        )
+    return pose_provenance.validate_provider_body_inputs({
+        "subject_pose": recipe.get("subject_pose", ""),
+        "fashion_accessories": recipe.get("fashion_accessories", ""),
+        "setting_background": recipe.get("setting_background", ""),
+        "environment_realism_notes": scene_logic_contract.get("environment_realism_notes", ""),
+        "technical_keywords": recipe.get("technical_keywords", ""),
+        "style_lighting": recipe.get("style_lighting", ""),
+        "negative_constraints": recipe.get("negative_constraints", ""),
+    }, field_limits=PROVIDER_RECIPE_FIELD_LIMITS, aggregate_max_chars=PROVIDER_RECIPE_AGGREGATE_MAX_CHARS)
+
+
+UNBOUND_EXPRESSION_PLACEHOLDER = "selected candidate expression authority required"
+
+
+def _assemble_structured_prompt_sections(
+    recipe,
+    recipe_section_inputs,
+    action,
+    expression,
+):
     subject_parts = [STRUCTURED_SUBJECT_BRIEF]
-    fashion = clean_fragment(recipe.get("fashion_accessories", ""))
+    fashion = recipe_section_inputs["fashion_accessories"]
     if fashion:
         subject_parts.append(f"Wardrobe and accessories: {fashion}")
-    subject = clean_fragment(" ".join(subject_parts))
+    subject = " ".join(subject_parts)
     subject_presence = build_hpe_subject_presence(recipe)
-    action = clean_fragment(recipe.get("subject_pose", ""))
-    environment_note = recipe.get("scene_logic_contract", {}).get(
-        "environment_realism_notes", ""
-    )
-    environment_parts = [recipe.get("setting_background", "")]
+    environment_note = recipe_section_inputs["environment_realism_notes"]
+    environment_parts = [recipe_section_inputs["setting_background"]]
     if environment_note:
         environment_parts.append(f"Realism cues: {environment_note}")
-    environment = clean_fragment(" ".join(part for part in environment_parts if part))
-    cinematography = clean_fragment(recipe.get("technical_keywords", ""))
-    lighting = clean_fragment(recipe.get("style_lighting", ""))
+    environment = " ".join(part for part in environment_parts if part)
+    cinematography = recipe_section_inputs["technical_keywords"]
+    lighting = recipe_section_inputs["style_lighting"]
     technical_parts = [
         STRUCTURED_TECHNICAL_REALISM,
-        recipe.get("negative_constraints", ""),
+        recipe_section_inputs["negative_constraints"],
     ]
-    technical = clean_fragment(" ".join(part for part in technical_parts if part))
-    return [
-        ("[Subject]", subject),
-        ("[Subject Presence]", subject_presence),
-        ("[Action]", action),
-        ("[Environment]", environment),
-        ("[Cinematography]", cinematography),
-        ("[Lighting/Style]", lighting),
-        ("[Technical]", technical),
-    ]
-
-
-def build_structured_kling_prompt(recipe, max_chars=2499):
-    sections = build_structured_prompt_sections(recipe)
-    built = []
-    current = ""
-
+    technical = " ".join(part for part in technical_parts if part)
+    sections = list(zip(
+        pose_provenance.PROVIDER_SECTION_ORDER,
+        (
+            subject,
+            subject_presence,
+            action,
+            expression,
+            environment,
+            cinematography,
+            lighting,
+            technical,
+        ),
+    ))
     for label, body in sections:
-        if not body:
-            continue
-        prefix = f"{label}: "
-        remaining = max_chars - len(current) - (1 if current else 0) - len(prefix)
-        if remaining <= 0:
-            break
-        section_cap = STRUCTURED_SECTION_MAX.get(label, remaining)
-        trimmed = fit_prompt_units(body, min(remaining, section_cap))
-        if not trimmed:
-            trimmed = trim_fragment_to_chars(body, min(remaining, section_cap))
-        if not trimmed:
-            continue
-        chunk = f"{prefix}{trimmed}".strip()
-        candidate = f"{current} {chunk}".strip() if current else chunk
-        if len(candidate) <= max_chars:
-            built.append(chunk)
-            current = candidate
+        if body:
+            pose_provenance.validate_provider_body_text(
+                body,
+                label=f"provider section {label}",
+                max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+            )
+    return sections
 
-    return " ".join(built).strip()
+
+def build_zero_loss_prompt_sections_for_budget_audit(
+    recipe,
+    pose_text,
+    expression_text,
+):
+    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
+    pose_text = pose_provenance.validate_provider_body_text(
+        pose_text,
+        label="canonical pose text for budget audit",
+        max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+    )
+    if not pose_text:
+        raise pose_provenance.PoseProvenanceError(
+            "pose_identity_missing",
+            "canonical pose text is required for budget audit",
+        )
+    expression_text = pose_provenance.validate_provider_body_text(
+        expression_text,
+        label="canonical expression text for budget audit",
+        max_chars=pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS,
+    )
+    if not expression_text:
+        raise pose_provenance.PoseProvenanceError(
+            "expression_identity_missing",
+            "canonical expression text is required for budget audit",
+        )
+    return _assemble_structured_prompt_sections(
+        recipe,
+        recipe_section_inputs,
+        pose_text,
+        expression_text,
+    )
+
+
+def build_structured_prompt_sections(
+    recipe,
+    pose_binding=None,
+    expression_binding=None,
+):
+    recipe_section_inputs = _validate_recipe_provider_inputs(recipe)
+    bound_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
+    )
+    bound_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (bound_pose is None) != (bound_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "provider prompt construction requires pose and expression authority together",
+        )
+    action = bound_pose["pose_text"] if bound_pose is not None else recipe_section_inputs["subject_pose"]
+    expression = (
+        bound_expression["expression_text"]
+        if bound_expression is not None
+        else UNBOUND_EXPRESSION_PLACEHOLDER
+    )
+    return _assemble_structured_prompt_sections(
+        recipe,
+        recipe_section_inputs,
+        action,
+        expression,
+    )
+
+
+def build_structured_kling_prompt(
+    recipe,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+    pose_binding=None,
+    expression_binding=None,
+):
+    if max_chars != prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        raise prompt_limits.PromptExecutionPolicyError(
+            "higgsfield_prompt_budget_override_forbidden",
+            (
+                "Higgsfield provider prompt construction must use the central "
+                "temporary repository execution policy maximum "
+                f"{prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}"
+            ),
+        )
+    sections = build_structured_prompt_sections(
+        recipe,
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
+    )
+    sections = [
+        (label, body)
+        for label, body in sections
+        if body or label != "Subject Presence"
+    ]
+    serialized_length = sum(
+        len(label) + len(body) + len("[]: ")
+        for label, body in sections
+    ) + max(0, len(sections) - 1)
+    prompt_limits.require_higgsfield_prompt_length_within_execution_policy(
+        serialized_length
+    )
+    prompt = pose_provenance.serialize_provider_prompt_sections(sections)
+    return prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
 
 
 def compute_proof_prompt_budget(
     wardrobe_entry=None,
     env_entry=None,
-    max_chars=2499,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
 ):
     # The current dry-run packet builder tracks locked wardrobe/environment
     # bindings as deterministic inputs, but does not append the old provider-
@@ -387,10 +502,12 @@ def compute_proof_prompt_budget(
     return max_chars
 
 
-def compute_style_bank_prompt_budget(max_chars=2499):
+def compute_style_bank_prompt_budget(
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+):
     reserved = max_production_style_override_len() + 24
     budget = max_chars - reserved
-    if budget < 1700:
+    if budget < prompt_limits.HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS:
         raise SystemExit(
             "[ABORT] style-bank reserved headroom leaves too little room "
             f"for the base Kling prompt ({budget} chars). "
@@ -633,40 +750,17 @@ def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
     return hook, reason
 
 
-def build_compact_kling_prompt(recipe, max_chars=2499):
-    structured = build_structured_kling_prompt(recipe, max_chars=max_chars)
-    if structured:
-        return structured
-
-    scene_label = recipe["scene_type"].replace("_", " ")
-    pillar_label = recipe["content_pillar"].replace("_", " ")
-    scene_prefix = (
-        f"Scene: {scene_label}. Pillar: {pillar_label}. "
-    )
-    kling_notes = (
-        recipe.get("provider_rendering_notes", {}).get("kling_omni", "")
-    )
-    proof_mode = recipe.get("production_proof_mode", False)
-    identity_brief = (
-        PROOF_MODE_IDENTITY_BRIEF if proof_mode else LENA_IDENTITY_BRIEF
-    )
-    return fit_prompt_sentences(
-        [
-            identity_brief,
-            FACE_LIGHT_REALISM_PRIORITY if proof_mode else "",
-            (
-                FACE_PRIORITY_FRAMING
-                if recipe.get("content_pillar") == "face_priority_getting_ready"
-                else ""
-            ),
-            build_hpe_subject_presence(recipe),
-            DRESS_CONTINUITY_PRIORITY if proof_mode else "",
-            SKIN_REALISM_COMPACT,
-            scene_prefix,
-            kling_notes,
-            HAND_REALISM_COMPACT,
-        ],
+def build_compact_kling_prompt(
+    recipe,
+    max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
+    pose_binding=None,
+    expression_binding=None,
+):
+    return build_structured_kling_prompt(
+        recipe,
         max_chars=max_chars,
+        pose_binding=pose_binding,
+        expression_binding=expression_binding,
     )
 
 
@@ -744,6 +838,8 @@ def build_packet(
     run_date,
     prompt_budget=None,
     expansion_matrix=None,
+    pose_binding=None,
+    expression_binding=None,
 ):
     recipe_id = recipe["id"]
     packet_id = f"cpkt_{run_date.replace('-', '')}_{recipe_id}"
@@ -751,27 +847,66 @@ def build_packet(
     outfit_id = recipe.get("wardrobe_outfit_id")
     environment_id = recipe.get("environment_id")
     if prompt_budget is None:
-        prompt_budget = 2499
-        if proof_mode and outfit_id:
-            prompt_budget = 1780 if environment_id else 1940
-        elif not outfit_id:
-            prompt_budget = compute_style_bank_prompt_budget()
-    kling_prompt = build_compact_kling_prompt(
-        recipe, max_chars=prompt_budget
+        prompt_budget = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+    if prompt_budget != prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        raise prompt_limits.PromptExecutionPolicyError(
+            "higgsfield_prompt_budget_override_forbidden",
+            (
+                "content packets must use the central temporary Higgsfield "
+                "repository execution policy maximum "
+                f"{prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS}"
+            ),
+        )
+    bound_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
     )
+    bound_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (bound_pose is None) != (bound_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "content packets require pose and expression authority together",
+        )
+    kling_prompt = build_compact_kling_prompt(
+        recipe,
+        max_chars=prompt_budget,
+        pose_binding=bound_pose,
+        expression_binding=bound_expression,
+    )
+    if bound_pose is not None:
+        pose_provenance.require_pose_bound_prompt(kling_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(kling_prompt, bound_expression)
     provider_prompt_blocked_terms = check_packet_blocked_terms(kling_prompt)
     provider_prompt_contract = {
         "surface_status": "quarantined_provider_neutral_dry_run_packet",
         "provider_route": "higgsfield_forward_no_live",
         "live_authority": False,
         "prompt_chars": len(kling_prompt),
-        "prompt_headroom": 2499 - len(kling_prompt),
+        "prompt_headroom": (
+            prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+            - len(kling_prompt)
+        ),
         "scene_logic_contract_present": bool(recipe.get("scene_logic_contract", {})),
         "master_identity_body_present": check_master_identity(kling_prompt),
         "blocked_terms_absent": len(provider_prompt_blocked_terms) == 0,
         "blocked_terms_found": provider_prompt_blocked_terms,
         "outfit_controlled": bool(outfit_id),
         "environment_controlled": bool(environment_id),
+        "pose_binding_status": "bound" if bound_pose is not None else "unbound",
+        "pose_authority_source": (
+            pose_provenance.AUTHORITY_SOURCE if bound_pose is not None else "selected_candidate_required"
+        ),
+        "expression_binding_status": "bound" if bound_expression is not None else "unbound",
+        "expression_authority_source": (
+            pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+            if bound_expression is not None
+            else "selected_candidate_required"
+        ),
     }
     provider_prompt_sha256 = hashlib.sha256(
         kling_prompt.encode("utf-8")
@@ -849,6 +984,13 @@ def build_packet(
             "human_reason": recipe.get("human_reason", ""),
             "style_lighting": recipe.get("style_lighting", ""),
             "subject_pose": recipe.get("subject_pose", ""),
+            "subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+            "provider_action_pose": bound_pose["pose_text"] if bound_pose is not None else "",
+            "provider_expression": (
+                bound_expression["expression_text"]
+                if bound_expression is not None
+                else ""
+            ),
             "fashion_accessories": recipe.get("fashion_accessories", ""),
             "setting_background": recipe.get("setting_background", ""),
             "technical_keywords": recipe.get("technical_keywords", ""),
@@ -885,11 +1027,188 @@ def build_packet(
         "safe_expansion_lanes": expansion_matrix or [],
         "realism_iteration_plan": realism_iteration_plan,
         "provider_prompt_contract": provider_prompt_contract,
+        "generation_pose_contract": {
+            "status": "bound" if bound_pose is not None else "unbound_until_selected_candidate_handoff",
+            "authority_source": (
+                pose_provenance.AUTHORITY_SOURCE if bound_pose is not None else "selected_candidate_required"
+            ),
+            "recipe_subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+        },
+        "pose_provenance": bound_pose,
+        "generation_expression_contract": {
+            "status": (
+                "bound"
+                if bound_expression is not None
+                else "unbound_until_selected_candidate_handoff"
+            ),
+            "authority_source": (
+                pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+                if bound_expression is not None
+                else "selected_candidate_required"
+            ),
+        },
+        "expression_provenance": bound_expression,
         "safety_flags": {},
     }
 
 
-def rebuild_packet_from_authoritative_sources(packet):
+def rebuild_packet_from_authoritative_sources(
+    packet,
+    pose_binding=None,
+    expression_binding=None,
+):
+    supplied_pose = (
+        pose_provenance.validate_pose_provenance(pose_binding)
+        if pose_binding is not None
+        else None
+    )
+    supplied_expression = (
+        pose_provenance.validate_expression_provenance(expression_binding)
+        if expression_binding is not None
+        else None
+    )
+    if (supplied_pose is None) != (supplied_expression is None):
+        raise pose_provenance.PoseProvenanceError(
+            "provider_authority_binding_incomplete",
+            "packet reconstruction requires pose and expression authority together",
+        )
+    existing_pose_value = packet.get("pose_provenance")
+    existing_contract = packet.get("generation_pose_contract")
+    if existing_pose_value is not None:
+        existing_pose = pose_provenance.validate_pose_provenance(existing_pose_value)
+        if supplied_pose is not None and existing_pose != supplied_pose:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_conflict",
+                "already-bound content packet pose provenance differs from the supplied candidate authority",
+            )
+        expected_contract = {
+            "status": "bound",
+            "authority_source": pose_provenance.AUTHORITY_SOURCE,
+            "recipe_subject_pose_semantics": pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS,
+        }
+        if existing_contract != expected_contract:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_contract_mismatch",
+                "already-bound content packet generation pose contract is incomplete or inconsistent",
+            )
+        source_sections = packet.get("high_caliber_source_sections")
+        if not isinstance(source_sections, dict) or (
+            source_sections.get("provider_action_pose") != existing_pose["pose_text"]
+            or source_sections.get("subject_pose_semantics")
+            != pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_source_mismatch",
+                "already-bound content packet provider pose fields disagree with its pose provenance",
+            )
+        pose_provenance.require_pose_bound_prompt(
+            str(packet.get("compact_provider_prompt_preview") or ""),
+            existing_pose,
+        )
+        provider_prompt = str(packet.get("compact_provider_prompt_preview") or "")
+        provider_prompt_sha = hashlib.sha256(provider_prompt.encode("utf-8")).hexdigest()
+        if packet.get("compact_provider_prompt_sha256") != provider_prompt_sha:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_sha_mismatch",
+                "already-bound content packet provider prompt SHA does not match its prompt bytes",
+            )
+        if packet.get("compact_provider_prompt_chars") != len(provider_prompt):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_chars_mismatch",
+                "already-bound content packet provider prompt character count does not match its prompt bytes",
+            )
+        kling_prompt = packet.get("compact_kling_prompt_preview")
+        if not isinstance(kling_prompt, str) or kling_prompt != provider_prompt:
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_retained_prompt_mismatch",
+                "already-bound compact_kling_prompt_preview must remain an exact retained copy of the provider prompt",
+            )
+        pose_provenance.require_pose_bound_prompt(kling_prompt, existing_pose)
+        if packet.get("compact_kling_prompt_chars") != len(kling_prompt):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_retained_prompt_chars_mismatch",
+                "already-bound Kling prompt character count does not match its retained prompt bytes",
+            )
+        provider_budget = packet.get("compact_provider_prompt_budget")
+        if (
+            type(provider_budget) is not int
+            or provider_budget <= 0
+            or packet.get("compact_kling_prompt_budget") != provider_budget
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_prompt_budget_mismatch",
+                "already-bound retained prompt budgets must be identical positive integers",
+            )
+        provider_contract = packet.get("provider_prompt_contract")
+        if (
+            not isinstance(provider_contract, dict)
+            or provider_contract.get("prompt_chars") != len(provider_prompt)
+            or provider_contract.get("pose_binding_status") != "bound"
+            or provider_contract.get("pose_authority_source") != pose_provenance.AUTHORITY_SOURCE
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "pose_bound_packet_provider_contract_mismatch",
+                "already-bound provider prompt contract disagrees with its pose-bound prompt",
+            )
+    elif isinstance(existing_contract, dict) and existing_contract.get("status") == "bound":
+        raise pose_provenance.PoseProvenanceError(
+            "pose_bound_packet_provenance_missing",
+            "content packet claims a bound generation pose without pose provenance",
+        )
+
+    existing_expression_value = packet.get("expression_provenance")
+    existing_expression_contract = packet.get("generation_expression_contract")
+    if existing_expression_value is not None:
+        existing_expression = pose_provenance.validate_expression_provenance(
+            existing_expression_value
+        )
+        if supplied_expression is not None and existing_expression != supplied_expression:
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_conflict",
+                "already-bound content packet expression provenance differs from the supplied candidate authority",
+            )
+        expected_expression_contract = {
+            "status": "bound",
+            "authority_source": pose_provenance.EXPRESSION_AUTHORITY_SOURCE,
+        }
+        if existing_expression_contract != expected_expression_contract:
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_contract_mismatch",
+                "already-bound content packet generation expression contract is incomplete or inconsistent",
+            )
+        source_sections = packet.get("high_caliber_source_sections")
+        if not isinstance(source_sections, dict) or (
+            source_sections.get("provider_expression")
+            != existing_expression["expression_text"]
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_source_mismatch",
+                "already-bound content packet provider expression disagrees with its expression provenance",
+            )
+        pose_provenance.require_expression_bound_prompt(
+            str(packet.get("compact_provider_prompt_preview") or ""),
+            existing_expression,
+        )
+        provider_contract = packet.get("provider_prompt_contract")
+        if (
+            not isinstance(provider_contract, dict)
+            or provider_contract.get("expression_binding_status") != "bound"
+            or provider_contract.get("expression_authority_source")
+            != pose_provenance.EXPRESSION_AUTHORITY_SOURCE
+        ):
+            raise pose_provenance.PoseProvenanceError(
+                "expression_bound_packet_provider_contract_mismatch",
+                "already-bound provider prompt contract disagrees with its expression-bound prompt",
+            )
+    elif (
+        isinstance(existing_expression_contract, dict)
+        and existing_expression_contract.get("status") == "bound"
+    ):
+        raise pose_provenance.PoseProvenanceError(
+            "expression_bound_packet_provenance_missing",
+            "content packet claims a bound generation expression without expression provenance",
+        )
+
     recipe_bank = load_json(RECIPE_BANK)
     hook_bank = load_json(HOOK_BANK)
     wardrobe_catalog = load_json(WARDROBE_CATALOG)
@@ -922,13 +1241,6 @@ def rebuild_packet_from_authoritative_sources(packet):
                 f"Environment: {env_entry['prompt_fragment']} "
             )
 
-    prompt_budget_override = None
-    if wf_entry:
-        prompt_budget_override = compute_proof_prompt_budget(
-            wardrobe_entry=wf_entry,
-            env_entry=env_entry,
-        )
-
     expansion_matrix = build_safe_expansion_matrix(
         recipe,
         recipe_bank,
@@ -945,14 +1257,33 @@ def rebuild_packet_from_authoritative_sources(packet):
             f"[ABORT] Hook '{packet['strong_hook_id']}' not found."
         )
 
-    return build_packet(
+    effective_pose_binding = supplied_pose
+    if effective_pose_binding is None and packet.get("pose_provenance") is not None:
+        effective_pose_binding = packet["pose_provenance"]
+    effective_expression_binding = supplied_expression
+    if (
+        effective_expression_binding is None
+        and packet.get("expression_provenance") is not None
+    ):
+        effective_expression_binding = packet["expression_provenance"]
+    rebuilt = build_packet(
         recipe,
         hook,
         packet.get("hook_selection_reason", "authoritative source rebuild"),
         packet["generated_date"],
-        prompt_budget=prompt_budget_override,
+        prompt_budget=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         expansion_matrix=expansion_matrix,
+        pose_binding=effective_pose_binding,
+        expression_binding=effective_expression_binding,
     )
+    if (
+        existing_pose_value is not None or existing_expression_value is not None
+    ) and packet != rebuilt:
+        raise pose_provenance.PoseProvenanceError(
+            "pose_bound_packet_integrity_mismatch",
+            "already-bound content packet differs from deterministic authoritative reconstruction",
+        )
+    return rebuilt
 
 
 def validate_packet(packet, output_path):
@@ -1026,9 +1357,32 @@ def validate_packet(packet, output_path):
             f"blocked packet terms present: {provider_prompt_contract.get('blocked_terms_found', [])}"
         )
 
+    pose_contract = packet.get("generation_pose_contract", {})
+    flags["recipe_subject_pose_non_authoritative"] = (
+        isinstance(pose_contract, dict)
+        and pose_contract.get("recipe_subject_pose_semantics")
+        == pose_provenance.RECIPE_SUBJECT_POSE_SEMANTICS
+    )
+    if not flags["recipe_subject_pose_non_authoritative"]:
+        errors.append("recipe subject_pose must be explicitly non-authoritative")
+    if pose_contract.get("status") == "bound":
+        try:
+            pose_provenance.require_pose_bound_prompt(
+                str(packet.get("compact_provider_prompt_preview") or ""),
+                packet.get("pose_provenance"),
+            )
+            flags["provider_action_pose_bound"] = True
+        except pose_provenance.PoseProvenanceError as exc:
+            flags["provider_action_pose_bound"] = False
+            errors.append(f"{exc.code}: {exc.detail}")
+    else:
+        flags["provider_action_pose_bound"] = False
+
     kling_len = packet.get("compact_kling_prompt_chars", 9999)
-    flags["kling_prompt_under_2500"] = kling_len < 2500
-    if kling_len >= 2500:
+    flags["higgsfield_prompt_within_execution_policy"] = (
+        kling_len <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+    )
+    if kling_len > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
         errors.append(f"kling prompt too long: {kling_len} chars")
 
     norm = os.path.normpath(output_path)
@@ -1093,8 +1447,10 @@ def print_summary(packet, filepath, flags, errors):
             )
         print()
     print(f"  Kling prompt chars   : {packet['compact_kling_prompt_chars']}")
-    print(f"  Kling under 2500     : "
-          f"{flags.get('kling_prompt_under_2500')}")
+    print(
+        "  Higgsfield policy fit: "
+        f"{flags.get('higgsfield_prompt_within_execution_policy')}"
+    )
     print()
     print("  VALIDATION FLAGS:")
     for k, v in flags.items():
@@ -1287,13 +1643,6 @@ def main():
     hook, hook_reason = select_hook(
         hook_bank, linked_cats, args.hook_category, args.hook_id
     )
-    prompt_budget_override = None
-    if wf_entry:
-        prompt_budget_override = compute_proof_prompt_budget(
-            wardrobe_entry=wf_entry,
-            env_entry=env_entry,
-        )
-
     expansion_matrix = build_safe_expansion_matrix(
         recipe,
         recipe_bank,
@@ -1312,7 +1661,7 @@ def main():
         hook,
         hook_reason,
         run_date,
-        prompt_budget=prompt_budget_override,
+        prompt_budget=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
         expansion_matrix=expansion_matrix,
     )
 

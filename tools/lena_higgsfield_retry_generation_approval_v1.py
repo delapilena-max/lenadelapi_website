@@ -111,6 +111,9 @@ def inspect_retry_handoff_artifact(retry_handoff_path: Path) -> dict[str, Any]:
         "soul_name": str(artifact["soul_name"]),
         "soul_type": str(artifact["soul_type"]),
         "retry_handoff_fingerprint_sha256": str(artifact["retry_handoff_fingerprint_sha256"]),
+        "expression_provenance_fingerprint_sha256": str(
+            artifact["expression_provenance_fingerprint_sha256"]
+        ),
     }
 
 
@@ -148,6 +151,9 @@ def build_retry_generation_approval_record(
         "retry_handoff_report_type": artifact.get("report_type"),
         "retry_handoff_schema_version": artifact.get("schema_version"),
         "retry_handoff_fingerprint_sha256": retry_facts["retry_handoff_fingerprint_sha256"],
+        "expression_provenance_fingerprint_sha256": retry_facts[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "date": retry_facts["date"],
         "slot_id": retry_facts["slot_id"],
         "prompt_sha256": retry_facts["prompt_sha256"],
@@ -309,6 +315,12 @@ def validate_retry_generation_approval_artifact(
         "approval_retry_handoff_fingerprint_mismatch",
         "approval retry_handoff_fingerprint_sha256 does not match the current retry handoff fingerprint",
     )
+    _require(
+        approval.get("expression_provenance_fingerprint_sha256")
+        == retry_facts["expression_provenance_fingerprint_sha256"],
+        "approval_expression_provenance_fingerprint_mismatch",
+        "approval expression provenance fingerprint does not match the retry handoff",
+    )
     _require(date_str == retry_facts["date"], "approval_date_binding_mismatch", "approval date does not match the bound retry handoff date")
     _require(slot_id == retry_facts["slot_id"], "approval_slot_binding_mismatch", "approval slot_id does not match the bound retry slot_id")
     _require(prompt_sha == retry_facts["prompt_sha256"], "approval_prompt_sha_mismatch", "approval prompt_sha256 does not match the bound retry prompt sha")
@@ -412,6 +424,9 @@ def build_retry_generation_claim_record(
         "retry_handoff_artifact_path": retry_facts["retry_handoff_repo_path"],
         "retry_handoff_artifact_sha256": retry_facts["retry_handoff_sha256"],
         "retry_handoff_fingerprint_sha256": retry_facts["retry_handoff_fingerprint_sha256"],
+        "expression_provenance_fingerprint_sha256": retry_facts[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": retry_facts["prompt_sha256"],
@@ -476,6 +491,9 @@ def build_retry_generation_execution_receipt_record(
         "retry_handoff_artifact_path": retry_facts["retry_handoff_repo_path"],
         "retry_handoff_artifact_sha256": retry_facts["retry_handoff_sha256"],
         "retry_handoff_fingerprint_sha256": retry_facts["retry_handoff_fingerprint_sha256"],
+        "expression_provenance_fingerprint_sha256": retry_facts[
+            "expression_provenance_fingerprint_sha256"
+        ],
         "date": date_str,
         "slot_id": slot_id,
         "prompt_sha256": retry_facts["prompt_sha256"],

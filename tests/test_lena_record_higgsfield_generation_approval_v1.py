@@ -11,11 +11,15 @@ import pytest
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_record_higgsfield_generation_approval_v1 as record_tool
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
+from tests.fixtures import lena_pose_provenance as pose_fixture
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 from tools.lena_higgsfield_generation_approval_v1 import confirmation_phrase
 
 DATE = "2026-07-14"
 SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
 CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+PROMPT_TEXT = pose_fixture.canonical_prompt()
+PROMPT_SHA = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
 
 
 def _selected_candidate_repo_path() -> str:
@@ -25,13 +29,24 @@ def _selected_candidate_repo_path() -> str:
 def _selected_candidate_payload() -> dict:
     return {
         "schema_version": "lena_pre_generation_candidate_gate_v1",
+        "authority_commit": "a" * 40,
         "candidate_status": "selected",
         "generated_at_utc": "2026-07-14T12:00:00+00:00",
         "candidate": {
             "candidate_id": f"{SLOT_ID}::hcr_011::cbn_004",
             "slot_id": SLOT_ID,
             "recipe_id": "hcr_011",
-            "prompt_sha256": "b" * 64,
+            "prompt_sha256": PROMPT_SHA,
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+            "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_text": pose_fixture.EXPRESSION_TEXT,
+            "expression_safe_fallback_used": False,
+            "expression_safe_fallback_reason": None,
+            "expression_scene_conflict_terms": [],
+            "expression_derivation_scene_action": "standing in a controlled studio portrait",
         },
     }
 
@@ -43,6 +58,7 @@ def _selected_candidate_sha() -> str:
 
 
 def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    approval_fixture._patch_root(tmp_path, monkeypatch)
     monkeypatch.setattr(approval_mod, "ROOT", tmp_path)
     monkeypatch.setattr(
         approval_mod, "DEFAULT_APPROVAL_ROOT",
@@ -50,6 +66,16 @@ def _patch_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(reconciliation_contract, "ROOT", tmp_path)
     monkeypatch.setattr(record_tool, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        approval_mod.pose_provenance,
+        "build_candidate_pose_provenance",
+        pose_fixture.candidate_pose_provenance,
+    )
+    monkeypatch.setattr(
+        approval_mod.pose_provenance,
+        "build_candidate_expression_provenance",
+        pose_fixture.candidate_expression_provenance,
+    )
 
 
 def _write_json(path: Path, payload: dict) -> Path:
@@ -62,10 +88,19 @@ def _handoff_repo_path() -> str:
     return f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
 
 
-def _valid_handoff_report(*, prompt_sha: str) -> dict:
+def _incomplete_legacy_handoff_report(*, prompt_sha: str) -> dict:
     handoff_repo_path = _handoff_repo_path()
     selected_candidate_repo_path = _selected_candidate_repo_path()
     selected_candidate_sha = _selected_candidate_sha()
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=selected_candidate_repo_path,
+        candidate_sha256=selected_candidate_sha,
+    )
+    expression_binding = pose_fixture.static_expression_provenance(
+        candidate_path=selected_candidate_repo_path,
+        candidate_sha256=selected_candidate_sha,
+    )
+    pose_bound_packet_sha = "4" * 64
     return {
         "report_type": "lena_next_live_image_handoff",
         "schema_version": "v1",
@@ -99,12 +134,25 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
             "prompt_sha256": prompt_sha,
             "schema_version": "lena_pre_generation_candidate_gate_v1",
             "candidate_status": "selected",
+            "pose_body_language_id": pose_fixture.POSE_ID,
+            "pose_body_language_label": pose_fixture.POSE_LABEL,
+            "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+            "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
         },
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         "selected_prompt_input_artifact_sha256": "a" * 64,
         "selected_prompt_input": {
             "prompt_sha256": prompt_sha,
+            "prompt_text": PROMPT_TEXT,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
         "structured_executor_inputs": {
             "provider": "higgsfield",
@@ -124,13 +172,18 @@ def _valid_handoff_report(*, prompt_sha: str) -> dict:
                 "identity_is_prompt_instruction": False,
             },
             "selected_prompt_sha256": prompt_sha,
+            "selected_prompt_text": PROMPT_TEXT,
             "selected_candidate_artifact_path": selected_candidate_repo_path,
             "selected_candidate_artifact_sha256": selected_candidate_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": pose_bound_packet_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": pose_bound_packet_sha,
         },
     }
 
 
-def _write_handoff(tmp_path: Path, *, prompt_sha: str = "b" * 64) -> Path:
+def _write_incomplete_legacy_handoff(tmp_path: Path, *, prompt_sha: str = PROMPT_SHA) -> Path:
     handoff_path = tmp_path / _handoff_repo_path()
     handoff_path.parent.mkdir(parents=True, exist_ok=True)
     selected_candidate_path = tmp_path / _selected_candidate_repo_path()
@@ -278,7 +331,7 @@ def _write_handoff(tmp_path: Path, *, prompt_sha: str = "b" * 64) -> Path:
         "blocking_reasons": [],
     }
     _write_json(reconciliation_path, reconciliation_report)
-    handoff_report = _valid_handoff_report(prompt_sha=prompt_sha)
+    handoff_report = _incomplete_legacy_handoff_report(prompt_sha=prompt_sha)
     handoff_report["source_learning_artifact_path"] = learning_repo_path.as_posix()
     handoff_report["source_learning_artifact_sha256"] = hashlib.sha256(learning_path.read_bytes()).hexdigest()
     handoff_report["source_recommendation_artifact_path"] = recommendation_repo_path.as_posix()
@@ -302,7 +355,7 @@ def test_recording_succeeds_and_writes_expected_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -328,11 +381,82 @@ def test_recording_succeeds_and_writes_expected_file(
     assert stdout["files_written_this_run"] == [str(expected_path)]
 
 
+def test_recording_has_no_caller_selectable_output_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    alternate_root = tmp_path / "alternate"
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run(
+            monkeypatch,
+            "--handoff-artifact",
+            str(handoff_path),
+            "--operator-id",
+            "nicolas",
+            "--confirm",
+            confirmation_phrase(SLOT_ID),
+            "--out-root",
+            str(alternate_root),
+        )
+
+    assert excinfo.value.code == 2
+    assert "unrecognized arguments: --out-root" in capsys.readouterr().err
+    assert not alternate_root.exists()
+
+
+@pytest.mark.parametrize(
+    ("block", "expected_code"),
+    [
+        (
+            "candidate_selection_binding",
+            "handoff_candidate_selection_binding_missing",
+        ),
+        (
+            "provider_execution_binding",
+            "handoff_provider_execution_binding_missing",
+        ),
+        ("binding_linkage", "handoff_binding_linkage_missing"),
+    ],
+)
+def test_recording_rejects_missing_authority_before_approval_issuance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    block: str,
+    expected_code: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff.pop(block)
+    handoff_path.write_text(json.dumps(handoff, indent=2), encoding="utf-8")
+
+    code = _run(
+        monkeypatch,
+        "--handoff-artifact",
+        str(handoff_path),
+        "--operator-id",
+        "nicolas",
+        "--confirm",
+        confirmation_phrase(SLOT_ID),
+    )
+
+    assert code == 1
+    stdout = json.loads(capsys.readouterr().out)
+    assert stdout["error_code"] == expected_code
+    assert stdout["files_written_this_run"] == []
+    assert not approval_mod.approval_output_path(DATE, SLOT_ID).exists()
+
+
 def test_recording_refuses_wrong_operator(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -354,7 +478,7 @@ def test_recording_refuses_wrong_confirmation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     code = _run(
         monkeypatch,
@@ -393,7 +517,7 @@ def test_recording_refuses_overwrite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
 
     first_code = _run(
         monkeypatch,
@@ -419,7 +543,7 @@ def test_recording_aborts_cleanly_on_missing_reconciliation_artifact(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _patch_root(tmp_path, monkeypatch)
-    handoff_path = _write_handoff(tmp_path)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
     reconciliation_path = tmp_path / "pipeline" / "strategy" / "lena" / "reconciliations" / DATE / "lena_generation_reconciliation_fixture.json"
     reconciliation_path.unlink()
 

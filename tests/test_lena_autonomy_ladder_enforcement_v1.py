@@ -17,6 +17,7 @@ from tools.strategy import lena_build_next_live_image_handoff_v1 as handoff_buil
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.strategy import lena_execute_retry_decision_v1 as retry_decision
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,23 +31,6 @@ def _write_json(path: Path, payload: dict) -> None:
 
 def _normalized_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode("utf-8")).hexdigest()
-
-
-def _fake_handoff_facts() -> dict:
-    return {
-        "report": {
-            "report_type": "lena_next_live_image_handoff",
-            "schema_version": "v1",
-        },
-        "handoff_repo_path": "pipeline/strategy/lena/next_actions/2026-07-13/lena_next_live_image_handoff_2026-07-13.json",
-        "handoff_sha256": "a" * 64,
-        "date": "2026-07-13",
-        "slot_id": "higgsfield-20260713-hcr_006-photo",
-        "prompt_sha256": "b" * 64,
-        "soul_name": "Lena",
-        "soul_type": "Soul 2.0",
-        "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-    }
 
 
 def _fake_retry_facts() -> dict:
@@ -73,6 +57,7 @@ def _fake_retry_facts() -> dict:
         "soul_name": "Lena",
         "soul_type": "Soul 2.0",
         "retry_handoff_fingerprint_sha256": "1" * 64,
+        "expression_provenance_fingerprint_sha256": "2" * 64,
     }
 
 
@@ -452,11 +437,18 @@ def test_level_three_replacement_policy_malformed_fails_closed(
     assert error.value.code == "level_3_policy_malformed"
 
 
-def test_level_two_approval_records_do_not_grant_posting_authority() -> None:
+def test_level_two_approval_records_do_not_grant_posting_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approval_fixture._patch_root(tmp_path, monkeypatch)
+    handoff_facts = approval.inspect_handoff_artifact(
+        approval_fixture._write_handoff(tmp_path)
+    )
     generation_record = approval.build_generation_approval_record(
-        _fake_handoff_facts(),
+        handoff_facts,
         operator_id=approval.CANONICAL_OPERATOR_ID,
-        confirmation=approval.confirmation_phrase("higgsfield-20260713-hcr_006-photo"),
+        confirmation=approval.confirmation_phrase(handoff_facts["slot_id"]),
     )
     retry_record = retry_approval.build_retry_generation_approval_record(
         _fake_retry_facts(),
