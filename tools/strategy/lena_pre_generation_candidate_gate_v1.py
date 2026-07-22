@@ -651,6 +651,12 @@ def select_candidate(
             reasons.append("required_recipe_candidate_missing")
         else:
             saw_required_recipe = True
+            if (
+                required_recipe_id
+                and recipe.get("controlled_proof_lane", False)
+                and image.get("wardrobe_outfit_id") != recipe.get("wardrobe_outfit_id")
+            ):
+                reasons.append("required_recipe_wardrobe_mismatch")
         hook = _best_hook(recipe, authorities["hooks"]) if recipe else None
         if hook is None:
             reasons.append("no_safe_linked_hook")
@@ -755,7 +761,7 @@ def _critical_gap_notes(recent: dict[str, Any]) -> list[str]:
     return notes
 
 
-def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str, Any], candidate: dict[str, Any] | None, rejected: list[dict[str, Any]], recent: dict[str, Any], prompt_meta: dict[str, Any]) -> dict[str, Any]:
+def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str, Any], candidate: dict[str, Any] | None, rejected: list[dict[str, Any]], recent: dict[str, Any], prompt_meta: dict[str, Any], *, required_recipe_id: str = "") -> dict[str, Any]:
     noncritical = _critical_gap_notes(recent)
     status = "selected" if candidate else "abstain"
     clean_candidate = None
@@ -780,7 +786,7 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
         "recipe_proof_priority",
         "canonical_hook_score",
     ])
-    return {
+    result = {
         "schema_version": SCHEMA_VERSION,
         "influencer_id": "lena",
         "as_of_date": as_of_date,
@@ -810,6 +816,9 @@ def _decision_core(authority_commit: str, as_of_date: str, authorities: dict[str
         "provider_authorized": False,
         "side_effects_performed": [],
     }
+    if required_recipe_id:
+        result["required_recipe_id"] = required_recipe_id
+    return result
 
 
 def write_decision(decision_core: dict[str, Any], output_root: Path = OUTPUT_ROOT, generated_at_utc: str | None = None) -> tuple[Path, dict[str, Any], bool]:
@@ -915,7 +924,16 @@ def run_gate(
             "required_recipe_candidate_missing",
             f"no candidate available for required recipe {required_recipe_id!r}",
         )
-    core = _decision_core(authority_commit, as_of_date, authorities, candidate, rejected, recent, prompt_meta)
+    core = _decision_core(
+        authority_commit,
+        as_of_date,
+        authorities,
+        candidate,
+        rejected,
+        recent,
+        prompt_meta,
+        required_recipe_id=required_recipe_id,
+    )
     return write_decision(core, output_root)
 
 

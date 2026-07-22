@@ -171,7 +171,14 @@ def _seed_production_selector_repo(tmp_path: Path) -> tuple[Path, Path, dict]:
     _git(root, "init", "-q")
     _git(root, "config", "user.email", "pose-test@example.invalid")
     _git(root, "config", "user.name", "Pose Test")
-    for repo_path in (*selector.AUTHORITY_PATHS, pose_provenance.POSE_AUTHORITY_REPO_PATH):
+    authority_paths = dict.fromkeys(
+        (
+            *selector.AUTHORITY_PATHS,
+            pose_provenance.POSE_AUTHORITY_REPO_PATH,
+            "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json",
+        )
+    )
+    for repo_path in authority_paths:
         target = root / repo_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(REPO_ROOT / repo_path, target)
@@ -185,11 +192,13 @@ def _seed_production_selector_repo(tmp_path: Path) -> tuple[Path, Path, dict]:
         prompt_candidates, prompt_meta = selector.build_prompt_candidates(
             as_of_date,
             authority_commit[:8],
+            required_recipe_id="hcr_012",
         )
         candidate, rejected, _ = selector.select_candidate(
             authorities,
             prompt_candidates,
             recent,
+            required_recipe_id="hcr_012",
         )
         if candidate is not None:
             break
@@ -202,6 +211,7 @@ def _seed_production_selector_repo(tmp_path: Path) -> tuple[Path, Path, dict]:
         rejected,
         recent,
         prompt_meta,
+        required_recipe_id="hcr_012",
     )
     candidate_path, artifact, _ = selector.write_decision(
         core,
@@ -433,6 +443,19 @@ def _build_real_pose_chain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> d
         },
     )
     monkeypatch.setattr(disposition, "ROOT", root)
+    monkeypatch.setattr(disposition, "POSE_BANK_PATH", root / pose_provenance.POSE_AUTHORITY_REPO_PATH)
+    monkeypatch.setattr(disposition, "EXPRESSION_BANK_PATH", root / pose_provenance.EXPRESSION_AUTHORITY_REPO_PATH)
+    monkeypatch.setattr(
+        disposition,
+        "WARDROBE_CATALOG_PATH",
+        root / "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json",
+    )
+    monkeypatch.setattr(
+        disposition,
+        "RECIPE_BANK_PATH",
+        root / "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json",
+    )
+    monkeypatch.setattr(disposition, "PROMPT_BRAIN_PATH", root / pose_provenance.EXPRESSION_DERIVATION_REPO_PATH)
     return {
         "root": root,
         "candidate_path": candidate_path,
@@ -1435,6 +1458,29 @@ def test_production_pose_and_expression_chain_advances_past_expression_qa(
     assert excinfo.value.code == "provenance_mismatch"
     assert "expression" not in excinfo.value.detail.casefold()
     assert "effective_wardrobe_silhouette_class" in excinfo.value.detail
+
+
+def test_production_pose_expression_and_wardrobe_manifest_passes_real_qa_ingestion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chain = _build_real_pose_chain(tmp_path, monkeypatch)
+    image_path = Path(chain["manifest"]["saved_image_path"])
+    image_path.write_bytes(b"complete provenance QA fixture")
+    manifest_path = chain["root"] / "generated_manifest_complete.json"
+    _write_json(manifest_path, chain["manifest"])
+
+    validated = disposition._validate_manifest(
+        manifest_path,
+        chain["decision"],
+        chain["candidate"],
+        {"path": str(image_path), "format": "PNG"},
+        "authorization_bound_handoff",
+        provider_binding=chain["handoff"]["provider_execution_binding"],
+    )
+    assert validated["effective_wardrobe_silhouette_class"] == chain["candidate"]["visual_style"]
+    assert validated["pose_provenance"] == chain["binding"]
+    assert validated["expression_provenance"] == chain["expression_binding"]
 
 
 @pytest.mark.parametrize("tamper", ["packet_digest", "nested_candidate_sha", "duplicate_action"])

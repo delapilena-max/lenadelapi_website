@@ -33,6 +33,7 @@ from tools.lena_structured_visual_tool_v1 import (  # noqa: E402
 from tools import lena_higgsfield_qa_bridge_v1 as qa_bridge  # noqa: E402
 from tools.strategy import lena_execute_selected_candidate_v1 as handoff  # noqa: E402
 from tools.strategy import lena_execute_retry_decision_v1 as retry_handoff  # noqa: E402
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as typed_retry_handoff  # noqa: E402
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 from tools.strategy import lena_pre_generation_candidate_gate_v1 as selector  # noqa: E402
@@ -55,6 +56,7 @@ ALLOWED_OBSERVATION_STATUSES = {"pass", "fail", "unreviewed"}
 POSE_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_pose_body_language_bank_v1.json"
 EXPRESSION_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_expression_gaze_bank_v1.json"
 WARDROBE_CATALOG_PATH = ROOT / "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json"
+RECIPE_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json"
 PROMPT_BRAIN_PATH = ROOT / "pipeline/prompting/lena_prompt_brain.py"
 CURRENT_LENA_SOUL_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 LENA_REFERENCE_MANIFEST_PATH = (
@@ -76,6 +78,7 @@ HARD_STOP_CODES = {
 }
 
 RETRYABLE_CODES = {
+    "hair_crown_forelock_artifact",
     "recoverable_identity_drift",
     "required_action_missed",
     "gaze_missed",
@@ -141,7 +144,7 @@ VISUAL_OBSERVATION_KEYS = tuple(key for key in OBSERVATION_KEYS if key not in LO
 
 ALLOWED_REASON_CODES_BY_OBSERVATION = {
     "face_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
-    "hair_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
+    "hair_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse", "hair_crown_forelock_artifact"},
     "apparent_age": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
     "skin_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
     "body_silhouette_continuity": {"recoverable_identity_drift", "wrong_person_or_identity_collapse"},
@@ -564,6 +567,37 @@ def _resolve_generation_binding_context(
             require_not_expired=False,
         )
         return decision, candidate, "authorization_bound_handoff", handoff_facts
+    if report_type == typed_retry_handoff.REPORT_TYPE:
+        try:
+            typed_retry = typed_retry_handoff.validate_retry_handoff_artifact(decision_path)
+            pose = pose_provenance.validate_pose_provenance(typed_retry.get("pose_provenance"))
+            candidate_path = _resolve_pose_repo_path(
+                pose["selected_candidate_artifact_path"],
+                label="typed retry selected candidate artifact",
+            )
+            selected_decision, source_candidate = _validate_selected_decision(candidate_path)
+        except (typed_retry_handoff.RetryHandoffError, pose_provenance.PoseProvenanceError) as exc:
+            raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
+        decision = dict(typed_retry)
+        decision["as_of_date"] = typed_retry["date"]
+        decision["authority_commit"] = selected_decision["authority_commit"]
+        decision["retry_decision_fingerprint_sha256"] = typed_retry["retry_handoff_fingerprint_sha256"]
+        candidate = dict(source_candidate)
+        candidate["candidate_id"] = f"{typed_retry['retry_slot_id']}::{source_candidate['recipe_id']}::{source_candidate['hook_id']}::typed-retry01"
+        candidate["slot_id"] = typed_retry["retry_slot_id"]
+        candidate["prompt_sha256"] = typed_retry["retry_prompt_sha256"]
+        provider_binding = {
+            "slot_id": typed_retry["retry_slot_id"],
+            "provider_lane": candidate["lane"],
+            "provider_prompt_sha256": typed_retry["retry_prompt_sha256"],
+            "content_packet_artifact_path": typed_retry["source_selected_prompt_input_artifact_path"],
+            "content_packet_artifact_sha256": typed_retry["source_selected_prompt_input_artifact_sha256"],
+            "pose_bound_content_packet_sha256": typed_retry["source_pose_bound_content_packet_sha256"],
+            "pose_provenance_fingerprint_sha256": typed_retry["pose_provenance_fingerprint_sha256"],
+            "expression_bound_content_packet_sha256": typed_retry["source_expression_bound_content_packet_sha256"],
+            "expression_provenance_fingerprint_sha256": typed_retry["expression_provenance_fingerprint_sha256"],
+        }
+        return decision, candidate, "typed_retry_handoff", provider_binding
     decision, candidate, decision_kind = _validate_decision(decision_path)
     return decision, candidate, decision_kind, None
 
@@ -651,6 +685,19 @@ def _validate_manifest_pose_contract(
                 "provenance_mismatch",
                 f"manifest flat {field} does not match nested expression provenance",
             )
+    silhouette_authority = manifest.get("effective_wardrobe_silhouette_authority")
+    expected_silhouette_authority = {
+        "source": "sha_bound_selected_candidate",
+        "selected_candidate_artifact_path": bound_pose["selected_candidate_artifact_path"],
+        "selected_candidate_artifact_sha256": bound_pose["selected_candidate_artifact_sha256"],
+        "wardrobe_outfit_id": candidate.get("wardrobe_outfit_id"),
+        "effective_wardrobe_silhouette_class": candidate.get("visual_style"),
+    }
+    if silhouette_authority is not None and silhouette_authority != expected_silhouette_authority:
+        raise BoundaryError(
+            "provenance_mismatch",
+            "manifest effective wardrobe silhouette authority does not match the SHA-bound selected candidate",
+        )
 
     packet_path_value = manifest.get("pose_bound_content_packet_artifact_path")
     packet_sha = manifest.get("pose_bound_content_packet_artifact_sha256")
@@ -809,6 +856,38 @@ def _validate_manifest(
             raise BoundaryError("provenance_mismatch", f"manifest {key} must be an integer")
     if decision_kind in {"selected_candidate", "authorization_bound_handoff"}:
         exact_context["retry_count"] = 0
+    elif decision_kind == "typed_retry_handoff":
+        retry_contract = manifest.get("retry_execution_contract")
+        if not isinstance(retry_contract, dict):
+            raise BoundaryError("provenance_mismatch", "typed retry manifest must carry retry_execution_contract")
+        expected_retry_contract = {
+            "schema_version": typed_retry_handoff.SCHEMA_VERSION,
+            "retry_handoff_fingerprint_sha256": decision["retry_handoff_fingerprint_sha256"],
+            "retry_attempt": decision["retry_attempt"],
+            "retry_cap": decision["retry_cap"],
+            "retry_purpose": decision["retry_purpose"],
+            "original_slot_id": decision["original_slot_id"],
+            "retry_slot_id": decision["retry_slot_id"],
+            "source_handoff_artifact_path": decision["source_handoff_artifact_path"],
+            "source_handoff_artifact_sha256": decision["source_handoff_artifact_sha256"],
+            "source_selected_prompt_input_artifact_path": decision["source_selected_prompt_input_artifact_path"],
+            "source_selected_prompt_input_artifact_sha256": decision["source_selected_prompt_input_artifact_sha256"],
+            "source_pose_bound_content_packet_sha256": decision["source_pose_bound_content_packet_sha256"],
+            "source_expression_bound_content_packet_sha256": decision["source_expression_bound_content_packet_sha256"],
+            "expression_provenance": decision["expression_provenance"],
+            "expression_provenance_fingerprint_sha256": decision["expression_provenance_fingerprint_sha256"],
+            "source_execution_receipt_path": decision["source_execution_receipt_path"],
+            "source_execution_receipt_sha256": decision["source_execution_receipt_sha256"],
+            "source_manifest_path": decision["source_manifest_path"],
+            "source_manifest_sha256": decision["source_manifest_sha256"],
+            "source_output_image_path": decision["source_output_image_path"],
+            "source_output_image_sha256": decision["source_output_image_sha256"],
+            "source_original_prompt_sha256": decision["source_original_prompt_sha256"],
+            "retry_constraints": decision["retry_constraints"],
+        }
+        if retry_contract != expected_retry_contract:
+            raise BoundaryError("provenance_mismatch", "typed retry manifest retry_execution_contract does not match retry handoff lineage exactly")
+        exact_context["retry_count"] = 0
     else:
         retry_contract = manifest.get("retry_execution_contract")
         if not isinstance(retry_contract, dict):
@@ -886,6 +965,11 @@ def _validate_manifest_bank_context(
         pose_bank = json.loads(_git_show_bytes(authority_commit, POSE_BANK_PATH).decode("utf-8-sig"))
         expression_bank = json.loads(_git_show_bytes(authority_commit, EXPRESSION_BANK_PATH).decode("utf-8-sig"))
         wardrobe_catalog = json.loads(_git_show_bytes(authority_commit, WARDROBE_CATALOG_PATH).decode("utf-8-sig"))
+        recipe_bank = (
+            json.loads(_git_show_bytes(authority_commit, RECIPE_BANK_PATH).decode("utf-8-sig"))
+            if candidate.get("recipe_id")
+            else {"recipes": []}
+        )
         committed_prompt_brain = _git_show_bytes(authority_commit, PROMPT_BRAIN_PATH)
     except (UnicodeError, json.JSONDecodeError, BoundaryError) as exc:
         raise BoundaryError("provenance_mismatch", f"canonical generation context could not be loaded: {exc}") from exc
@@ -913,6 +997,11 @@ def _validate_manifest_bank_context(
         if item["outfit_id"] in wardrobe_by_id:
             raise BoundaryError("provenance_mismatch", f"duplicate committed wardrobe outfit ID: {item['outfit_id']}")
         wardrobe_by_id[item["outfit_id"]] = item
+    recipe_by_id = {
+        item.get("id"): item
+        for item in recipe_bank.get("recipes", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
     pose = pose_by_id.get(manifest["pose_body_language_id"])
     expression = expression_by_id.get(manifest["expression_gaze_id"])
     canonical_pose_text = str(pose.get("text") or "") if pose else ""
@@ -943,9 +1032,26 @@ def _validate_manifest_bank_context(
     wardrobe = wardrobe_by_id.get(manifest["wardrobe_outfit_id"])
     if not wardrobe or wardrobe.get("name") != manifest["wardrobe_outfit_name"]:
         raise BoundaryError("provenance_mismatch", "manifest wardrobe ID and name do not match committed wardrobe authority")
-    wardrobe_prompt = wardrobe.get("prompt")
-    if not isinstance(wardrobe_prompt, str) or not wardrobe_prompt.strip() or wardrobe_prompt.casefold() not in manifest["image_prompt"].casefold():
-        raise BoundaryError("provenance_mismatch", "generated prompt does not contain the committed wardrobe prompt for the selected outfit")
+    expected_catalog_silhouette = lena_prompt_brain.catalog_outfit_silhouette_class(wardrobe)
+    if (
+        "wardrobe_silhouette_class" in manifest
+        and manifest.get("wardrobe_silhouette_class") != expected_catalog_silhouette
+    ):
+        raise BoundaryError("provenance_mismatch", "manifest wardrobe silhouette class does not match committed wardrobe authority")
+    recipe_id = candidate.get("recipe_id")
+    recipe = recipe_by_id.get(recipe_id) if recipe_id else None
+    if recipe_id and (not recipe or recipe.get("wardrobe_outfit_id") != manifest["wardrobe_outfit_id"]):
+        raise BoundaryError("provenance_mismatch", "selected recipe does not bind the manifest wardrobe outfit")
+    recipe_wardrobe_text = recipe.get("fashion_accessories") if recipe else wardrobe.get("prompt")
+    if (
+        not isinstance(recipe_wardrobe_text, str)
+        or not recipe_wardrobe_text.strip()
+        or recipe_wardrobe_text not in manifest["image_prompt"]
+    ):
+        raise BoundaryError(
+            "provenance_mismatch",
+            "generated prompt does not contain the exact committed recipe wardrobe text",
+        )
 
 
 def _validate_identity_evidence(

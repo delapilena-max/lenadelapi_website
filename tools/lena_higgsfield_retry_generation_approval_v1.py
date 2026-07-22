@@ -24,6 +24,8 @@ RECEIPT_REPORT_TYPE = "lena_higgsfield_retry_generation_execution_receipt"
 RECEIPT_SCHEMA_VERSION = "v1"
 RECEIPT_TYPE = "higgsfield_single_retry_generation_execution_receipt"
 APPROVAL_TTL_MINUTES = canonical_approval.APPROVAL_TTL_MINUTES
+MANUAL_AUTHORIZATION_MODE = "procedural_local_authorization_record_only"
+STANDING_AUTONOMY_AUTHORIZATION_MODE = "standing_autonomy_policy"
 
 
 class HiggsfieldRetryGenerationApprovalError(RuntimeError):
@@ -178,7 +180,91 @@ def build_retry_generation_approval_record(
         "scheduling_authorized": False,
         "analytics_mutation_authorized": False,
         "immutability": "immutable_once_written",
-        "authorization_identity_mode": "procedural_local_authorization_record_only",
+        "authorization_identity_mode": MANUAL_AUTHORIZATION_MODE,
+    }
+
+
+def build_standing_autonomy_retry_generation_approval_record(
+    retry_facts: dict[str, Any],
+    authorization_result: dict[str, Any],
+    *,
+    approved_at: datetime | None = None,
+) -> dict[str, Any]:
+    from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+
+    auth = authorization_result.get("artifact")
+    _require(isinstance(auth, dict), "standing_authorization_invalid", "standing authorization artifact is missing")
+    controlled = auth.get("controlled_photo_autonomy")
+    _require(
+        isinstance(controlled, dict) and controlled.get("enabled") is True,
+        "standing_authorization_scope_invalid",
+        "standing authorization does not enable controlled photo autonomy",
+    )
+    _require(auth.get("consumed") is True, "standing_authorization_not_consumed", "standing authorization must be consumed before a retry can be approved")
+    _require(int(auth.get("provider_call_cap_per_cycle", 0)) == 2, "standing_provider_cap_invalid", "standing authorization must permit exactly two provider calls")
+    _require(int(auth.get("retry_cap_per_cycle", 0)) == 1, "standing_retry_cap_invalid", "standing authorization must permit exactly one retry")
+    _require(
+        retry_facts["artifact"].get("reason_code") in controlled.get("retry_reason_codes", []),
+        "standing_retry_reason_not_authorized",
+        "retry reason is outside the controlled standing-autonomy allowlist",
+    )
+    _require(
+        retry_facts["original_slot_id"] == auth.get("slot_id"),
+        "standing_retry_slot_mismatch",
+        "retry source slot does not match the standing authorization",
+    )
+    _require(
+        retry_facts["source_handoff_artifact_path"]
+        == canonical_approval.repo_relative_path(Path(str(auth.get("generation_handoff_artifact_path") or ""))),
+        "standing_retry_handoff_mismatch",
+        "retry source handoff does not match the standing authorization",
+    )
+    approved_at = (approved_at or utcnow()).astimezone(timezone.utc).replace(microsecond=0)
+    expires_at = approved_at + timedelta(minutes=APPROVAL_TTL_MINUTES)
+    artifact = retry_facts["artifact"]
+    auth_path = Path(authorization_result["path"]).resolve()
+    return {
+        "report_type": APPROVAL_REPORT_TYPE,
+        "schema_version": APPROVAL_SCHEMA_VERSION,
+        "approval_type": APPROVAL_TYPE,
+        "operator_id": standing_autonomy.AUTHORIZATION_ISSUER,
+        "approved_at_utc": approved_at.isoformat(),
+        "expires_at_utc": expires_at.isoformat(),
+        "retry_handoff_artifact_path": retry_facts["retry_handoff_repo_path"],
+        "retry_handoff_artifact_sha256": retry_facts["retry_handoff_sha256"],
+        "retry_handoff_report_type": artifact.get("report_type"),
+        "retry_handoff_schema_version": artifact.get("schema_version"),
+        "retry_handoff_fingerprint_sha256": retry_facts["retry_handoff_fingerprint_sha256"],
+        "expression_provenance_fingerprint_sha256": retry_facts["expression_provenance_fingerprint_sha256"],
+        "date": retry_facts["date"],
+        "slot_id": retry_facts["slot_id"],
+        "prompt_sha256": retry_facts["prompt_sha256"],
+        "original_slot_id": retry_facts["original_slot_id"],
+        "source_handoff_artifact_path": retry_facts["source_handoff_artifact_path"],
+        "source_handoff_artifact_sha256": retry_facts["source_handoff_artifact_sha256"],
+        "source_execution_receipt_path": retry_facts["source_execution_receipt_path"],
+        "source_execution_receipt_sha256": retry_facts["source_execution_receipt_sha256"],
+        "provider": retry_facts["provider"],
+        "executor": retry_facts["executor"],
+        "model": retry_facts["model"],
+        "aspect_ratio": retry_facts["aspect_ratio"],
+        "soul_name": retry_facts["soul_name"],
+        "soul_type": retry_facts["soul_type"],
+        "custom_reference_id": retry_facts["custom_reference_id"],
+        "confirmation_statement": "issued automatically under the consumed standing-autonomy cycle authorization",
+        "credits_may_be_spent_acknowledged": True,
+        "authorized_attempts": 1,
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "scheduling_authorized": False,
+        "analytics_mutation_authorized": False,
+        "immutability": "immutable_once_written",
+        "authorization_identity_mode": STANDING_AUTONOMY_AUTHORIZATION_MODE,
+        "standing_authorization_artifact_path": repo_relative_path(auth_path),
+        "standing_authorization_artifact_sha256": sha256_file(auth_path),
+        "standing_authorization_cycle_id": auth.get("cycle_id"),
+        "standing_policy_artifact_sha256": auth.get("policy_artifact_sha256"),
     }
 
 
@@ -213,11 +299,18 @@ def validate_retry_generation_approval_artifact(
         "approval_type_mismatch",
         f"approval approval_type must be {APPROVAL_TYPE!r}",
     )
+    authorization_mode = approval.get("authorization_identity_mode")
     _require(
-        approval.get("operator_id") == canonical_approval.CANONICAL_OPERATOR_ID,
-        "approval_operator_mismatch",
-        f"approval operator_id must be exactly {canonical_approval.CANONICAL_OPERATOR_ID!r}",
+        authorization_mode in {MANUAL_AUTHORIZATION_MODE, STANDING_AUTONOMY_AUTHORIZATION_MODE},
+        "approval_authorization_mode_invalid",
+        "approval authorization identity mode is invalid",
     )
+    if authorization_mode == MANUAL_AUTHORIZATION_MODE:
+        _require(
+            approval.get("operator_id") == canonical_approval.CANONICAL_OPERATOR_ID,
+            "approval_operator_mismatch",
+            f"approval operator_id must be exactly {canonical_approval.CANONICAL_OPERATOR_ID!r}",
+        )
     try:
         approved_at = canonical_approval.parse_iso8601_utc(
             approval.get("approved_at_utc"),
@@ -252,11 +345,12 @@ def validate_retry_generation_approval_artifact(
         )
     except canonical_approval.HiggsfieldGenerationApprovalError as exc:
         raise _translate_canonical_error(exc) from exc
-    _require(
-        approval.get("confirmation_statement") == confirmation_phrase(slot_id),
-        "approval_confirmation_mismatch",
-        "approval confirmation_statement did not exactly match the required retry approval phrase",
-    )
+    if authorization_mode == MANUAL_AUTHORIZATION_MODE:
+        _require(
+            approval.get("confirmation_statement") == confirmation_phrase(slot_id),
+            "approval_confirmation_mismatch",
+            "approval confirmation_statement did not exactly match the required retry approval phrase",
+        )
     _require(
         approval.get("credits_may_be_spent_acknowledged") is True,
         "approval_credits_acknowledgement_missing",
@@ -385,6 +479,53 @@ def validate_retry_generation_approval_artifact(
         "approval custom_reference_id does not match the bound retry handoff Soul reference",
     )
 
+    standing_authorization_result = None
+    if authorization_mode == STANDING_AUTONOMY_AUTHORIZATION_MODE:
+        from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+
+        _require(
+            approval.get("operator_id") == standing_autonomy.AUTHORIZATION_ISSUER,
+            "approval_operator_mismatch",
+            "standing-autonomy retry approval issuer is invalid",
+        )
+        standing_auth_path = canonical_approval.resolve_repo_path(
+            str(approval.get("standing_authorization_artifact_path") or ""),
+            code="standing_authorization_path_missing",
+            label="standing authorization artifact",
+        )
+        try:
+            standing_authorization_result = standing_autonomy.validate_cycle_authorization_artifact(
+                standing_auth_path,
+                allow_consumed=True,
+            )
+        except standing_autonomy.StandingAutonomyPolicyError as exc:
+            raise HiggsfieldRetryGenerationApprovalError(exc.code, exc.detail) from exc
+        standing_auth = standing_authorization_result["artifact"]
+        _require(standing_auth.get("consumed") is True, "standing_authorization_not_consumed", "standing authorization must be consumed")
+        _require(
+            approval.get("standing_authorization_artifact_path") == repo_relative_path(standing_auth_path),
+            "standing_authorization_path_mismatch",
+            "retry approval does not use the canonical standing authorization path",
+        )
+        _require(
+            approval.get("standing_authorization_artifact_sha256") == sha256_file(standing_auth_path),
+            "standing_authorization_sha_mismatch",
+            "retry approval standing authorization SHA does not match current bytes",
+        )
+        controlled = standing_auth.get("controlled_photo_autonomy")
+        _require(isinstance(controlled, dict) and controlled.get("enabled") is True, "standing_authorization_scope_invalid", "controlled photo autonomy is not enabled")
+        _require(int(standing_auth.get("provider_call_cap_per_cycle", 0)) == 2, "standing_provider_cap_invalid", "standing provider cap must be two")
+        _require(int(standing_auth.get("retry_cap_per_cycle", 0)) == 1, "standing_retry_cap_invalid", "standing retry cap must be one")
+        _require(retry_facts["artifact"].get("reason_code") in controlled.get("retry_reason_codes", []), "standing_retry_reason_not_authorized", "retry reason is outside standing policy")
+        _require(standing_auth.get("slot_id") == retry_facts["original_slot_id"], "standing_retry_slot_mismatch", "standing authorization slot differs from retry source")
+        _require(
+            repo_relative_path(Path(str(standing_auth.get("generation_handoff_artifact_path") or ""))) == retry_facts["source_handoff_artifact_path"],
+            "standing_retry_handoff_mismatch",
+            "standing authorization handoff differs from retry source",
+        )
+        _require(approval.get("standing_authorization_cycle_id") == standing_auth.get("cycle_id"), "standing_cycle_id_mismatch", "retry approval cycle ID differs from standing authorization")
+        _require(approval.get("standing_policy_artifact_sha256") == standing_auth.get("policy_artifact_sha256"), "standing_policy_sha_mismatch", "retry approval policy SHA differs from standing authorization")
+
     return {
         "approval": approval,
         "approval_path": approval_path,
@@ -402,6 +543,7 @@ def validate_retry_generation_approval_artifact(
             "scheduling_authorized": approval["scheduling_authorized"],
             "analytics_mutation_authorized": approval["analytics_mutation_authorized"],
         },
+        "standing_authorization_result": standing_authorization_result,
     }
 
 

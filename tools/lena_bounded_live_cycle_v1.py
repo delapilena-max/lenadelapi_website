@@ -14,8 +14,12 @@ from typing import Any
 from pipeline.identity import lena_higgsfield_identity as identity
 from pipeline.identity import lena_higgsfield_identity_evidence as local_identity_evidence
 from tools import lena_higgsfield_generation_approval_v1 as approval
+from tools import lena_higgsfield_retry_generation_approval_v1 as retry_approval
+from tools import lena_autopublish_approved_queue_v2_8 as autonomous_publisher
 from tools import lena_photo_qa_disposition_v1 as photo_qa
+from tools import lena_prepare_privacy_clean_photo_v1 as clean_photo
 from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 import pipeline.higgsfield_lena_api_executor as executor
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -433,6 +437,66 @@ def _load_reference_specs() -> tuple[Path, str, list[tuple[Path, str]]]:
     return authority_path.resolve(), _sha256_file(authority_path), specs
 
 
+def _controlled_photo_authority(auth: dict[str, Any]) -> dict[str, Any] | None:
+    value = auth.get("artifact", {}).get("controlled_photo_autonomy")
+    return dict(value) if isinstance(value, dict) and value.get("enabled") is True else None
+
+
+def controlled_autonomous_disposition(qa_artifact: dict[str, Any], *, retries_performed: int) -> str:
+    if qa_artifact.get("disposition") == "accept":
+        return "accept_and_publish"
+    if (
+        retries_performed == 0
+        and qa_artifact.get("disposition") == "retryable_failure"
+        and qa_artifact.get("reason_codes") == ["hair_crown_forelock_artifact"]
+    ):
+        return "reject_and_retry"
+    if qa_artifact.get("hard_stop_reason") in {"visual_review_unavailable", "corrupt_or_untrusted_evidence"}:
+        return "operational_failure"
+    return "reject_and_hold"
+
+
+def _controlled_visual_qa_kwargs(
+    auth: dict[str, Any],
+    candidate_artifact: dict[str, Any],
+    reference_authority_path: Path,
+    *,
+    decision_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    controlled = _controlled_photo_authority(auth)
+    if controlled is None:
+        return {}
+    configured_reference = (ROOT / str(controlled.get("identity_reference_authority_path") or "")).resolve()
+    _require(configured_reference == reference_authority_path.resolve(), "controlled_reference_authority_mismatch", "controlled visual QA reference authority differs from the canonical authority")
+    reference_authority = _read_json_object(reference_authority_path, code="reference_authority_missing_or_invalid", label="reference authority artifact")
+    reference_set_sha = str(reference_authority.get("reference_set_sha256") or "")
+    model_authority_path = (ROOT / str(controlled.get("visual_model_authority_path") or "")).resolve()
+    _ensure_path_within_root(model_authority_path, ROOT, code="visual_model_authority_escape", label="visual model authority", must_exist=True)
+    decision_fingerprint = str(decision_fingerprint or candidate_artifact.get("decision_fingerprint_sha256") or "")
+    _require(len(decision_fingerprint) == 64, "controlled_candidate_fingerprint_missing", "controlled visual QA requires the selected candidate decision fingerprint")
+    _require(len(reference_set_sha) == 64, "controlled_reference_set_sha_missing", "controlled visual QA requires the canonical reference-set SHA")
+    return {
+        "live_visual_review": True,
+        "visual_provider": str(controlled["visual_provider"]),
+        "visual_model": str(controlled["visual_model"]),
+        "visual_model_authority_artifact": model_authority_path,
+        "visual_model_authority_sha256": _sha256_file(model_authority_path),
+        "expected_decision_fingerprint": decision_fingerprint,
+        "expected_reference_set_sha256": reference_set_sha,
+    }
+
+
+def _issue_controlled_retry_approval(auth: dict[str, Any], retry_handoff_path: Path) -> dict[str, Any]:
+    retry_facts = retry_approval.inspect_retry_handoff_artifact(retry_handoff_path)
+    record = retry_approval.build_standing_autonomy_retry_generation_approval_record(
+        retry_facts,
+        auth,
+    )
+    path = retry_approval.approval_output_path(retry_facts["date"], retry_facts["slot_id"])
+    retry_approval.write_retry_generation_approval_record_atomic(path, record)
+    return retry_approval.validate_retry_generation_approval_artifact(path)
+
+
 def _identity_evidence_reuse_fingerprint(evidence: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(evidence, dict):
         raise LenaBoundedLiveCycleError("identity_evidence_existing_invalid", "identity evidence must be a JSON object")
@@ -531,6 +595,9 @@ def _build_live_publish_sidecar(
     image_path: Path,
     caption: str,
     platform: str,
+    controlled_lineage: dict[str, str] | None = None,
+    clean_export_report: dict[str, Any] | None = None,
+    publish_policy_result: dict[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any], str]:
     sidecar_path = image_path.with_suffix(".status.json")
     payload = {
@@ -561,6 +628,25 @@ def _build_live_publish_sidecar(
         "caption": caption,
         "target_platform": platform,
     }
+    if controlled_lineage is not None or clean_export_report is not None:
+        _require(controlled_lineage is not None and clean_export_report is not None and publish_policy_result is not None, "clean_export_binding_incomplete", "controlled publish sidecar requires clean-export report, publication policy, and complete lineage")
+        payload["generation_policy_id"] = payload["policy_id"]
+        payload["generation_policy_sha256"] = payload["policy_sha256"]
+        payload["policy_id"] = publish_policy_result["artifact"]["policy_id"]
+        payload["policy_version"] = publish_policy_result["artifact"]["policy_version"]
+        payload["policy_sha256"] = publish_policy_result["sha256"]
+        payload.update(
+            {
+                "controlled_photo_autonomy": True,
+                "asset_sha256": str(clean_export_report["output_sha256"]),
+                "provider_original_path": str(clean_export_report["source_path"]),
+                "provider_original_sha256": str(clean_export_report["source_sha256"]),
+                "privacy_clean_verified": True,
+                "clean_export_report_path": _repo_relative(Path(str(clean_export_report["report_path"]))),
+                "clean_export_report_sha256": str(clean_export_report["report_sha256"]),
+                "lineage": dict(controlled_lineage),
+            }
+        )
     _write_json_atomic(sidecar_path, payload)
     return sidecar_path, payload, _sha256_file(sidecar_path)
 
@@ -961,6 +1047,51 @@ def _validate_completed_provider_result(
     }
 
 
+def _validate_completed_retry_provider_result(
+    provider_result: dict[str, Any],
+    *,
+    retry_facts: dict[str, Any],
+) -> dict[str, Any]:
+    _require(provider_result.get("ok") is True, "retry_provider_generation_failed", str(provider_result.get("failure_error_text") or "retry generation failed"))
+    claim_path = Path(str(provider_result["claim_path"]))
+    receipt_path = Path(str(provider_result["receipt_path"]))
+    manifest_path_value = Path(str(provider_result["manifest_path"]))
+    live_result = provider_result.get("live_result") or {}
+    provider_manifest = _read_json_object(manifest_path_value, code="retry_manifest_missing_or_invalid", label="retry generation manifest")
+    provider_claim = _read_json_object(claim_path, code="retry_claim_missing_or_invalid", label="retry generation claim")
+    provider_receipt = _read_json_object(receipt_path, code="retry_receipt_missing_or_invalid", label="retry generation receipt")
+    expected_directory = approval.expected_output_directory(retry_facts["date"])
+    expected_stem = approval.expected_output_stem(retry_facts["slot_id"])
+    generated_image_path = _manifest_output_image_path(
+        provider_manifest,
+        expected_directory,
+        expected_stem,
+        list(approval.ALLOWED_OUTPUT_EXTENSIONS),
+    )
+    generated_image_sha256 = _sha256_file(generated_image_path)
+    _require(provider_manifest.get("slot_id") == retry_facts["slot_id"], "retry_manifest_slot_mismatch", "retry manifest slot does not match retry handoff")
+    _require(provider_manifest.get("prompt_sha256") == retry_facts["prompt_sha256"], "retry_manifest_prompt_mismatch", "retry manifest prompt does not match retry handoff")
+    _require(provider_manifest.get("saved_image_sha256") == generated_image_sha256, "retry_manifest_image_sha_mismatch", "retry manifest image SHA does not match current bytes")
+    expected_retry_approval_path = retry_approval.approval_output_path(retry_facts["date"], retry_facts["slot_id"])
+    _require(provider_receipt.get("approval_artifact_path") == retry_approval.repo_relative_path(expected_retry_approval_path), "retry_receipt_approval_path_mismatch", "retry receipt approval path is not canonical")
+    _require(provider_receipt.get("retry_handoff_artifact_sha256") == retry_facts["retry_handoff_sha256"], "retry_receipt_handoff_mismatch", "retry receipt handoff SHA does not match")
+    _require(provider_receipt.get("prompt_sha256") == retry_facts["prompt_sha256"], "retry_receipt_prompt_mismatch", "retry receipt prompt SHA does not match")
+    _require(provider_receipt.get("output_path") == str(generated_image_path), "retry_receipt_output_mismatch", "retry receipt output path does not match")
+    _require(provider_receipt.get("outcome") == "success", "retry_receipt_outcome_invalid", "retry receipt must record success")
+    return {
+        "claim_path": claim_path,
+        "receipt_path": receipt_path,
+        "manifest_path": manifest_path_value,
+        "live_result": live_result,
+        "provider_manifest": provider_manifest,
+        "provider_claim": provider_claim,
+        "provider_receipt": provider_receipt,
+        "generated_image_path": generated_image_path,
+        "generated_image_sha256": generated_image_sha256,
+        "manifest_sha256": _sha256_file(manifest_path_value),
+    }
+
+
 def _build_fail_report(
     *,
     auth: dict[str, Any] | None,
@@ -1027,15 +1158,15 @@ def _build_fail_report(
             "one_candidate": True,
             "one_asset": True,
             "one_platform": True,
-            "provider_call_cap_per_cycle": 1,
+            "provider_call_cap_per_cycle": int(artifact.get("provider_call_cap_per_cycle", 1)),
             "publish_action_cap_per_cycle": 1,
-            "retry_cap_per_cycle": 0,
+            "retry_cap_per_cycle": int(artifact.get("retry_cap_per_cycle", 0)),
             "daily_spend_ceiling": artifact.get("daily_spend_ceiling", 0),
             "spend_unit": artifact.get("spend_unit", ""),
             "kill_switch_enabled": artifact.get("kill_switch_enabled", False),
             "duplicate_rejection": "report_path_must_not_exist",
-            "no_scheduler": True,
-            "no_second_provider_call": True,
+            "no_scheduler": not bool(artifact.get("controlled_photo_autonomy")),
+            "no_second_provider_call": int(artifact.get("provider_call_cap_per_cycle", 1)) < 2,
             "no_second_publish_call": True,
             "analytics_triggered_rerun_blocked": True,
             "qa_required": True,
@@ -1182,6 +1313,11 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     provider_receipt = validated_provider["provider_receipt"]
     generated_image_path = validated_provider["generated_image_path"]
     generated_image_sha256 = validated_provider["generated_image_sha256"]
+    provider_calls_performed = 1
+    retries_performed = 0
+    publish_handoff_path = live_requirements["handoff_path"]
+    publish_approval_path = auth["path"]
+    publish_approval_sha256 = auth["pre_consumption_sha256"]
     stages.append(
         _stage_summary(
             "provider_generation",
@@ -1198,28 +1334,173 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         )
     )
 
-    identity_evidence_path = identity.identity_verification_evidence_path(day, str(auth_data["slot_id"]))
-    identity_evidence_path, identity_evidence, identity_written = _build_local_identity_evidence(
-        date_str=day,
-        slot_id=str(auth_data["slot_id"]),
-        manifest=provider_manifest,
-        image_path=generated_image_path,
-        image_sha256=generated_image_sha256,
-        identity_evidence_path=identity_evidence_path,
-    )
-    reference_authority_path, reference_authority_sha256, reference_specs = _load_reference_specs()
-    qa_artifact = photo_qa.evaluate_photo_qa_disposition(
-        decision_path=auth["path"],
-        manifest_path=manifest_path,
-        image_path=generated_image_path,
-        identity_evidence_path=identity_evidence_path,
-        reference_specs=reference_specs,
-        reference_authority_artifact=reference_authority_path,
-        reference_authority_sha256=reference_authority_sha256,
-        expected_image_sha256=generated_image_sha256,
-    )
-    qa_path, qa_written_artifact, _qa_written = photo_qa.write_disposition_artifact(qa_artifact)
+    try:
+        identity_evidence_path = identity.identity_verification_evidence_path(day, str(auth_data["slot_id"]))
+        identity_evidence_path, identity_evidence, identity_written = _build_local_identity_evidence(
+            date_str=day,
+            slot_id=str(auth_data["slot_id"]),
+            manifest=provider_manifest,
+            image_path=generated_image_path,
+            image_sha256=generated_image_sha256,
+            identity_evidence_path=identity_evidence_path,
+        )
+        reference_authority_path, reference_authority_sha256, reference_specs = _load_reference_specs()
+        qa_artifact = photo_qa.evaluate_photo_qa_disposition(
+            decision_path=auth["path"],
+            manifest_path=manifest_path,
+            image_path=generated_image_path,
+            identity_evidence_path=identity_evidence_path,
+            reference_specs=reference_specs,
+            reference_authority_artifact=reference_authority_path,
+            reference_authority_sha256=reference_authority_sha256,
+            expected_image_sha256=generated_image_sha256,
+            **_controlled_visual_qa_kwargs(auth, candidate, reference_authority_path),
+        )
+        qa_path, qa_written_artifact, _qa_written = photo_qa.write_disposition_artifact(qa_artifact)
+    except Exception as exc:
+        return _build_fail_report(
+            auth=auth,
+            report_path=report_path,
+            started_at=started_at,
+            cycle_id=cycle_id,
+            stages=stages,
+            failed_stage="automated_visual_qa",
+            error_code=str(getattr(exc, "code", "automated_visual_qa_failed")),
+            error_detail=str(getattr(exc, "detail", str(exc))),
+            extra={"provider_calls_performed": 1, "retries_performed": 0},
+        )
     qa_terminal_state = _qa_terminal_state(qa_written_artifact)
+    controlled = _controlled_photo_authority(auth)
+    if controlled is not None and qa_written_artifact.get("disposition") != "accept":
+        retry_allowed = controlled_autonomous_disposition(qa_written_artifact, retries_performed=0) == "reject_and_retry"
+        if retry_allowed:
+            _require(int(auth_data.get("provider_call_cap_per_cycle", 0)) == 2, "retry_provider_cap_invalid", "controlled retry requires a two-call provider cap")
+            _require(int(auth_data.get("retry_cap_per_cycle", 0)) == 1, "retry_cap_invalid", "controlled retry requires a one-retry cap")
+            stages.append(
+                _stage_summary(
+                    "image_qa",
+                    True,
+                    disposition="reject_and_retry",
+                    qa_artifact_path=str(qa_path),
+                    qa_artifact_sha256=_sha256_file(qa_path),
+                )
+            )
+            try:
+                retry_preparation = retry_handoff.evaluate_retry_handoff(
+                    handoff_artifact=live_requirements["handoff_path"],
+                    execution_receipt=receipt_path,
+                    write_artifact=True,
+                    reason_code="hair_crown_forelock_artifact",
+                )
+                retry_handoff_path = Path(retry_preparation["retry_handoff_artifact_path"])
+                retry_approval_result = _issue_controlled_retry_approval(auth, retry_handoff_path)
+                retry_result = executor.execute_approved_retry_live_generation(
+                    retry_handoff_path,
+                    retry_approval_result["approval_path"],
+                    live_executor=executor.run_live,
+                )
+                retry_facts = retry_approval_result["retry_facts"]
+                retry_provider = _validate_completed_retry_provider_result(retry_result, retry_facts=retry_facts)
+            except Exception as exc:
+                return _build_fail_report(
+                    auth=auth,
+                    report_path=report_path,
+                    started_at=started_at,
+                    cycle_id=cycle_id,
+                    stages=stages,
+                    failed_stage="controlled_retry_execution",
+                    error_code=str(getattr(exc, "code", "controlled_retry_failed")),
+                    error_detail=str(getattr(exc, "detail", str(exc))),
+                    extra={"provider_calls_performed": 2 if "retry_result" in locals() else 1, "retries_performed": 1},
+                )
+            provider_calls_performed = 2
+            retries_performed = 1
+            claim_path = retry_provider["claim_path"]
+            receipt_path = retry_provider["receipt_path"]
+            manifest_path = retry_provider["manifest_path"]
+            provider_manifest = retry_provider["provider_manifest"]
+            provider_claim = retry_provider["provider_claim"]
+            provider_receipt = retry_provider["provider_receipt"]
+            generated_image_path = retry_provider["generated_image_path"]
+            generated_image_sha256 = retry_provider["generated_image_sha256"]
+            publish_handoff_path = retry_handoff_path
+            publish_approval_path = retry_approval_result["approval_path"]
+            publish_approval_sha256 = retry_approval_result["approval_sha256"]
+            identity_evidence_path = identity.identity_verification_evidence_path(day, retry_facts["slot_id"])
+            identity_evidence_path, identity_evidence, identity_written = _build_local_identity_evidence(
+                date_str=day,
+                slot_id=retry_facts["slot_id"],
+                manifest=provider_manifest,
+                image_path=generated_image_path,
+                image_sha256=generated_image_sha256,
+                identity_evidence_path=identity_evidence_path,
+            )
+            qa_artifact = photo_qa.evaluate_photo_qa_disposition(
+                decision_path=retry_handoff_path,
+                manifest_path=manifest_path,
+                image_path=generated_image_path,
+                identity_evidence_path=identity_evidence_path,
+                reference_specs=reference_specs,
+                reference_authority_artifact=reference_authority_path,
+                reference_authority_sha256=reference_authority_sha256,
+                expected_image_sha256=generated_image_sha256,
+                **_controlled_visual_qa_kwargs(
+                    auth,
+                    candidate,
+                    reference_authority_path,
+                    decision_fingerprint=retry_facts["retry_handoff_fingerprint_sha256"],
+                ),
+            )
+            qa_path, qa_written_artifact, _qa_written = photo_qa.write_disposition_artifact(qa_artifact)
+            qa_terminal_state = _qa_terminal_state(qa_written_artifact)
+            stages.append(
+                _stage_summary(
+                    "controlled_retry",
+                    True,
+                    retry_handoff_path=str(retry_handoff_path),
+                    retry_handoff_sha256=_sha256_file(retry_handoff_path),
+                    retry_approval_path=str(retry_approval_result["approval_path"]),
+                    retry_approval_sha256=retry_approval_result["approval_sha256"],
+                    retry_claim_path=str(claim_path),
+                    retry_receipt_path=str(receipt_path),
+                    retry_manifest_path=str(manifest_path),
+                    retry_image_path=str(generated_image_path),
+                    retry_image_sha256=generated_image_sha256,
+                )
+            )
+        if not retry_allowed or qa_written_artifact.get("disposition") != "accept":
+            disposition = controlled_autonomous_disposition(qa_written_artifact, retries_performed=retries_performed)
+            finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            report = {
+                "ok": disposition != "operational_failure",
+                "version": "v2",
+                "report_type": "lena_bounded_live_cycle",
+                "live_execution": True,
+                "autonomous_execution": True,
+                "controlled_photo_autonomy": True,
+                "date": day,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "autonomous_disposition": disposition,
+                "qa_lifecycle_status": str(qa_written_artifact.get("disposition") or "blocked"),
+                "provider_calls_performed": provider_calls_performed,
+                "publish_calls_performed": 0,
+                "retries_performed": retries_performed,
+                "publish_authorized": False,
+                "publish_performed": False,
+                "queue_mutated": False,
+                "retry_executed": retries_performed == 1,
+                "human_review_required": False,
+                "exceptional_escalation_required": True,
+                "qa_artifact": qa_written_artifact,
+                "qa_artifact_path": str(qa_path),
+                "qa_artifact_sha256": _sha256_file(qa_path),
+                "stage_coverage": stages,
+                "stages": stages,
+            }
+            _write_json_atomic(report_path, report)
+            report["report_path"] = str(report_path)
+            return report
     if qa_terminal_state == "awaiting_human_visual_review":
         finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
         report = {
@@ -1276,6 +1557,128 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             identity_evidence_sha256=_sha256_file(identity_evidence_path),
         )
     )
+
+    if controlled is not None:
+        handoff_report = auth["handoff"]["report"]
+        packet_sha = str(
+            handoff_report.get("selected_prompt_input_artifact_sha256")
+            or handoff_report.get("structured_executor_inputs", {}).get("selected_prompt_input_artifact_sha256")
+            or ""
+        )
+        lineage = {
+            "candidate_artifact_sha256": candidate_sha256,
+            "prompt_sha256": str(provider_manifest["prompt_sha256"]),
+            "packet_sha256": packet_sha,
+            "handoff_sha256": _sha256_file(publish_handoff_path),
+            "approval_sha256": publish_approval_sha256,
+            "execution_receipt_sha256": _sha256_file(receipt_path),
+            "manifest_sha256": _sha256_file(manifest_path),
+            "qa_sha256": _sha256_file(qa_path),
+        }
+        clean_dir = _ensure_path_within_root(
+            report_root / day / str(auth_data["slot_id"]),
+            report_root,
+            code="clean_export_path_escape",
+            label="privacy-clean export directory",
+            must_exist=False,
+        )
+        clean_path = clean_dir / f"{auth_data['slot_id']}_publish_clean{generated_image_path.suffix.lower()}"
+        clean_report_path = clean_dir / f"{auth_data['slot_id']}_publish_clean_provenance.json"
+        clean_export = clean_photo.prepare_privacy_clean_photo(
+            generated_image_path,
+            clean_path,
+            clean_report_path,
+            source_image_sha256=generated_image_sha256,
+            lineage=lineage,
+        )
+        publish_policy_result = autonomous_publisher._validate_policy_artifact(autonomous_publisher.POLICY_PATH)
+        publish_sidecar_path, publish_sidecar, publish_sidecar_sha256 = _build_live_publish_sidecar(
+            authorization=auth,
+            image_path=clean_path,
+            caption=str(auth_data["caption"]),
+            platform=str(auth_data["platform"]),
+            controlled_lineage=lineage,
+            clean_export_report=clean_export,
+            publish_policy_result=publish_policy_result,
+        )
+        admission = autonomous_publisher.admit_controlled_photo(
+            day=day,
+            slot_id=str(auth_data["slot_id"]),
+            schedule_slot=str(controlled["schedule_slot"]),
+            platform=str(auth_data["platform"]),
+            lane=str(resolved_candidate.get("lane") or ""),
+            asset_path=clean_path,
+            asset_sha256=str(clean_export["output_sha256"]),
+            caption=str(auth_data["caption"]),
+            lineage=lineage,
+            clean_export_report_path=clean_report_path,
+            clean_export_report_sha256=str(clean_export["report_sha256"]),
+            policy_path=autonomous_publisher.POLICY_PATH,
+        )
+        stages.append(
+            _stage_summary(
+                "autonomous_queue_admission",
+                True,
+                queue_path=admission["queue_path"],
+                queue_id=admission["queue_id"],
+                clean_export_path=str(clean_path),
+                clean_export_sha256=clean_export["output_sha256"],
+                clean_export_report_path=str(clean_report_path),
+                clean_export_report_sha256=clean_export["report_sha256"],
+            )
+        )
+        publish_result = autonomous_publisher.run_scheduled_autonomous(
+            day=day,
+            slot_keyword=str(controlled["schedule_slot"]),
+            limit=1,
+            dry_run=False,
+            policy_path=autonomous_publisher.POLICY_PATH,
+        )
+        _require(int(publish_result.get("posted_count", 0)) == 1, "autonomous_publish_not_completed", "scheduled autonomous publisher did not record exactly one posted item")
+        _require(int(publish_result.get("publish_calls_performed", 0)) == 1, "autonomous_publish_count_invalid", "scheduled autonomous publisher must perform exactly one publish call")
+        stages.append(_stage_summary("scheduled_publish", True, publish_report=publish_result))
+        finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        report = {
+            "ok": True,
+            "version": "v2",
+            "report_type": "lena_bounded_live_cycle",
+            "live_execution": True,
+            "autonomous_execution": True,
+            "controlled_photo_autonomy": True,
+            "human_per_cycle_approval_required": False,
+            "human_per_cycle_approval_present": False,
+            "human_review_required": False,
+            "date": day,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "cycle_id": cycle_id,
+            "autonomous_disposition": "accept_and_publish",
+            "provider_calls_performed": provider_calls_performed,
+            "publish_calls_performed": 1,
+            "retries_performed": retries_performed,
+            "qa_lifecycle_status": "accepted",
+            "publish_authorized": True,
+            "publish_performed": True,
+            "queue_mutated": True,
+            "retry_executed": retries_performed == 1,
+            "provider_original": {"path": str(generated_image_path), "sha256": generated_image_sha256},
+            "privacy_clean_derivative": {"path": str(clean_path), "sha256": clean_export["output_sha256"]},
+            "clean_export_report": {"path": str(clean_report_path), "sha256": clean_export["report_sha256"]},
+            "publish_sidecar": {"path": str(publish_sidecar_path), "sha256": publish_sidecar_sha256},
+            "queue_admission": admission,
+            "publish_result": publish_result,
+            "qa_artifact": qa_written_artifact,
+            "qa_artifact_path": str(qa_path),
+            "qa_artifact_sha256": _sha256_file(qa_path),
+            "lineage": lineage,
+            "generation_handoff": {"path": str(publish_handoff_path), "sha256": _sha256_file(publish_handoff_path)},
+            "generation_approval": {"path": str(publish_approval_path), "sha256": publish_approval_sha256},
+            "stage_coverage": stages,
+            "stages": stages,
+        }
+        _write_json_atomic(report_path, report)
+        report["report_path"] = str(report_path)
+        return report
 
     publish_sidecar_path, publish_sidecar, publish_sidecar_sha256 = _build_live_publish_sidecar(
         authorization=auth,

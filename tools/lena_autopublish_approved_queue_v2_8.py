@@ -5,8 +5,10 @@ import csv
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -25,11 +27,13 @@ RECEIPT_ROOT = ROOT / "pipeline" / "publishing" / "lena" / "approved_queue_recei
 REPORT_ROOT = ROOT / "pipeline" / "publishing" / "lena" / "dispatch_reports"
 DISPATCH_OUTBOX = ROOT / "pipeline" / "publishing" / "lena" / "dispatch_outbox"
 QUEUE_FIELDS = [
-    "queue_id","date","created_at","slot_id","platform","media_type","lane","asset_status","asset_path",
+    "queue_id","date","created_at","slot_id","schedule_slot","platform","media_type","lane","asset_status","asset_path","asset_sha256",
     "growth_bucket","hook_category","audio_name",
     "caption","short_caption","pinned_comment","story_prompt","story_poll","post_poll","keyword_notes",
     "public_text_score","public_text_decision","publish_state","publish_mode","connector_path",
-    "post_url","posted_at","failure_reason","attempt_count","notes"
+    "post_url","posted_at","failure_reason","attempt_count","notes",
+    "candidate_artifact_sha256","prompt_sha256","packet_sha256","handoff_sha256","approval_sha256",
+    "execution_receipt_sha256","manifest_sha256","qa_sha256","clean_export_report_path","clean_export_report_sha256"
 ]
 AUTONOMOUS_SLOT_KEYWORDS = {"morning", "afternoon", "evening"}
 
@@ -268,10 +272,19 @@ def _load_queue(day: str) -> tuple[Path, list[dict[str, str]]]:
 
 def _write_queue(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=QUEUE_FIELDS)
-        writer.writeheader()
-        writer.writerows([{key: row.get(key, "") for key in QUEUE_FIELDS} for row in rows])
+    fd, raw = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    temp = Path(raw)
+    try:
+        with temp.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=QUEUE_FIELDS)
+            writer.writeheader()
+            writer.writerows([{key: row.get(key, "") for key in QUEUE_FIELDS} for row in rows])
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _parse_json_stdout(raw: str) -> dict | None:
@@ -564,11 +577,40 @@ def _validate_clean_export(row: dict[str, str], policy: dict[str, Any]) -> dict[
             if str(sidecar.get(sha_key) or "") != actual_sha:
                 raise AutopublishError("clean_export_asset_sha_mismatch", f"publish approval sidecar {sha_key} mismatch")
             break
+    if sidecar.get("controlled_photo_autonomy") is True:
+        from tools import lena_prepare_privacy_clean_photo_v1 as clean_photo
+
+        report_path = _resolve_repo_path(str(sidecar.get("clean_export_report_path") or ""))
+        report = clean_photo.validate_privacy_clean_report(report_path, expected_output_path=asset_path)
+        if str(sidecar.get("clean_export_report_sha256") or "") != _sha256_file(report_path):
+            raise AutopublishError("clean_export_report_sha_mismatch", "privacy-clean report SHA-256 mismatch")
+        if str(sidecar.get("asset_sha256") or "") != report.get("output_sha256"):
+            raise AutopublishError("clean_export_asset_sha_mismatch", "publish sidecar is not bound to the privacy-clean derivative")
+        lineage = sidecar.get("lineage")
+        if not isinstance(lineage, dict) or lineage != report.get("lineage"):
+            raise AutopublishError("clean_export_lineage_mismatch", "publish sidecar lineage differs from the privacy-clean report")
+        row_lineage = {
+            "candidate_artifact_sha256": row.get("candidate_artifact_sha256", ""),
+            "prompt_sha256": row.get("prompt_sha256", ""),
+            "packet_sha256": row.get("packet_sha256", ""),
+            "handoff_sha256": row.get("handoff_sha256", ""),
+            "approval_sha256": row.get("approval_sha256", ""),
+            "execution_receipt_sha256": row.get("execution_receipt_sha256", ""),
+            "manifest_sha256": row.get("manifest_sha256", ""),
+            "qa_sha256": row.get("qa_sha256", ""),
+        }
+        if row_lineage != lineage:
+            raise AutopublishError("clean_export_queue_lineage_mismatch", "queue row lineage differs from the verified clean export")
+        if row.get("asset_sha256") != report.get("output_sha256"):
+            raise AutopublishError("clean_export_queue_asset_sha_mismatch", "queue row SHA-256 differs from the verified clean derivative")
+        if row.get("clean_export_report_path") != _repo_relative(report_path) or row.get("clean_export_report_sha256") != _sha256_file(report_path):
+            raise AutopublishError("clean_export_queue_report_binding_mismatch", "queue row clean-export report binding is invalid")
     return {"sidecar": sidecar, "asset_sha256": _sha256_file(asset_path), "sidecar_sha256": _sha256_file(asset_path.with_suffix(".status.json"))}
 
 
 def _slot_key_from_row(row: dict[str, str], slot_keyword: str) -> bool:
-    return slot_keyword.lower() in (row.get("slot_id", "").lower())
+    scheduled = row.get("schedule_slot", "").strip().lower()
+    return scheduled == slot_keyword.lower() if scheduled else slot_keyword.lower() in row.get("slot_id", "").lower()
 
 
 def _select_autonomous_slot_rows(
@@ -791,6 +833,110 @@ def _recover_from_existing_receipt(day: str, slot_id: str, row: dict[str, str], 
         raise AutopublishError("autonomous_receipt_not_posted", f"receipt does not record a published row: {receipt_path}")
     _apply_posted_row_update(row, receipt)
     return {"ok": True, "recovered": True, "receipt_path": str(receipt_path), "receipt": receipt, "posted": True, "post_id": receipt.get("post_id", ""), "post_url": receipt.get("post_url", "")}
+
+
+def admit_controlled_photo(
+    *,
+    day: str,
+    slot_id: str,
+    schedule_slot: str,
+    platform: str,
+    lane: str,
+    asset_path: Path,
+    asset_sha256: str,
+    caption: str,
+    lineage: dict[str, str],
+    clean_export_report_path: Path,
+    clean_export_report_sha256: str,
+    policy_path: Path = POLICY_PATH,
+) -> dict[str, Any]:
+    policy_result = _validate_policy_artifact(policy_path)
+    policy = dict(policy_result["artifact"])
+    policy["_policy_path"] = str(policy_result["path"])
+    policy["_policy_sha256"] = policy_result["sha256"]
+    if schedule_slot not in AUTONOMOUS_SLOT_KEYWORDS:
+        raise AutopublishError("autonomous_schedule_slot_invalid", "schedule_slot must be morning, afternoon, or evening")
+    if platform not in {str(item) for item in policy.get("autonomous_queue_platforms", [])}:
+        raise AutopublishError("autonomous_platform_invalid", "platform is outside the autonomous queue policy")
+    asset_path = asset_path.resolve(strict=True)
+    if _sha256_file(asset_path) != asset_sha256:
+        raise AutopublishError("autonomous_asset_sha_mismatch", "queue admission asset SHA-256 mismatch")
+    required_lineage = {
+        "candidate_artifact_sha256",
+        "prompt_sha256",
+        "packet_sha256",
+        "handoff_sha256",
+        "approval_sha256",
+        "execution_receipt_sha256",
+        "manifest_sha256",
+        "qa_sha256",
+    }
+    if set(lineage) != required_lineage or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in lineage.values()):
+        raise AutopublishError("autonomous_lineage_incomplete", "queue admission requires the complete generation and QA SHA lineage")
+    connector = {
+        "Instagram Feed": "tools/publishers/lena_publish_instagram_feed_v2_8.py",
+        "Facebook Page": "tools/publishers/lena_publish_facebook_page_v2_8.py",
+    }[platform]
+    queue_id = "q_" + hashlib.sha1(f"{day}|{slot_id}|{platform}".encode("utf-8")).hexdigest()[:14]
+    row = {
+        "queue_id": queue_id,
+        "date": day,
+        "created_at": _iso_now(),
+        "slot_id": slot_id,
+        "schedule_slot": schedule_slot,
+        "platform": platform,
+        "media_type": "photo",
+        "lane": lane,
+        "asset_status": "approved",
+        "asset_path": _repo_relative(asset_path),
+        "asset_sha256": asset_sha256,
+        "growth_bucket": "controlled_photo_autonomy",
+        "hook_category": "",
+        "audio_name": "",
+        "caption": caption,
+        "short_caption": caption,
+        "pinned_comment": "",
+        "story_prompt": "",
+        "story_poll": "",
+        "post_poll": "",
+        "keyword_notes": "",
+        "public_text_score": "100",
+        "public_text_decision": "APPROVED",
+        "publish_state": "queued",
+        "publish_mode": str(policy.get("publish_mode") or "explicit_live_connector_required"),
+        "connector_path": connector,
+        "post_url": "",
+        "posted_at": "",
+        "failure_reason": "",
+        "attempt_count": "0",
+        "notes": "Controlled photo autonomy; exact clean-export and generation lineage required.",
+        **lineage,
+        "clean_export_report_path": _repo_relative(clean_export_report_path.resolve(strict=True)),
+        "clean_export_report_sha256": clean_export_report_sha256,
+    }
+    _validate_clean_export(row, policy)
+    queue_path, existing = _load_queue(day)
+    lock_path = queue_path.with_suffix(queue_path.suffix + ".admission.lock")
+    queue_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError as exc:
+        raise AutopublishError("autonomous_queue_admission_active", "another queue admission is active") from exc
+    try:
+        os.close(fd)
+        queue_path, existing = _load_queue(day)
+        matches = [item for item in existing if item.get("queue_id") == queue_id and item.get("platform") == platform]
+        canonical_row = {key: row.get(key, "") for key in QUEUE_FIELDS}
+        if matches:
+            if len(matches) != 1 or {key: matches[0].get(key, "") for key in QUEUE_FIELDS} != canonical_row:
+                raise AutopublishError("autonomous_queue_conflict", "existing queue row conflicts with the exact controlled-lane admission")
+            return {"ok": True, "reused": True, "queue_path": str(queue_path), "queue_id": queue_id, "row": canonical_row}
+        if any(item.get("slot_id") == slot_id and item.get("publish_state") != "posted" for item in existing):
+            raise AutopublishError("autonomous_slot_queue_conflict", "slot already has a non-posted queue row")
+        _write_queue(queue_path, [*existing, canonical_row])
+    finally:
+        lock_path.unlink(missing_ok=True)
+    return {"ok": True, "reused": False, "queue_path": str(queue_path), "queue_id": queue_id, "row": canonical_row}
 
 
 def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run: bool, policy_path: Path = POLICY_PATH) -> dict[str, Any]:

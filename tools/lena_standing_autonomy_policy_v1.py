@@ -193,9 +193,15 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     _require(policy.get("allowed_soul") == "Lena", "policy_soul_mismatch", "allowed_soul must be Lena")
     allowed_platforms = policy.get("allowed_platforms")
     _require(isinstance(allowed_platforms, list) and {"Instagram Feed", "Facebook Page"}.issubset(set(map(str, allowed_platforms))), "policy_platforms_invalid", "allowed_platforms must include Instagram Feed and Facebook Page")
-    _require(int(policy.get("provider_call_cap_per_cycle", 0)) == 1, "policy_provider_call_cap_invalid", "provider_call_cap_per_cycle must be 1")
+    controlled = policy.get("controlled_photo_autonomy")
+    controlled_enabled = isinstance(controlled, dict) and controlled.get("enabled") is True
+    if controlled_enabled:
+        _require(type(policy.get("emergency_stop")) is bool, "policy_emergency_stop_invalid", "controlled autonomy requires an explicit emergency_stop boolean")
+    expected_provider_cap = 2 if controlled_enabled else 1
+    expected_retry_cap = 1 if controlled_enabled else 0
+    _require(int(policy.get("provider_call_cap_per_cycle", 0)) == expected_provider_cap, "policy_provider_call_cap_invalid", f"provider_call_cap_per_cycle must be {expected_provider_cap}")
     _require(int(policy.get("publish_action_cap_per_cycle", 0)) == 1, "policy_publish_action_cap_invalid", "publish_action_cap_per_cycle must be 1")
-    _require(int(policy.get("retry_cap_per_cycle", -1)) == 0, "policy_retry_cap_invalid", "retry_cap_per_cycle must be 0")
+    _require(int(policy.get("retry_cap_per_cycle", -1)) == expected_retry_cap, "policy_retry_cap_invalid", f"retry_cap_per_cycle must be {expected_retry_cap}")
     _require(int(policy.get("maximum_cycles_per_day", 0)) > 0, "policy_maximum_cycles_per_day_invalid", "maximum_cycles_per_day must be positive")
     _require(int(policy.get("maximum_provider_calls_per_day", 0)) > 0, "policy_maximum_provider_calls_per_day_invalid", "maximum_provider_calls_per_day must be positive")
     _require(int(policy.get("maximum_publish_actions_per_day", 0)) > 0, "policy_maximum_publish_actions_per_day_invalid", "maximum_publish_actions_per_day must be positive")
@@ -207,6 +213,22 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     _require(policy.get("qa_required") is True, "policy_qa_required_invalid", "qa_required must be true")
     _require(policy.get("identity_verification_required") is True, "policy_identity_required_invalid", "identity_verification_required must be true")
     _require(policy.get("analytics_triggered_regeneration_disabled") is True, "policy_analytics_regeneration_invalid", "analytics_triggered_regeneration_disabled must be true")
+    if controlled_enabled:
+        _require(controlled.get("recipe_id") == "hcr_012", "policy_controlled_recipe_invalid", "controlled photo autonomy is limited to hcr_012")
+        _require(controlled.get("wardrobe_outfit_id") == "wc_p050", "policy_controlled_wardrobe_invalid", "controlled photo autonomy is limited to wc_p050")
+        _require(controlled.get("visual_provider") == "anthropic", "policy_visual_provider_invalid", "controlled photo autonomy requires the approved Anthropic visual provider")
+        _require(controlled.get("visual_model") == "claude-sonnet-5", "policy_visual_model_invalid", "controlled photo autonomy requires the approved visual model")
+        _require(controlled.get("retry_reason_codes") == ["hair_crown_forelock_artifact"], "policy_retry_reasons_invalid", "controlled photo autonomy permits only the canonical hair-crown retry")
+        _require(int(controlled.get("provider_call_cap_per_cycle", 0)) == 2, "policy_controlled_provider_cap_invalid", "controlled photo autonomy provider cap must be two")
+        _require(int(controlled.get("retry_cap_per_cycle", -1)) == 1, "policy_controlled_retry_cap_invalid", "controlled photo autonomy retry cap must be one")
+        _require(int(controlled.get("queue_item_cap_per_cycle", 0)) == 1, "policy_controlled_queue_cap_invalid", "controlled photo autonomy queue cap must be one")
+        _require(int(controlled.get("publish_action_cap_per_cycle", 0)) == 1, "policy_controlled_publish_cap_invalid", "controlled photo autonomy publish cap must be one")
+        _require(controlled.get("privacy_clean_derivative_required") is True, "policy_clean_derivative_invalid", "controlled photo autonomy requires a privacy-clean derivative")
+        _require(controlled.get("human_review_is_exception_only") is True, "policy_human_review_mode_invalid", "routine human review must be disabled for controlled photo autonomy")
+        _require(controlled.get("schedule_slot") in {"morning", "afternoon", "evening"}, "policy_schedule_slot_invalid", "controlled photo autonomy schedule_slot is invalid")
+        for key in ("visual_model_authority_path", "identity_reference_authority_path"):
+            authority_path = _path_from_repo_text(str(controlled.get(key) or ""))
+            _ensure_path_within_root(authority_path, ROOT, code=f"policy_{key}_escape", label=key, must_exist=True)
     current_utc = _now_utc()
     effective_at = _validate_iso_datetime(str(policy.get("effective_at_utc") or ""), code="policy_effective_at_invalid", label="effective_at_utc")
     _require(effective_at <= current_utc, "policy_effective_at_future_invalid", "effective_at_utc must not be in the future")
@@ -335,6 +357,10 @@ def _prepare_authorization_scope(
     if binding_error is not None:
         code, detail = binding_error
         _require(False, code, detail)
+    controlled = policy.get("controlled_photo_autonomy")
+    if isinstance(controlled, dict) and controlled.get("enabled") is True:
+        _require(candidate.get("recipe_id") == controlled.get("recipe_id"), "controlled_recipe_mismatch", "selected candidate is outside the authorized controlled recipe")
+        _require(candidate.get("wardrobe_outfit_id") == controlled.get("wardrobe_outfit_id"), "controlled_wardrobe_mismatch", "selected candidate is outside the authorized controlled wardrobe")
     return {
         "date": date_str,
         "slot_id": slot_id,
@@ -366,6 +392,7 @@ def _prepare_authorization_scope(
         "provider_execution_binding": provider_execution_binding,
         "binding_linkage": binding_linkage,
         "selected_candidate": candidate,
+        "controlled_photo_autonomy": dict(controlled) if isinstance(controlled, dict) else None,
     }
 
 
@@ -506,6 +533,7 @@ def issue_cycle_authorization(
             "candidate_selection_binding": scope["candidate_selection_binding"],
             "provider_execution_binding": scope["provider_execution_binding"],
             "binding_linkage": scope["binding_linkage"],
+            "controlled_photo_autonomy": scope["controlled_photo_autonomy"],
             "expected_output_directory": str(expected_output_directory),
             "expected_output_stem": expected_output_stem,
             "allowed_output_extensions": allowed_output_extensions,
@@ -543,6 +571,7 @@ def issue_cycle_authorization(
             "identity_verification_required": True,
             "analytics_triggered_regeneration_disabled": True,
             "kill_switch_enabled": True,
+            "emergency_stop": bool(policy_result["artifact"].get("emergency_stop", False)),
             "autonomy_enabled": True,
             "live_generation_enabled": True,
             "live_publishing_enabled": True,
@@ -648,9 +677,15 @@ def validate_cycle_authorization_artifact(
         "authorization has already been consumed",
     )
     _require(auth.get("kill_switch_enabled") is True, "authorization_kill_switch_disabled", "kill switch must be enabled")
-    _require(int(auth.get("provider_call_cap_per_cycle", 0)) == 1, "provider_call_cap_invalid", "provider call cap must be one")
+    controlled = auth.get("controlled_photo_autonomy")
+    controlled_enabled = isinstance(controlled, dict) and controlled.get("enabled") is True
+    if controlled_enabled:
+        _require(auth.get("emergency_stop") is False, "authorization_emergency_stop_active", "emergency stop is active")
+    expected_provider_cap = 2 if controlled_enabled else 1
+    expected_retry_cap = 1 if controlled_enabled else 0
+    _require(int(auth.get("provider_call_cap_per_cycle", 0)) == expected_provider_cap, "provider_call_cap_invalid", f"provider call cap must be {expected_provider_cap}")
     _require(int(auth.get("publish_action_cap_per_cycle", 0)) == 1, "publish_action_cap_invalid", "publish action cap must be one")
-    _require(int(auth.get("retry_cap_per_cycle", -1)) == 0, "retry_cap_invalid", "retry cap must be zero")
+    _require(int(auth.get("retry_cap_per_cycle", -1)) == expected_retry_cap, "retry_cap_invalid", f"retry cap must be {expected_retry_cap}")
     _require(int(auth.get("maximum_cycles_per_day", 0)) > 0, "daily_cycle_cap_invalid", "maximum_cycles_per_day must be positive")
     _require(int(auth.get("maximum_provider_calls_per_day", 0)) > 0, "daily_provider_call_cap_invalid", "maximum_provider_calls_per_day must be positive")
     _require(int(auth.get("maximum_publish_actions_per_day", 0)) > 0, "daily_publish_action_cap_invalid", "maximum_publish_actions_per_day must be positive")
@@ -667,11 +702,16 @@ def validate_cycle_authorization_artifact(
     _require(auth.get("model") == "text2image_soul_v2", "model_mismatch", "model must be text2image_soul_v2")
     _require(auth.get("soul_name") == "Lena", "soul_mismatch", "soul_name must be Lena")
     _require(auth.get("platform") in {"Instagram Feed", "Facebook Page"}, "platform_invalid", "platform must be allowed by policy")
+    if controlled_enabled:
+        _require(controlled.get("recipe_id") == "hcr_012", "controlled_recipe_invalid", "controlled authorization recipe must be hcr_012")
+        _require(controlled.get("wardrobe_outfit_id") == "wc_p050", "controlled_wardrobe_invalid", "controlled authorization wardrobe must be wc_p050")
+        _require(controlled.get("retry_reason_codes") == ["hair_crown_forelock_artifact"], "controlled_retry_reasons_invalid", "controlled authorization retry reasons are invalid")
     if policy_result is not None:
         policy = policy_result["artifact"]
         _require(str(auth.get("policy_artifact_sha256") or "") == policy_result["sha256"], "policy_sha_mismatch", "policy artifact SHA does not match")
         _require(str(auth.get("policy_id") or "") == str(policy.get("policy_id") or ""), "policy_id_mismatch", "policy id does not match")
         _require(str(auth.get("policy_version") or "") == str(policy.get("policy_version") or ""), "policy_version_mismatch", "policy version does not match")
+        _require(auth.get("controlled_photo_autonomy") == policy.get("controlled_photo_autonomy"), "controlled_photo_policy_mismatch", "controlled photo autonomy authority differs from the standing policy")
     _require(auth.get("authorization_artifact_path") == str(auth_path), "authorization_path_binding_mismatch", "authorization artifact path binding mismatch")
     canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
     _require(str(auth.get("authorization_artifact_sha256") or "") == canonical_sha, "authorization_sha_mismatch", "authorization SHA does not match canonical artifact bytes")

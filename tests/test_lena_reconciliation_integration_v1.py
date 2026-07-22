@@ -224,6 +224,8 @@ def _selected_candidate_payload() -> dict:
             "pose_body_language_label": pose_fixture.POSE_LABEL,
             "expression_gaze_id": "exp_fixture",
             "expression_gaze_label": "calm expression",
+            "wardrobe_outfit_id": "wc_p059",
+            "visual_style": "beautiful_trouble",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {SLOT_ID}",
         },
         "decision_fingerprint_sha256": "5" * 64,

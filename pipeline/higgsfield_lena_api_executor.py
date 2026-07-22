@@ -207,7 +207,7 @@ class HandoffArtifactError(Exception):
 
 # --- Prompt-source resolution ----------------------------------------------
 
-def resolve_prompt_source(date_str: str, slot_id: str) -> dict:
+def resolve_prompt_source(date_str: str, slot_id: str, *, required_recipe_id: str = "") -> dict:
     """Reproduces the exact accepted image package for slot_id, using only
     the already-committed generator/report code. Only one source shape is
     supported in v1: a photo-dump-pack slot_id
@@ -229,7 +229,12 @@ def resolve_prompt_source(date_str: str, slot_id: str) -> dict:
     pack_index = match.group("pack_index")
     slot_prefix = f"{library_prefix}-pack{pack_index}"
 
-    pack_report = build_report(date_str, slot_prefix, KNOWN_PHOTO_DUMP_PACK_COUNT)
+    pack_report = build_report(
+        date_str,
+        slot_prefix,
+        KNOWN_PHOTO_DUMP_PACK_COUNT,
+        required_recipe_id=required_recipe_id,
+    )
     for image in pack_report["images"]:
         if image["slot_id"] == slot_id:
             return {
@@ -525,7 +530,12 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     _require_handoff(structured.get("selected_prompt_text") == prompt, "handoff_structured_prompt_text_mismatch", f"{handoff_path} structured prompt text mismatch")
     _require_handoff(rebuilt_packet.get("compact_provider_prompt_preview") == prompt, "handoff_rebuilt_prompt_text_mismatch", f"{handoff_path} rebuilt prompt text mismatch")
     validation = validate_candidate(source, None)
-    _require_handoff(validation["ok"], "handoff_prompt_validation_failed", f"{handoff_path} regenerated prompt does not satisfy the existing dry-run validation gates")
+    _require_handoff(
+        validation["ok"],
+        "handoff_prompt_validation_failed",
+        f"{handoff_path} regenerated prompt failed validation: "
+        + "; ".join(validation["all_reasons"]),
+    )
     _require_handoff(report.get("selected_prompt_input_artifact_path") == report.get("selected_prompt_input", {}).get("artifact_path"), "handoff_candidate_path_mismatch", f"{handoff_path} selected prompt input path mismatch")
     _require_handoff(report.get("selected_prompt_input_artifact_path") == _repo_relative_path(packet_path), "handoff_candidate_path_mismatch", f"{handoff_path} selected prompt input path mismatch")
     _require_handoff(report.get("expected_handoff_artifact_path") == _repo_relative_path(handoff_path), "handoff_artifact_path_mismatch", f"{handoff_path} packet path mismatch")
@@ -922,6 +932,129 @@ def _validate_retry_approval_artifact(retry_handoff_path: Path, approval_path: P
     return result
 
 
+def execute_approved_retry_live_generation(
+    retry_handoff_path: Path,
+    retry_approval_path: Path,
+    *,
+    live_executor: Callable[[str, str, dict, str], dict] | None = None,
+) -> dict[str, Any]:
+    """Validate, consume, and execute one canonical bounded retry."""
+    retry_handoff_path = retry_handoff_path.resolve()
+    retry_approval_path = retry_approval_path.resolve()
+    date_str, slot_id, source, _ = _load_retry_decision_source(retry_handoff_path)
+    validation = validate_candidate(source, None)
+    _require_handoff(
+        validation.get("ok") is True,
+        "retry_prompt_validation_failed",
+        "retry prompt failed validation before approval consumption or provider execution",
+    )
+    approval_result = _validate_retry_approval_artifact(retry_handoff_path, retry_approval_path)
+    retry_facts = approval_result["retry_facts"]
+    custom_reference_id = str(retry_facts["custom_reference_id"])
+    claim_info = _create_retry_generation_claim(approval_result)
+    claim_path = Path(claim_info["claim_path"])
+    manifest_path_obj = manifest_path(date_str, slot_id)
+    result: dict[str, Any] = {
+        "ok": False,
+        "date": date_str,
+        "slot_id": slot_id,
+        "claim_info": claim_info,
+        "claim_path": claim_path.resolve(),
+        "receipt_info": None,
+        "receipt_path": None,
+        "manifest_path": manifest_path_obj.resolve(),
+        "live_result": None,
+        "provider_submission_may_have_occurred": False,
+        "subprocess_start_attempted": False,
+        "provider_call_performed": False,
+        "generation_performed": False,
+        "receipt_written": False,
+        "manifest_written": False,
+        "failure_stage": None,
+        "failure_error_text": None,
+    }
+    live_executor = live_executor or run_live
+    try:
+        live_result = live_executor(date_str, slot_id, source, custom_reference_id)
+    except Exception as exc:
+        failure_stage = getattr(exc, "stage", "provider_failure")
+        result.update(
+            {
+                "provider_submission_may_have_occurred": bool(getattr(exc, "provider_submission_may_have_occurred", False)),
+                "subprocess_start_attempted": bool(getattr(exc, "subprocess_start_attempted", False)),
+                "provider_call_performed": bool(getattr(exc, "provider_submission_may_have_occurred", False)),
+                "failure_stage": failure_stage,
+                "failure_error_text": _sanitize_operational_error_text(exc),
+            }
+        )
+        try:
+            receipt_info = _write_retry_generation_execution_receipt(
+                claim_path,
+                approval_result,
+                outcome="execution_failed",
+                failure_stage=failure_stage,
+                error_text=result["failure_error_text"],
+                subprocess_start_attempted=result["subprocess_start_attempted"],
+                provider_submission_may_have_occurred=result["provider_submission_may_have_occurred"],
+                provider_job_id=getattr(exc, "provider_job_id", None),
+                provider_status=getattr(exc, "provider_status", None),
+                output_path=getattr(exc, "output_path", None),
+                image_format_detected=getattr(exc, "image_format_detected", None),
+                actual_manifest_path=None,
+            )
+            result.update({"receipt_info": receipt_info, "receipt_path": receipt_info["receipt_path"], "receipt_written": True})
+        except Exception as receipt_exc:
+            result["failure_error_text"] = f"{result['failure_error_text']} (receipt write failed: {_sanitize_operational_error_text(receipt_exc)})"
+        return result
+
+    result["live_result"] = live_result
+    result["provider_submission_may_have_occurred"] = bool(live_result.get("provider_submission_may_have_occurred"))
+    result["subprocess_start_attempted"] = bool(live_result.get("subprocess_start_attempted"))
+    result["provider_call_performed"] = bool(live_result.get("provider_submission_may_have_occurred"))
+    result["generation_performed"] = bool(live_result.get("saved_image_path"))
+    saved_image_path = Path(str(live_result.get("saved_image_path") or "")).resolve()
+    saved_image_sha256 = _sha256_file(saved_image_path)
+    from tools.lena_higgsfield_retry_generation_approval_v1 import receipt_output_path as retry_receipt_output_path  # noqa: E402
+
+    expected_receipt_path = retry_receipt_output_path(date_str, slot_id)
+    manifest = build_manifest(
+        date_str,
+        slot_id,
+        source,
+        custom_reference_id,
+        live_result,
+        claim_repo_path=claim_info["claim_repo_path"],
+        receipt_repo_path=_repo_relative_path(expected_receipt_path),
+        saved_image_sha256=saved_image_sha256,
+    )
+    _write_manifest_atomic(manifest_path_obj, manifest)
+    receipt_info = _write_retry_generation_execution_receipt(
+        claim_path,
+        approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=result["subprocess_start_attempted"],
+        provider_submission_may_have_occurred=result["provider_submission_may_have_occurred"],
+        provider_job_id=live_result.get("job_id"),
+        provider_status=live_result.get("status"),
+        output_path=str(saved_image_path),
+        image_format_detected=live_result.get("image_format_detected"),
+        actual_manifest_path=_repo_relative_path(manifest_path_obj),
+    )
+    result.update(
+        {
+            "ok": True,
+            "receipt_info": receipt_info,
+            "receipt_path": receipt_info["receipt_path"],
+            "receipt_written": True,
+            "manifest_record": manifest,
+            "manifest_written": True,
+        }
+    )
+    return result
+
+
 def print_retry_approval_validation_report(approval_path: Path, approval_result: dict[str, Any]) -> None:
     approval = approval_result["approval"]
     scope = approval_result["scope_summary"]
@@ -1190,6 +1323,21 @@ def _rebuild_packet_prompt_source(
         "handoff_expression_provenance_mismatch",
         "executor-derived expression provenance disagrees with the handoff authority",
     )
+    try:
+        candidate_report = json.loads(candidate_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise HandoffArtifactError("handoff_candidate_wardrobe_invalid", f"selected candidate wardrobe authority is unreadable: {exc}") from exc
+    candidate_body = candidate_report.get("candidate") if isinstance(candidate_report, dict) else None
+    if not isinstance(candidate_body, dict):
+        candidate_body = candidate_report if isinstance(candidate_report, dict) else {}
+    candidate_wardrobe_id = str(candidate_body.get("wardrobe_outfit_id") or "").strip()
+    candidate_effective_silhouette = str(
+        candidate_body.get("effective_wardrobe_silhouette_class")
+        or candidate_body.get("visual_style")
+        or ""
+    ).strip()
+    _require_handoff(candidate_wardrobe_id, "handoff_candidate_wardrobe_missing", "SHA-bound candidate wardrobe_outfit_id is required")
+    _require_handoff(candidate_effective_silhouette, "handoff_candidate_silhouette_missing", "SHA-bound candidate effective wardrobe silhouette is required")
     rebuilt_packet = packet_builder.rebuild_packet_from_authoritative_sources(
         packet_report,
         pose_binding=derived_pose_provenance,
@@ -1228,6 +1376,16 @@ def _rebuild_packet_prompt_source(
                 wardrobe_silhouette_class = catalog_outfit_silhouette_class(wf_entry)
         except Exception:
             pass
+    _require_handoff(
+        wardrobe_outfit_id == candidate_wardrobe_id,
+        "handoff_candidate_wardrobe_mismatch",
+        "content packet wardrobe differs from the SHA-bound selected candidate",
+    )
+    _require_handoff(
+        isinstance(wardrobe_silhouette_class, str) and bool(wardrobe_silhouette_class.strip()),
+        "handoff_catalog_silhouette_missing",
+        "catalog wardrobe silhouette class is required",
+    )
 
     source = {
         "resolver": "content_packet_dryrun",
@@ -1264,7 +1422,14 @@ def _rebuild_packet_prompt_source(
             "expression_bound_content_packet_artifact_path": _repo_relative_path(packet_path),
             "expression_bound_content_packet_artifact_sha256": _sha256_file(packet_path),
             "expression_bound_content_packet_sha256": pose_bound_packet_sha256,
-            "effective_wardrobe_silhouette_class": wardrobe_silhouette_class,
+            "effective_wardrobe_silhouette_class": candidate_effective_silhouette,
+            "effective_wardrobe_silhouette_authority": {
+                "source": "sha_bound_selected_candidate",
+                "selected_candidate_artifact_path": _repo_relative_path(candidate_path),
+                "selected_candidate_artifact_sha256": _sha256_file(candidate_path),
+                "wardrobe_outfit_id": candidate_wardrobe_id,
+                "effective_wardrobe_silhouette_class": candidate_effective_silhouette,
+            },
             "soul_name": CONFIRMED_LENA_SOUL_NAME,
             "soul_version": CONFIRMED_LENA_SOUL_TYPE,
             "soul_selection_mode": "provider_config_not_prompt_text",
@@ -1501,6 +1666,20 @@ def build_manifest(
         "manifest_expression_provenance_mismatch",
         "manifest expression fields must equal the validated provider expression authority",
     )
+    silhouette_authority = image.get("effective_wardrobe_silhouette_authority")
+    _require_handoff(isinstance(silhouette_authority, dict), "manifest_silhouette_authority_missing", "manifest source must carry SHA-bound effective wardrobe silhouette authority")
+    _require_handoff(
+        silhouette_authority.get("selected_candidate_artifact_path") == bound_pose["selected_candidate_artifact_path"]
+        and silhouette_authority.get("selected_candidate_artifact_sha256") == bound_pose["selected_candidate_artifact_sha256"],
+        "manifest_silhouette_candidate_mismatch",
+        "effective wardrobe silhouette authority must use the same SHA-bound candidate as pose and expression",
+    )
+    _require_handoff(
+        silhouette_authority.get("wardrobe_outfit_id") == image.get("wardrobe_outfit_id")
+        and silhouette_authority.get("effective_wardrobe_silhouette_class") == image.get("effective_wardrobe_silhouette_class"),
+        "manifest_silhouette_authority_mismatch",
+        "effective wardrobe silhouette fields differ from selected-candidate authority",
+    )
     packet_path_value = image.get("pose_bound_content_packet_artifact_path")
     packet_artifact_sha256 = image.get("pose_bound_content_packet_artifact_sha256")
     packet_bound_sha256 = image.get("pose_bound_content_packet_sha256")
@@ -1556,6 +1735,7 @@ def build_manifest(
         "wardrobe_outfit_name": image.get("wardrobe_outfit_name"),
         "wardrobe_silhouette_class": image.get("wardrobe_silhouette_class"),
         "effective_wardrobe_silhouette_class": image.get("effective_wardrobe_silhouette_class"),
+        "effective_wardrobe_silhouette_authority": silhouette_authority,
         "text_surface_risk_terms_found": image.get("text_surface_risk_terms_found", []),
         "pose_body_language_id": image.get("pose_body_language_id"),
         "pose_body_language_label": image.get("pose_body_language_label"),
