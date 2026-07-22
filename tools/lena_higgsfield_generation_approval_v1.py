@@ -1542,12 +1542,12 @@ def _write_immutable_record_atomic(
             temp_path.unlink()
 
 
-def _validate_lineage_record_authority(
+def validate_lineage_record_authority(
     record: Any,
     *,
     expected_report_type: str,
     owner: str,
-) -> None:
+) -> dict[str, Any]:
     require(
         isinstance(record, dict) and record.get("report_type") == expected_report_type,
         f"{owner}_report_type_mismatch",
@@ -1562,6 +1562,11 @@ def _validate_lineage_record_authority(
         approval_path,
         require_not_expired=False,
     )
+    require(
+        record.get("approval_artifact_path") == approval_result["approval_repo_path"],
+        f"{owner}_approval_path_mismatch",
+        f"{owner} approval_artifact_path must use the validated approval artifact's canonical path",
+    )
     approval_blocks = _validated_approval_result_authority_blocks(approval_result)
     record_blocks = _require_named_authority_blocks(record, owner=owner)
     for key, actual, expected in zip(AUTHORITY_BLOCK_KEYS, record_blocks, approval_blocks):
@@ -1570,8 +1575,13 @@ def _validate_lineage_record_authority(
             f"{owner}_{key}_mismatch",
             f"{owner} {key} must exactly match the validated approval authority snapshot",
         )
+    approval_sha = require_sha256(
+        record.get("approval_artifact_sha256"),
+        code=f"{owner}_approval_sha_invalid",
+        label=f"{owner} approval_artifact_sha256",
+    )
     require(
-        record.get("approval_artifact_sha256") == approval_result["approval_sha256"],
+        approval_sha == approval_result["approval_sha256"],
         f"{owner}_approval_sha_mismatch",
         f"{owner} approval_artifact_sha256 must match the validated approval artifact",
     )
@@ -1588,19 +1598,208 @@ def _validate_lineage_record_authority(
             f"{owner}_{key}_mismatch",
             f"{owner} {key} must match the validated handoff authority",
         )
+    approval = approval_result["approval"]
+    for key in (
+        "operator_id",
+        "provider",
+        "executor",
+        "model",
+        "aspect_ratio",
+        "soul_name",
+        "soul_type",
+        "custom_reference_id",
+    ):
+        require(
+            record.get(key) == approval.get(key),
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the validated approval authority",
+        )
+    return {
+        "approval_result": approval_result,
+        "handoff_facts": handoff_facts,
+        "authority_blocks": approval_blocks,
+    }
 
 
-def validate_lineage_authority_snapshots(
+def validate_generation_claim_lineage(
     record: Any,
-    handoff_facts: dict[str, Any],
     *,
-    owner: str,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    return validate_authority_snapshots_against_handoff(
+    claim_path: Path | None = None,
+) -> dict[str, Any]:
+    owner = "generation_claim"
+    lineage = validate_lineage_record_authority(
         record,
-        handoff_facts,
+        expected_report_type=CLAIM_REPORT_TYPE,
         owner=owner,
     )
+    require(
+        record.get("schema_version") == CLAIM_SCHEMA_VERSION,
+        f"{owner}_schema_version_mismatch",
+        f"{owner} schema_version must be {CLAIM_SCHEMA_VERSION!r}",
+    )
+    require(
+        record.get("claim_type") == CLAIM_TYPE,
+        f"{owner}_type_mismatch",
+        f"{owner} claim_type must be {CLAIM_TYPE!r}",
+    )
+    parse_iso8601_utc(
+        record.get("claimed_at_utc"),
+        code=f"{owner}_claimed_at_invalid",
+        label=f"{owner} claimed_at_utc",
+    )
+    handoff_facts = lineage["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    if claim_path is not None:
+        resolved_claim_path = claim_path.resolve()
+        require(
+            resolved_claim_path == claim_output_path(date_str, slot_id).resolve(),
+            f"{owner}_path_mismatch",
+            f"{owner} artifact path must be the canonical claim path for the validated slot",
+        )
+    expected_values = {
+        "authorized_attempts": 1,
+        "consumed_attempt_number": 1,
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "expected_output_directory": repo_relative_path(expected_output_directory(date_str)),
+        "expected_output_stem": expected_output_stem(slot_id),
+        "allowed_output_extensions": list(ALLOWED_OUTPUT_EXTENSIONS),
+        "state": "claimed_pending_receipt",
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+    for key, expected in expected_values.items():
+        require(
+            record.get(key) == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the canonical claim contract",
+        )
+    return lineage
+
+
+def validate_generation_execution_receipt_lineage(
+    record: Any,
+    *,
+    receipt_path: Path | None = None,
+) -> dict[str, Any]:
+    owner = "generation_receipt"
+    lineage = validate_lineage_record_authority(
+        record,
+        expected_report_type=RECEIPT_REPORT_TYPE,
+        owner=owner,
+    )
+    require(
+        record.get("schema_version") == RECEIPT_SCHEMA_VERSION,
+        f"{owner}_schema_version_mismatch",
+        f"{owner} schema_version must be {RECEIPT_SCHEMA_VERSION!r}",
+    )
+    require(
+        record.get("receipt_type") == RECEIPT_TYPE,
+        f"{owner}_type_mismatch",
+        f"{owner} receipt_type must be {RECEIPT_TYPE!r}",
+    )
+    parse_iso8601_utc(
+        record.get("receipt_written_at_utc"),
+        code=f"{owner}_written_at_invalid",
+        label=f"{owner} receipt_written_at_utc",
+    )
+    handoff_facts = lineage["handoff_facts"]
+    date_str = handoff_facts["date"]
+    slot_id = handoff_facts["slot_id"]
+    if receipt_path is not None:
+        resolved_receipt_path = receipt_path.resolve()
+        require(
+            resolved_receipt_path == receipt_output_path(date_str, slot_id).resolve(),
+            f"{owner}_path_mismatch",
+            f"{owner} artifact path must be the canonical receipt path for the validated slot",
+        )
+
+    claim_path = resolve_repo_path(
+        str(record.get("claim_artifact_path") or ""),
+        code=f"{owner}_claim_path_missing",
+        label=f"{owner} claim_artifact_path",
+    )
+    require(
+        record.get("claim_artifact_path") == repo_relative_path(claim_path),
+        f"{owner}_claim_path_noncanonical",
+        f"{owner} claim_artifact_path must use the resolved claim artifact's canonical path",
+    )
+    require(
+        claim_path == claim_output_path(date_str, slot_id).resolve(),
+        f"{owner}_claim_path_mismatch",
+        f"{owner} claim_artifact_path must identify the canonical claim for the validated slot",
+    )
+    claim_sha = require_sha256(
+        record.get("claim_artifact_sha256"),
+        code=f"{owner}_claim_sha_invalid",
+        label=f"{owner} claim_artifact_sha256",
+    )
+    require(
+        claim_path.is_file(),
+        f"{owner}_claim_missing",
+        f"{owner} referenced claim artifact is missing: {claim_path}",
+    )
+    require(
+        sha256_file(claim_path) == claim_sha,
+        f"{owner}_claim_sha_mismatch",
+        f"{owner} claim_artifact_sha256 does not match the referenced claim bytes",
+    )
+    claim = read_json_object(
+        claim_path,
+        code=f"{owner}_claim_invalid",
+        label=f"{owner} claim artifact",
+    )
+    claim_lineage = validate_generation_claim_lineage(claim, claim_path=claim_path)
+    for key in (
+        "approval_artifact_path",
+        "approval_artifact_sha256",
+        "handoff_artifact_path",
+        "handoff_artifact_sha256",
+        "date",
+        "slot_id",
+        "prompt_sha256",
+        "operator_id",
+        "provider",
+        "executor",
+        "model",
+        "aspect_ratio",
+        "soul_name",
+        "soul_type",
+        "custom_reference_id",
+        *AUTHORITY_BLOCK_KEYS,
+    ):
+        require(
+            record.get(key) == claim.get(key),
+            f"{owner}_claim_{key}_mismatch",
+            f"{owner} {key} must exactly match the validated claim lineage",
+        )
+    require(
+        claim_lineage["approval_result"]["approval_sha256"]
+        == lineage["approval_result"]["approval_sha256"],
+        f"{owner}_claim_approval_mismatch",
+        f"{owner} and its claim must bind the same validated approval artifact",
+    )
+    expected_values = {
+        "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
+        "upload_authorized": False,
+        "queue_promotion_authorized": False,
+        "publish_authorized": False,
+        "analytics_mutation_authorized": False,
+    }
+    for key, expected in expected_values.items():
+        require(
+            record.get(key) == expected,
+            f"{owner}_{key}_mismatch",
+            f"{owner} {key} must match the canonical receipt contract",
+        )
+    return {
+        **lineage,
+        "claim": claim,
+        "claim_path": claim_path,
+        "claim_sha256": claim_sha,
+    }
 
 
 def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
@@ -1627,11 +1826,7 @@ def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
 
 
 def write_generation_claim_atomic(path: Path, record: dict[str, Any]) -> None:
-    _validate_lineage_record_authority(
-        record,
-        expected_report_type=CLAIM_REPORT_TYPE,
-        owner="generation_claim",
-    )
+    validate_generation_claim_lineage(record, claim_path=path)
     _write_immutable_record_atomic(
         path,
         record,
@@ -1641,11 +1836,7 @@ def write_generation_claim_atomic(path: Path, record: dict[str, Any]) -> None:
 
 
 def write_generation_execution_receipt_atomic(path: Path, record: dict[str, Any]) -> None:
-    _validate_lineage_record_authority(
-        record,
-        expected_report_type=RECEIPT_REPORT_TYPE,
-        owner="generation_receipt",
-    )
+    validate_generation_execution_receipt_lineage(record, receipt_path=path)
     _write_immutable_record_atomic(
         path,
         record,

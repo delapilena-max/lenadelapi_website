@@ -1690,8 +1690,9 @@ def _build_retry_fixture(
     image_path.parent.mkdir(parents=True, exist_ok=True)
     image_path.write_bytes(b"\x89PNG\r\n\x1a\nretry-proof-image")
     manifest_repo_path = Path("pipeline/higgsfield_debug") / retry_date / original_slot / "result_manifest.json"
+    manifest_path = tmp_root / manifest_repo_path
     _write_json(
-        tmp_root / manifest_repo_path,
+        manifest_path,
         {
             "provider": "higgsfield",
             "slot_id": original_slot,
@@ -1719,35 +1720,42 @@ def _build_retry_fixture(
             "provider_status": "completed",
         },
     )
-    receipt_repo_path = Path("pipeline/approvals/lena/generation") / retry_date / f"{original_slot}_higgsfield_generation_execution_receipt.json"
-    receipt_path = tmp_root / receipt_repo_path
-    _write_json(
+    original_handoff_facts = approval_mod.inspect_handoff_artifact(handoff_path)
+    original_approval_record = approval_mod.build_generation_approval_record(
+        original_handoff_facts,
+        operator_id=approval_mod.CANONICAL_OPERATOR_ID,
+        confirmation=approval_mod.confirmation_phrase(original_slot),
+    )
+    original_approval_path = approval_mod.approval_output_path(retry_date, original_slot)
+    approval_mod.write_approval_record_atomic(original_approval_path, original_approval_record)
+    original_approval_result = approval_mod.validate_generation_approval_artifact(
+        original_approval_path
+    )
+    original_claim_path = approval_mod.claim_output_path(retry_date, original_slot)
+    approval_mod.write_generation_claim_atomic(
+        original_claim_path,
+        approval_mod.build_generation_claim_record(original_approval_result),
+    )
+    receipt_path = approval_mod.receipt_output_path(retry_date, original_slot)
+    original_receipt_record = approval_mod.build_generation_execution_receipt_record(
+        original_claim_path,
+        original_approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        provider_job_id="job-123",
+        provider_status="completed",
+        output_path=str(image_path),
+        image_format_detected=".png",
+        actual_manifest_path=manifest_repo_path.as_posix(),
+        generated_image_sha256=hashlib.sha256(image_path.read_bytes()).hexdigest(),
+        manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+    approval_mod.write_generation_execution_receipt_atomic(
         receipt_path,
-        {
-            "report_type": "lena_higgsfield_generation_execution_receipt",
-            "schema_version": "v1",
-            "receipt_type": "higgsfield_single_generation_execution_receipt",
-            "handoff_artifact_path": handoff_repo_path.as_posix(),
-            "handoff_artifact_sha256": handoff_sha,
-            "date": retry_date,
-            "slot_id": original_slot,
-            "prompt_sha256": original_prompt_sha,
-            "candidate_selection_binding": handoff_report["candidate_selection_binding"],
-            "provider_execution_binding": handoff_report["provider_execution_binding"],
-            "binding_linkage": handoff_report["binding_linkage"],
-            "outcome": "success",
-            "provider_job_id": "job-123",
-            "provider_status": "completed",
-            "provider_submission_may_have_occurred": True,
-            "subprocess_start_attempted": True,
-            "output_path": str(image_path),
-            "actual_manifest_path": manifest_repo_path.as_posix(),
-            "provider": "Higgsfield",
-            "executor": "Higgsfield CLI repo adapter",
-            "model": "text2image_soul_v2",
-            "aspect_ratio": "9:16",
-            "custom_reference_id": custom_reference_id,
-        },
+        original_receipt_record,
     )
     monkeypatch.setattr(
         retry_handoff_mod.pose_provenance,

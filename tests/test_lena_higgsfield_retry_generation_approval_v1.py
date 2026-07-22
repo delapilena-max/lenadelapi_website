@@ -516,34 +516,43 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     }
     _write_json(manifest_path, manifest_report)
 
-    receipt_repo_path = Path("pipeline/approvals/lena/generation") / DATE / f"{ORIGINAL_SLOT}_higgsfield_generation_execution_receipt.json"
-    receipt_path = tmp_path / receipt_repo_path
-    receipt_report = {
-        "report_type": "lena_higgsfield_generation_execution_receipt",
-        "schema_version": "v1",
-        "receipt_type": "higgsfield_single_generation_execution_receipt",
-        "handoff_artifact_path": handoff_repo_path.as_posix(),
-        "handoff_artifact_sha256": handoff_sha,
-        "date": DATE,
-        "slot_id": ORIGINAL_SLOT,
-        "prompt_sha256": PROMPT_SHA,
-        "candidate_selection_binding": handoff_report["candidate_selection_binding"],
-        "provider_execution_binding": handoff_report["provider_execution_binding"],
-        "binding_linkage": handoff_report["binding_linkage"],
-        "outcome": "success",
-        "provider_job_id": "job-123",
-        "provider_status": "completed",
-        "provider_submission_may_have_occurred": True,
-        "subprocess_start_attempted": True,
-        "output_path": str(image_path),
-        "actual_manifest_path": manifest_repo_path.as_posix(),
-        "provider": "Higgsfield",
-        "executor": "Higgsfield CLI repo adapter",
-        "model": "text2image_soul_v2",
-        "aspect_ratio": "9:16",
-        "custom_reference_id": CUSTOM_REFERENCE_ID,
-    }
-    _write_json(receipt_path, receipt_report)
+    handoff_facts = canonical_approval.inspect_handoff_artifact(handoff_path)
+    original_approval = canonical_approval.build_generation_approval_record(
+        handoff_facts,
+        operator_id=canonical_approval.CANONICAL_OPERATOR_ID,
+        confirmation=canonical_approval.confirmation_phrase(ORIGINAL_SLOT),
+    )
+    original_approval_path = canonical_approval.approval_output_path(DATE, ORIGINAL_SLOT)
+    canonical_approval.write_approval_record_atomic(original_approval_path, original_approval)
+    original_approval_result = canonical_approval.validate_generation_approval_artifact(
+        original_approval_path
+    )
+    original_claim_path = canonical_approval.claim_output_path(DATE, ORIGINAL_SLOT)
+    canonical_approval.write_generation_claim_atomic(
+        original_claim_path,
+        canonical_approval.build_generation_claim_record(original_approval_result),
+    )
+    receipt_path = canonical_approval.receipt_output_path(DATE, ORIGINAL_SLOT)
+    receipt_record = canonical_approval.build_generation_execution_receipt_record(
+        original_claim_path,
+        original_approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        provider_job_id="job-123",
+        provider_status="completed",
+        output_path=str(image_path),
+        image_format_detected=".png",
+        actual_manifest_path=manifest_repo_path.as_posix(),
+        generated_image_sha256=hashlib.sha256(image_path.read_bytes()).hexdigest(),
+        manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+    canonical_approval.write_generation_execution_receipt_atomic(
+        receipt_path,
+        receipt_record,
+    )
 
     report = retry_mod.evaluate_retry_handoff(
         handoff_artifact=handoff_path,

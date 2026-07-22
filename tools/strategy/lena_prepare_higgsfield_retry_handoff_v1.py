@@ -248,10 +248,9 @@ def _validate_execution_receipt(
         "receipt prompt_sha256 does not match the reviewed handoff prompt sha",
     )
     try:
-        approval_contract.validate_lineage_authority_snapshots(
+        approval_contract.validate_generation_execution_receipt_lineage(
             receipt,
-            handoff_facts,
-            owner="receipt",
+            receipt_path=receipt_path,
         )
     except approval_contract.HiggsfieldGenerationApprovalError as exc:
         raise RetryHandoffError(exc.code, exc.detail) from exc

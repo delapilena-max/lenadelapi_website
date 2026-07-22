@@ -496,36 +496,42 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     }
     _write_json(manifest_path, manifest_report)
 
-    receipt_repo_path = Path("pipeline/approvals/lena/generation") / DATE / f"{ORIGINAL_SLOT}_higgsfield_generation_execution_receipt.json"
-    receipt_path = tmp_path / receipt_repo_path
-    receipt_report = {
-        "report_type": "lena_higgsfield_generation_execution_receipt",
-        "schema_version": "v1",
-        "receipt_type": "higgsfield_single_generation_execution_receipt",
-        "handoff_artifact_path": handoff_repo_path.as_posix(),
-        "handoff_artifact_sha256": handoff_sha,
-        "date": DATE,
-        "slot_id": ORIGINAL_SLOT,
-        "prompt_sha256": PROMPT_SHA,
-        "candidate_selection_binding": handoff_report["candidate_selection_binding"],
-        "provider_execution_binding": handoff_report["provider_execution_binding"],
-        "binding_linkage": handoff_report["binding_linkage"],
-        "outcome": "success",
-        "provider_job_id": "job-123",
-        "provider_status": "completed",
-        "provider_submission_may_have_occurred": True,
-        "subprocess_start_attempted": True,
-        "output_path": str(image_path),
-        "actual_manifest_path": manifest_repo_path.as_posix(),
-        "provider": "Higgsfield",
-        "executor": "Higgsfield CLI repo adapter",
-        "model": "text2image_soul_v2",
-        "aspect_ratio": "9:16",
-        "custom_reference_id": CUSTOM_REFERENCE_ID,
-    }
-    _write_json(receipt_path, receipt_report)
+    handoff_facts = approval_mod.inspect_handoff_artifact(handoff_path)
+    approval_record = approval_mod.build_generation_approval_record(
+        handoff_facts,
+        operator_id=approval_mod.CANONICAL_OPERATOR_ID,
+        confirmation=approval_mod.confirmation_phrase(ORIGINAL_SLOT),
+    )
+    approval_path = approval_mod.approval_output_path(DATE, ORIGINAL_SLOT)
+    approval_mod.write_approval_record_atomic(approval_path, approval_record)
+    approval_result = approval_mod.validate_generation_approval_artifact(approval_path)
+
+    claim_path = approval_mod.claim_output_path(DATE, ORIGINAL_SLOT)
+    claim_record = approval_mod.build_generation_claim_record(approval_result)
+    approval_mod.write_generation_claim_atomic(claim_path, claim_record)
+
+    receipt_path = approval_mod.receipt_output_path(DATE, ORIGINAL_SLOT)
+    receipt_record = approval_mod.build_generation_execution_receipt_record(
+        claim_path,
+        approval_result,
+        outcome="success",
+        failure_stage=None,
+        error_text=None,
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        provider_job_id="job-123",
+        provider_status="completed",
+        output_path=str(image_path),
+        image_format_detected=".png",
+        actual_manifest_path=manifest_repo_path.as_posix(),
+        generated_image_sha256=hashlib.sha256(image_path.read_bytes()).hexdigest(),
+        manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+    approval_mod.write_generation_execution_receipt_atomic(receipt_path, receipt_record)
     return {
         "handoff_path": handoff_path,
+        "approval_path": approval_path,
+        "claim_path": claim_path,
         "receipt_path": receipt_path,
         "packet_path": packet_path,
         "manifest_path": manifest_path,
@@ -630,7 +636,215 @@ def test_retry_source_receipt_requires_complete_authority_snapshots(
             output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
             write_artifact=False,
         )
-    assert excinfo.value.code == f"receipt_{block}_missing"
+    assert excinfo.value.code == f"generation_receipt_{block}_missing"
+
+
+@pytest.mark.parametrize(
+    ("field", "expected_code"),
+    [
+        ("approval_artifact_path", "generation_receipt_approval_path_missing"),
+        ("approval_artifact_sha256", "generation_receipt_approval_sha_invalid"),
+        ("claim_artifact_path", "generation_receipt_claim_path_missing"),
+        ("claim_artifact_sha256", "generation_receipt_claim_sha_invalid"),
+    ],
+)
+def test_retry_source_receipt_requires_complete_approval_and_claim_lineage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    expected_code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt.pop(field)
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == expected_code
+
+
+def test_retry_source_receipt_rejects_snapshot_only_lineage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    for field in (
+        "approval_artifact_path",
+        "approval_artifact_sha256",
+        "claim_artifact_path",
+        "claim_artifact_sha256",
+    ):
+        receipt.pop(field)
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == "generation_receipt_approval_path_missing"
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "expected_code"),
+    [
+        (
+            "approval_artifact_path",
+            "pipeline/approvals/lena/generation/missing-approval.json",
+            "approval_missing_or_invalid",
+        ),
+        (
+            "approval_artifact_sha256",
+            "f" * 64,
+            "generation_receipt_approval_sha_mismatch",
+        ),
+        (
+            "claim_artifact_path",
+            "pipeline/approvals/lena/generation/missing-claim.json",
+            "generation_receipt_claim_path_mismatch",
+        ),
+        (
+            "claim_artifact_sha256",
+            "f" * 64,
+            "generation_receipt_claim_sha_mismatch",
+        ),
+    ],
+)
+def test_retry_source_receipt_rejects_altered_lineage_path_or_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    replacement: str,
+    expected_code: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt[field] = replacement
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == expected_code
+
+
+@pytest.mark.parametrize("artifact_key", ["approval_path", "claim_path"])
+def test_retry_source_receipt_rejects_referenced_lineage_byte_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_key: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    artifact = json.loads(seeded[artifact_key].read_text(encoding="utf-8"))
+    artifact["tampered_after_issuance"] = True
+    _write_json(seeded[artifact_key], artifact)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    expected = (
+        "generation_receipt_approval_sha_mismatch"
+        if artifact_key == "approval_path"
+        else "generation_receipt_claim_sha_mismatch"
+    )
+    assert excinfo.value.code == expected
+
+
+def test_retry_source_receipt_rejects_claim_bound_to_different_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    alternate_approval_path = tmp_path / "alternate" / "approval.json"
+    alternate_approval_path.parent.mkdir(parents=True, exist_ok=True)
+    alternate_approval_path.write_bytes(seeded["approval_path"].read_bytes())
+
+    claim = json.loads(seeded["claim_path"].read_text(encoding="utf-8"))
+    claim["approval_artifact_path"] = approval_mod.repo_relative_path(alternate_approval_path)
+    _write_json(seeded["claim_path"], claim)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["claim_artifact_sha256"] = hashlib.sha256(seeded["claim_path"].read_bytes()).hexdigest()
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == "generation_receipt_claim_approval_artifact_path_mismatch"
+
+
+def test_retry_source_receipt_rejects_different_or_noncanonical_claim_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["claim_artifact_path"] = (
+        Path(receipt["claim_artifact_path"]).parent / ".." / DATE / Path(receipt["claim_artifact_path"]).name
+    ).as_posix()
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == "generation_receipt_claim_path_noncanonical"
+
+
+def test_retry_ingestion_reuses_complete_receipt_lineage_validator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    original = approval_mod.validate_generation_execution_receipt_lineage
+    calls: list[Path | None] = []
+
+    def tracking_validator(record, *, receipt_path=None):
+        calls.append(receipt_path)
+        return original(record, receipt_path=receipt_path)
+
+    monkeypatch.setattr(
+        approval_mod,
+        "validate_generation_execution_receipt_lineage",
+        tracking_validator,
+    )
+    retry_mod.evaluate_retry_handoff(
+        handoff_artifact=seeded["handoff_path"],
+        execution_receipt=seeded["receipt_path"],
+        output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+        write_artifact=False,
+    )
+    assert calls == [seeded["receipt_path"].resolve()]
 
 
 @pytest.mark.parametrize(
