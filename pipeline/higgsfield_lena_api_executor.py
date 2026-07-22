@@ -670,13 +670,29 @@ def _sanitize_operational_error_text(value: Any) -> str:
 
 
 def _create_generation_claim(approval_result: dict[str, Any]) -> dict[str, Any]:
+    handoff_facts = approval_result["handoff_facts"]
+    if approval_result.get("approval", {}).get("authorization_identity_mode") == "standing_autonomy_policy":
+        from tools.lena_higgsfield_standing_autonomy_generation_approval_v1 import (  # noqa: E402
+            build_standing_autonomy_generation_claim_record,
+            claim_output_path,
+            write_standing_autonomy_generation_claim_atomic,
+        )
+
+        path = claim_output_path(handoff_facts["date"], handoff_facts["slot_id"])
+        record = build_standing_autonomy_generation_claim_record(approval_result)
+        write_standing_autonomy_generation_claim_atomic(path, record)
+        return {
+            "claim_path": path.resolve(),
+            "claim_repo_path": _repo_relative_path(path),
+            "claim_record": record,
+        }
+
     from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
         build_generation_claim_record,
         claim_output_path,
         write_generation_claim_atomic,
     )
 
-    handoff_facts = approval_result["handoff_facts"]
     path = claim_output_path(handoff_facts["date"], handoff_facts["slot_id"])
     record = build_generation_claim_record(approval_result)
     write_generation_claim_atomic(path, record)
@@ -704,17 +720,8 @@ def _write_generation_execution_receipt(
     generated_image_sha256: str | None = None,
     manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
-    from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
-        build_generation_execution_receipt_record,
-        receipt_output_path,
-        write_generation_execution_receipt_atomic,
-    )
-
     handoff_facts = approval_result["handoff_facts"]
-    path = receipt_output_path(handoff_facts["date"], handoff_facts["slot_id"])
-    record = build_generation_execution_receipt_record(
-        claim_path,
-        approval_result,
+    receipt_kwargs = dict(
         outcome=outcome,
         failure_stage=failure_stage,
         error_text=error_text,
@@ -728,6 +735,30 @@ def _write_generation_execution_receipt(
         generated_image_sha256=generated_image_sha256,
         manifest_sha256=manifest_sha256,
     )
+    if approval_result.get("approval", {}).get("authorization_identity_mode") == "standing_autonomy_policy":
+        from tools.lena_higgsfield_standing_autonomy_generation_approval_v1 import (  # noqa: E402
+            build_standing_autonomy_generation_execution_receipt_record,
+            receipt_output_path,
+            write_standing_autonomy_generation_execution_receipt_atomic,
+        )
+
+        path = receipt_output_path(handoff_facts["date"], handoff_facts["slot_id"])
+        record = build_standing_autonomy_generation_execution_receipt_record(claim_path, approval_result, **receipt_kwargs)
+        write_standing_autonomy_generation_execution_receipt_atomic(path, record)
+        return {
+            "receipt_path": path.resolve(),
+            "receipt_repo_path": _repo_relative_path(path),
+            "receipt_record": record,
+        }
+
+    from tools.lena_higgsfield_generation_approval_v1 import (  # noqa: E402
+        build_generation_execution_receipt_record,
+        receipt_output_path,
+        write_generation_execution_receipt_atomic,
+    )
+
+    path = receipt_output_path(handoff_facts["date"], handoff_facts["slot_id"])
+    record = build_generation_execution_receipt_record(claim_path, approval_result, **receipt_kwargs)
     write_generation_execution_receipt_atomic(path, record)
     return {
         "receipt_path": path.resolve(),

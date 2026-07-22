@@ -874,7 +874,17 @@ def _validate_live_required_artifacts(auth: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_autonomous_approval_result(auth: dict[str, Any], live_requirements: dict[str, Any]) -> dict[str, Any]:
+def _build_uncontrolled_autonomous_approval_result(
+    auth: dict[str, Any], live_requirements: dict[str, Any]
+) -> dict[str, Any]:
+    """Legacy in-memory approval_result for standing-autonomy cycles outside
+    the governed hcr_012/wc_p050 lane. Unchanged from the pre-existing
+    behavior (never exercised against the real manual-approval lineage
+    chain in production -- execute_approved_handoff_live_generation is
+    always mocked wherever this path is tested). The controlled lane uses
+    _issue_standing_autonomy_generation_approval instead, which issues a
+    real, independently re-validated approval artifact.
+    """
     artifact = auth["artifact"]
     handoff_report = auth["handoff"]["report"]
     handoff_path = live_requirements["handoff_path"]
@@ -941,6 +951,38 @@ def _build_autonomous_approval_result(auth: dict[str, Any], live_requirements: d
         "policy_path": auth.get("policy", {}).get("path") if isinstance(auth.get("policy"), dict) else None,
         "candidate_artifact_path": candidate_path,
     }
+
+
+def _issue_standing_autonomy_generation_approval(
+    auth: dict[str, Any], live_requirements: dict[str, Any]
+) -> dict[str, Any]:
+    """Issue, write, and validate a real standing-autonomy generation approval
+    for the governed hcr_012/wc_p050 controlled lane.
+
+    Replaces the previous in-memory-only approval_result for that lane: the
+    executor's claim/receipt writers independently re-read and re-validate
+    the approval artifact from disk (see lena_higgsfield_generation_approval_v1's
+    manual lineage chain, which the standing-autonomy path must satisfy with
+    its own parallel artifact rather than a hand-built dict impersonating
+    one). Cycles outside the controlled lane fall back to the legacy
+    in-memory behavior, unchanged.
+    """
+    if _controlled_photo_authority(auth) is None:
+        return _build_uncontrolled_autonomous_approval_result(auth, live_requirements)
+
+    from tools import lena_higgsfield_standing_autonomy_generation_approval_v1 as standing_generation_approval
+
+    handoff_path = live_requirements["handoff_path"]
+    candidate_path = live_requirements["candidate_path"]
+    handoff_facts = standing_generation_approval.inspect_generation_handoff_for_standing_autonomy(
+        handoff_path, candidate_path
+    )
+    record = standing_generation_approval.build_standing_autonomy_generation_approval_record(handoff_facts, auth)
+    approval_path = standing_generation_approval.approval_output_path(handoff_facts["date"], handoff_facts["slot_id"])
+    standing_generation_approval.write_standing_autonomy_generation_approval_record_atomic(approval_path, record)
+    return standing_generation_approval.validate_standing_autonomy_generation_approval_artifact(
+        approval_path, require_not_expired=False
+    )
 
 
 def _manifest_output_image_path(manifest: dict[str, Any], expected_directory: Path, expected_stem: str, allowed_output_extensions: list[str]) -> Path:
@@ -1239,13 +1281,16 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         )
     )
 
-    approval_result = _build_autonomous_approval_result(auth, live_requirements)
+    approval_result = _issue_standing_autonomy_generation_approval(auth, live_requirements)
+    _, provider_prompt_source, _, packet_validation = executor._validate_handoff_packet(live_requirements["handoff_path"])
+    _require(packet_validation.get("ok") is True, "provider_source_validation_failed", "regenerated provider prompt source failed validation before provider execution")
     context = {
         "date": day,
         "slot_id": str(auth_data["slot_id"]),
         "recipe_id": str(auth["handoff"]["report"].get("selected_recipe_id") or auth_data.get("recipe_id") or ""),
         "handoff_report": auth["handoff"]["report"],
         "approval_result": approval_result,
+        "source": provider_prompt_source,
         "claim_path": approval.claim_output_path(day, str(auth_data["slot_id"])),
         "receipt_path": approval.receipt_output_path(day, str(auth_data["slot_id"])),
         "manifest_path": executor.manifest_path(day, str(auth_data["slot_id"])),
@@ -1673,6 +1718,21 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             "lineage": lineage,
             "generation_handoff": {"path": str(publish_handoff_path), "sha256": _sha256_file(publish_handoff_path)},
             "generation_approval": {"path": str(publish_approval_path), "sha256": publish_approval_sha256},
+            "child_artifacts": {
+                "authorization_artifact": {"path": str(auth["path"]), "sha256": auth["pre_consumption_sha256"]},
+                "candidate_artifact": {"path": str(candidate_path), "sha256": candidate_sha256},
+                "provider_generation_claim": {"path": str(claim_path), "sha256": _sha256_file(claim_path)},
+                "provider_generation_receipt": {"path": str(receipt_path), "sha256": _sha256_file(receipt_path)},
+                "provider_generation_manifest": {"path": str(manifest_path), "sha256": _sha256_file(manifest_path)},
+                "provider_original": {"path": str(generated_image_path), "sha256": generated_image_sha256},
+                "identity_evidence": {"path": str(identity_evidence_path), "sha256": _sha256_file(identity_evidence_path)},
+                "qa_artifact": {"path": str(qa_path), "sha256": _sha256_file(qa_path)},
+                "privacy_clean_derivative": {"path": str(clean_path), "sha256": clean_export["output_sha256"]},
+                "clean_export_report": {"path": str(clean_report_path), "sha256": clean_export["report_sha256"]},
+                "generation_handoff": {"path": str(publish_handoff_path), "sha256": _sha256_file(publish_handoff_path)},
+                "generation_approval": {"path": str(publish_approval_path), "sha256": publish_approval_sha256},
+                "publish_sidecar": {"path": str(publish_sidecar_path), "sha256": publish_sidecar_sha256},
+            },
             "stage_coverage": stages,
             "stages": stages,
         }

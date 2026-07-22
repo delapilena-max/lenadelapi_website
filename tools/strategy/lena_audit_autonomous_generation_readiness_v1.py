@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
-
-
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits  # noqa: E402
 RECIPE_BANK = (
     ROOT / "pipeline" / "prompt_banks" / "lena"
     / "lena_high_caliber_prompt_recipe_bank_v1.json"

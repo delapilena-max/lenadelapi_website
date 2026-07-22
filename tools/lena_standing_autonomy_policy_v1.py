@@ -713,7 +713,34 @@ def validate_cycle_authorization_artifact(
         _require(str(auth.get("policy_version") or "") == str(policy.get("policy_version") or ""), "policy_version_mismatch", "policy version does not match")
         _require(auth.get("controlled_photo_autonomy") == policy.get("controlled_photo_autonomy"), "controlled_photo_policy_mismatch", "controlled photo autonomy authority differs from the standing policy")
     _require(auth.get("authorization_artifact_path") == str(auth_path), "authorization_path_binding_mismatch", "authorization artifact path binding mismatch")
-    canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
+    # authorization_artifact_sha256 is the self-referential hash embedded at
+    # issuance time, computed over the payload as it existed *before*
+    # consumption. _consume_authorization_artifact legitimately mutates
+    # exactly consumed/consumed_at_utc/authorization_consumed/
+    # authorization_state_after and adds cycle_authorization_sha256
+    # afterward. To validate an already-consumed artifact's self-consistency,
+    # reconstruct those fields' pre-consumption values (not merely exclude
+    # the keys -- excluding more keys than the original 1-key exclusion
+    # would hash a structurally different, shorter payload and could never
+    # match) before recomputing, so this check still proves nothing *else*
+    # was tampered with post-issuance.
+    if consumed is True:
+        reconstructed_for_hash = dict(auth)
+        reconstructed_for_hash["consumed"] = False
+        reconstructed_for_hash["consumed_at_utc"] = None
+        reconstructed_for_hash["authorization_consumed"] = False
+        reconstructed_for_hash["authorization_state_after"] = {
+            "single_use": True,
+            "consumed": False,
+            "consumed_at_utc": None,
+        }
+        reconstructed_for_hash.pop("cycle_authorization_sha256", None)
+        reconstructed_for_hash.pop("authorization_artifact_sha256", None)
+        canonical_sha = _sha256_bytes(
+            (json.dumps(reconstructed_for_hash, indent=2, ensure_ascii=True) + "\n").encode("utf-8")
+        )
+    else:
+        canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
     _require(str(auth.get("authorization_artifact_sha256") or "") == canonical_sha, "authorization_sha_mismatch", "authorization SHA does not match canonical artifact bytes")
     _require(str(auth.get("policy_artifact_path") or "").strip(), "policy_artifact_path_missing", "policy_artifact_path is required")
     _require(str(auth.get("generation_handoff_artifact_path") or "").strip(), "handoff_artifact_path_missing", "generation_handoff_artifact_path is required")
