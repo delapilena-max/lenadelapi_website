@@ -1207,6 +1207,27 @@ def test_write_approval_record_atomic_leaves_no_tmp_file_on_success(
     assert leftovers == []
 
 
+def test_write_approval_record_atomic_rejects_noncanonical_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    record = build_generation_approval_record(
+        handoff_facts,
+        operator_id=CANONICAL_OPERATOR_ID,
+        confirmation=confirmation_phrase(SLOT_ID),
+    )
+    alternate_path = tmp_path / "alternate" / "copied-approval.json"
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        write_approval_record_atomic(alternate_path, record)
+
+    assert excinfo.value.code == "approval_path_mismatch"
+    assert not alternate_path.exists()
+    assert not alternate_path.parent.exists()
+
+
 @pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
 def test_write_approval_record_rejects_missing_or_modified_authority(
     tmp_path: Path,
@@ -1262,7 +1283,7 @@ def test_write_approval_record_rejects_manually_malformed_record(
         confirmation=confirmation_phrase(SLOT_ID),
     )
     record["operator_id"] = "not-the-canonical-operator"
-    out_path = tmp_path / "manual" / "malformed-approval.json"
+    out_path = approval_mod.approval_output_path(DATE, SLOT_ID)
 
     with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
         write_approval_record_atomic(out_path, record)

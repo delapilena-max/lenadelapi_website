@@ -26,7 +26,6 @@ def record_generation_approval(
     handoff_artifact: Path,
     operator_id: str,
     confirm: str,
-    out_root: Path | None = None,
 ) -> dict:
     handoff_facts = inspect_handoff_artifact(handoff_artifact)
     record = build_generation_approval_record(
@@ -34,7 +33,7 @@ def record_generation_approval(
         operator_id=operator_id,
         confirmation=confirm,
     )
-    output_path = approval_output_path(handoff_facts["date"], handoff_facts["slot_id"], out_root)
+    output_path = approval_output_path(handoff_facts["date"], handoff_facts["slot_id"])
     write_approval_record_atomic(output_path, record)
     return {
         "ok": True,
@@ -57,20 +56,13 @@ def main() -> int:
     parser.add_argument("--handoff-artifact", required=True, type=Path)
     parser.add_argument("--operator-id", required=True)
     parser.add_argument("--confirm", required=True)
-    parser.add_argument("--out-root", default=None)
     args = parser.parse_args()
-
-    out_root = None
-    if args.out_root:
-        candidate = Path(args.out_root)
-        out_root = candidate if candidate.is_absolute() else (ROOT / candidate)
 
     try:
         summary = record_generation_approval(
             handoff_artifact=args.handoff_artifact,
             operator_id=args.operator_id,
             confirm=args.confirm,
-            out_root=out_root,
         )
     except reconciliation_contract.ReconciliationContractError as exc:
         print(f"[ABORT] {exc.code}: {exc.detail}")

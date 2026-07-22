@@ -381,6 +381,33 @@ def test_recording_succeeds_and_writes_expected_file(
     assert stdout["files_written_this_run"] == [str(expected_path)]
 
 
+def test_recording_has_no_caller_selectable_output_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    alternate_root = tmp_path / "alternate"
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run(
+            monkeypatch,
+            "--handoff-artifact",
+            str(handoff_path),
+            "--operator-id",
+            "nicolas",
+            "--confirm",
+            confirmation_phrase(SLOT_ID),
+            "--out-root",
+            str(alternate_root),
+        )
+
+    assert excinfo.value.code == 2
+    assert "unrecognized arguments: --out-root" in capsys.readouterr().err
+    assert not alternate_root.exists()
+
+
 @pytest.mark.parametrize(
     ("block", "expected_code"),
     [

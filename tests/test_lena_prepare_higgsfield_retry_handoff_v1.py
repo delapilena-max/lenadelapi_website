@@ -771,20 +771,22 @@ def test_retry_source_receipt_rejects_referenced_lineage_byte_drift(
     assert excinfo.value.code == expected
 
 
-def test_retry_source_receipt_rejects_claim_bound_to_different_approval(
+def test_retry_source_receipt_rejects_consistently_rewired_copied_approval(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_roots(tmp_path, monkeypatch)
     seeded = _seed_bound_retry_source(tmp_path)
-    alternate_approval_path = tmp_path / "alternate" / "approval.json"
+    alternate_approval_path = tmp_path / "alternate" / "copied-approval.json"
     alternate_approval_path.parent.mkdir(parents=True, exist_ok=True)
     alternate_approval_path.write_bytes(seeded["approval_path"].read_bytes())
+    alternate_repo_path = approval_mod.repo_relative_path(alternate_approval_path)
 
     claim = json.loads(seeded["claim_path"].read_text(encoding="utf-8"))
-    claim["approval_artifact_path"] = approval_mod.repo_relative_path(alternate_approval_path)
+    claim["approval_artifact_path"] = alternate_repo_path
     _write_json(seeded["claim_path"], claim)
     receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["approval_artifact_path"] = alternate_repo_path
     receipt["claim_artifact_sha256"] = hashlib.sha256(seeded["claim_path"].read_bytes()).hexdigest()
     _write_json(seeded["receipt_path"], receipt)
 
@@ -795,7 +797,36 @@ def test_retry_source_receipt_rejects_claim_bound_to_different_approval(
             output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
             write_artifact=False,
         )
-    assert excinfo.value.code == "generation_receipt_claim_approval_artifact_path_mismatch"
+    assert excinfo.value.code == "generation_receipt_approval_path_mismatch"
+
+
+def test_retry_source_receipt_rejects_normalized_spelling_of_canonical_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    canonical_repo_path = Path(approval_mod.repo_relative_path(seeded["approval_path"]))
+    noncanonical_repo_path = (
+        canonical_repo_path.parent / ".." / DATE / canonical_repo_path.name
+    ).as_posix()
+
+    claim = json.loads(seeded["claim_path"].read_text(encoding="utf-8"))
+    claim["approval_artifact_path"] = noncanonical_repo_path
+    _write_json(seeded["claim_path"], claim)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt["approval_artifact_path"] = noncanonical_repo_path
+    receipt["claim_artifact_sha256"] = hashlib.sha256(seeded["claim_path"].read_bytes()).hexdigest()
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == "generation_receipt_approval_path_mismatch"
 
 
 def test_retry_source_receipt_rejects_different_or_noncanonical_claim_path(

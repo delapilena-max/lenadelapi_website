@@ -81,9 +81,8 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def approval_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
-    base = out_root if out_root is not None else DEFAULT_APPROVAL_ROOT
-    return base / date_str / f"{slot_id}_higgsfield_generation_approval.json"
+def approval_output_path(date_str: str, slot_id: str) -> Path:
+    return DEFAULT_APPROVAL_ROOT / date_str / f"{slot_id}_higgsfield_generation_approval.json"
 
 
 def claim_output_path(date_str: str, slot_id: str, out_root: Path | None = None) -> Path:
@@ -1562,10 +1561,20 @@ def validate_lineage_record_authority(
         approval_path,
         require_not_expired=False,
     )
+    handoff_facts = approval_result["handoff_facts"]
+    expected_approval_path = approval_output_path(
+        handoff_facts["date"],
+        handoff_facts["slot_id"],
+    ).resolve()
+    require(
+        approval_path == expected_approval_path,
+        f"{owner}_approval_path_mismatch",
+        f"{owner} approval_artifact_path must identify the canonical approval for the validated slot",
+    )
     require(
         record.get("approval_artifact_path") == approval_result["approval_repo_path"],
         f"{owner}_approval_path_mismatch",
-        f"{owner} approval_artifact_path must use the validated approval artifact's canonical path",
+        f"{owner} approval_artifact_path must use the canonical repo-relative approval path",
     )
     approval_blocks = _validated_approval_result_authority_blocks(approval_result)
     record_blocks = _require_named_authority_blocks(record, owner=owner)
@@ -1585,7 +1594,6 @@ def validate_lineage_record_authority(
         f"{owner}_approval_sha_mismatch",
         f"{owner} approval_artifact_sha256 must match the validated approval artifact",
     )
-    handoff_facts = approval_result["handoff_facts"]
     for key in ("handoff_artifact_path", "handoff_artifact_sha256", "date", "slot_id", "prompt_sha256"):
         expected = handoff_facts[
             {
@@ -1803,12 +1811,21 @@ def validate_generation_execution_receipt_lineage(
 
 
 def write_approval_record_atomic(path: Path, record: dict[str, Any]) -> None:
+    handoff_facts, _ = _validate_approval_record_authority(record)
+    expected_path = approval_output_path(
+        handoff_facts["date"],
+        handoff_facts["slot_id"],
+    ).resolve()
+    require(
+        path.resolve() == expected_path,
+        "approval_path_mismatch",
+        "approval artifact path must be the canonical approval path for the validated slot",
+    )
     if path.exists():
         raise HiggsfieldGenerationApprovalError(
             "approval_already_exists",
             f"refusing to overwrite an existing approval artifact: {path}",
         )
-    _validate_approval_record_authority(record)
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
     payload = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
