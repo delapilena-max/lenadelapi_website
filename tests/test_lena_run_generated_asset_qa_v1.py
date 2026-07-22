@@ -25,6 +25,7 @@ from tools.strategy import lena_execute_retry_decision_v1 as retry_decision
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 from tools.strategy import lena_run_generated_asset_qa_v1 as wrapper
 from tools.strategy import lena_human_presence_profile_v1 as lena_profile
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 
 
 DATE = "2026-07-15"
@@ -62,124 +63,31 @@ def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(autonomy_ladder, "assert_allowed", lambda *args, **kwargs: None)
 
 
-def _approval_result(tmp_path: Path) -> dict[str, object]:
-    approval_repo_path = f"pipeline/approvals/lena/generation/{DATE}/{SLOT_ID}_higgsfield_generation_approval.json"
-    handoff_repo_path = f"pipeline/strategy/lena/next_actions/{DATE}/lena_next_live_image_handoff_{DATE}.json"
-    approval_path = tmp_path / approval_repo_path
-    candidate_selection_binding = {
-        "selected_candidate_artifact_path": (
-            f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/"
-            "lena_pre_generation_candidate_selected.json"
-        ),
-        "selected_candidate_artifact_sha256": "b" * 64,
-        "candidate_id": f"{SLOT_ID}::{RECIPE_ID}::fixture",
-        "slot_id": SLOT_ID,
-        "recipe_id": RECIPE_ID,
-        "candidate_prompt_sha256": PROMPT_SHA,
-        "candidate_lane": "fixture_lane",
-        "source_prompt_family": "prompt_library_candidate",
-    }
-    provider_execution_binding = {
-        "content_packet_artifact_path": (
-            f"pipeline/strategy/lena/content_packets/{DATE}/"
-            f"lena_content_packet_dryrun_{DATE}_{RECIPE_ID}.json"
-        ),
-        "content_packet_artifact_sha256": "c" * 64,
-        "recipe_id": RECIPE_ID,
-        "slot_id": SLOT_ID,
-        "provider_prompt_sha256": PROMPT_SHA,
-        "provider_lane": "fixture_lane",
-        "source_prompt_family": "compact_provider_prompt",
-        "provider": "higgsfield",
-        "model": "text2image_soul_v2",
-    }
-    binding_linkage = {
-        "selected_candidate_artifact_path": candidate_selection_binding[
-            "selected_candidate_artifact_path"
-        ],
-        "selected_candidate_artifact_sha256": candidate_selection_binding[
-            "selected_candidate_artifact_sha256"
-        ],
-        "content_packet_artifact_path": provider_execution_binding[
-            "content_packet_artifact_path"
-        ],
-        "content_packet_artifact_sha256": provider_execution_binding[
-            "content_packet_artifact_sha256"
-        ],
-        "recipe_id": RECIPE_ID,
-        "slot_id": SLOT_ID,
-        "candidate_id": candidate_selection_binding["candidate_id"],
-        "candidate_lane": "fixture_lane",
-        "provider_lane": "fixture_lane",
-        "candidate_prompt_family": "prompt_library_candidate",
-        "provider_prompt_family": "compact_provider_prompt",
-    }
-    approval_record = {
-        "report_type": approval.APPROVAL_REPORT_TYPE,
-        "schema_version": approval.APPROVAL_SCHEMA_VERSION,
-        "approval_type": approval.APPROVAL_TYPE,
-        "operator_id": approval.CANONICAL_OPERATOR_ID,
-        "approved_at_utc": "2026-07-15T12:00:00+00:00",
-        "expires_at_utc": "2026-07-15T12:30:00+00:00",
-        "handoff_artifact_path": handoff_repo_path,
-        "handoff_artifact_sha256": "a" * 64,
-        "handoff_report_type": approval.HANDOFF_REPORT_TYPE,
-        "handoff_schema_version": approval.HANDOFF_SCHEMA_VERSION,
-        "date": DATE,
-        "slot_id": SLOT_ID,
-        "prompt_sha256": PROMPT_SHA,
-        "candidate_selection_binding": candidate_selection_binding,
-        "provider_execution_binding": provider_execution_binding,
-        "binding_linkage": binding_linkage,
-        "provider": approval.APPROVAL_PROVIDER,
-        "executor": approval.APPROVAL_EXECUTOR,
-        "model": approval.MODEL,
-        "aspect_ratio": approval.ASPECT_RATIO,
-        "soul_name": approval.SOUL_NAME,
-        "soul_type": approval.SOUL_TYPE,
-        "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-        "confirmation_statement": approval.confirmation_phrase(SLOT_ID),
-        "credits_may_be_spent_acknowledged": True,
-        "authorized_attempts": 1,
-        "upload_authorized": False,
-        "queue_promotion_authorized": False,
-        "publish_authorized": False,
-        "analytics_mutation_authorized": False,
-    }
-    _write_json(approval_path, approval_record)
-    return {
-        "approval": approval_record,
-        "approval_path": approval_path,
-        "approval_repo_path": approval_repo_path,
-        "approval_sha256": _sha(approval_path),
-        "handoff_facts": {
-            "date": DATE,
-            "slot_id": SLOT_ID,
-            "handoff_repo_path": handoff_repo_path,
-            "handoff_sha256": "a" * 64,
-            "prompt_sha256": PROMPT_SHA,
-            "candidate_selection_binding": candidate_selection_binding,
-            "provider_execution_binding": provider_execution_binding,
-            "binding_linkage": binding_linkage,
-            "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-            "soul_name": approval.SOUL_NAME,
-            "soul_type": approval.SOUL_TYPE,
-        },
-        "approved_at_utc": "2026-07-15T12:00:00+00:00",
-        "expires_at_utc": "2026-07-15T12:30:00+00:00",
-        "is_expired": False,
-        "scope_summary": {
-            "authorized_attempts": 1,
-            "upload_authorized": False,
-            "queue_promotion_authorized": False,
-            "publish_authorized": False,
-            "analytics_mutation_authorized": False,
-        },
-    }
+def _approval_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    monkeypatch.setattr(approval_fixture, "DATE", DATE)
+    monkeypatch.setattr(approval_fixture, "SLOT_ID", SLOT_ID)
+    monkeypatch.setattr(
+        approval_fixture,
+        "RECONCILIATION_PATH",
+        f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json",
+    )
+    approval_fixture._patch_root(tmp_path, monkeypatch)
+    handoff_path = approval_fixture._write_handoff(tmp_path)
+    approval_path = approval_fixture._record_and_write(tmp_path, handoff_path)
+    return approval.validate_generation_approval_artifact(
+        approval_path,
+        require_not_expired=False,
+    )
 
 
-def _build_fixture(tmp_path: Path) -> dict[str, object]:
-    approval_result = _approval_result(tmp_path)
+def _build_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    approval_result = _approval_result(tmp_path, monkeypatch)
     claim_path = approval.claim_output_path(DATE, SLOT_ID)
     receipt_path = approval.receipt_output_path(DATE, SLOT_ID)
     approval.write_generation_claim_atomic(claim_path, approval.build_generation_claim_record(approval_result))
@@ -366,10 +274,11 @@ def _add_hpe_prompt_pack_evidence(
 
 def _build_hpe_fixture(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     *,
     include_plan_fingerprint: bool,
 ) -> dict[str, object]:
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     contract = lena_profile.build_lena_presence_contract()
     plan = presence_plan.compile_human_presence_prompt_plan(contract, medium="still_image")
     decision = json.loads(fixture["decision_path"].read_text(encoding="utf-8"))
@@ -439,7 +348,7 @@ def test_missing_accounting_report_fails_closed(tmp_path: Path, monkeypatch: pyt
 
 def test_missing_generated_image_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     fixture["image_path"].unlink()
 
@@ -465,7 +374,7 @@ def test_missing_generated_image_fails_closed(tmp_path: Path, monkeypatch: pytes
 
 def test_missing_claim_or_receipt_linkage_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
     receipt["claim_artifact_path"] = "pipeline/approvals/lena/generation/wrong.json"
@@ -493,7 +402,7 @@ def test_missing_claim_or_receipt_linkage_fails_closed(tmp_path: Path, monkeypat
 
 def test_valid_receipt_hashes_delegate_to_qa_runner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
 
@@ -522,7 +431,7 @@ def test_wrong_receipt_generated_image_sha_fails_before_qa_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
     receipt["generated_image_sha256"] = "0" * 64
@@ -554,7 +463,7 @@ def test_wrong_receipt_manifest_sha_fails_before_qa_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     receipt = json.loads(fixture["receipt_path"].read_text(encoding="utf-8"))
     receipt["manifest_sha256"] = "0" * 64
@@ -586,7 +495,7 @@ def test_manifest_saved_image_sha_mismatch_fails_before_qa_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     manifest = json.loads(fixture["manifest_path"].read_text(encoding="utf-8"))
     manifest["saved_image_sha256"] = "0" * 64
@@ -617,7 +526,7 @@ def test_valid_generated_asset_delegates_to_qa_and_writes_lifecycle_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     captured: dict[str, object] = {}
 
@@ -695,7 +604,7 @@ def test_hpe_success_records_completed_lifecycle_state_and_image_index_zero(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     captured: dict[str, object] = {}
 
@@ -763,7 +672,7 @@ def test_live_presence_semantic_review_flag_is_forwarded_to_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     captured: dict[str, object] = {}
 
@@ -801,7 +710,7 @@ def test_hpe_without_plan_fingerprint_still_completes_as_not_assessable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=False)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=False)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     report = wrapper.evaluate_generated_asset_qa_lifecycle(
@@ -826,7 +735,7 @@ def test_absent_hpe_metadata_marks_not_requested_and_skips_runner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     called = {"value": False}
 
@@ -856,7 +765,7 @@ def test_malformed_hpe_metadata_is_reported_as_error_without_disguising_as_not_r
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     decision = json.loads(fixture["decision_path"].read_text(encoding="utf-8"))
     decision["evidence"] = {"prompt_pack": {"human_presence": "not-a-dict"}}
     _write_json(fixture["decision_path"], decision)
@@ -880,7 +789,7 @@ def test_malformed_hpe_metadata_is_reported_as_error_without_disguising_as_not_r
 
 def test_hpe_typed_error_preserves_photo_qa_disposition(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
@@ -905,7 +814,7 @@ def test_hpe_typed_error_preserves_photo_qa_disposition(tmp_path: Path, monkeypa
 
 def test_hpe_filesystem_error_is_reported_as_integration_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
@@ -932,7 +841,7 @@ def test_hpe_type_error_propagates_without_becoming_integration_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     observed = {"called": False}
 
@@ -958,7 +867,7 @@ def test_hpe_type_error_propagates_without_becoming_integration_error(
 
 def test_unexpected_hpe_exception_is_not_silently_swallowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def hpe_runner(**kwargs: object) -> tuple[Path, dict[str, object]]:
@@ -981,7 +890,7 @@ def test_qa_fail_surfaces_retry_reference_without_executing_retry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
     decision = json.loads(fixture["decision_path"].read_text(encoding="utf-8"))
 
@@ -1053,7 +962,7 @@ def test_blocked_human_visual_review_waits_without_retry_or_publish(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def qa_runner(**kwargs: object) -> dict[str, object]:
@@ -1119,7 +1028,7 @@ def test_unbound_photo_qa_binding_error_is_not_masked_or_written(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_fixture(tmp_path)
+    fixture = _build_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def qa_runner(**kwargs: object) -> dict[str, object]:
@@ -1166,7 +1075,7 @@ def test_hpe_authority_invariance_matrix_stays_stable_across_semantic_states(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_layout(monkeypatch, tmp_path)
-    fixture = _build_hpe_fixture(tmp_path, include_plan_fingerprint=True)
+    fixture = _build_hpe_fixture(tmp_path, monkeypatch, include_plan_fingerprint=True)
     monkeypatch.setattr(approval, "validate_generation_approval_artifact", lambda *args, **kwargs: fixture["approval_result"])
 
     def semantic_provider_for(status: str):

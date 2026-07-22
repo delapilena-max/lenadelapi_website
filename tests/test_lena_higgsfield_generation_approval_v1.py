@@ -562,6 +562,58 @@ def test_approval_record_builder_does_not_coerce_missing_authority_blocks(
     assert excinfo.value.code == expected_code
 
 
+@pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
+def test_approval_record_builder_rejects_arbitrary_nonempty_authority_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    handoff_facts[block] = {"arbitrary": block}
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        build_generation_approval_record(
+            handoff_facts,
+            operator_id=CANONICAL_OPERATOR_ID,
+            confirmation=confirmation_phrase(SLOT_ID),
+        )
+    assert excinfo.value.code == "approval_handoff_facts_authority_mismatch"
+
+
+@pytest.mark.parametrize(
+    ("block", "field"),
+    [
+        ("candidate_selection_binding", "selected_candidate_artifact_sha256"),
+        ("candidate_selection_binding", "candidate_prompt_sha256"),
+        ("candidate_selection_binding", "pose_provenance_fingerprint_sha256"),
+        ("candidate_selection_binding", "expression_provenance_fingerprint_sha256"),
+        ("provider_execution_binding", "pose_bound_content_packet_sha256"),
+        ("provider_execution_binding", "expression_bound_content_packet_sha256"),
+        ("binding_linkage", "selected_candidate_artifact_sha256"),
+        ("binding_linkage", "pose_provenance_fingerprint_sha256"),
+        ("binding_linkage", "expression_provenance_fingerprint_sha256"),
+    ],
+)
+def test_approval_record_builder_rejects_substituted_authority_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    field: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    handoff_facts[block][field] = "f" * 64
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        build_generation_approval_record(
+            handoff_facts,
+            operator_id=CANONICAL_OPERATOR_ID,
+            confirmation=confirmation_phrase(SLOT_ID),
+        )
+    assert excinfo.value.code == "approval_handoff_facts_authority_mismatch"
+
+
 @pytest.mark.parametrize("authority", ["pose", "expression"])
 def test_inspect_rejects_candidate_derived_provider_authority_mismatch(
     tmp_path: Path,
@@ -628,6 +680,67 @@ def test_build_and_validate_round_trip_succeeds(tmp_path: Path, monkeypatch: pyt
     assert result["handoff_facts"]["slot_id"] == SLOT_ID
 
 
+@pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
+@pytest.mark.parametrize("shape", ["missing", "null", "non_object", "empty", "arbitrary"])
+def test_validate_rejects_missing_or_malformed_approval_authority_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    shape: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    approval_path = _record_and_write(tmp_path, _write_handoff(tmp_path))
+    record = json.loads(approval_path.read_text(encoding="utf-8"))
+    if shape == "missing":
+        record.pop(block)
+    elif shape == "null":
+        record[block] = None
+    elif shape == "non_object":
+        record[block] = "not-an-authority-object"
+    elif shape == "empty":
+        record[block] = {}
+    else:
+        record[block] = {"arbitrary": block}
+    approval_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code in {
+        f"approval_{block}_missing",
+        f"approval_{block}_mismatch",
+    }
+
+
+@pytest.mark.parametrize(
+    ("block", "field"),
+    [
+        ("candidate_selection_binding", "selected_candidate_artifact_sha256"),
+        ("candidate_selection_binding", "candidate_prompt_sha256"),
+        ("candidate_selection_binding", "pose_provenance_fingerprint_sha256"),
+        ("candidate_selection_binding", "expression_provenance_fingerprint_sha256"),
+        ("provider_execution_binding", "provider_prompt_sha256"),
+        ("provider_execution_binding", "pose_bound_content_packet_sha256"),
+        ("provider_execution_binding", "expression_bound_content_packet_sha256"),
+        ("binding_linkage", "selected_candidate_artifact_sha256"),
+    ],
+)
+def test_validate_rejects_substituted_approval_authority_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+    field: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    approval_path = _record_and_write(tmp_path, _write_handoff(tmp_path))
+    record = json.loads(approval_path.read_text(encoding="utf-8"))
+    record[block][field] = "f" * 64
+    approval_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code == f"approval_{block}_mismatch"
+
+
 def test_generation_claim_binds_exact_identity_and_expected_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -662,6 +775,8 @@ def test_generation_claim_binds_exact_identity_and_expected_paths(
     assert claim["queue_promotion_authorized"] is False
     assert claim["publish_authorized"] is False
     assert claim["analytics_mutation_authorized"] is False
+    for block in approval_mod.AUTHORITY_BLOCK_KEYS:
+        assert claim[block] == approval_result["approval"][block]
 
 
 def test_generation_execution_receipt_binds_claim_and_failure_context(
@@ -710,6 +825,8 @@ def test_generation_execution_receipt_binds_claim_and_failure_context(
     assert receipt["queue_promotion_authorized"] is False
     assert receipt["publish_authorized"] is False
     assert receipt["analytics_mutation_authorized"] is False
+    for block in approval_mod.AUTHORITY_BLOCK_KEYS:
+        assert receipt[block] == approval_result["approval"][block]
 
 
 def test_confirmation_phrase_names_slot_and_credit_acknowledgement() -> None:
@@ -1088,6 +1205,98 @@ def test_write_approval_record_atomic_leaves_no_tmp_file_on_success(
     approval_path = _record_and_write(tmp_path, handoff_path)
     leftovers = list(approval_path.parent.glob("*.tmp"))
     assert leftovers == []
+
+
+@pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
+def test_write_approval_record_rejects_missing_or_modified_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    record = build_generation_approval_record(
+        handoff_facts,
+        operator_id=CANONICAL_OPERATOR_ID,
+        confirmation=confirmation_phrase(SLOT_ID),
+    )
+    record.pop(block)
+    out_path = tmp_path / "manual" / "malformed-approval.json"
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        write_approval_record_atomic(out_path, record)
+    assert excinfo.value.code == f"approval_{block}_missing"
+    assert not out_path.exists()
+    assert not out_path.parent.exists()
+
+
+def test_write_approval_record_rejects_authority_modified_after_construction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    record = build_generation_approval_record(
+        handoff_facts,
+        operator_id=CANONICAL_OPERATOR_ID,
+        confirmation=confirmation_phrase(SLOT_ID),
+    )
+    record["provider_execution_binding"]["provider_prompt_sha256"] = "f" * 64
+    out_path = tmp_path / "manual" / "modified-approval.json"
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        write_approval_record_atomic(out_path, record)
+    assert excinfo.value.code == "approval_provider_execution_binding_mismatch"
+    assert not out_path.exists()
+
+
+def test_write_approval_record_rejects_manually_malformed_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_facts = inspect_handoff_artifact(_write_handoff(tmp_path))
+    record = build_generation_approval_record(
+        handoff_facts,
+        operator_id=CANONICAL_OPERATOR_ID,
+        confirmation=confirmation_phrase(SLOT_ID),
+    )
+    record["operator_id"] = "not-the-canonical-operator"
+    out_path = tmp_path / "manual" / "malformed-approval.json"
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        write_approval_record_atomic(out_path, record)
+    assert excinfo.value.code == "approval_operator_mismatch"
+    assert not out_path.exists()
+    assert list(out_path.parent.glob("*.tmp")) == []
+
+
+@pytest.mark.parametrize("artifact_kind", ["claim", "receipt"])
+def test_lineage_builders_reject_approval_authority_modified_after_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    artifact_kind: str,
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    approval_path = _record_and_write(tmp_path, _write_handoff(tmp_path))
+    approval_result = validate_generation_approval_artifact(approval_path)
+    approval_result["approval"]["binding_linkage"]["pose_provenance_fingerprint_sha256"] = "f" * 64
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        if artifact_kind == "claim":
+            build_generation_claim_record(approval_result)
+        else:
+            claim_path = claim_output_path(DATE, SLOT_ID)
+            claim_path.parent.mkdir(parents=True, exist_ok=True)
+            claim_path.write_text("{}\n", encoding="utf-8")
+            build_generation_execution_receipt_record(
+                claim_path,
+                approval_result,
+                outcome="execution_failed",
+                subprocess_start_attempted=False,
+                provider_submission_may_have_occurred=False,
+            )
+    assert excinfo.value.code == "approval_binding_linkage_mismatch"
 
 
 def test_write_generation_claim_atomic_allows_exactly_one_winner(

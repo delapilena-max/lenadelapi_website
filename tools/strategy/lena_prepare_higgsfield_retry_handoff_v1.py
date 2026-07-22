@@ -247,6 +247,14 @@ def _validate_execution_receipt(
         "receipt_prompt_sha_mismatch",
         "receipt prompt_sha256 does not match the reviewed handoff prompt sha",
     )
+    try:
+        approval_contract.validate_lineage_authority_snapshots(
+            receipt,
+            handoff_facts,
+            owner="receipt",
+        )
+    except approval_contract.HiggsfieldGenerationApprovalError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     _require(receipt.get("provider") == approval_contract.APPROVAL_PROVIDER, "receipt_provider_mismatch", "receipt provider is invalid")
     _require(receipt.get("executor") == approval_contract.APPROVAL_EXECUTOR, "receipt_executor_mismatch", "receipt executor is invalid")
     _require(receipt.get("model") == approval_contract.MODEL, "receipt_model_mismatch", "receipt model is invalid")

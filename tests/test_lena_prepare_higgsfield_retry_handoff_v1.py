@@ -507,6 +507,9 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "date": DATE,
         "slot_id": ORIGINAL_SLOT,
         "prompt_sha256": PROMPT_SHA,
+        "candidate_selection_binding": handoff_report["candidate_selection_binding"],
+        "provider_execution_binding": handoff_report["provider_execution_binding"],
+        "binding_linkage": handoff_report["binding_linkage"],
         "outcome": "success",
         "provider_job_id": "job-123",
         "provider_status": "completed",
@@ -606,6 +609,28 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     source_handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
     assert artifact["pose_provenance"] == source_handoff["pose_provenance"]
     assert artifact["source_pose_bound_content_packet_sha256"] == source_handoff["pose_bound_content_packet_sha256"]
+
+
+@pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
+def test_retry_source_receipt_requires_complete_authority_snapshots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block: str,
+) -> None:
+    _patch_roots(tmp_path, monkeypatch)
+    seeded = _seed_bound_retry_source(tmp_path)
+    receipt = json.loads(seeded["receipt_path"].read_text(encoding="utf-8"))
+    receipt.pop(block)
+    _write_json(seeded["receipt_path"], receipt)
+
+    with pytest.raises(retry_mod.RetryHandoffError) as excinfo:
+        retry_mod.evaluate_retry_handoff(
+            handoff_artifact=seeded["handoff_path"],
+            execution_receipt=seeded["receipt_path"],
+            output_root=retry_mod.DEFAULT_OUTPUT_ROOT,
+            write_artifact=False,
+        )
+    assert excinfo.value.code == f"receipt_{block}_missing"
 
 
 @pytest.mark.parametrize(

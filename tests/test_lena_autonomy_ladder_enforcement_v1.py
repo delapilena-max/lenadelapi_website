@@ -17,6 +17,7 @@ from tools.strategy import lena_build_next_live_image_handoff_v1 as handoff_buil
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 from tools.strategy import lena_execute_retry_decision_v1 as retry_decision
 from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
+from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,62 +31,6 @@ def _write_json(path: Path, payload: dict) -> None:
 
 def _normalized_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode("utf-8")).hexdigest()
-
-
-def _fake_handoff_facts() -> dict:
-    slot_id = "higgsfield-20260713-hcr_006-photo"
-    candidate_path = (
-        "pipeline/strategy/lena/pre_generation_candidates/2026-07-13/"
-        "lena_pre_generation_candidate_selected.json"
-    )
-    packet_path = (
-        "pipeline/strategy/lena/content_packets/2026-07-13/"
-        "lena_content_packet_dryrun_2026-07-13_hcr_006.json"
-    )
-    return {
-        "report": {
-            "report_type": "lena_next_live_image_handoff",
-            "schema_version": "v1",
-        },
-        "handoff_repo_path": "pipeline/strategy/lena/next_actions/2026-07-13/lena_next_live_image_handoff_2026-07-13.json",
-        "handoff_sha256": "a" * 64,
-        "date": "2026-07-13",
-        "slot_id": slot_id,
-        "prompt_sha256": "b" * 64,
-        "candidate_selection_binding": {
-            "selected_candidate_artifact_path": candidate_path,
-            "selected_candidate_artifact_sha256": "c" * 64,
-            "candidate_id": f"{slot_id}::hcr_006::fixture",
-            "slot_id": slot_id,
-            "recipe_id": "hcr_006",
-            "candidate_prompt_sha256": "b" * 64,
-            "source_prompt_family": "prompt_library_candidate",
-        },
-        "provider_execution_binding": {
-            "content_packet_artifact_path": packet_path,
-            "content_packet_artifact_sha256": "d" * 64,
-            "recipe_id": "hcr_006",
-            "slot_id": slot_id,
-            "provider_prompt_sha256": "b" * 64,
-            "source_prompt_family": "compact_provider_prompt",
-            "provider": "higgsfield",
-            "model": "text2image_soul_v2",
-        },
-        "binding_linkage": {
-            "selected_candidate_artifact_path": candidate_path,
-            "selected_candidate_artifact_sha256": "c" * 64,
-            "content_packet_artifact_path": packet_path,
-            "content_packet_artifact_sha256": "d" * 64,
-            "candidate_id": f"{slot_id}::hcr_006::fixture",
-            "slot_id": slot_id,
-            "recipe_id": "hcr_006",
-            "candidate_prompt_family": "prompt_library_candidate",
-            "provider_prompt_family": "compact_provider_prompt",
-        },
-        "soul_name": "Lena",
-        "soul_type": "Soul 2.0",
-        "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
-    }
 
 
 def _fake_retry_facts() -> dict:
@@ -492,11 +437,18 @@ def test_level_three_replacement_policy_malformed_fails_closed(
     assert error.value.code == "level_3_policy_malformed"
 
 
-def test_level_two_approval_records_do_not_grant_posting_authority() -> None:
+def test_level_two_approval_records_do_not_grant_posting_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approval_fixture._patch_root(tmp_path, monkeypatch)
+    handoff_facts = approval.inspect_handoff_artifact(
+        approval_fixture._write_handoff(tmp_path)
+    )
     generation_record = approval.build_generation_approval_record(
-        _fake_handoff_facts(),
+        handoff_facts,
         operator_id=approval.CANONICAL_OPERATOR_ID,
-        confirmation=approval.confirmation_phrase("higgsfield-20260713-hcr_006-photo"),
+        confirmation=approval.confirmation_phrase(handoff_facts["slot_id"]),
     )
     retry_record = retry_approval.build_retry_generation_approval_record(
         _fake_retry_facts(),
