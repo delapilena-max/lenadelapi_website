@@ -7,6 +7,7 @@
   "live_generation_enabled": true,
   "live_publishing_enabled": true,
   "kill_switch_enabled": true,
+  "emergency_stop": false,
   "allowed_provider": "Higgsfield",
   "allowed_model": "text2image_soul_v2",
   "allowed_soul": "Lena",
@@ -14,11 +15,11 @@
     "Instagram Feed",
     "Facebook Page"
   ],
-  "provider_call_cap_per_cycle": 1,
+  "provider_call_cap_per_cycle": 2,
   "publish_action_cap_per_cycle": 1,
-  "retry_cap_per_cycle": 0,
+  "retry_cap_per_cycle": 1,
   "maximum_cycles_per_day": 1,
-  "maximum_provider_calls_per_day": 1,
+  "maximum_provider_calls_per_day": 2,
   "maximum_publish_actions_per_day": 1,
   "daily_spend_ceiling": 1,
   "spend_unit": "provider_credits",
@@ -29,6 +30,25 @@
   "qa_required": true,
   "identity_verification_required": true,
   "analytics_triggered_regeneration_disabled": true,
+  "controlled_photo_autonomy": {
+    "enabled": true,
+    "recipe_id": "hcr_012",
+    "wardrobe_outfit_id": "wc_p050",
+    "visual_provider": "anthropic",
+    "visual_model": "claude-sonnet-5",
+    "visual_model_authority_path": "pipeline/identity/lena_visual_model_authority_v1.json",
+    "identity_reference_authority_path": "pipeline/identity/lena_visual_reference_authority_v1.json",
+    "retry_reason_codes": [
+      "hair_crown_forelock_artifact"
+    ],
+    "provider_call_cap_per_cycle": 2,
+    "retry_cap_per_cycle": 1,
+    "queue_item_cap_per_cycle": 1,
+    "publish_action_cap_per_cycle": 1,
+    "privacy_clean_derivative_required": true,
+    "human_review_is_exception_only": true,
+    "schedule_slot": "morning"
+  },
   "effective_at_utc": "2026-07-18T00:00:00Z",
   "expires_at_utc": null
 }

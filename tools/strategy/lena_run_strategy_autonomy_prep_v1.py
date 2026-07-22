@@ -40,6 +40,8 @@ ENGAGEMENT_DEMAND = ROOT / "tools" / "strategy" / "lena_build_engagement_demand_
 POST_OUTCOME = ROOT / "tools" / "strategy" / "lena_build_post_outcome_learning_state_v1.py"
 BUILD_QUEUE = ROOT / "tools" / "strategy" / "lena_build_autonomous_generation_queue_dryrun_v1.py"
 BUILD_NEXT_LIVE_HANDOFF = ROOT / "tools" / "strategy" / "lena_build_next_live_image_handoff_v1.py"
+SELECT_CANDIDATE = ROOT / "tools" / "strategy" / "lena_pre_generation_candidate_gate_v1.py"
+BUILD_RECONCILIATION = ROOT / "tools" / "strategy" / "lena_build_generation_reconciliation_v1.py"
 
 
 def utc_date() -> str:
@@ -165,6 +167,15 @@ def packet_path(date_str: str, recipe_id: str) -> Path:
         CONTENT_PACKETS / date_str
         / f"lena_content_packet_dryrun_{date_str}_{recipe_id}.json"
     )
+
+
+def reconciliation_path_from_step(step: dict) -> Path | None:
+    stdout = step.get("stdout_json")
+    if isinstance(stdout, dict) and stdout.get("report_path"):
+        return Path(str(stdout["report_path"])).resolve()
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the canonical Lena strategy autonomy prep dry-run stack."
@@ -184,6 +195,11 @@ def main() -> int:
         default=6,
         help="Queue slot count for autonomous_generation_queue_dryrun",
     )
+    parser.add_argument(
+        "--controlled-photo-autonomy",
+        action="store_true",
+        help="Prepare the single governed hcr_012 candidate, reconciliation, and handoff for unattended execution.",
+    )
     args = parser.parse_args()
 
     recipe_ids = (
@@ -191,6 +207,8 @@ def main() -> int:
         if args.recipes
         else default_recipe_ids()
     )
+    if args.controlled_photo_autonomy and recipe_ids != ["hcr_012"]:
+        parser.error("--controlled-photo-autonomy requires --recipes hcr_012")
 
     report = {
         "report_type": "lena_strategy_autonomy_prep",
@@ -238,6 +256,34 @@ def main() -> int:
         output_path = save_report(report, args.date)
         print(json.dumps({"ok": False, "failed_step": step["step"], "report_path": str(output_path)}, indent=2))
         return 1
+
+    selected_candidate_path: Path | None = None
+    if args.controlled_photo_autonomy:
+        step = run_step(
+            "select_controlled_candidate",
+            [
+                sys.executable,
+                str(SELECT_CANDIDATE),
+                "--date",
+                args.date,
+                "--required-recipe-id",
+                "hcr_012",
+            ],
+        )
+        steps.append(step)
+        if not step["ok"]:
+            report["status"] = "failed"
+            report["failed_step"] = step["step"]
+            output_path = save_report(report, args.date)
+            print(json.dumps({"ok": False, "failed_step": step["step"], "report_path": str(output_path)}, indent=2))
+            return 1
+        selected_candidate_path = Path(str((step.get("stdout_json") or {}).get("artifact_path") or "")).resolve()
+        if not selected_candidate_path.is_file():
+            report["status"] = "failed"
+            report["failed_step"] = "select_controlled_candidate_artifact"
+            output_path = save_report(report, args.date)
+            print(json.dumps({"ok": False, "failed_step": report["failed_step"], "report_path": str(output_path)}, indent=2))
+            return 1
 
     audit_cmd = [sys.executable, str(AUDIT), "--date", args.date]
     if args.recipes:
@@ -420,10 +466,36 @@ def main() -> int:
 
     save_report(report, args.date)
 
-    step = run_step(
-        "build_next_live_image_handoff",
-        [sys.executable, str(BUILD_NEXT_LIVE_HANDOFF), "--date", args.date],
-    )
+    handoff_cmd = [sys.executable, str(BUILD_NEXT_LIVE_HANDOFF), "--date", args.date]
+    if args.controlled_photo_autonomy:
+        reconciliation_step = run_step(
+            "build_generation_reconciliation",
+            [
+                sys.executable,
+                str(BUILD_RECONCILIATION),
+                "--date",
+                args.date,
+                "--learning-artifact",
+                str(learning_path),
+                "--recommendation-artifact",
+                str(next_step_path(args.date)),
+                "--selected-candidate-artifact",
+                str(selected_candidate_path),
+            ],
+        )
+        steps.append(reconciliation_step)
+        reconciliation_path = reconciliation_path_from_step(reconciliation_step)
+        if not reconciliation_step["ok"] or reconciliation_path is None or not reconciliation_path.is_file():
+            report["status"] = "failed"
+            report["failed_step"] = reconciliation_step["step"]
+            output_path = save_report(report, args.date)
+            print(json.dumps({"ok": False, "failed_step": reconciliation_step["step"], "report_path": str(output_path)}, indent=2))
+            return 1
+        handoff_cmd.extend(["--reconciliation-artifact", str(reconciliation_path)])
+        report["artifacts"]["selected_candidate"] = str(selected_candidate_path)
+        report["artifacts"]["generation_reconciliation"] = str(reconciliation_path)
+
+    step = run_step("build_next_live_image_handoff", handoff_cmd)
     steps.append(step)
     if not step["ok"]:
         report["status"] = "failed"

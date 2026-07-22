@@ -831,7 +831,24 @@ def _hard_exclude_reasons(image: dict) -> list[str]:
     if v["low_hook_terms_found"]:
         reasons.append(f"failed: low-hook filler terms found {v['low_hook_terms_found']}")
     prompt_lower = image["image_prompt"].lower()
-    unsafe_hits = [term for term in UNSAFE_EXPLICIT_TERMS if term in prompt_lower]
+    unsafe_hits = []
+    for term in UNSAFE_EXPLICIT_TERMS:
+        positions = [match.start() for match in re.finditer(re.escape(term), prompt_lower)]
+        if not positions:
+            continue
+        positive_occurrence = False
+        for position in positions:
+            sentence_start = max(
+                prompt_lower.rfind(separator, 0, position)
+                for separator in (".", "!", "?", "\n")
+            ) + 1
+            prefix = prompt_lower[sentence_start:position].lstrip()
+            prefix = re.sub(r"^\[[a-z/ ]+\]:\s*", "", prefix)
+            if not re.match(r"^(?:no|never|avoid|without|do not|don't)\b", prefix):
+                positive_occurrence = True
+                break
+        if positive_occurrence:
+            unsafe_hits.append(term)
     if unsafe_hits:
         reasons.append(f"failed: unsafe/explicit term(s) found {unsafe_hits}")
     return reasons

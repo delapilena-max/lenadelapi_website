@@ -252,6 +252,8 @@ def _selected_candidate_payload(recipe_id: str = RECIPE_ID, *, generated_at_utc:
             "expression_safe_fallback_reason": None,
             "expression_scene_conflict_terms": [],
             "expression_derivation_scene_action": "standing in a controlled studio portrait",
+            "wardrobe_outfit_id": "wc_p059",
+            "visual_style": "beautiful_trouble",
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {DATE} --slot-id {slot_id}",
         },
         "decision_fingerprint_sha256": "5" * 64,
@@ -305,6 +307,13 @@ def _source_from_prompt(
             "expression_bound_content_packet_artifact_sha256": packet_sha256 or "3" * 64,
             "expression_bound_content_packet_sha256": packet_bound_sha256 or "4" * 64,
             "effective_wardrobe_silhouette_class": "beautiful_trouble",
+            "effective_wardrobe_silhouette_authority": {
+                "source": "sha_bound_selected_candidate",
+                "selected_candidate_artifact_path": pose_binding["selected_candidate_artifact_path"],
+                "selected_candidate_artifact_sha256": pose_binding["selected_candidate_artifact_sha256"],
+                "wardrobe_outfit_id": "wc_p059",
+                "effective_wardrobe_silhouette_class": "beautiful_trouble",
+            },
             "soul_name": "Lena",
             "soul_version": "Soul 2.0",
             "soul_selection_mode": "provider_config_not_prompt_text",
@@ -1314,9 +1323,9 @@ def _build_retry_fixture(
     original_slot = "higgsfield-20260714-hcr_011-photo"
     custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
     original_prompt = (
-        ORIGINAL_PROMPT.replace("lingerie", "intimate apparel")
+        ORIGINAL_PROMPT
         if safe_prompt
-        else ORIGINAL_PROMPT
+        else ORIGINAL_PROMPT.replace("[Subject]: Lena", "[Subject]: Lena in lingerie", 1)
     )
     original_prompt_sha = hashlib.sha256(original_prompt.encode("utf-8")).hexdigest()
     handoff_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_next_live_image_handoff_{retry_date}.json"
@@ -1811,10 +1820,21 @@ def _build_retry_fixture(
                 "expression_text": expression_binding["expression_text"],
                 "expression_provenance": expression_binding,
                 "expression_bound_content_packet_artifact_path": packet_repo_path.as_posix(),
-                "expression_bound_content_packet_artifact_sha256": packet_sha,
-                "expression_bound_content_packet_sha256": "4" * 64,
+            "expression_bound_content_packet_artifact_sha256": packet_sha,
+            "expression_bound_content_packet_sha256": "4" * 64,
+            "effective_wardrobe_silhouette_class": "beautiful_trouble",
+            "effective_wardrobe_silhouette_authority": {
+                "source": "sha_bound_selected_candidate",
+                "selected_candidate_artifact_path": pose_binding[
+                    "selected_candidate_artifact_path"
+                ],
+                "selected_candidate_artifact_sha256": pose_binding[
+                    "selected_candidate_artifact_sha256"
+                ],
+                "wardrobe_outfit_id": "wc_p020",
                 "effective_wardrobe_silhouette_class": "beautiful_trouble",
-                "soul_name": "Lena",
+            },
+            "soul_name": "Lena",
                 "soul_version": "Soul 2.0",
                 "soul_selection_mode": "provider_config_not_prompt_text",
                 "camera_text": "85mm portrait compression",
@@ -2429,6 +2449,8 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
             "pose": pose_fixture.POSE_LABEL,
             "expression_gaze_id": "expr_soft_direct",
             "expression_gaze_label": "soft direct gaze",
+            "wardrobe_outfit_id": "wc_p050",
+            "visual_style": "jeans_based",
         }
     })
 
@@ -2485,9 +2507,16 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     assert img["wardrobe_silhouette_class"] == "jeans_based", (
         "wardrobe_silhouette_class must be derived from catalog_outfit_silhouette_class"
     )
-    assert img["effective_wardrobe_silhouette_class"] == img["wardrobe_silhouette_class"], (
-        "effective_wardrobe_silhouette_class must equal wardrobe_silhouette_class, not content_pillar"
+    assert img["effective_wardrobe_silhouette_class"] == "jeans_based", (
+        "effective_wardrobe_silhouette_class must come from the SHA-bound candidate"
     )
     assert img["effective_wardrobe_silhouette_class"] != packet_report.get("content_pillar"), (
         "effective_wardrobe_silhouette_class must not be the content_pillar string"
     )
+    assert img["effective_wardrobe_silhouette_authority"] == {
+        "source": "sha_bound_selected_candidate",
+        "selected_candidate_artifact_path": executor._repo_relative_path(candidate_path),
+        "selected_candidate_artifact_sha256": hashlib.sha256(candidate_path.read_bytes()).hexdigest(),
+        "wardrobe_outfit_id": "wc_p050",
+        "effective_wardrobe_silhouette_class": "jeans_based",
+    }

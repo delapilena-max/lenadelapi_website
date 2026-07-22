@@ -404,8 +404,11 @@ def _production_dual_binding_fixture(
     wardrobe_catalog = json.loads(
         (ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_wardrobe_catalog_v1.json").read_text(encoding="utf-8")
     )
+    recipe_bank = json.loads(
+        (ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_high_caliber_prompt_recipe_bank_v1.json").read_text(encoding="utf-8")
+    )
     wardrobe_prompt = next(
-        item["prompt"] for item in wardrobe_catalog["outfits"] if item["outfit_id"] == "wc_p050"
+        item["fashion_accessories"] for item in recipe_bank["recipes"] if item["id"] == "hcr_012"
     )
     reference_authority_commit = disposition.subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -439,7 +442,7 @@ def _production_dual_binding_fixture(
         "expression_derivation_scene_action": "",
         "wardrobe_outfit_id": "wc_p050",
         "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
-        "wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "wardrobe_silhouette_class": "jeans_based",
         "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
         "visual_style": "fitted_top_and_jeans",
         "image_format_detected": ".png",
@@ -886,7 +889,7 @@ def _production_dual_binding_fixture(
         "expression_bound_content_packet_sha256": "4" * 64,
         "wardrobe_outfit_id": "wc_p050",
         "wardrobe_outfit_name": "Dusty Rose Off-Shoulder Knit Top + Stone-Wash Straight Jeans",
-        "wardrobe_silhouette_class": "fitted_top_and_jeans",
+        "wardrobe_silhouette_class": "jeans_based",
         "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
         "custom_reference_id": str(auth["custom_reference_id"]),
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
@@ -1048,7 +1051,7 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
         reference_authority_sha256=str(bundle["reference_authority_sha"]),
         expected_image_sha256=_sha(Path(bundle["image_path"])),
     )
-    assert result["qa_inputs"]["decision_kind"] == "authorization_bound_handoff"
+    assert result["qa_inputs"].get("decision_kind") == "authorization_bound_handoff", result
     assert result["provider_called"] is False
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_lane"] == bundle["provider_lane"]

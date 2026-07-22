@@ -12,6 +12,7 @@ from PIL import Image
 import pipeline.identity.lena_higgsfield_identity as identity
 import pipeline.higgsfield_lena_api_executor as higgsfield_executor
 import tools.lena_bounded_live_cycle_v1 as cycle
+import tools.lena_autopublish_approved_queue_v2_8 as autonomous_publisher
 import tools.lena_higgsfield_generation_approval_v1 as approval
 import tools.lena_photo_qa_disposition_v1 as photo_qa
 import tools.lena_standing_autonomy_policy_v1 as standing_autonomy
@@ -147,6 +148,7 @@ def _build_bundle(
     consumed: bool = False,
     policy_overrides: dict | None = None,
     nested_candidate: bool = False,
+    controlled: bool = False,
 ) -> dict[str, Path | dict]:
     candidate_path = _candidate_path(tmp_path, date_str)
     handoff_path = _handoff_path(tmp_path, date_str)
@@ -160,13 +162,45 @@ def _build_bundle(
         "recipe_id": RECIPE_ID,
         "hook_id": HOOK_ID,
         "prompt_sha256": PROMPT_SHA,
+        "wardrobe_outfit_id": "wc_p050" if controlled else None,
         "authority_commit": AUTHORITY_COMMIT,
+        "decision_fingerprint_sha256": "d" * 64 if controlled else None,
         "final_action": "prepare_higgsfield_still_dry_run_for_review",
         "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date_str} --slot-id {slot_id}",
     }
     candidate_file = {"candidate": candidate} if nested_candidate else candidate
     _write_json(candidate_path, candidate_file)
     policy = _policy_payload(daily_spend_ceiling=daily_spend_ceiling)
+    if controlled:
+        model_authority = tmp_path / "pipeline" / "identity" / "lena_visual_model_authority_v1.json"
+        reference_authority = tmp_path / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
+        _write_json(model_authority, {"authority_id": "lena_visual_model_authority_v1"})
+        _write_json(reference_authority, {"reference_set_sha256": "a" * 64})
+        policy.update(
+            {
+                "provider_call_cap_per_cycle": 2,
+                "retry_cap_per_cycle": 1,
+                "maximum_provider_calls_per_day": 2,
+                "emergency_stop": False,
+                "controlled_photo_autonomy": {
+                    "enabled": True,
+                    "recipe_id": "hcr_012",
+                    "wardrobe_outfit_id": "wc_p050",
+                    "visual_provider": "anthropic",
+                    "visual_model": "claude-sonnet-5",
+                    "visual_model_authority_path": "pipeline/identity/lena_visual_model_authority_v1.json",
+                    "identity_reference_authority_path": "pipeline/identity/lena_visual_reference_authority_v1.json",
+                    "retry_reason_codes": ["hair_crown_forelock_artifact"],
+                    "provider_call_cap_per_cycle": 2,
+                    "retry_cap_per_cycle": 1,
+                    "queue_item_cap_per_cycle": 1,
+                    "publish_action_cap_per_cycle": 1,
+                    "privacy_clean_derivative_required": True,
+                    "human_review_is_exception_only": True,
+                    "schedule_slot": "morning",
+                },
+            }
+        )
     if policy_overrides:
         policy.update(policy_overrides)
     _write_json(policy_path, policy)
@@ -679,6 +713,7 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
             "influencer_id": "lena",
             "authority_id": "lena_visual_reference_authority_v1",
             "authority_commit": AUTHORITY_COMMIT,
+            "reference_set_sha256": "a" * 64,
             "references": [
                 {
                     "path": str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"),
@@ -855,6 +890,233 @@ def _run_cycle_outcome(bundle: dict[str, Path | dict], *, simulate: bool, report
         return ("report", _run_cycle(bundle, simulate=simulate, report_root=report_root))
     except cycle.LenaBoundedLiveCycleError as exc:
         return ("error", exc)
+
+
+def test_controlled_live_success_autonomously_cleans_queues_schedules_and_publishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    admissions: list[dict] = []
+
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "_validate_policy_artifact",
+        lambda path: {
+            "path": Path(path),
+            "sha256": "p" * 64,
+            "artifact": {
+                "policy_id": "lena_approved_queue_auto_publisher_policy_v2_8",
+                "policy_version": "v2.8.0",
+            },
+        },
+    )
+
+    def fake_admit(**kwargs):
+        admissions.append(kwargs)
+        assert Path(kwargs["asset_path"]).is_file()
+        assert kwargs["schedule_slot"] == "morning"
+        assert kwargs["lineage"]["qa_sha256"]
+        return {"queue_path": str(tmp_path / "queue.csv"), "queue_id": "controlled-queue-1", "created": True}
+
+    monkeypatch.setattr(autonomous_publisher, "admit_controlled_photo", fake_admit)
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "run_scheduled_autonomous",
+        lambda **kwargs: {
+            "ok": True,
+            "posted_count": 1,
+            "publish_calls_performed": 1,
+            "receipt_paths": [str(tmp_path / "publish-receipt.json")],
+        },
+    )
+
+    report = _run_cycle(
+        bundle,
+        simulate=False,
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+
+    assert report["autonomous_disposition"] == "accept_and_publish"
+    assert report["human_review_required"] is False
+    assert report["human_per_cycle_approval_required"] is False
+    assert report["provider_calls_performed"] == 1
+    assert report["publish_calls_performed"] == 1
+    assert report["queue_mutated"] is True
+    assert report["publish_performed"] is True
+    assert admissions and state["qa_calls"] == 1
+
+
+def test_controlled_hair_rejection_executes_one_retry_then_publishes_without_human_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    qa_count = {"value": 0}
+    retry_slot = f"{SLOT_ID}-retry01"
+    retry_handoff_path = _write_json(tmp_path / "retry-handoff.json", {"retry": 1})
+    retry_approval_path = _write_json(tmp_path / "retry-approval.json", {"approval": 1})
+
+    def fake_identity(**kwargs):
+        path = Path(kwargs["identity_evidence_path"])
+        payload = {
+            "date": kwargs["date_str"],
+            "slot_id": kwargs["slot_id"],
+            "local_image_sha256": kwargs["image_sha256"],
+        }
+        _write_json(path, payload)
+        return path, payload, True
+
+    def fake_qa(**kwargs):
+        qa_count["value"] += 1
+        if qa_count["value"] == 1:
+            return {
+                "report_type": "lena_photo_qa_disposition",
+                "schema_version": "v1",
+                "slot_id": SLOT_ID,
+                "date": DATE,
+                "disposition": "retryable_failure",
+                "overall": "fail",
+                "reason_codes": ["hair_crown_forelock_artifact"],
+                "image_sha256": kwargs["expected_image_sha256"],
+            }
+        return {
+            "report_type": "lena_photo_qa_disposition",
+            "schema_version": "v1",
+            "slot_id": retry_slot,
+            "date": DATE,
+            "disposition": "accept",
+            "overall": "pass",
+            "reason_codes": [],
+            "image_sha256": kwargs["expected_image_sha256"],
+        }
+
+    def fake_write_qa(artifact, output_root=None):
+        path = tmp_path / "qa" / f"qa-{qa_count['value']}.json"
+        _write_json(path, artifact)
+        return path, artifact, True
+
+    monkeypatch.setattr(cycle, "_build_local_identity_evidence", fake_identity)
+    monkeypatch.setattr(photo_qa, "evaluate_photo_qa_disposition", fake_qa)
+    monkeypatch.setattr(photo_qa, "write_disposition_artifact", fake_write_qa)
+    monkeypatch.setattr(
+        cycle.retry_handoff,
+        "evaluate_retry_handoff",
+        lambda **kwargs: {
+            "retry_handoff_artifact_path": str(retry_handoff_path),
+            "retry_handoff_fingerprint_sha256": "r" * 64,
+        },
+    )
+    retry_facts = {
+        "date": DATE,
+        "slot_id": retry_slot,
+        "prompt_sha256": "9" * 64,
+        "retry_handoff_sha256": _sha(retry_handoff_path),
+        "retry_handoff_fingerprint_sha256": "r" * 64,
+    }
+    monkeypatch.setattr(
+        cycle,
+        "_issue_controlled_retry_approval",
+        lambda auth, path: {
+            "approval_path": retry_approval_path,
+            "approval_sha256": _sha(retry_approval_path),
+            "retry_facts": retry_facts,
+        },
+    )
+    retry_image = tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{retry_slot}_seed.png"
+    retry_manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / retry_slot / "result_manifest.json"
+    retry_claim_path = _write_json(tmp_path / "retry-claim.json", {"claim": 1})
+    retry_receipt_path = _write_json(tmp_path / "retry-receipt.json", {"receipt": 1})
+
+    def fake_retry_execute(*args, **kwargs):
+        _write_image(retry_image)
+        _write_json(
+            retry_manifest_path,
+            {
+                "provider": "higgsfield",
+                "date": DATE,
+                "slot_id": retry_slot,
+                "prompt_sha256": retry_facts["prompt_sha256"],
+                "provider_job_id": "job-retry",
+                "provider_status": "completed",
+                "saved_image_path": str(retry_image),
+                "saved_image_sha256": _sha(retry_image),
+            },
+        )
+        return {"ok": True}
+
+    monkeypatch.setattr(higgsfield_executor, "execute_approved_retry_live_generation", fake_retry_execute)
+    monkeypatch.setattr(
+        cycle,
+        "_validate_completed_retry_provider_result",
+        lambda result, retry_facts: {
+            "claim_path": retry_claim_path,
+            "receipt_path": retry_receipt_path,
+            "manifest_path": retry_manifest_path,
+            "provider_manifest": json.loads(retry_manifest_path.read_text(encoding="utf-8")),
+            "provider_claim": {"claim": 1},
+            "provider_receipt": {"receipt": 1},
+            "generated_image_path": retry_image,
+            "generated_image_sha256": _sha(retry_image),
+        },
+    )
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "_validate_policy_artifact",
+        lambda path: {"sha256": "p" * 64, "artifact": {"policy_id": "lena_approved_queue_auto_publisher_policy_v2_8", "policy_version": "v2.8.0"}},
+    )
+    monkeypatch.setattr(autonomous_publisher, "admit_controlled_photo", lambda **kwargs: {"queue_path": str(tmp_path / "queue.csv"), "queue_id": "retry-queue", "created": True})
+    monkeypatch.setattr(autonomous_publisher, "run_scheduled_autonomous", lambda **kwargs: {"posted_count": 1, "publish_calls_performed": 1})
+
+    report = _run_cycle(
+        bundle,
+        simulate=False,
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+
+    assert report["autonomous_disposition"] == "accept_and_publish"
+    assert report["provider_calls_performed"] == 2
+    assert report["retries_performed"] == 1
+    assert report["retry_executed"] is True
+    assert report["human_review_required"] is False
+    assert qa_count["value"] == 2
+
+
+def test_controlled_missing_or_malformed_visual_qa_records_operational_failure_without_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    _install_live_fakes(monkeypatch, bundle, tmp_path)
+    publish = {"count": 0}
+    monkeypatch.setattr(
+        photo_qa,
+        "evaluate_photo_qa_disposition",
+        lambda **kwargs: (_ for _ in ()).throw(photo_qa.BoundaryError("visual_review_unavailable", "malformed automated observations")),
+    )
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "run_scheduled_autonomous",
+        lambda **kwargs: publish.__setitem__("count", publish["count"] + 1),
+    )
+
+    report = _run_cycle(
+        bundle,
+        simulate=False,
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+
+    assert report["ok"] is False
+    assert report["failed_stage"] == "automated_visual_qa"
+    assert report["failure"]["code"] == "visual_review_unavailable"
+    assert report["provider_calls_performed"] == 1
+    assert report["publish_calls_performed"] == 0
+    assert publish["count"] == 0
 
 
 def test_policy_issue_and_simulation_success_chain_without_consumption(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -381,6 +381,17 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
                 "expression_bound_content_packet_sha256": packet_digest,
                 "wardrobe_outfit_id": candidate["wardrobe_outfit_id"],
                 "effective_wardrobe_silhouette_class": candidate["visual_style"],
+                "effective_wardrobe_silhouette_authority": {
+                    "source": "sha_bound_selected_candidate",
+                    "selected_candidate_artifact_path": pose_binding[
+                        "selected_candidate_artifact_path"
+                    ],
+                    "selected_candidate_artifact_sha256": pose_binding[
+                        "selected_candidate_artifact_sha256"
+                    ],
+                    "wardrobe_outfit_id": candidate["wardrobe_outfit_id"],
+                    "effective_wardrobe_silhouette_class": candidate["visual_style"],
+                },
                 "camera_text": candidate["camera_text"],
                 "lighting_text": candidate["lighting_text"],
             },

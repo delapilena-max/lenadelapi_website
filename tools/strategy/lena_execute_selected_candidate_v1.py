@@ -252,10 +252,18 @@ def _rebuild_current_decision(
     try:
         authorities = selector.load_authorities(effective_root)
         recent = selector.load_recent_content(effective_root)
+        required_recipe_id = str(artifact.get("required_recipe_id") or "")
         prompt_candidates, prompt_meta = selector.build_prompt_candidates(
-            artifact["as_of_date"], artifact["authority_commit"][:8]
+            artifact["as_of_date"],
+            artifact["authority_commit"][:8],
+            required_recipe_id=required_recipe_id,
         )
-        candidate, rejected, _ = selector.select_candidate(authorities, prompt_candidates, recent)
+        candidate, rejected, _ = selector.select_candidate(
+            authorities,
+            prompt_candidates,
+            recent,
+            required_recipe_id=required_recipe_id,
+        )
     except selector.GateError as exc:
         raise ConsumerError("stale_decision", f"selector revalidation failed: {exc.code}: {exc.detail}") from exc
     if candidate is None:
@@ -268,6 +276,7 @@ def _rebuild_current_decision(
         rejected,
         recent,
         prompt_meta,
+        required_recipe_id=required_recipe_id,
     )
     return fresh_core, candidate
 
@@ -304,7 +313,17 @@ def _validate_regenerated_candidate(
             raise ConsumerError(f"{field}_mismatch", f"stored {field} does not match current deterministic selection")
 
     try:
-        source = executor.resolve_prompt_source(artifact["as_of_date"], candidate["slot_id"])
+        required_recipe_id = str(artifact.get("required_recipe_id") or "")
+        if required_recipe_id:
+            source = executor.resolve_prompt_source(
+                artifact["as_of_date"],
+                candidate["slot_id"],
+                required_recipe_id=required_recipe_id,
+            )
+        else:
+            source = executor.resolve_prompt_source(
+                artifact["as_of_date"], candidate["slot_id"]
+            )
     except executor.PromptSourceError as exc:
         raise ConsumerError("slot_mismatch", str(exc)) from exc
     image = source.get("image", {})
