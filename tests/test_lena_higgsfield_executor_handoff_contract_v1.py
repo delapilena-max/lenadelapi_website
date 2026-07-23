@@ -2024,8 +2024,8 @@ def test_provider_argv_attaches_verified_lena_soul_and_sends_no_image_reference(
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     assert argv[1:4] == ["generate", "create", "text2image_soul_v2"]
     assert argv[argv.index("--prompt") + 1] == prompt
-    assert "--custom_reference_id" in argv
-    assert argv[argv.index("--custom_reference_id") + 1] == "79119c27-64fc-47f8-9ff3-c174d12932aa"
+    assert "--soul-id" in argv
+    assert argv[argv.index("--soul-id") + 1] == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     # Soul 2.0 identity comes from --custom_reference_id only; the good-recipe
     # sends no --image-references (forcing one overrode the Soul identity).
     assert "--image-references" not in argv
@@ -2275,8 +2275,8 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
     )
     assert binding["provider_job_id"] == job_id
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
-    assert binding["soul_id_flag"] == "--custom_reference_id"
-    assert "--custom_reference_id" in binding["resolved_argv_redacted"]
+    assert binding["soul_id_flag"] == "--soul-id"
+    assert "--soul-id" in binding["resolved_argv_redacted"]
     assert "--image-references" not in binding["resolved_argv_redacted"]
     assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
@@ -2404,8 +2404,8 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     )
     assert binding["provider_job_id"] == job_id
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
-    assert binding["soul_id_flag"] == "--custom_reference_id"
-    assert "--custom_reference_id" in binding["resolved_argv_redacted"]
+    assert binding["soul_id_flag"] == "--soul-id"
+    assert "--soul-id" in binding["resolved_argv_redacted"]
     assert "--image-references" not in binding["resolved_argv_redacted"]
     assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]

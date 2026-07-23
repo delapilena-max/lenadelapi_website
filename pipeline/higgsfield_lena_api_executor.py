@@ -1602,7 +1602,7 @@ def build_provider_argv(
         HIGGSFIELD_IMAGE_JOB_TYPE,
         "--prompt",
         prompt,
-        "--custom_reference_id",
+        "--soul-id",
         custom_reference_id,
         "--aspect_ratio",
         HIGGSFIELD_ASPECT_RATIO,
@@ -1967,12 +1967,12 @@ def _bind_provider_command_to_job(
             provider_status=status,
         )
     if (
-        "--custom_reference_id" not in resolved_argv
-        or resolved_argv[resolved_argv.index("--custom_reference_id") + 1]
+        "--soul-id" not in resolved_argv
+        or resolved_argv[resolved_argv.index("--soul-id") + 1]
         != custom_reference_id
     ):
         raise ProviderCallError(
-            "constructed provider command is missing the verified Lena Soul custom_reference_id binding",
+            "constructed provider command is missing the verified Lena Soul --soul-id binding",
             stage="soul_reference_binding_invalid",
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
@@ -2005,7 +2005,7 @@ def _bind_provider_command_to_job(
         "provider_job_id": job_id,
         "provider_status": status,
         "custom_reference_id": custom_reference_id,
-        "soul_id_flag": "--custom_reference_id",
+        "soul_id_flag": "--soul-id",
         "soul_id_binding_verified_before_subprocess": True,
         "generation_reference": reference_binding,
         "generation_reference_transmitted": False,
