@@ -102,6 +102,7 @@ def clean_test_day():
     snapshots: dict[Path, bytes | None] = {
         path: (path.read_bytes() if path.exists() else None) for path in _ROLLING_STATE_PATHS
     }
+    (ROOT / "pipeline/autonomy/lena/bounded_live_cycles").mkdir(parents=True, exist_ok=True)
     try:
         yield TEST_DAY
     finally:
