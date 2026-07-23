@@ -2017,40 +2017,32 @@ def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> 
     assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
 
 
-def test_provider_argv_attaches_verified_lena_soul_and_authoritative_source_image() -> None:
+def test_provider_argv_attaches_verified_lena_soul_and_sends_no_image_reference() -> None:
     prompt = "complete approved scene prompt"
     argv = executor.build_provider_argv(prompt, executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
-    reference = executor.soul_cinema_contract.load_generation_reference_binding()
 
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     assert argv[1:4] == ["generate", "create", "text2image_soul_v2"]
     assert argv[argv.index("--prompt") + 1] == prompt
     assert "--custom_reference_id" in argv
     assert argv[argv.index("--custom_reference_id") + 1] == "79119c27-64fc-47f8-9ff3-c174d12932aa"
-    assert "--image-references" in argv
-    assert (
-        Path(argv[argv.index("--image-references") + 1]).resolve()
-        == executor.soul_cinema_contract.resolve_reference_image(reference)
-    )
+    # Soul 2.0 identity comes from --custom_reference_id only; the good-recipe
+    # sends no --image-references (forcing one overrode the Soul identity).
+    assert "--image-references" not in argv
     assert "--enhance_prompt" not in argv
     assert argv[argv.index("--quality") + 1] == "2k"
 
 
-def test_provider_argv_rejects_substituted_generation_reference_before_subprocess() -> None:
+def test_provider_argv_sends_no_image_reference_even_with_binding_supplied() -> None:
     reference = executor.soul_cinema_contract.load_generation_reference_binding()
-    substituted = copy.deepcopy(reference)
-    substituted["reference_image_sha256"] = "0" * 64
 
-    with pytest.raises(executor.ProviderCallError) as exc_info:
-        executor.build_provider_argv(
-            "prompt",
-            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
-            substituted,
-        )
+    argv = executor.build_provider_argv(
+        "prompt",
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        reference,
+    )
 
-    assert exc_info.value.stage == "generation_reference_binding_mismatch"
-    assert exc_info.value.subprocess_start_attempted is False
-    assert exc_info.value.provider_submission_may_have_occurred is False
+    assert "--image-references" not in argv
 
 
 def test_provider_argv_rejects_missing_or_wrong_lena_soul_before_subprocess(
@@ -2285,7 +2277,8 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
     assert binding["soul_id_flag"] == "--custom_reference_id"
     assert "--custom_reference_id" in binding["resolved_argv_redacted"]
-    assert "--image-references" in binding["resolved_argv_redacted"]
+    assert "--image-references" not in binding["resolved_argv_redacted"]
+    assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
     assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 
@@ -2413,7 +2406,8 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
     assert binding["soul_id_flag"] == "--custom_reference_id"
     assert "--custom_reference_id" in binding["resolved_argv_redacted"]
-    assert "--image-references" in binding["resolved_argv_redacted"]
+    assert "--image-references" not in binding["resolved_argv_redacted"]
+    assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
     assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 

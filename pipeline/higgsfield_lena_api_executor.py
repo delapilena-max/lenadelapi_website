@@ -24,11 +24,15 @@ from __future__ import annotations
 #   params:   prompt (string, required), custom_reference_id (string|null),
 #             image_references (array, max 1), aspect_ratio (enum incl.
 #             "9:16"), quality (enum "1.5k"/"2k").
-#   This executor requires exactly one SHA-bound image reference. No
-#   enhance_prompt parameter and no negative-prompt parameter exist on this
-#   model -- neither is ever sent. (soul_cinema_studio was briefly used on
-#   2026-07-23 and reverted: it is a cinema/video-oriented workflow, wrong
-#   for still photos.)
+#   This executor sends NO image_references: Soul 2.0 identity is carried
+#   entirely by --custom_reference_id (the trained Lena Soul), and the
+#   known-good Lena generations (see pipeline/higgsfield_debug/2026-07-09/
+#   .../result_manifest.json) used Soul + prompt only -- forcing an extra
+#   image reference overrode the Soul's identity and produced a stranger.
+#   No enhance_prompt parameter and no negative-prompt parameter exist on
+#   this model -- neither is ever sent. (soul_cinema_studio was briefly used
+#   on 2026-07-23 and reverted: it is a cinema/video-oriented workflow,
+#   wrong for still photos.)
 #   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
 #   id=79119c27-64fc-47f8-9ff3-c174d12932aa (`soul-id list --json`,
 #   confirmed 2026-07-23 -- Nicolas erased the account's prior Souls and
@@ -1582,22 +1586,15 @@ def build_provider_argv(
     generation_reference: dict[str, Any] | None = None,
 ) -> list[str]:
     """Constructed as a list, never shell-concatenated text. subprocess is
-    invoked with this list and shell=False."""
+    invoked with this list and shell=False.
+
+    The Soul 2.0 identity is carried entirely by --custom_reference_id (the
+    trained Lena Soul). No --image-references is sent: the known-good Lena
+    generations (see pipeline/higgsfield_debug/2026-07-09/.../result_manifest
+    .json) were produced from Soul + prompt only, and forcing an extra image
+    reference overrode the Soul's identity. generation_reference is retained
+    only as the recorded identity anchor of provenance, never transmitted."""
     _require_current_lena_soul_reference_id(custom_reference_id)
-    try:
-        reference_binding = soul_cinema_contract.validate_generation_reference_binding(
-            generation_reference
-            if generation_reference is not None
-            else soul_cinema_contract.load_generation_reference_binding()
-        )
-        reference_path = soul_cinema_contract.resolve_reference_image(reference_binding)
-    except soul_cinema_contract.SoulCinemaContractError as exc:
-        raise ProviderCallError(
-            exc.detail,
-            stage=exc.code,
-            subprocess_start_attempted=False,
-            provider_submission_may_have_occurred=False,
-        ) from exc
     return [
         HIGGSFIELD_CLI_BINARY,
         "generate",
@@ -1607,8 +1604,6 @@ def build_provider_argv(
         prompt,
         "--custom_reference_id",
         custom_reference_id,
-        "--image-references",
-        str(reference_path),
         "--aspect_ratio",
         HIGGSFIELD_ASPECT_RATIO,
         "--quality",
@@ -1986,7 +1981,6 @@ def _bind_provider_command_to_job(
         reference_binding = soul_cinema_contract.validate_generation_reference_binding(
             generation_reference
         )
-        reference_path = soul_cinema_contract.resolve_reference_image(reference_binding)
     except soul_cinema_contract.SoulCinemaContractError as exc:
         raise ProviderCallError(
             exc.detail,
@@ -1994,14 +1988,11 @@ def _bind_provider_command_to_job(
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
         ) from exc
-    if (
-        "--image-references" not in resolved_argv
-        or Path(resolved_argv[resolved_argv.index("--image-references") + 1]).resolve()
-        != reference_path
-    ):
+    if "--image-references" in resolved_argv:
         raise ProviderCallError(
-            "constructed provider command is missing the authoritative generation reference",
-            stage="generation_reference_binding_invalid",
+            "provider command must not send --image-references; Soul 2.0 identity "
+            "comes from --custom_reference_id and the good-recipe uses no image reference",
+            stage="unexpected_image_reference_in_command",
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
         )
@@ -2017,8 +2008,8 @@ def _bind_provider_command_to_job(
         "soul_id_flag": "--custom_reference_id",
         "soul_id_binding_verified_before_subprocess": True,
         "generation_reference": reference_binding,
-        "generation_reference_flag": "--image-references",
-        "generation_reference_binding_verified_before_subprocess": True,
+        "generation_reference_transmitted": False,
+        "generation_reference_note": "recorded identity anchor only; not sent to provider",
         "resolved_argv_redacted": redacted_argv,
         "resolved_argv_redacted_sha256": hashlib.sha256(
             json.dumps(redacted_argv, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

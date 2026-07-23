@@ -18,7 +18,7 @@ from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixtur
 DATE = "2026-07-15"
 SLOT_ID = "higgsfield-20260715-hcr_011-photo"
 RECIPE_ID = "hcr_011"
-CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+CUSTOM_REFERENCE_ID = "79119c27-64fc-47f8-9ff3-c174d12932aa"
 
 
 def _patch_layout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -206,6 +206,7 @@ def test_stale_handoff_is_rejected_by_live_execution_validation(
                 "soul_name": "Lena",
                 "soul_type": "Soul 2.0",
                 "custom_reference_id": CUSTOM_REFERENCE_ID,
+                "generation_reference": executor.soul_cinema_contract.load_generation_reference_binding(),
                 "confirmation_statement": approval.confirmation_phrase(SLOT_ID),
                 "credits_may_be_spent_acknowledged": True,
                 "authorized_attempts": 1,
