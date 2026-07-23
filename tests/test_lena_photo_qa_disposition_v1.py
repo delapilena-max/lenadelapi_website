@@ -39,6 +39,11 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2), encoding="utf-8")
 
 
+def _write_auth_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+
+
 def _write_png(path: Path) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (1, 1), "white").save(path)
@@ -847,20 +852,27 @@ def _production_dual_binding_fixture(
     )
     _write_json(handoff_path, handoff)
     handoff_sha = _sha(handoff_path)
-    auth["consumed"] = True
-    auth["authorization_consumed"] = True
-    auth["consumed_at_utc"] = "2026-07-19T00:00:00Z"
-    auth["authorization_state_before"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
-    auth["authorization_state_after"] = {"single_use": True, "consumed": True, "consumed_at_utc": "2026-07-19T00:00:00Z"}
     auth["candidate_artifact_path"] = resolved_candidate_path
     auth["candidate_artifact_sha256"] = candidate_sha
     auth["prompt_sha256"] = provider_prompt_sha
     auth["provider_execution_binding"]["provider_prompt_sha256"] = provider_prompt_sha
     auth["generation_handoff_artifact_sha256"] = handoff_sha
+    auth["consumed"] = False
+    auth["authorization_consumed"] = False
+    auth["consumed_at_utc"] = None
+    auth["authorization_state_before"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
+    auth["authorization_state_after"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
     auth.pop("authorization_artifact_sha256", None)
-    _write_json(auth_path, auth)
+    _write_auth_json(auth_path, auth)
     auth["authorization_artifact_sha256"] = standing_autonomy._sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
-    _write_json(auth_path, auth)
+    _write_auth_json(auth_path, auth)
+    pre_consumption_sha = _sha(auth_path)
+    auth["consumed"] = True
+    auth["authorization_consumed"] = True
+    auth["consumed_at_utc"] = "2026-07-19T00:00:00Z"
+    auth["authorization_state_after"] = {"single_use": True, "consumed": True, "consumed_at_utc": "2026-07-19T00:00:00Z"}
+    auth["cycle_authorization_sha256"] = pre_consumption_sha
+    _write_auth_json(auth_path, auth)
     prompt_text = provider_prompt_text
     provider_binding = dict(handoff["provider_execution_binding"])
     date_str = str(auth["date"])
@@ -1071,9 +1083,9 @@ def test_consumed_authorization_with_invalid_linkage_fails_closed(
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
     auth.pop("candidate_selection_binding", None)
     auth.pop("authorization_artifact_sha256", None)
-    _write_json(auth_path, auth)
+    _write_auth_json(auth_path, auth)
     auth["authorization_artifact_sha256"] = standing_autonomy._sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
-    _write_json(auth_path, auth)
+    _write_auth_json(auth_path, auth)
 
     with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
         disposition.evaluate_photo_qa_disposition(
@@ -1087,7 +1099,7 @@ def test_consumed_authorization_with_invalid_linkage_fails_closed(
             expected_image_sha256=_sha(Path(bundle["image_path"])),
         )
 
-    assert exc_info.value.code == "authorization_candidate_selection_binding_missing"
+    assert exc_info.value.code == "authorization_sha_mismatch"
 
 
 @pytest.mark.parametrize(

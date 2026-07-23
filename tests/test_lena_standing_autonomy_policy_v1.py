@@ -69,13 +69,14 @@ def test_validate_cycle_authorization_artifact_accepts_consumed_in_read_only_mod
     patch_live_cycle_clock(monkeypatch)
     bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
     auth_path = Path(bundle["auth_path"])
+    pre_consumption_sha = standing_autonomy._sha256_file(auth_path)
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
     auth["consumed"] = True
     auth["authorization_consumed"] = True
     auth["consumed_at_utc"] = "2026-07-19T00:00:00Z"
     auth["authorization_state_before"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
     auth["authorization_state_after"] = {"single_use": True, "consumed": True, "consumed_at_utc": "2026-07-19T00:00:00Z"}
-    auth["authorization_artifact_sha256"] = _json_sha_without_keys_payload(auth, {"authorization_artifact_sha256"})
+    auth["cycle_authorization_sha256"] = pre_consumption_sha
     auth_path.write_text(json.dumps(auth, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
 
     handoff_report = json.loads(Path(bundle["handoff_path"]).read_text(encoding="utf-8"))
@@ -85,6 +86,35 @@ def test_validate_cycle_authorization_artifact_accepts_consumed_in_read_only_mod
     assert result["artifact"]["authorization_consumed"] is True
     assert result["artifact"]["provider_execution_binding"]["provider_prompt_sha256"] == result["artifact"]["prompt_sha256"]
     assert result["artifact"]["candidate_selection_binding"]["candidate_id"] == result["artifact"]["candidate_selection_binding"]["candidate_id"]
+
+
+def test_validate_cycle_authorization_artifact_rejects_consumed_without_cycle_authorization_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    auth_path = Path(bundle["auth_path"])
+    auth = json.loads(auth_path.read_text(encoding="utf-8"))
+    auth["consumed"] = True
+    auth["authorization_consumed"] = True
+    auth["consumed_at_utc"] = "2026-07-19T00:00:00Z"
+    auth["authorization_state_before"] = {"single_use": True, "consumed": False, "consumed_at_utc": None}
+    auth["authorization_state_after"] = {"single_use": True, "consumed": True, "consumed_at_utc": "2026-07-19T00:00:00Z"}
+    auth.pop("cycle_authorization_sha256", None)
+    auth["authorization_artifact_sha256"] = _json_sha_without_keys_payload(auth, {"authorization_artifact_sha256"})
+    auth_path.write_text(json.dumps(auth, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    handoff_report = json.loads(Path(bundle["handoff_path"]).read_text(encoding="utf-8"))
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.validate_cycle_authorization_artifact(
+            auth_path,
+            allow_consumed=True,
+            handoff_report=handoff_report,
+        )
+
+    assert exc_info.value.code == "authorization_sha_mismatch"
 
 
 def test_default_validation_rejects_expired_authorization(

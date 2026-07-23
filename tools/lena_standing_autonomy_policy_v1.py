@@ -752,9 +752,11 @@ def validate_cycle_authorization_artifact(
                 "cycle authorization SHA does not match reconstructed pre-consumption authorization bytes",
             )
         else:
-            consumed_payload_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
-            if str(auth.get("authorization_artifact_sha256") or "") == consumed_payload_sha and auth.get("cycle_id"):
-                canonical_sha = consumed_payload_sha
+            _require(
+                False,
+                "authorization_sha_mismatch",
+                "cycle authorization SHA is required for consumed authorization artifacts",
+            )
     else:
         canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
     _require(str(auth.get("authorization_artifact_sha256") or "") == canonical_sha, "authorization_sha_mismatch", "authorization SHA does not match canonical artifact bytes")
