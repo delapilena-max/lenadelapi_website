@@ -372,8 +372,8 @@ def _validate_reference_metadata(authority: dict[str, Any], authority_commit: st
     required = {
         "role": "canonical_face_hair_and_full_body",
         "format": "PNG",
-        "width": 1152,
-        "height": 2048,
+        "width": identity.EXPECTED_WIDTH,
+        "height": identity.EXPECTED_HEIGHT,
         "provider": "higgsfield",
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "job_type": "text2image_soul_v2",

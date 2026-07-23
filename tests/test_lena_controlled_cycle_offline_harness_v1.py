@@ -41,6 +41,7 @@ import pytest
 from PIL import Image
 
 import pipeline.higgsfield_lena_api_executor as executor
+import pipeline.identity.lena_higgsfield_identity as identity
 import tools.lena_autopublish_approved_queue_v2_8 as autopublish
 import tools.lena_bounded_live_cycle_v1 as live_cycle
 import tools.lena_full_photo_autonomy_v1 as autonomy
@@ -117,7 +118,7 @@ def clean_test_day():
 
 def _fake_run_live(date_str, slot_id, source, custom_reference_id):
     buf = io.BytesIO()
-    Image.new("RGB", (1152, 2048), (198, 168, 150)).save(buf, format="PNG")
+    Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), (198, 168, 150)).save(buf, format="PNG")
     image_bytes = buf.getvalue()
     ext = executor._detect_image_extension(image_bytes)
     final_path = executor.library_path(date_str, slot_id, ext)

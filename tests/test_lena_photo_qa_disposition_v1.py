@@ -792,8 +792,8 @@ def _production_dual_binding_fixture(
             {
                 "role": "canonical_face_hair_and_full_body",
                 "format": "PNG",
-                "width": 1152,
-                "height": 2048,
+                "width": identity.EXPECTED_WIDTH,
+                "height": identity.EXPECTED_HEIGHT,
                 "provider": "higgsfield",
                 "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
                 "job_type": "text2image_soul_v2",
@@ -2008,7 +2008,7 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         "influencer_id": "lena", "authority_commit": "a" * 40, "authority_id": authority_id,
         "references": [{"path": "refs/lena.png", "sha256": ref_sha}], "reference_set_sha256": set_sha,
         "reference_metadata": [{
-            "role": "canonical_face_hair_and_full_body", "format": "PNG", "width": 1152, "height": 2048,
+            "role": "canonical_face_hair_and_full_body", "format": "PNG", "width": identity.EXPECTED_WIDTH, "height": identity.EXPECTED_HEIGHT,
             "provider": "higgsfield", "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
             "job_type": "text2image_soul_v2", "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
             "authority_scope": "identity_continuity_not_style", "provenance_manifest": "manifest.json",
@@ -2112,8 +2112,8 @@ def test_real_visual_reference_authority_bundle_rejects_stale_or_forged_commit(t
             {
                 "role": "canonical_face_hair_and_full_body",
                 "format": "PNG",
-                "width": 1152,
-                "height": 2048,
+                "width": identity.EXPECTED_WIDTH,
+                "height": identity.EXPECTED_HEIGHT,
                 "provider": "higgsfield",
                 "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
                 "job_type": "text2image_soul_v2",

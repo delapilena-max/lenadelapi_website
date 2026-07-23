@@ -61,7 +61,7 @@ APPROVED_CUSTOM_REFERENCE_IDS = {
 # which measures this from the real saved image rather than trusting a
 # manifest field. Not claimed to be the only resolution Higgsfield could
 # ever produce -- just the one this pipeline has actually verified.
-EXPECTED_WIDTH = 1152
+EXPECTED_WIDTH = 2048
 EXPECTED_HEIGHT = 2048
 
 SCHEMA_VERSION = "1"

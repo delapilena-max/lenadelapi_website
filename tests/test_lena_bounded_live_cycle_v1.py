@@ -56,7 +56,7 @@ def _write_auth_json(path: Path, payload: dict) -> Path:
 
 def _write_image(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", (1152, 2048), "white").save(path)
+    Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(path)
     return path
 
 
@@ -978,8 +978,8 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
             "cli_soul_type": "soul_2",
             "saved_image_path": str(image_path),
             "saved_image_sha256": _sha(image_path),
-            "width": 1152,
-            "height": 2048,
+            "width": identity.EXPECTED_WIDTH,
+            "height": identity.EXPECTED_HEIGHT,
         }
         manifest.update(state["provider_manifest_overrides"])  # type: ignore[arg-type]
         _write_json(manifest_path, manifest)

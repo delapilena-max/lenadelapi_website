@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 import pipeline.higgsfield_lena_api_executor as executor
+import pipeline.identity.lena_higgsfield_identity as identity
 import tools.lena_higgsfield_generation_approval_v1 as approval
 import tools.strategy.lena_execute_approved_live_generation_v1 as wrapper
 from tests import test_lena_higgsfield_generation_approval_v1 as approval_fixture
@@ -34,8 +35,9 @@ def _touch(path: Path, payload: str = "{}\n") -> Path:
     return path
 
 
-def _write_image(path: Path, *, size: tuple[int, int] = (1152, 2048)) -> Path:
+def _write_image(path: Path, *, size: tuple[int, int] | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
+    size = size or (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT)
     Image.new("RGB", size, "white").save(path)
     return path
 
@@ -391,8 +393,8 @@ def test_success_accounting_writes_manifest_claim_and_receipt(
     assert identity_evidence["custom_reference_id"] == CUSTOM_REFERENCE_ID
     assert identity_evidence["soul_name"] == "Lena"
     assert identity_evidence["soul_type"] == "soul_2"
-    assert identity_evidence["width"] == 1152
-    assert identity_evidence["height"] == 2048
+    assert identity_evidence["width"] == identity.EXPECTED_WIDTH
+    assert identity_evidence["height"] == identity.EXPECTED_HEIGHT
     assert wrapper.report_path(DATE, SLOT_ID).is_file()
     assert json.loads(wrapper.report_path(DATE, SLOT_ID).read_text(encoding="utf-8")) == report
 
@@ -440,7 +442,7 @@ def test_identity_evidence_manifest_validation_failures_do_not_write_accounting(
 
     def fake_run_live(date_str: str, slot_id: str, source: dict[str, object], custom_reference_id: str) -> dict[str, object]:
         state["provider_calls"] += 1
-        size = (64, 64) if expected_code == "generated_image_dimensions_mismatch" else (1152, 2048)
+        size = (64, 64) if expected_code == "generated_image_dimensions_mismatch" else None
         _write_image(saved_image_path, size=size)
         _write_image(other_image_path)
         return {

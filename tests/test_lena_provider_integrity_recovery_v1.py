@@ -34,7 +34,7 @@ def _sha(path: Path) -> str:
 
 def _write_image(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", (1152, 2048), "white").save(path)
+    Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(path)
 
 
 def _build_recovery_bundle(
