@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 from tools import lena_higgsfield_generation_approval_v1 as canonical_approval
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 
@@ -90,6 +91,12 @@ def inspect_retry_handoff_artifact(retry_handoff_path: Path) -> dict[str, Any]:
         artifact = retry_handoff.validate_retry_handoff_artifact(retry_handoff_path)
     except retry_handoff.RetryHandoffError as exc:
         raise _translate_retry_error(exc) from exc
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            artifact.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldRetryGenerationApprovalError(exc.code, exc.detail) from exc
 
     return {
         "artifact": artifact,
@@ -110,6 +117,7 @@ def inspect_retry_handoff_artifact(retry_handoff_path: Path) -> dict[str, Any]:
         "model": str(artifact["model"]),
         "aspect_ratio": str(artifact["aspect_ratio"]),
         "custom_reference_id": str(artifact["custom_reference_id"]),
+        "generation_reference": generation_reference,
         "soul_name": str(artifact["soul_name"]),
         "soul_type": str(artifact["soul_type"]),
         "retry_handoff_fingerprint_sha256": str(artifact["retry_handoff_fingerprint_sha256"]),
@@ -171,6 +179,7 @@ def build_retry_generation_approval_record(
         "soul_name": retry_facts["soul_name"],
         "soul_type": retry_facts["soul_type"],
         "custom_reference_id": retry_facts["custom_reference_id"],
+        "generation_reference": retry_facts["generation_reference"],
         "confirmation_statement": confirmation,
         "credits_may_be_spent_acknowledged": True,
         "authorized_attempts": 1,
@@ -251,6 +260,7 @@ def build_standing_autonomy_retry_generation_approval_record(
         "soul_name": retry_facts["soul_name"],
         "soul_type": retry_facts["soul_type"],
         "custom_reference_id": retry_facts["custom_reference_id"],
+        "generation_reference": retry_facts["generation_reference"],
         "confirmation_statement": "issued automatically under the consumed standing-autonomy cycle authorization",
         "credits_may_be_spent_acknowledged": True,
         "authorized_attempts": 1,
@@ -478,6 +488,17 @@ def validate_retry_generation_approval_artifact(
         "approval_custom_reference_id_mismatch",
         "approval custom_reference_id does not match the bound retry handoff Soul reference",
     )
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            approval.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldRetryGenerationApprovalError(exc.code, exc.detail) from exc
+    _require(
+        generation_reference == retry_facts["generation_reference"],
+        "approval_generation_reference_mismatch",
+        "approval generation reference does not match the bound retry handoff",
+    )
 
     standing_authorization_result = None
     if authorization_mode == STANDING_AUTONOMY_AUTHORIZATION_MODE:
@@ -585,6 +606,7 @@ def build_retry_generation_claim_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "authorized_attempts": 1,
         "consumed_attempt_number": 1,
         "expected_manifest_path": repo_relative_path(canonical_approval.expected_manifest_path(date_str, slot_id)),
@@ -663,6 +685,7 @@ def build_retry_generation_execution_receipt_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "upload_authorized": False,
         "queue_promotion_authorized": False,
         "publish_authorized": False,

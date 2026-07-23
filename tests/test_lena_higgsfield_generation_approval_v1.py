@@ -36,7 +36,7 @@ SLOT_ID = "readypack0709-pack003-08-photo-approval-test"
 PROMPT_TEXT = pose_fixture.canonical_prompt()
 PROMPT_SHA = hashlib.sha256(PROMPT_TEXT.encode("utf-8")).hexdigest()
 CANDIDATE_ARTIFACT_SHA = hashlib.sha256(b"synthetic-candidate-artifact-bytes").hexdigest()
-CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+CUSTOM_REFERENCE_ID = approval_mod.soul_cinema_contract.CUSTOM_REFERENCE_ID
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
 
 
@@ -761,7 +761,8 @@ def test_generation_claim_binds_exact_identity_and_expected_paths(
     assert claim["operator_id"] == CANONICAL_OPERATOR_ID
     assert claim["provider"] == "Higgsfield"
     assert claim["executor"] == "Higgsfield CLI repo adapter"
-    assert claim["model"] == "text2image_soul_v2"
+    assert claim["model"] == approval_mod.MODEL
+    assert claim["generation_reference"] == approval_mod.soul_cinema_contract.load_generation_reference_binding()
     assert claim["aspect_ratio"] == "9:16"
     assert claim["custom_reference_id"] == CUSTOM_REFERENCE_ID
     assert claim["authorized_attempts"] == 1
@@ -1110,6 +1111,21 @@ def test_validate_rejects_custom_reference_id_mismatch(tmp_path: Path, monkeypat
     with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
         validate_generation_approval_artifact(approval_path)
     assert excinfo.value.code == "approval_custom_reference_id_mismatch"
+
+
+def test_validate_rejects_generation_reference_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_root(tmp_path, monkeypatch)
+    handoff_path = _write_handoff(tmp_path)
+    approval_path = _record_and_write(tmp_path, handoff_path)
+    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+    approval["generation_reference"]["reference_image_sha256"] = "0" * 64
+    approval_path.write_text(json.dumps(approval), encoding="utf-8")
+
+    with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
+        validate_generation_approval_artifact(approval_path)
+    assert excinfo.value.code == "generation_reference_binding_mismatch"
 
 
 # --- prohibited authorization flags -------------------------------------------

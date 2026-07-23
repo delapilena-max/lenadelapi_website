@@ -38,6 +38,9 @@ def _approved_live_source(prompt: str = "prompt") -> dict:
         "image": {
             "image_prompt": prompt,
             "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            "generation_reference": (
+                executor.soul_cinema_contract.load_generation_reference_binding()
+            ),
         }
     }
 
@@ -821,6 +824,7 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     recommendation_recipe_id = "hcr_011"
     selected_recipe_id = "hcr_008"
     custom_reference_id = executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
+    generation_reference = executor.soul_cinema_contract.load_generation_reference_binding()
     prompt_text = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
     prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
 
@@ -1087,11 +1091,12 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
             "selected_candidate_artifact_sha256": selected_candidate_sha,
             "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date} --slot-id {slot_id}",
         },
+        "generation_reference": generation_reference,
         "structured_executor_inputs": {
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
             "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-            "model": "text2image_soul_v2",
+            "model": executor.HIGGSFIELD_IMAGE_JOB_TYPE,
             "aspect_ratio": "9:16",
             "negative_prompt_enabled": False,
             "live_execution_authorized": False,
@@ -1108,6 +1113,7 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
             },
             "selected_prompt_sha256": prompt_sha,
             "selected_prompt_text": prompt_text,
+            "generation_reference": generation_reference,
             "dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
             "live_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()} --live",
             "dry_run_argv": [
@@ -1332,6 +1338,7 @@ def _build_retry_fixture(
     retry_date = "2026-07-14"
     original_slot = "higgsfield-20260714-hcr_011-photo"
     custom_reference_id = executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
+    generation_reference = executor.soul_cinema_contract.load_generation_reference_binding()
     original_prompt = (
         ORIGINAL_PROMPT
         if safe_prompt
@@ -1437,6 +1444,7 @@ def _build_retry_fixture(
             "pose_bound_content_packet_sha256": "4" * 64,
             "expression_provenance": expression_binding,
             "expression_bound_content_packet_sha256": "4" * 64,
+            "generation_reference": generation_reference,
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_prompt_input": {
@@ -1454,7 +1462,7 @@ def _build_retry_fixture(
                 "provider": "higgsfield",
                 "executor_type": "higgsfield_cli",
                 "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-                "model": "text2image_soul_v2",
+                "model": executor.HIGGSFIELD_IMAGE_JOB_TYPE,
                 "aspect_ratio": "9:16",
                 "negative_prompt_enabled": False,
                 "live_execution_authorized": False,
@@ -1475,6 +1483,7 @@ def _build_retry_fixture(
                 },
                 "selected_prompt_sha256": original_prompt_sha,
                 "selected_prompt_text": original_prompt,
+                "generation_reference": generation_reference,
             },
         }
     learning_repo_path = Path("pipeline/strategy/lena/next_actions") / retry_date / f"lena_post_outcome_learning_state_{retry_date}.json"
@@ -1670,7 +1679,8 @@ def _build_retry_fixture(
         "provider_lane": packet_report["scene_type"],
         "source_prompt_family": "compact_provider_prompt",
         "provider": "higgsfield",
-        "model": "text2image_soul_v2",
+        "model": executor.HIGGSFIELD_IMAGE_JOB_TYPE,
+        "generation_reference": generation_reference,
     }
     handoff_report["binding_linkage"] = {
         "recommendation_artifact_path": recommendation_repo_path.as_posix(),
@@ -1851,6 +1861,7 @@ def _build_retry_fixture(
                 "lighting_text": "blue-hour ambient mixed with warm lamp fill",
                 "negative_prompt_enabled": False,
                 "image_prompt": original_prompt,
+                "generation_reference": generation_reference,
                 "validation": {
                     "framing_present": True,
                     "wardrobe_casual_free": True,
@@ -2006,12 +2017,40 @@ def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> 
     assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
 
 
-def test_provider_argv_attaches_verified_lena_soul_reference_id() -> None:
-    argv = executor.build_provider_argv("prompt", executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
+def test_provider_argv_attaches_verified_lena_soul_and_authoritative_source_image() -> None:
+    prompt = "complete approved scene prompt"
+    argv = executor.build_provider_argv(prompt, executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
+    reference = executor.soul_cinema_contract.load_generation_reference_binding()
 
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "e45ec580-a6db-4063-a9b2-f9163856daae"
-    assert "--soul-id" in argv
-    assert argv[argv.index("--soul-id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert argv[1:4] == ["generate", "create", "soul_cinema_studio"]
+    assert argv[argv.index("--prompt") + 1] == prompt
+    assert "--custom_reference_id" in argv
+    assert argv[argv.index("--custom_reference_id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert "--image-references" in argv
+    assert (
+        Path(argv[argv.index("--image-references") + 1]).resolve()
+        == executor.soul_cinema_contract.resolve_reference_image(reference)
+    )
+    assert argv[argv.index("--enhance_prompt") + 1] == "false"
+    assert argv[argv.index("--quality") + 1] == "2k"
+
+
+def test_provider_argv_rejects_substituted_generation_reference_before_subprocess() -> None:
+    reference = executor.soul_cinema_contract.load_generation_reference_binding()
+    substituted = copy.deepcopy(reference)
+    substituted["reference_image_sha256"] = "0" * 64
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.build_provider_argv(
+            "prompt",
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+            substituted,
+        )
+
+    assert exc_info.value.stage == "generation_reference_binding_mismatch"
+    assert exc_info.value.subprocess_start_attempted is False
+    assert exc_info.value.provider_submission_may_have_occurred is False
 
 
 def test_provider_argv_rejects_missing_or_wrong_lena_soul_before_subprocess(
@@ -2118,6 +2157,7 @@ def test_old_shortened_provider_prompt_stops_before_provider_call_when_full_prom
                 "image": {
                     "image_prompt": old_provider_record_prompt,
                     "prompt_sha256": hashlib.sha256(approved_full_prompt.encode("utf-8")).hexdigest(),
+                    "generation_reference": executor.soul_cinema_contract.load_generation_reference_binding(),
                 }
             },
             executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
@@ -2142,7 +2182,13 @@ def test_prompt_sha_mismatch_stops_before_provider_call(
         executor.run_live(
             DATE,
             SLOT_ID,
-            {"image": {"image_prompt": "complete approved prompt", "prompt_sha256": "0" * 64}},
+            {
+                "image": {
+                    "image_prompt": "complete approved prompt",
+                    "prompt_sha256": "0" * 64,
+                    "generation_reference": executor.soul_cinema_contract.load_generation_reference_binding(),
+                }
+            },
             executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         )
 
@@ -2206,7 +2252,7 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
             self.returncode = returncode
 
     def fake_run(argv, **kwargs):
-        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+        if argv[1:4] == ["generate", "create", executor.HIGGSFIELD_IMAGE_JOB_TYPE]:
             return Completed(f"{job_id}\n")
         if argv[1:] == ["generate", "list", "--image", "--json"]:
             return Completed(json.dumps([{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png", "params": {}}]))
@@ -2237,8 +2283,9 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
     )
     assert binding["provider_job_id"] == job_id
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
-    assert binding["soul_id_flag"] == "--soul-id"
-    assert "--soul-id" in binding["resolved_argv_redacted"]
+    assert binding["soul_id_flag"] == "--custom_reference_id"
+    assert "--custom_reference_id" in binding["resolved_argv_redacted"]
+    assert "--image-references" in binding["resolved_argv_redacted"]
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
     assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 
@@ -2257,7 +2304,7 @@ def test_live_after_preflight_writes_submitted_prompt_once_and_second_attempt_st
 
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
-        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+        if argv[1:4] == ["generate", "create", executor.HIGGSFIELD_IMAGE_JOB_TYPE]:
             return Completed(f"{job_id}\n")
         if argv[1:] == ["generate", "list", "--image", "--json"]:
             return Completed(json.dumps([{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png", "params": {}}]))
@@ -2320,7 +2367,7 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
 
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
-        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+        if argv[1:4] == ["generate", "create", executor.HIGGSFIELD_IMAGE_JOB_TYPE]:
             return Completed(f"{job_id}\n")
         if argv[1:] == ["generate", "list", "--image", "--json"]:
             return Completed(
@@ -2364,8 +2411,9 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     )
     assert binding["provider_job_id"] == job_id
     assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
-    assert binding["soul_id_flag"] == "--soul-id"
-    assert "--soul-id" in binding["resolved_argv_redacted"]
+    assert binding["soul_id_flag"] == "--custom_reference_id"
+    assert "--custom_reference_id" in binding["resolved_argv_redacted"]
+    assert "--image-references" in binding["resolved_argv_redacted"]
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
     assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 
@@ -2403,7 +2451,7 @@ def test_run_live_polls_bare_uuid_until_result_url_is_available(
 
     def fake_run(argv, **kwargs):
         calls.append(list(argv))
-        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+        if argv[1:4] == ["generate", "create", executor.HIGGSFIELD_IMAGE_JOB_TYPE]:
             return Completed(f"{job_id}\n")
         if argv[1:] == ["generate", "list", "--image", "--json"]:
             return Completed(json.dumps(lookup_responses.pop(0)))

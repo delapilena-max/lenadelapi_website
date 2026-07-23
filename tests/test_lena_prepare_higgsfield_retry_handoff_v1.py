@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from pipeline import higgsfield_lena_api_executor as executor
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 from tools import lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
@@ -20,7 +21,7 @@ from tests.fixtures import lena_pose_provenance as pose_fixture
 DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
-CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+CUSTOM_REFERENCE_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 ORIGINAL_PROMPT = packet_builder.rebuild_packet_from_authoritative_sources(
     {
         "recipe_id": "hcr_011",
@@ -110,6 +111,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     handoff_path = tmp_path / handoff_repo_path
     packet_path = tmp_path / packet_repo_path
     selected_candidate_path = tmp_path / selected_candidate_repo_path
+    generation_reference = soul_cinema_contract.load_generation_reference_binding()
     packet_report = {
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
@@ -379,7 +381,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
             "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-            "model": "text2image_soul_v2",
+            "model": approval_mod.MODEL,
             "aspect_ratio": "9:16",
             "negative_prompt_enabled": False,
             "live_execution_authorized": False,
@@ -394,6 +396,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             },
             "selected_prompt_sha256": PROMPT_SHA,
             "selected_prompt_text": ORIGINAL_PROMPT,
+            "generation_reference": generation_reference,
             "selected_prompt_input_artifact_sha256": packet_sha,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_candidate_sha,
@@ -417,7 +420,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "provider_lane": "fit_check_mirror_getting_ready",
             "source_prompt_family": "compact_provider_prompt",
             "provider": "higgsfield",
-            "model": "text2image_soul_v2",
+            "model": approval_mod.MODEL,
+            "generation_reference": generation_reference,
         },
         "binding_linkage": {
             "recommendation_artifact_path": recommendation_repo_path.as_posix(),
@@ -450,6 +454,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
                 "distinct for the same recipe/slot chain"
             ),
         },
+        "generation_reference": generation_reference,
     }
     _write_json(handoff_path, handoff_report)
     handoff_sha = hashlib.sha256(handoff_path.read_bytes()).hexdigest()
@@ -615,6 +620,8 @@ def test_build_and_validate_retry_handoff_round_trip(tmp_path: Path, monkeypatch
     source_handoff = json.loads(seeded["handoff_path"].read_text(encoding="utf-8"))
     assert artifact["pose_provenance"] == source_handoff["pose_provenance"]
     assert artifact["source_pose_bound_content_packet_sha256"] == source_handoff["pose_bound_content_packet_sha256"]
+    assert artifact["generation_reference"] == soul_cinema_contract.load_generation_reference_binding()
+    assert artifact["generation_reference"] == source_handoff["generation_reference"]
 
 
 @pytest.mark.parametrize("block", approval_mod.AUTHORITY_BLOCK_KEYS)
@@ -1234,11 +1241,12 @@ def test_executor_accepts_new_retry_handoff_artifact_in_dry_run(
                 "pose_text": bound_pose["pose_text"],
                 "pose_provenance": bound_pose,
                 "expression_gaze_id": bound_expression["expression_gaze_id"],
-                "expression_gaze_label": bound_expression["expression_gaze_label"],
-                "expression_text": bound_expression["expression_text"],
-                "expression_provenance": bound_expression,
-            },
-        }
+                    "expression_gaze_label": bound_expression["expression_gaze_label"],
+                    "expression_text": bound_expression["expression_text"],
+                    "expression_provenance": bound_expression,
+                    "generation_reference": retry_artifact["generation_reference"],
+                },
+            }
         return ({}, source, {}, {"ok": True, "prompt_matches_expected": None, "hard_exclude_reasons": [], "all_reasons": []})
 
     monkeypatch.setattr(executor, "_validate_handoff_packet", fake_validate_handoff_packet)

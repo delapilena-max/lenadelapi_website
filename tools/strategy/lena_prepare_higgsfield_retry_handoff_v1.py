@@ -16,6 +16,7 @@ if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
 from tools import lena_higgsfield_generation_approval_v1 as approval_contract  # noqa: E402
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract  # noqa: E402
 from tools.strategy import lena_audit_autonomous_generation_readiness_v1 as readiness_audit  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits  # noqa: E402
@@ -344,6 +345,12 @@ def build_retry_handoff(
 ) -> tuple[Path, dict[str, Any]]:
     handoff_facts = approval_contract.inspect_handoff_artifact(handoff_artifact)
     handoff_report = handoff_facts["report"]
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            handoff_facts["generation_reference"]
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
     packet_path, packet_report = _load_packet(str(handoff_report.get("selected_prompt_input_artifact_path") or ""))
     packet_sha = _sha256_file(packet_path)
     _require(
@@ -446,6 +453,11 @@ def build_retry_handoff(
         _require(soul.get("type") == "soul_2", "soul_type_mismatch", "retry Soul type must be soul_2")
         _require(soul.get("status") == "completed", "soul_status_mismatch", "retry Soul status must be completed")
         _require(bool(str(soul.get("id") or "").strip()), "soul_id_missing", "retry Soul id is required")
+        _require(
+            soul.get("id") == soul_cinema_contract.CUSTOM_REFERENCE_ID,
+            "soul_id_mismatch",
+            "retry Soul id must match the verified Lena Soul 2.0 id",
+        )
         custom_reference_id = soul["id"]
         soul_name = soul["name"]
         soul_type = soul["type"]
@@ -510,6 +522,7 @@ def build_retry_handoff(
         "model": approval_contract.MODEL,
         "aspect_ratio": approval_contract.ASPECT_RATIO,
         "custom_reference_id": custom_reference_id,
+        "generation_reference": generation_reference,
         "soul_name": soul_name,
         "soul_type": soul_type,
         "retry_soul_binding": retry_soul_binding,
@@ -599,6 +612,17 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         "source_original_prompt_sha256 does not match the source handoff prompt sha",
     )
     try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            artifact.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise RetryHandoffError(exc.code, exc.detail) from exc
+    _require(
+        generation_reference == handoff_facts["generation_reference"],
+        "generation_reference_binding_mismatch",
+        "retry handoff generation reference differs from the source handoff",
+    )
+    try:
         bound_pose = pose_provenance.validate_pose_provenance(artifact.get("pose_provenance"))
         source_pose = pose_provenance.validate_pose_provenance(handoff_facts["report"].get("pose_provenance"))
         bound_expression = pose_provenance.validate_expression_provenance(
@@ -632,11 +656,21 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         _require(soul.get("name") == "Lena", "soul_name_mismatch", "retry Soul name must be Lena")
         _require(soul.get("type") == "soul_2", "soul_type_mismatch", "retry Soul type must be soul_2")
         _require(soul.get("status") == "completed", "soul_status_mismatch", "retry Soul status must be completed")
+        _require(
+            soul.get("id") == soul_cinema_contract.CUSTOM_REFERENCE_ID,
+            "soul_id_mismatch",
+            "retry Soul id must match the verified Lena Soul 2.0 id",
+        )
         _require(artifact.get("custom_reference_id") == soul.get("id"), "custom_reference_id_mismatch", "retry handoff custom_reference_id must match retry Soul id")
         _require(artifact.get("soul_name") == soul.get("name"), "soul_name_mismatch", "retry handoff soul_name must match retry Soul binding")
         _require(artifact.get("soul_type") == soul.get("type"), "soul_type_mismatch", "retry handoff soul_type must match retry Soul binding")
     else:
         _require(artifact.get("custom_reference_id") == handoff_facts["custom_reference_id"], "custom_reference_id_mismatch", "background retry handoff must preserve the source reference id")
+    _require(
+        artifact.get("custom_reference_id") == soul_cinema_contract.CUSTOM_REFERENCE_ID,
+        "custom_reference_id_mismatch",
+        "retry handoff must preserve the verified Lena Soul 2.0 id",
+    )
     _require(
         artifact.get("historical_custom_reference_id") == handoff_facts["custom_reference_id"],
         "historical_reference_mismatch",

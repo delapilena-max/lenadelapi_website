@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 
 import pipeline.identity.lena_higgsfield_identity as identity
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 import pipeline.higgsfield_lena_api_executor as higgsfield_executor
 from tests.fixtures import lena_pose_provenance as pose_fixture
 import tools.lena_bounded_live_cycle_v1 as cycle
@@ -24,7 +25,7 @@ DATE = "2026-07-18"
 SLOT_ID = "lenagate202607176924dc10-pack000-00-photo"
 RECIPE_ID = "hcr_012"
 HOOK_ID = "cbn_001"
-CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+CUSTOM_REFERENCE_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 PROMPT_SHA = "186c0feb77d819cf1d001507dd56448e22057eeab5f2af33c83e0b464abdf640"
 AUTHORITY_COMMIT = "6924dc10d7916b3bc91a87953ca3e319171e42fc"
 CAPTION = "single-command bounded live cycle"
@@ -119,7 +120,7 @@ def _policy_payload(*, autonomy_enabled: bool = True, live_generation_enabled: b
         "live_publishing_enabled": live_publishing_enabled,
         "kill_switch_enabled": kill_switch_enabled,
         "allowed_provider": "Higgsfield",
-        "allowed_model": "text2image_soul_v2",
+        "allowed_model": approval.MODEL,
         "allowed_soul": "Lena",
         "allowed_platforms": ["Instagram Feed", "Facebook Page"],
         "provider_call_cap_per_cycle": 1,
@@ -158,6 +159,7 @@ def _build_bundle(
     handoff_path = _handoff_path(tmp_path, date_str)
     image_path = tmp_path / "pipeline" / "higgsfield_library" / "lena" / date_str / f"{slot_id}_seed.png"
     policy_path = _policy_path(tmp_path)
+    generation_reference = soul_cinema_contract.load_generation_reference_binding()
 
     candidate = {
         "candidate_id": f"{slot_id}::{RECIPE_ID}::{HOOK_ID}",
@@ -272,6 +274,7 @@ def _build_bundle(
         "expected_handoff_artifact_path": handoff_path.relative_to(tmp_path).as_posix(),
         "prompt_sha256": PROMPT_SHA,
         "custom_reference_id": CUSTOM_REFERENCE_ID,
+        "generation_reference": generation_reference,
         "platform": platform,
         "live_execution_authorized": False,
         "generation_approval_required": True,
@@ -298,9 +301,10 @@ def _build_bundle(
             "expected_output_directory": (Path("pipeline") / "higgsfield_library" / "lena" / date_str).as_posix(),
             "expected_output_stem": f"{slot_id}_seed",
             "allowed_output_extensions": list(approval.ALLOWED_OUTPUT_EXTENSIONS),
-            "model": "text2image_soul_v2",
+            "model": approval.MODEL,
             "aspect_ratio": "9:16",
             "custom_reference_id": CUSTOM_REFERENCE_ID,
+            "generation_reference": soul_cinema_contract.load_generation_reference_binding(),
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
             "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
@@ -370,7 +374,8 @@ def _build_bundle(
         "provider_lane": packet["lane"],
         "source_prompt_family": "compact_provider_prompt",
         "provider": "higgsfield",
-        "model": "text2image_soul_v2",
+        "model": approval.MODEL,
+        "generation_reference": generation_reference,
         "pose_bound_content_packet_sha256": packet_bound_sha,
         "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
         "expression_bound_content_packet_sha256": packet_bound_sha,
@@ -439,6 +444,7 @@ def _build_bundle(
             "candidate_selection_binding": candidate_selection_binding,
             "provider_execution_binding": provider_execution_binding,
             "binding_linkage": binding_linkage,
+            "generation_reference": generation_reference,
         }
     )
     handoff["structured_executor_inputs"].update(
@@ -574,7 +580,7 @@ def _build_bundle(
                 "provider": "higgsfield",
                 "executor_type": "higgsfield_cli",
                 "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-                "model": "text2image_soul_v2",
+                "model": approval.MODEL,
                 "aspect_ratio": "9:16",
                 "negative_prompt_enabled": False,
                 "live_execution_authorized": False,
@@ -595,6 +601,7 @@ def _build_bundle(
                 },
                 "selected_prompt_sha256": PROMPT_SHA,
                 "selected_prompt_text": "provider prompt preview",
+                "generation_reference": generation_reference,
                 "dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
                 "live_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()} --live",
                 "dry_run_argv": [
@@ -632,6 +639,7 @@ def _build_bundle(
                 "soul_selection_mode": "provider_config_not_prompt_text",
                 "negative_prompt_enabled": False,
                 "image_prompt": "provider prompt preview",
+                "generation_reference": generation_reference,
             },
         }
         packet_validation = {"ok": True}
@@ -970,7 +978,7 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
         manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
         manifest = {
             "provider": "higgsfield",
-            "job_type": "text2image_soul_v2",
+            "job_type": identity.EXPECTED_JOB_TYPE,
             "date": DATE,
             "slot_id": SLOT_ID,
             "lane": "bounded-live",
@@ -979,6 +987,7 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
             "provider_job_id": "job-123",
             "provider_status": "completed",
             "custom_reference_id": CUSTOM_REFERENCE_ID,
+            "generation_reference": soul_cinema_contract.load_generation_reference_binding(),
             "cli_soul_name": "Lena",
             "cli_soul_type": "soul_2",
             "saved_image_path": str(image_path),

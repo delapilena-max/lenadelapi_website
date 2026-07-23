@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
@@ -27,10 +28,10 @@ PROVIDER = "higgsfield"
 EXECUTOR_TYPE = "higgsfield_cli"
 MEDIA_CONTENT_TYPE = "image"
 SLOT_MEDIA_TYPE = "photo"
-MODEL = "text2image_soul_v2"
-ASPECT_RATIO = "9:16"
+MODEL = soul_cinema_contract.MODEL
+ASPECT_RATIO = soul_cinema_contract.ASPECT_RATIO
 NEGATIVE_PROMPT_ENABLED = False
-DEFAULT_CUSTOM_REFERENCE_ID = "e45ec580-a6db-4063-a9b2-f9163856daae"
+DEFAULT_CUSTOM_REFERENCE_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 SOUL_NAME = "Lena"
 SOUL_TYPE = "Soul 2.0"
 REVIEWED_LANE_BINDING_ALIASES = {
@@ -457,6 +458,10 @@ def build_handoff(
         )
     except autonomy_ladder.AutonomyLadderError as exc:
         raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
+    try:
+        generation_reference = soul_cinema_contract.load_generation_reference_binding()
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
 
     recommendation_path = next_step_path(date_str)
     recommendation = load_report(
@@ -627,6 +632,7 @@ def build_handoff(
         "source_prompt_family": PROMPT_FAMILY_PROVIDER_EXECUTION,
         "provider": PROVIDER,
         "model": MODEL,
+        "generation_reference": generation_reference,
     }
     binding_linkage = {
         "recommendation_artifact_path": repo_relative_path(recommendation_path),
@@ -708,6 +714,7 @@ def build_handoff(
         "execution_owner": EXECUTION_OWNER,
         "provider": PROVIDER,
         "executor_type": EXECUTOR_TYPE,
+        "generation_reference": generation_reference,
         "repo_executor_path": REPO_EXECUTOR_PATH,
         "media_content_type": MEDIA_CONTENT_TYPE,
         "slot_media_type": SLOT_MEDIA_TYPE,
@@ -833,6 +840,9 @@ def build_handoff(
             "aspect_ratio": ASPECT_RATIO,
             "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
             "negative_prompt_enabled": NEGATIVE_PROMPT_ENABLED,
+            "quality": soul_cinema_contract.QUALITY,
+            "enhance_prompt": soul_cinema_contract.ENHANCE_PROMPT,
+            "generation_reference": generation_reference,
             "soul_metadata": {
                 "name": SOUL_NAME,
                 "type": SOUL_TYPE,
@@ -988,6 +998,15 @@ def build_handoff(
         pose_provenance.validate_handoff_expression_copies(report)
     except pose_provenance.PoseProvenanceError as exc:
         raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
+    try:
+        soul_cinema_contract.validate_generation_reference_binding(
+            report.get("generation_reference")
+        )
+        soul_cinema_contract.validate_generation_reference_binding(
+            report.get("structured_executor_inputs", {}).get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HandoffBuildError(f"[ABORT] {exc.code}: {exc.detail}") from exc
     return report
 
 
@@ -1028,6 +1047,8 @@ def write_markdown(path: Path, report: dict) -> None:
         f"- selected candidate: `{report['source_selected_candidate_artifact_path']}`",
         f"- selected candidate id: `{report['selected_candidate']['candidate_id']}`",
         f"- selected candidate recipe: `{report['selected_candidate']['recipe_id']}`",
+        f"- generation reference: `{structured['generation_reference']['reference_image_path']}`",
+        f"- generation reference SHA-256: `{structured['generation_reference']['reference_image_sha256']}`",
         f"- reconciliation artifact: `{report['source_reconciliation_artifact_path']}`",
         f"- reconciliation decision artifact: `{report['source_reconciliation_decision_artifact_path']}`",
         f"- selected prompt input: `{report['selected_prompt_input_artifact_path']}`",

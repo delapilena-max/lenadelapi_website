@@ -1,9 +1,12 @@
 # Lena Provider Surfaces
 
 Higgsfield is the only supported Lena generation provider in this repository.
-Paid Lena generation through `text2image_soul_v2` remains stopped after the
-human rejection of provider job `9a0e5ebf-40ff-4c70-823c-dfa99aa5664a`.
-Keeping the executor code does not authorize another paid call.
+The rejected unrestricted `text2image_soul_v2` route is retired for new Lena
+generation. The active replacement contract is reference-guided
+`soul_cinema_studio`: it requires Lena's verified Soul plus one SHA-bound
+source image and preserves the approved prompt bytes with
+`enhance_prompt=false`. Keeping the executor code does not authorize a paid
+call.
 
 ## Active photo-generation surfaces
 
@@ -16,9 +19,10 @@ Keeping the executor code does not authorize another paid call.
 | `tools/lena_higgsfield_generation_approval_v1.py` | Validates manual generation approval |
 | `tools/lena_higgsfield_standing_autonomy_generation_approval_v1.py` | Validates controlled standing-autonomy generation approval |
 
-The verified Lena Soul id must be present in the handoff, approval, and exact
-subprocess command binding. Provider submission remains fail-closed on prompt,
-Soul, approval, claim, or lineage mismatch.
+The verified Lena Soul id and authoritative source-image path/SHA must be
+present in the handoff, approval, and exact subprocess command binding.
+Provider submission remains fail-closed on prompt, Soul, source image,
+approval, claim, or lineage mismatch.
 
 ## Unsupported generation surfaces
 

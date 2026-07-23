@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 import tools.lena_higgsfield_generation_approval_v1 as canonical_approval
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval
 import tools.lena_record_higgsfield_retry_generation_approval_v1 as record_tool
@@ -38,7 +39,7 @@ from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_mod
 DATE = "2026-07-14"
 ORIGINAL_SLOT = "higgsfield-20260714-hcr_011-photo"
 RETRY_SLOT = "higgsfield-20260714-hcr_011-retry01-photo"
-CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+CUSTOM_REFERENCE_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 PROMPT_SHA = hashlib.sha256(ORIGINAL_PROMPT.encode("utf-8")).hexdigest()
 SELECTED_CANDIDATE_REPO_PATH = Path(
     f"pipeline/strategy/lena/pre_generation_candidates/{DATE}/lena_pre_generation_candidate_selected.json"
@@ -145,6 +146,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
     handoff_path = tmp_path / handoff_repo_path
     packet_path = tmp_path / packet_repo_path
     selected_candidate_path = tmp_path / selected_candidate_repo_path
+    generation_reference = soul_cinema_contract.load_generation_reference_binding()
     packet_report = {
         "report_type": "lena_content_packet_dryrun",
         "generated_date": DATE,
@@ -349,7 +351,8 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "provider_lane": packet_report["scene_type"],
         "source_prompt_family": "compact_provider_prompt",
         "provider": "higgsfield",
-        "model": "text2image_soul_v2",
+        "model": canonical_approval.MODEL,
+        "generation_reference": generation_reference,
     }
     binding_linkage = {
         "recommendation_artifact_path": recommendation_repo_path.as_posix(),
@@ -435,6 +438,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
         "candidate_selection_binding": candidate_selection_binding,
         "provider_execution_binding": provider_execution_binding,
         "binding_linkage": binding_linkage,
+        "generation_reference": generation_reference,
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": pose_bound_packet_sha,
         "expression_provenance": expression_binding,
@@ -456,7 +460,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
             "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
-            "model": "text2image_soul_v2",
+            "model": canonical_approval.MODEL,
             "aspect_ratio": "9:16",
             "negative_prompt_enabled": False,
             "live_execution_authorized": False,
@@ -471,6 +475,7 @@ def _seed_bound_retry_source(tmp_path: Path) -> dict[str, Path]:
             },
             "selected_prompt_sha256": PROMPT_SHA,
             "selected_prompt_text": ORIGINAL_PROMPT,
+            "generation_reference": generation_reference,
             "selected_candidate_artifact_path": selected_candidate_repo_path.as_posix(),
             "selected_candidate_artifact_sha256": selected_sha256,
             "pose_provenance": pose_binding,
@@ -605,6 +610,8 @@ def test_valid_retry_approval_round_trip(tmp_path: Path, monkeypatch: pytest.Mon
     assert result["is_expired"] is False
     assert result["retry_facts"]["slot_id"] == RETRY_SLOT
     assert result["retry_facts"]["prompt_sha256"] == retry_facts["prompt_sha256"]
+    assert result["approval"]["generation_reference"] == soul_cinema_contract.load_generation_reference_binding()
+    assert result["approval"]["generation_reference"] == retry_facts["generation_reference"]
     assert result["scope_summary"]["authorized_attempts"] == 1
     assert result["scope_summary"]["upload_authorized"] is False
     assert result["scope_summary"]["queue_promotion_authorized"] is False
@@ -826,6 +833,7 @@ def test_retry_execution_receipt_binds_flags_false(
     )
     receipt_path = receipt_output_path(DATE, RETRY_SLOT)
     write_retry_generation_execution_receipt_atomic(receipt_path, receipt)
+    assert receipt["generation_reference"] == soul_cinema_contract.load_generation_reference_binding()
     assert receipt["publish_authorized"] is False
     assert receipt["queue_promotion_authorized"] is False
     assert receipt["upload_authorized"] is False

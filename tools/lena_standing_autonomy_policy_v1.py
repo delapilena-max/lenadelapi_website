@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import lena_higgsfield_generation_approval_v1 as approval
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 from tools.strategy.lena_build_next_live_image_handoff_v1 import _handoff_cross_field_binding_split_brain_error
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -189,7 +190,11 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     _require(policy.get("live_publishing_enabled") is True, "policy_live_publishing_disabled", "live publishing must be enabled")
     _require(policy.get("kill_switch_enabled") is True, "policy_kill_switch_disabled", "kill switch must be enabled")
     _require(policy.get("allowed_provider") == "Higgsfield", "policy_provider_mismatch", "allowed_provider must be Higgsfield")
-    _require(policy.get("allowed_model") == "text2image_soul_v2", "policy_model_mismatch", "allowed_model must be text2image_soul_v2")
+    _require(
+        policy.get("allowed_model") == approval.MODEL,
+        "policy_model_mismatch",
+        f"allowed_model must be {approval.MODEL}",
+    )
     _require(policy.get("allowed_soul") == "Lena", "policy_soul_mismatch", "allowed_soul must be Lena")
     allowed_platforms = policy.get("allowed_platforms")
     _require(isinstance(allowed_platforms, list) and {"Instagram Feed", "Facebook Page"}.issubset(set(map(str, allowed_platforms))), "policy_platforms_invalid", "allowed_platforms must include Instagram Feed and Facebook Page")
@@ -332,6 +337,12 @@ def _prepare_authorization_scope(
         or soul_metadata.get("custom_reference_id")
         or ""
     )
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            structured.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise StandingAutonomyPolicyError(exc.code, exc.detail) from exc
     candidate_selection_binding = handoff_report.get("candidate_selection_binding")
     candidate_selection_binding = candidate_selection_binding if isinstance(candidate_selection_binding, dict) else {}
     provider_execution_binding = handoff_report.get("provider_execution_binding")
@@ -386,6 +397,7 @@ def _prepare_authorization_scope(
         "soul_name": str(policy["allowed_soul"]),
         "soul_type": "Soul 2.0",
         "custom_reference_id": custom_reference_id,
+        "generation_reference": generation_reference,
         "generation_handoff_artifact_path": str(Path(str(handoff_report.get("handoff_artifact_path") or handoff_report.get("selected_handoff_artifact_path") or ""))),
         "generation_handoff_artifact_sha256": str(handoff_report.get("handoff_sha256") or handoff_report.get("selected_handoff_sha256") or ""),
         "candidate_selection_binding": candidate_selection_binding,
@@ -544,6 +556,7 @@ def issue_cycle_authorization(
             "soul_name": scope["soul_name"],
             "soul_type": scope["soul_type"],
             "custom_reference_id": scope["custom_reference_id"],
+            "generation_reference": scope["generation_reference"],
             "generation_handoff_artifact_path": str(handoff_path),
             "generation_handoff_artifact_sha256": _sha256_file(handoff_path),
             "single_use": True,
@@ -699,8 +712,23 @@ def validate_cycle_authorization_artifact(
     _require(auth.get("live_generation_enabled") is True, "live_generation_enabled_invalid", "live_generation must be enabled")
     _require(auth.get("live_publishing_enabled") is True, "live_publishing_enabled_invalid", "live publishing must be enabled")
     _require(auth.get("provider") == "Higgsfield", "provider_mismatch", "provider must be Higgsfield")
-    _require(auth.get("model") == "text2image_soul_v2", "model_mismatch", "model must be text2image_soul_v2")
+    _require(
+        auth.get("model") == approval.MODEL,
+        "model_mismatch",
+        f"model must be {approval.MODEL}",
+    )
     _require(auth.get("soul_name") == "Lena", "soul_mismatch", "soul_name must be Lena")
+    _require(
+        auth.get("custom_reference_id") == soul_cinema_contract.CUSTOM_REFERENCE_ID,
+        "custom_reference_id_mismatch",
+        "custom_reference_id must match the current Lena Soul",
+    )
+    try:
+        soul_cinema_contract.validate_generation_reference_binding(
+            auth.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise StandingAutonomyPolicyError(exc.code, exc.detail) from exc
     _require(auth.get("platform") in {"Instagram Feed", "Facebook Page"}, "platform_invalid", "platform must be allowed by policy")
     if controlled_enabled:
         _require(controlled.get("recipe_id") == "hcr_012", "controlled_recipe_invalid", "controlled authorization recipe must be hcr_012")

@@ -1,6 +1,4 @@
-# Claude Handoff - Lena Provider Retirement
-
-This is the concise handoff for Claude or another coding agent.
+# Claude Handoff - Lena Reference-Guided Higgsfield Integration
 
 ## Repo
 
@@ -8,31 +6,54 @@ This is the concise handoff for Claude or another coding agent.
 
 ## Git
 
-- HEAD: `e23e94844ca96a187f887e25654b2c7c84ecb78b`
+- HEAD: `1fbd796b184f01faac0882926e59dbc97c822e8e`
 - Branch: detached HEAD
-- State: dirty by design; provider-retirement patch is not staged or committed.
+- State: dirty by design with an uncommitted replacement integration.
 
 ## User Intent
 
-The user rejected the latest Lena Higgsfield output and then instructed: remove Kling Omni and OpenArt/Seedance completely. They are only using Higgsfield, but paid Lena generation through the current `text2image_soul_v2` path remains stopped until a better controlled Higgsfield path is selected offline.
+Higgsfield is the only image provider. The rejected unrestricted `text2image_soul_v2` path must not be used again for Lena. Marketing Studio is not used. The replacement must still make pictures, with stronger identity and composition control.
 
-## What Changed In The Dirty Patch
+## Selected Replacement
 
-- Kling Omni and OpenArt/Seedance active surfaces were removed.
-- Higgsfield is now the only configured Lena image-provider family.
-- Video generation is disabled in policy.
-- Legacy daily provider/orchestrator/scheduler entrypoints were removed.
-- A provider-surface regression test was added to guard against retired provider routes returning.
-- Historical runtime/audit evidence was preserved.
+Use Higgsfield `soul_cinema_studio` with:
 
-## Files To Treat As Intended Source Changes
+- exact Lena Soul ID `e45ec580-a6db-4063-a9b2-f9163856daae`
+- exactly one SHA-bound `image_references` source
+- source `pipeline/higgsfield_library/lena/2026-07-09/prompt_isolation_tests/readypack0709-pack004-08-wardrobe-test-c_seed.png`
+- source SHA-256 `7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb`
+- aspect ratio `9:16`
+- quality `2k`
+- `enhance_prompt=false`
+- the exact approved full prompt
 
-Stage/review the tracked modifications and deletions shown by `git status --short`, plus:
+## What The Dirty Patch Does
 
-- `tools/PROVIDER_SURFACES.md`
-- `tests/test_lena_higgsfield_only_provider_surface_v1.py`
+- Adds `pipeline/identity/lena_higgsfield_soul_cinema_contract_v1.py`.
+- Switches active policy and prompt routing to reference-guided Soul Cinema.
+- Binds the source image through handoff, approval, standing authorization, claim, receipt, manifest, and retry lineage.
+- Fails before spend on missing, wrong, stale, malformed, or SHA-mismatched source evidence.
+- Requires the verified Lena Soul ID in the provider command.
+- Binds the exact local Soul/reference command to the returned job UUID.
+- Keeps historical `text2image_soul_v2` evidence intact.
+- Does not enable Marketing Studio, video, Kling, OpenArt, or Seedance.
 
-Do not stage these runtime artifacts unless Nicolas explicitly names them:
+## Verification
+
+- Executor contract: `65 passed`
+- Generation approval: `115 passed`
+- Retry pair: `53 passed`
+- Provider policy/config: `12 passed`
+- Handoff builder: `16 passed, 1 unrelated test deselected`
+- Cross-boundary focused ring: `14 passed`
+- Controlled success path: `1 passed`
+- `git diff --check`: clean
+
+Known unrelated test issues are recorded in `pipeline/change_notes/NEXT_SESSION_START.md`; do not fix them as part of this integration.
+
+## Runtime Evidence
+
+Do not stage:
 
 - `pipeline/approvals/lena/generation/2026-07-23/`
 - `pipeline/higgsfield_debug/2026-07-23/`
@@ -40,36 +61,6 @@ Do not stage these runtime artifacts unless Nicolas explicitly names them:
 - `pipeline/state/lena_world_state_v1.json`
 - `pipeline/strategy/`
 
-## Verification
-
-Use this as the current focused baseline, not a full-suite claim:
-
-```powershell
-python -B -m pytest -p no:cacheprovider tests/test_lena_higgsfield_only_provider_surface_v1.py tests/test_lena_prompt_brain_hair_and_safety_v1.py tests/test_lena_human_presence_prompt_plan_v1.py -q
-```
-
-Last result: `16 passed`.
-
-Also reported green in this session:
-
-- retirement changed-surface ring: `125 passed`
-- canonical/prompt-brain ring: `37 passed`
-- `git diff --check`
-- scheduler syntax parse
-- changed JSON parse check
-
-## Current No-Go
-
-Do not run paid provider generation. The latest generated image is rejected:
-
-- provider job: `9a0e5ebf-40ff-4c70-823c-dfa99aa5664a`
-- image: `pipeline/higgsfield_library/lena/2026-07-23/lenagate20260723e23e9484-pack000-00-photo_seed.png`
-- reason: output ignored prompt constraints and produced open jeans, visible underwear/lower-abdomen exposure, body-centered crop, partially cropped face, and empty background.
-
 ## Next Safe Step
 
-Review and commit the provider-retirement patch only. Suggested commit message:
-
-`Retire legacy Lena provider surfaces`
-
-After that, do offline research/planning for the next Higgsfield path. Prefer image-to-image, reference-guided, structure-controlled, or other stronger-control Higgsfield surfaces. Do not generate another image until Nicolas explicitly authorizes one paid test.
+Review and commit only the intended integration. A first paid proof, if Nicolas explicitly approves it, must be one executor-only generation followed by download and human review. No Anthropic, queue, publish, or scheduler action.

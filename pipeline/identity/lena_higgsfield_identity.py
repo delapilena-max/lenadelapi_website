@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
+
 # Read-only Higgsfield identity-verification module -- the Higgsfield
 # authority for Higgsfield generations. A real live-provider check happens
 # ONCE, here, and
@@ -38,7 +40,9 @@ EXPECTED_JOB_STATUS = "completed"
 EXPECTED_SOUL_STATUS = "completed"
 EXPECTED_SOUL_NAME = "Lena"
 EXPECTED_SOUL_TYPE = "soul_2"
-EXPECTED_JOB_TYPE = "text2image_soul_v2"
+EXPECTED_JOB_TYPE = soul_cinema_contract.MODEL
+HISTORICAL_JOB_TYPES = frozenset({"text2image_soul_v2"})
+APPROVED_JOB_TYPES = frozenset({EXPECTED_JOB_TYPE, *HISTORICAL_JOB_TYPES})
 # Both are real, provider-confirmed Lena Soul ids -- not interchangeable
 # by convenience, but both genuinely valid depending on WHEN a given piece
 # of evidence was recorded. The account's live Soul id rotated at some
@@ -470,9 +474,10 @@ def validate_local_identity_evidence(
             f"identity_verification.json slot_id {evidence.get('slot_id')!r} does not match {slot_id!r}"
         )
 
-    if evidence.get("job_type") != EXPECTED_JOB_TYPE:
+    if evidence.get("job_type") not in APPROVED_JOB_TYPES:
         reasons.append(
-            f"identity_verification.json job_type {evidence.get('job_type')!r} is not {EXPECTED_JOB_TYPE!r}"
+            f"identity_verification.json job_type {evidence.get('job_type')!r} "
+            "is not an approved Lena Higgsfield job type"
         )
 
     if evidence.get("custom_reference_id") not in APPROVED_CUSTOM_REFERENCE_IDS:

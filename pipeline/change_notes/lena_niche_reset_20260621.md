@@ -299,6 +299,9 @@ Current provider state:
 - BodyLock/Kling production notes above are historical only.
 - Higgsfield is the only configured Lena image-provider family after the 2026-07-23 cleanup.
 - Video generation is disabled.
-- Paid Lena generation through the current Higgsfield `text2image_soul_v2` lane is stopped pending an offline replacement/provider-boundary decision.
+- New Lena generation through unrestricted Higgsfield `text2image_soul_v2` is retired.
+- The offline-selected replacement is reference-guided Higgsfield `soul_cinema_studio`, using the verified Lena Soul ID and one SHA-bound identity source image.
+- Marketing Studio is not used.
+- The replacement integration has not yet received a paid, human-reviewed provider proof.
 
 Do not reintroduce the deleted Kling Omni, OpenArt, Seedance, BodyLock, or legacy video-provider files when continuing from this note.

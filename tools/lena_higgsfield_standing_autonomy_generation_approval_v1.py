@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import lena_higgsfield_generation_approval_v1 as canonical_approval
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
@@ -156,6 +157,19 @@ def inspect_generation_handoff_for_standing_autonomy(
     )
     custom_reference_id = str(structured.get("custom_reference_id") or "").strip()
     _require(custom_reference_id, "handoff_custom_reference_id_missing", "handoff structured_executor_inputs.custom_reference_id is missing")
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            structured.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldStandingAutonomyGenerationApprovalError(
+            exc.code, exc.detail
+        ) from exc
+    _require(
+        report.get("generation_reference") == generation_reference,
+        "handoff_generation_reference_mismatch",
+        "handoff top-level generation reference differs from structured executor inputs",
+    )
 
     authority_blocks = canonical_approval.require_authority_blocks(report)
 
@@ -178,6 +192,7 @@ def inspect_generation_handoff_for_standing_autonomy(
         "effective_wardrobe_silhouette_class": effective_wardrobe_silhouette_class,
         "prompt_sha256": prompt_sha256,
         "custom_reference_id": custom_reference_id,
+        "generation_reference": generation_reference,
         "authority_commit": authority_commit,
         "decision_fingerprint_sha256": decision_fingerprint_sha256,
         "pose_provenance": pose_provenance,
@@ -278,6 +293,7 @@ def build_standing_autonomy_generation_approval_record(
         "soul_name": handoff_facts["soul_name"],
         "soul_type": handoff_facts["soul_type"],
         "custom_reference_id": handoff_facts["custom_reference_id"],
+        "generation_reference": handoff_facts["generation_reference"],
         "credits_may_be_spent_acknowledged": True,
         "authorized_attempts": 1,
         "upload_authorized": False,
@@ -378,6 +394,21 @@ def validate_standing_autonomy_generation_approval_artifact(
     prompt_sha = canonical_approval.require_sha256(approval.get("prompt_sha256"), code="approval_prompt_sha_missing_or_invalid", label="approval prompt_sha256")
     _require(prompt_sha == handoff_facts["prompt_sha256"], "approval_prompt_sha_mismatch", "approval prompt_sha256 does not match the bound handoff prompt sha")
     _require(approval.get("custom_reference_id") == handoff_facts["custom_reference_id"], "approval_custom_reference_id_mismatch", "approval custom_reference_id does not match the bound handoff")
+    try:
+        approval_generation_reference = (
+            soul_cinema_contract.validate_generation_reference_binding(
+                approval.get("generation_reference")
+            )
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldStandingAutonomyGenerationApprovalError(
+            exc.code, exc.detail
+        ) from exc
+    _require(
+        approval_generation_reference == handoff_facts["generation_reference"],
+        "approval_generation_reference_mismatch",
+        "approval generation reference does not match the bound handoff source image",
+    )
 
     authority_commit = str(approval.get("authority_commit") or "")
     _require(len(authority_commit) == 40 and authority_commit == handoff_facts["authority_commit"], "approval_authority_commit_mismatch", "approval authority_commit does not match the bound candidate")
@@ -526,6 +557,7 @@ def build_standing_autonomy_generation_claim_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "authorized_attempts": 1,
         "consumed_attempt_number": 1,
         "expected_manifest_path": repo_relative_path(canonical_approval.expected_manifest_path(date_str, slot_id)),
@@ -577,7 +609,7 @@ def validate_standing_autonomy_generation_claim_lineage(
         "prompt_sha256", "authority_commit",
         "candidate_selection_binding", "provider_execution_binding", "binding_linkage",
         "operator_id", "provider", "executor", "model", "aspect_ratio",
-        "soul_name", "soul_type", "custom_reference_id",
+        "soul_name", "soul_type", "custom_reference_id", "generation_reference",
     ):
         expected = {
             "handoff_artifact_path": handoff_facts["handoff_repo_path"],
@@ -601,6 +633,7 @@ def validate_standing_autonomy_generation_claim_lineage(
             "soul_name": approval_result["approval"]["soul_name"],
             "soul_type": approval_result["approval"]["soul_type"],
             "custom_reference_id": approval_result["approval"]["custom_reference_id"],
+            "generation_reference": approval_result["approval"]["generation_reference"],
         }[key]
         _require(record.get(key) == expected, f"{owner}_{key}_mismatch", f"{owner} {key} must exactly match the validated approval lineage")
 
@@ -706,6 +739,7 @@ def build_standing_autonomy_generation_execution_receipt_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "upload_authorized": False,
         "queue_promotion_authorized": False,
         "publish_authorized": False,
@@ -756,7 +790,7 @@ def validate_standing_autonomy_generation_receipt_lineage(
         "approval_artifact_path", "handoff_artifact_path", "handoff_artifact_sha256",
         "candidate_artifact_path", "candidate_artifact_sha256",
         "date", "slot_id", "recipe_id", "wardrobe_outfit_id", "prompt_sha256", "authority_commit",
-        "operator_id", "provider", "executor", "model", "aspect_ratio", "soul_name", "soul_type", "custom_reference_id",
+        "operator_id", "provider", "executor", "model", "aspect_ratio", "soul_name", "soul_type", "custom_reference_id", "generation_reference",
     ):
         _require(record.get(key) == claim.get(key), f"{owner}_claim_{key}_mismatch", f"{owner} {key} must exactly match the validated claim lineage")
 

@@ -17,15 +17,16 @@ from __future__ import annotations
 # generation (pipeline/prompting/lena_prompt_brain.py) or any diagnostic
 # tool; it only reads their already-committed, already-validated output.
 #
-# CONFIRMED REAL PROVIDER CONTRACT (authenticated `higgsfield` CLI v1.1.13,
-# `model get text2image_soul_v2 --json`, inspected read-only this session --
-# not guessed):
-#   job_type: text2image_soul_v2
+# CONFIRMED REPLACEMENT PROVIDER CONTRACT (authenticated Higgsfield CLI
+# v1.1.13, `workflow get soul_cinema_studio --json`, inspected read-only
+# 2026-07-23):
+#   job_type: soul_cinema_studio
 #   params:   prompt (string, required), custom_reference_id (string|null),
-#             aspect_ratio (enum incl. "9:16", default "1:1"),
-#             image_references (array, max 1), quality (enum "1.5k"/"2k").
-#   No Prompt Enhancer parameter exists in this schema -- see doctrine note
-#   below. No negative-prompt parameter exists either.
+#             image_references (array), aspect_ratio (enum incl. "9:16"),
+#             quality (enum "1.5k"/"2k"), enhance_prompt (boolean), and
+#             style_id (string|null).
+#   This executor requires exactly one SHA-bound image reference and forces
+#   enhance_prompt=false. No negative-prompt parameter exists.
 #   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
 #   id=e45ec580-a6db-4063-a9b2-f9163856daae (`soul-id list --json`,
 #   re-confirmed 2026-07-23 -- the provider account's live Soul ID rotated
@@ -33,13 +34,9 @@ from __future__ import annotations
 #   historical fact in already-recorded manifests/evidence -- never used as
 #   a default for new live submissions).
 #
-# PROMPT ENHANCER DOCTRINE: the authenticated schema for text2image_soul_v2
-# exposes no enhancer-shaped parameter at all (searched for enhance/
-# enhancer/enhance_prompt/prompt_enhancer/improve_prompt/rewrite_prompt/
-# prompt_magic -- none present). This executor therefore does NOT invent an
-# enhancer flag, does NOT claim to force Prompt Enhancer OFF, and does NOT
-# fail startup over its absence. It simply is not a controllable parameter
-# on this model/CLI version.
+# PROMPT ENHANCER DOCTRINE: Soul Cinema Studio exposes enhance_prompt as a
+# real boolean parameter. This executor always submits false so the approved
+# prompt bytes remain the provider request rather than being rewritten.
 #
 # NEGATIVE PROMPT DOCTRINE: no negative-prompt parameter exists either.
 # Omission is the correct (and only possible) behavior -- never invented,
@@ -99,6 +96,7 @@ if str(DIAGNOSTICS_DIR) not in sys.path:
     sys.path.insert(0, str(DIAGNOSTICS_DIR))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract  # noqa: E402
 
 # Reuses the already-committed, already-validated pack builder/report --
 # the single source of truth for what a photo-dump-pack slot's final
@@ -115,8 +113,10 @@ from lena_higgsfield_prompt_library_dryrun import _hard_exclude_reasons  # noqa:
 # --- Confirmed provider contract constants (see module docstring) ----------
 
 HIGGSFIELD_CLI_BINARY = "higgsfield"
-HIGGSFIELD_IMAGE_JOB_TYPE = "text2image_soul_v2"
-HIGGSFIELD_ASPECT_RATIO = "9:16"
+HIGGSFIELD_IMAGE_JOB_TYPE = soul_cinema_contract.MODEL
+HIGGSFIELD_ASPECT_RATIO = soul_cinema_contract.ASPECT_RATIO
+HIGGSFIELD_QUALITY = soul_cinema_contract.QUALITY
+HIGGSFIELD_ENHANCE_PROMPT = soul_cinema_contract.ENHANCE_PROMPT
 _UUID_STDOUT_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 HIGGSFIELD_JOB_LOOKUP_MAX_ATTEMPTS = 30
 HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS = 10.0
@@ -141,7 +141,7 @@ HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.13"
 # valid historical fact (see pipeline/identity/lena_higgsfield_identity.py's
 # APPROVED_CUSTOM_REFERENCE_IDS for the separate, read-only evidence-side
 # policy).
-DEFAULT_LENA_CUSTOM_REFERENCE_ID = "e45ec580-a6db-4063-a9b2-f9163856daae"
+DEFAULT_LENA_CUSTOM_REFERENCE_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 CONFIRMED_LENA_SOUL_NAME = "Lena"
 CONFIRMED_LENA_SOUL_TYPE = "Soul 2.0"
 CONFIRMED_LENA_CLI_SOUL_TYPE = "soul_2"
@@ -377,6 +377,17 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
     _require_handoff(soul.get("type") == CONFIRMED_LENA_SOUL_TYPE, "handoff_soul_type_mismatch", f"{handoff_path} soul type mismatch")
     _require_handoff(soul.get("custom_reference_id") == DEFAULT_LENA_CUSTOM_REFERENCE_ID, "handoff_soul_reference_mismatch", f"{handoff_path} custom_reference_id mismatch")
     _require_handoff(soul.get("identity_is_prompt_instruction") is False, "handoff_soul_prompt_instruction_invalid", f"{handoff_path} soul identity must remain metadata")
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            structured.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
+    _require_handoff(
+        report.get("generation_reference") == generation_reference,
+        "handoff_generation_reference_mismatch",
+        f"{handoff_path} top-level generation reference differs from structured executor inputs",
+    )
 
     handoff_rel = _repo_relative_path(handoff_path)
     expected_dry = f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_rel}"
@@ -496,6 +507,7 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         expected_expression_provenance=expected_expression_provenance,
     )
     image = source.get("image", {})
+    image["generation_reference"] = generation_reference
     _require_handoff(
         image.get("pose_provenance") == expected_pose_provenance,
         "handoff_executor_pose_provenance_mismatch",
@@ -581,6 +593,8 @@ def _validate_handoff_packet(handoff_path: Path) -> tuple[dict[str, Any], dict[s
         "selected_candidate_binding_valid": True,
         "reconciliation_provenance_valid": True,
         "provider_model_aspect_soul_agreement": True,
+        "generation_reference_binding_valid": True,
+        "generation_reference_image_sha256": generation_reference["reference_image_sha256"],
         "provider_call_performed": False,
         "generation_performed": False,
         "live_execution_authorized": False,
@@ -1560,10 +1574,28 @@ def _require_provider_job_bound_lena_soul(parsed: Any, expected_custom_reference
     _require_current_lena_soul_reference_id(expected_custom_reference_id)
 
 
-def build_provider_argv(prompt: str, custom_reference_id: str) -> list[str]:
+def build_provider_argv(
+    prompt: str,
+    custom_reference_id: str,
+    generation_reference: dict[str, Any] | None = None,
+) -> list[str]:
     """Constructed as a list, never shell-concatenated text. subprocess is
     invoked with this list and shell=False."""
     _require_current_lena_soul_reference_id(custom_reference_id)
+    try:
+        reference_binding = soul_cinema_contract.validate_generation_reference_binding(
+            generation_reference
+            if generation_reference is not None
+            else soul_cinema_contract.load_generation_reference_binding()
+        )
+        reference_path = soul_cinema_contract.resolve_reference_image(reference_binding)
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise ProviderCallError(
+            exc.detail,
+            stage=exc.code,
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        ) from exc
     return [
         HIGGSFIELD_CLI_BINARY,
         "generate",
@@ -1571,10 +1603,16 @@ def build_provider_argv(prompt: str, custom_reference_id: str) -> list[str]:
         HIGGSFIELD_IMAGE_JOB_TYPE,
         "--prompt",
         prompt,
-        "--soul-id",
+        "--custom_reference_id",
         custom_reference_id,
+        "--image-references",
+        str(reference_path),
         "--aspect_ratio",
         HIGGSFIELD_ASPECT_RATIO,
+        "--quality",
+        HIGGSFIELD_QUALITY,
+        "--enhance_prompt",
+        "true" if HIGGSFIELD_ENHANCE_PROMPT else "false",
         "--wait",
         "--json",
     ]
@@ -1921,6 +1959,7 @@ def _bind_provider_command_to_job(
     resolved_argv: list[str],
     prompt: str,
     custom_reference_id: str,
+    generation_reference: dict[str, Any],
     submitted_prompt: dict[str, Any],
 ) -> dict[str, Any]:
     _require_current_lena_soul_reference_id(custom_reference_id)
@@ -1932,10 +1971,37 @@ def _bind_provider_command_to_job(
             provider_submission_may_have_occurred=True,
             provider_status=status,
         )
-    if "--soul-id" not in resolved_argv or resolved_argv[resolved_argv.index("--soul-id") + 1] != custom_reference_id:
+    if (
+        "--custom_reference_id" not in resolved_argv
+        or resolved_argv[resolved_argv.index("--custom_reference_id") + 1]
+        != custom_reference_id
+    ):
         raise ProviderCallError(
-            "constructed provider command is missing the verified Lena Soul --soul-id binding",
+            "constructed provider command is missing the verified Lena Soul custom_reference_id binding",
             stage="soul_reference_binding_invalid",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    try:
+        reference_binding = soul_cinema_contract.validate_generation_reference_binding(
+            generation_reference
+        )
+        reference_path = soul_cinema_contract.resolve_reference_image(reference_binding)
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise ProviderCallError(
+            exc.detail,
+            stage=exc.code,
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        ) from exc
+    if (
+        "--image-references" not in resolved_argv
+        or Path(resolved_argv[resolved_argv.index("--image-references") + 1]).resolve()
+        != reference_path
+    ):
+        raise ProviderCallError(
+            "constructed provider command is missing the authoritative generation reference",
+            stage="generation_reference_binding_invalid",
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
         )
@@ -1948,8 +2014,11 @@ def _bind_provider_command_to_job(
         "provider_job_id": job_id,
         "provider_status": status,
         "custom_reference_id": custom_reference_id,
-        "soul_id_flag": "--soul-id",
+        "soul_id_flag": "--custom_reference_id",
         "soul_id_binding_verified_before_subprocess": True,
+        "generation_reference": reference_binding,
+        "generation_reference_flag": "--image-references",
+        "generation_reference_binding_verified_before_subprocess": True,
         "resolved_argv_redacted": redacted_argv,
         "resolved_argv_redacted_sha256": hashlib.sha256(
             json.dumps(redacted_argv, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -2047,6 +2116,12 @@ def build_manifest(
         "manifest_expression_bound_packet_mismatch",
         "manifest source expression packet binding must equal the pose-bound packet bytes",
     )
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            image.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HandoffArtifactError(exc.code, exc.detail) from exc
 
     manifest = {
         "provider": "higgsfield",
@@ -2062,6 +2137,9 @@ def build_manifest(
         "cli_soul_name": CONFIRMED_LENA_SOUL_NAME,
         "cli_soul_type": CONFIRMED_LENA_CLI_SOUL_TYPE,
         "aspect_ratio": HIGGSFIELD_ASPECT_RATIO,
+        "quality": HIGGSFIELD_QUALITY,
+        "enhance_prompt": HIGGSFIELD_ENHANCE_PROMPT,
+        "generation_reference": generation_reference,
         "prompt_sha256": hashlib.sha256(prompt_bytes).hexdigest(),
         "prompt_length": len(prompt),
         "image_prompt": prompt,
@@ -2178,6 +2256,21 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
         retry_source["image"]["slot_id"] = artifact["retry_slot_id"]
         retry_source["image"]["image_prompt"] = artifact["retry_prompt_text"]
         retry_source["image"]["prompt_sha256"] = artifact["retry_prompt_sha256"]
+        try:
+            retry_generation_reference = (
+                soul_cinema_contract.validate_generation_reference_binding(
+                    artifact.get("generation_reference")
+                )
+            )
+        except soul_cinema_contract.SoulCinemaContractError as exc:
+            raise HandoffArtifactError(exc.code, exc.detail) from exc
+        _require_handoff(
+            retry_source["image"].get("generation_reference")
+            == retry_generation_reference,
+            "retry_generation_reference_mismatch",
+            "retry source generation reference differs from the original generation handoff",
+        )
+        retry_source["image"]["generation_reference"] = retry_generation_reference
         from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
 
         try:
@@ -2230,6 +2323,7 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
             "source_output_image_path": artifact["source_output_image_path"],
             "source_output_image_sha256": artifact["source_output_image_sha256"],
             "source_original_prompt_sha256": artifact["source_original_prompt_sha256"],
+            "generation_reference": retry_generation_reference,
             "retry_constraints": artifact["retry_constraints"],
         }
         return str(artifact["date"]), str(artifact["retry_slot_id"]), retry_source, retry_decision_artifact.resolve()
@@ -2245,7 +2339,18 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
 def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str) -> dict:
     image = source["image"]
     prompt = image["image_prompt"]
-    argv = build_provider_argv(prompt, custom_reference_id)
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            image.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise ProviderCallError(
+            exc.detail,
+            stage=exc.code,
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        ) from exc
+    argv = build_provider_argv(prompt, custom_reference_id, generation_reference)
     submitted_prompt = _persist_and_validate_submitted_prompt(date_str, slot_id, image, prompt)
 
     # Windows fix (2026-07-10): subprocess.run([...], shell=False) calls
@@ -2327,6 +2432,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         resolved_argv=resolved_argv,
         prompt=prompt,
         custom_reference_id=custom_reference_id,
+        generation_reference=generation_reference,
         submitted_prompt=submitted_prompt,
     )
 
@@ -2407,6 +2513,12 @@ def print_dry_run_report(date_str: str, slot_id: str, source: dict, custom_refer
     print(f"custom_reference_id     : {custom_reference_id}")
     print(f"cli soul identity       : name={CONFIRMED_LENA_SOUL_NAME!r} type={CONFIRMED_LENA_SOUL_TYPE!r}")
     print(f"aspect_ratio            : {HIGGSFIELD_ASPECT_RATIO}")
+    print(f"quality                 : {HIGGSFIELD_QUALITY}")
+    print(f"enhance_prompt          : {HIGGSFIELD_ENHANCE_PROMPT}")
+    print(
+        "generation_reference    : "
+        f"{soul_cinema_contract.load_generation_reference_binding()['reference_image_path']}"
+    )
     print(f"prompt_length           : {len(prompt)} chars")
     print(f"prompt_sha256           : {hashlib.sha256(prompt.encode('utf-8')).hexdigest()}")
     print(f"prompt_matches_expected : {validation['prompt_matches_expected']}")

@@ -15,6 +15,7 @@ if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
 
@@ -41,8 +42,8 @@ ALLOWED_OUTPUT_EXTENSIONS = (".png", ".jpg", ".webp", ".bin")
 CANONICAL_OPERATOR_ID = "nicolas"
 APPROVAL_PROVIDER = "Higgsfield"
 APPROVAL_EXECUTOR = "Higgsfield CLI repo adapter"
-MODEL = "text2image_soul_v2"
-ASPECT_RATIO = "9:16"
+MODEL = soul_cinema_contract.MODEL
+ASPECT_RATIO = soul_cinema_contract.ASPECT_RATIO
 SOUL_NAME = "Lena"
 SOUL_TYPE = "Soul 2.0"
 APPROVAL_TTL_MINUTES = 30
@@ -553,6 +554,17 @@ def inspect_handoff_artifact(
         "handoff_soul_identity_mode_invalid",
         "handoff Soul identity must remain metadata, not prompt text",
     )
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            structured.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
+    require(
+        report.get("generation_reference") == generation_reference,
+        "handoff_generation_reference_mismatch",
+        "handoff top-level generation reference differs from structured executor inputs",
+    )
 
     prompt_sha = require_sha256(
         structured.get("selected_prompt_sha256"),
@@ -670,9 +682,14 @@ def inspect_handoff_artifact(
         "provider_execution_binding provider must be higgsfield",
     )
     require(
-        provider_execution_binding.get("model") == "text2image_soul_v2",
+        provider_execution_binding.get("model") == MODEL,
         "handoff_provider_execution_model_mismatch",
-        "provider_execution_binding model must be text2image_soul_v2",
+        f"provider_execution_binding model must be {MODEL}",
+    )
+    require(
+        provider_execution_binding.get("generation_reference") == generation_reference,
+        "handoff_provider_execution_reference_mismatch",
+        "provider_execution_binding generation reference must match the authoritative source image",
     )
     require(
         binding_linkage.get("recommendation_artifact_path") == report.get("source_recommendation_artifact_path"),
@@ -749,6 +766,7 @@ def inspect_handoff_artifact(
         "slot_id": slot_id,
         "prompt_sha256": prompt_sha,
         "custom_reference_id": custom_reference_id,
+        "generation_reference": generation_reference,
         "soul_name": soul.get("name"),
         "soul_type": soul.get("type"),
         "selected_candidate_path": selected_candidate_path,
@@ -793,6 +811,7 @@ def _reinspect_authoritative_handoff_facts(handoff_facts: Any) -> dict[str, Any]
         "slot_id",
         "prompt_sha256",
         "custom_reference_id",
+        "generation_reference",
         "selected_candidate_path",
         "selected_candidate_sha256",
         "selected_candidate",
@@ -1084,6 +1103,7 @@ def build_generation_approval_record(
         "soul_name": handoff_facts["soul_name"],
         "soul_type": handoff_facts["soul_type"],
         "custom_reference_id": handoff_facts["custom_reference_id"],
+        "generation_reference": handoff_facts["generation_reference"],
         "confirmation_statement": confirmation,
         "reconciliation": handoff_facts.get("reconciliation"),
         "reconciled_candidate": handoff_facts.get("reconciled_candidate"),
@@ -1199,6 +1219,12 @@ def validate_generation_approval_artifact(
     )
     custom_reference_id = str(approval.get("custom_reference_id") or "").strip()
     require(custom_reference_id, "approval_custom_reference_id_missing", "approval custom_reference_id is missing")
+    try:
+        generation_reference = soul_cinema_contract.validate_generation_reference_binding(
+            approval.get("generation_reference")
+        )
+    except soul_cinema_contract.SoulCinemaContractError as exc:
+        raise HiggsfieldGenerationApprovalError(exc.code, exc.detail) from exc
     prompt_sha = require_sha256(
         approval.get("prompt_sha256"),
         code="approval_prompt_sha_missing_or_invalid",
@@ -1291,6 +1317,11 @@ def validate_generation_approval_artifact(
         custom_reference_id == handoff_facts["custom_reference_id"],
         "approval_custom_reference_id_mismatch",
         "approval custom_reference_id does not match the bound handoff Soul reference",
+    )
+    require(
+        generation_reference == handoff_facts["generation_reference"],
+        "approval_generation_reference_mismatch",
+        "approval generation reference does not match the bound handoff source image",
     )
     require(
         approval.get("reconciliation") == reconciliation_facts["reconciliation"],
@@ -1439,6 +1470,7 @@ def build_generation_claim_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "authorized_attempts": 1,
         "consumed_attempt_number": 1,
         "expected_manifest_path": repo_relative_path(expected_manifest_path(date_str, slot_id)),
@@ -1517,6 +1549,7 @@ def build_generation_execution_receipt_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "generation_reference": approval["generation_reference"],
         "upload_authorized": False,
         "queue_promotion_authorized": False,
         "publish_authorized": False,
@@ -1622,6 +1655,7 @@ def validate_lineage_record_authority(
         "soul_name",
         "soul_type",
         "custom_reference_id",
+        "generation_reference",
     ):
         require(
             record.get(key) == approval.get(key),
@@ -1782,6 +1816,7 @@ def validate_generation_execution_receipt_lineage(
         "soul_name",
         "soul_type",
         "custom_reference_id",
+        "generation_reference",
         *AUTHORITY_BLOCK_KEYS,
     ):
         require(

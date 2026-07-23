@@ -906,11 +906,14 @@ def _build_uncontrolled_autonomous_approval_result(
     approval_artifact["operator_id"] = "lena_autonomy_controller"
     approval_artifact["provider"] = str(artifact.get("allowed_provider") or artifact.get("provider") or "Higgsfield")
     approval_artifact["executor"] = "Higgsfield CLI repo adapter"
-    approval_artifact["model"] = str(artifact.get("allowed_model") or artifact.get("model") or "text2image_soul_v2")
+    approval_artifact["model"] = str(
+        artifact.get("allowed_model") or artifact.get("model") or approval.MODEL
+    )
     approval_artifact["aspect_ratio"] = "9:16"
     approval_artifact["soul_name"] = str(artifact.get("allowed_soul") or artifact.get("soul_name") or "Lena")
     approval_artifact["soul_type"] = str(artifact.get("soul_type") or "Soul 2.0")
     approval_artifact["custom_reference_id"] = str(handoff_report.get("custom_reference_id") or artifact.get("custom_reference_id") or "")
+    approval_artifact["generation_reference"] = handoff_report.get("generation_reference")
     approval_artifact["authorized_attempts"] = 1
     approval_artifact["upload_authorized"] = False
     approval_artifact["queue_promotion_authorized"] = False

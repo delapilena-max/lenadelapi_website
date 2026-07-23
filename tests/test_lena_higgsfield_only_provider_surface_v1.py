@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pipeline.identity import lena_higgsfield_identity as identity
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -89,7 +92,16 @@ def test_generation_policy_is_higgsfield_only_and_video_is_disabled() -> None:
         )
     )
     generation = policy["generation"]
-    assert generation["image_engine"] == "higgsfield_text2image_soul_v2"
+    assert (
+        generation["image_engine"]
+        == "higgsfield_soul_cinema_studio_reference_guided"
+    )
     assert generation["video_engine"] is None
     assert generation["video_generation_enabled"] is False
     assert policy["content_mix"]["daily_target"]["videos"] == 0
+
+
+def test_current_higgsfield_identity_contract_uses_reference_guided_soul_cinema() -> None:
+    assert identity.EXPECTED_JOB_TYPE == soul_cinema_contract.MODEL
+    assert soul_cinema_contract.MODEL == "soul_cinema_studio"
+    assert "text2image_soul_v2" in identity.HISTORICAL_JOB_TYPES
