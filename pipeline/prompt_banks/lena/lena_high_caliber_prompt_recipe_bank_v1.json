@@ -55,10 +55,6 @@
       ],
       "caption_angle": "Playful self-aware -- she checked, the mirror agreed, she posted. Short, present-tense, quiet punchline.",
       "caption_draft": "the mirror said yes first",
-      "provider_rendering_notes": {
-        "kling_omni": "Tall frameless full-length mirror only; no bulb frame, Hollywood vanity mirror, or mirror lights. Body 35 degrees toward mirror; eyes at reflection, not lens. One simple hand action only: lightly touching hem, resting on thigh, or brushing hair near shoulder. No clasped hands, no interlocked fingers, no hands touching each other. Window plus warm lamp fill. No phone/camera arm in mirror. Slight mirror smudges, blurred bed edge/folded throw, small plant bokeh, warm neutral wall, ordinary apartment furniture edges. Scene-motivated light only; no ring light or beauty-dish fill. Real candid social-media feel, not sterile studio, not hotel room, not luxury suite, not commercial beauty campaign.",
-        "openart": "Lead: natural window light, apartment bedroom, three-quarter mirror angle, candid adjustment. Negative: ring light, phone in reflection, frontal pose, white background."
-      },
       "scene_logic_contract": {
         "caption_intent": "Candid pre-leaving fit check — mirror agreed, she posted; self-aware and unhurried",
         "required_visual_evidence": [
@@ -133,10 +129,6 @@
       ],
       "caption_angle": "Dry self-aware -- the errand was optional, the outfit was not. Short and matter-of-fact.",
       "caption_draft": "quick run. ended up dressed like this.",
-      "provider_rendering_notes": {
-        "kling_omni": "Paused mid-stride sidewalk, 3/4 angle. Coffee cup in hand naturally, not displayed. Natural daylight, blurred street background. No readable text. Under 2500 chars.",
-        "openart": "Street photography, natural daylight, urban sidewalk, 85mm. Negative: readable text, brand logos, straight-on walking, staged background."
-      },
       "scene_logic_contract": {
         "caption_intent": "Quick coffee run, but the look is doing more than the errand. Real sidewalk moment, attractive without feeling staged.",
         "required_visual_evidence": [
@@ -206,10 +198,6 @@
       ],
       "caption_angle": "Playful confession -- overdressed for the errand and fully aware of it. Short, dry, present-tense.",
       "caption_draft": "the store was not ready for this.",
-      "provider_rendering_notes": {
-        "kling_omni": "Produce aisle, 3/4 angle to shelving. One hand selects one berry clamshell; other holds a low nearly-empty basket with 2-3 mixed items only, never full of oranges. Natural closed-mouth smirk, caught mid-errand. Real phone-photo face with pores/asymmetry, not CGI/doll. Blank signs only; no readable logos, prices, labels. Soft crates, misted produce, fridge reflections, uneven grocery light. Body visible; props do not block body.",
-        "openart": "Grocery store interior, produce section background, warm ambient. Negative: readable labels, price tags, aisle signs, product brands, studio background."
-      },
       "wardrobe_outfit_id": "wc_e001",
       "wardrobe_allow_high_risk": false,
       "wardrobe_notes": "QA-confirmed white French terry hoodie set. task 899503921557798966.",
@@ -254,10 +242,6 @@
       ],
       "caption_angle": "Post-workout quiet confidence -- no hype, no hustle-culture language. Just presence and completion.",
       "caption_draft": "the session happened. rest is optional.",
-      "provider_rendering_notes": {
-        "kling_omni": "Near gym window wall or plain wall, natural side light, 3/4 angle. Athletic set, high-waist leggings. Blurred gym interior background. Reference element for body. Under 2500 chars.",
-        "openart": "Gym interior lifestyle photography, athletic body portrait, shallow focus, real gym environment. Negative: brand logos, ring light, studio background, hard flex."
-      },
       "scene_logic_contract": {
         "caption_intent": "Post-set gym confidence in a real athletic environment, with pretty-girl discipline energy and no staged equipment-prop vibe.",
         "required_visual_evidence": [
@@ -329,10 +313,6 @@
       ],
       "caption_angle": "Ready-to-leave self-awareness -- the outfit is better than the destination warrants. Short, dry.",
       "caption_draft": "the door was the only thing between this and the street.",
-      "provider_rendering_notes": {
-        "kling_omni": "Apartment doorway threshold, 3/4 angle, one foot in doorframe. Coat rack with worn jacket in foreground; small entry table with keys and mail; potted plant near door; hallway blurred beyond threshold. Warm indoor ambient behind, natural outdoor daylight fill from front — no ring light, no artificial fill. Real candid social-media feel, not a sterile studio shoot. No door numbers or address. Full-body visible. Preserve her reference-true warm medium-brown hair with honey/caramel highlights and lighter face-framing pieces. Keep her fuller bust, small waist, wider hips, and fuller thighs intact; do not slim her into a straighter fashion-model body. No fake freckle speckling beyond subtle reference beauty marks. Under 2500 chars.",
-        "openart": "Doorway lifestyle portrait, dual ambient and natural light. Negative: mirror, door numbers, address, lobby signage, dead-center symmetrical pose."
-      },
       "scene_logic_contract": {
         "caption_intent": "Confident leaving-the-apartment moment — doorframe caught the full outfit before the street did",
         "required_visual_evidence": [
@@ -408,10 +388,6 @@
       ],
       "caption_angle": "Dry self-aware -- what was she doing here and why did she look like this? No explanation offered.",
       "caption_draft": "the parking garage was not the plan. the photo was.",
-      "provider_rendering_notes": {
-        "kling_omni": "Parking garage, concrete column beside her, structural ceiling beams overhead. Hard direct on-camera flash — strong foreground exposure, sharp falloff behind. Cool fluorescent ambient receding into shadow in background. Concrete floor texture underfoot. High contrast, cool blue-gray palette, analog grain. No readable signage, no license plates, no level numbers. 3/4 angle, direct confident gaze. Real flash editorial, not studio-lit. Under 2500 chars.",
-        "openart": "Hard flash parking garage editorial portrait, concrete interior, cool fluorescent ambient. Negative: studio background, golden hour, license plates, floor numbering, exit sign glow."
-      },
       "scene_logic_contract": {
         "caption_intent": "She was in a parking garage. The flash fired. The concrete became a frame. No explanation.",
         "required_visual_evidence": [
@@ -636,10 +612,6 @@
       ],
       "caption_angle": "Morning or evening routine energy -- dry, matter-of-fact, no performance required.",
       "caption_draft": "the coffee is doing the work today.",
-      "provider_rendering_notes": {
-        "kling_omni": "Ordinary apartment kitchen, morning routine, natural window light, 3/4 or near-front body angle mid-action. Avoid hard side twist or hip-narrowing pose. Modern casual-sexy apartment styling is allowed when it feels like a real woman at home: stable dresses, fitted tanks, scoop-neck knits, or body-skimming tops with attractive but believable bottoms are all acceptable if they stay structurally stable and socially plausible for the scene. Avoid bulky frumpy fallback styling, awkward overshirt layering, or anything that makes the kitchen scene look accidentally conservative. Include one or two subtle lived-in details like a dish towel, utensil crock, slight cabinet wear, or faint water spot near the sink. Not pristine showroom perfect, not luxury-listing clean. Keep skin unretouched and realistic, with pores and natural texture, and keep facial beauty marks faithful to the reference rather than restyled or multiplied. No readable labels. Under 2500 chars.",
-        "openart": "Kitchen lifestyle candid portrait, natural window light, warm interior bokeh. Negative: restaurant kitchen, food product labels, brand logos, commercial staging."
-      },
       "scene_logic_contract": {
         "caption_intent": "Candid home-kitchen routine moment — attractive without trying too hard, caught mid-task in her own apartment.",
         "required_visual_evidence": [
@@ -706,10 +678,6 @@
       ],
       "caption_angle": "Present in the moment -- the city was the backdrop, the outfit was just there. Short and confident.",
       "caption_draft": "the city does not care. I dressed up anyway.",
-      "provider_rendering_notes": {
-        "kling_omni": "Rooftop, concrete or gravel texture underfoot, weathered concrete planters at edges. Golden hour warm orange-pink side raking light, or deep blue-hour with warm building windows in background bokeh. City skyline in natural soft focus — no readable building names or rooftop bar signage. Subtle wind movement in hair. Real sky color only, no HDR or oversaturated filter. Scene-motivated light only, no ring light, no artificial fill. Real candid social-media feel. Under 2500 chars.",
-        "openart": "Rooftop lifestyle editorial portrait, golden hour or blue-hour sky, city skyline bokeh. Negative: building names, rooftop bar signage, HDR sky, ring light."
-      },
       "scene_logic_contract": {
         "caption_intent": "She went up to the roof. The city and sky were doing exactly that. She dressed up anyway.",
         "required_visual_evidence": [
@@ -781,10 +749,6 @@
       ],
       "caption_angle": "Going-out energy -- composed and in the moment. Not explaining where or why. Short.",
       "caption_draft": "running late. still showing up like this.",
-      "provider_rendering_notes": {
-        "kling_omni": "Interior staircase with carved or painted banister, carpeted or stone steps. Warm sconce fixtures mounted on staircase wall — available light only, no direct flash. Pools of tungsten warm light on face and upper body; deep shadow fills corners. More steps receding into shadow in background. Mid-step motion, 3/4 angle, composed chin-up expression. No event signage, no venue branding, no other guests. Real candid social-media feel, not a staged fashion shoot. Under 2500 chars.",
-        "openart": "Interior staircase cinematic ambient portrait, warm sconce light, available light only. Negative: direct flash, event signage, fire stairwell, cold fluorescent."
-      },
       "scene_logic_contract": {
         "caption_intent": "Running late, showing up like this anyway — mid-step on a dramatic staircase, full going-out look, composed and unhurried",
         "required_visual_evidence": [
@@ -860,10 +824,6 @@
       ],
       "caption_angle": "Self-aware about the outfit versus the complete absence of occasion. Just outside. No reason. Short.",
       "caption_draft": "just outside. no reason.",
-      "provider_rendering_notes": {
-        "kling_omni": "Paused mid-stride sidewalk, 3/4 angle, not straight-on walking. Natural daylight, 85mm compression, blurred street background. No readable text in frame. Under 2500 chars.",
-        "openart": "Street photography lifestyle portrait, natural daylight, urban sidewalk, shallow focus. Negative: readable signage, license plates, straight-on walking pose, studio backdrop."
-      },
       "wardrobe_outfit_id": "wc_p021",
       "wardrobe_allow_high_risk": false,
       "environment_id": "env_s007",
@@ -935,9 +895,6 @@
       ],
       "caption_angle": "Quiet self-check energy -- she only meant to check the top half and still saved it.",
       "caption_draft": "only meant to check the earrings.",
-      "provider_rendering_notes": {
-        "kling_omni": "Mirror selfie is okay; keep the phone low enough to keep her face readable. Home getting-ready corner, not hotel. Clothes on chair, shoes near mirror, small products, warm apartment light. Face light must stay imperfect and asymmetrical with soft cheek-to-jaw shadow falloff, subtle under-eye shadow retention, and slight forehead tone variation. No fake freckle speckling. Keep the reference-true fuller bust, small waist, and wider-hip curvy silhouette; do not slim her down or reduce chest fullness."
-      },
       "scene_logic_contract": {
         "caption_intent": "Upper-half mirror save while checking earrings, skin, and the neckline in her own getting-ready space before leaving",
         "required_visual_evidence": [
@@ -1012,9 +969,6 @@
       ],
       "caption_angle": "A quick getting-ready save she almost skipped because it was only supposed to be a last-second mirror check.",
       "caption_draft": "was only checking the neckline.",
-      "provider_rendering_notes": {
-        "kling_omni": "Mirror edge or dresser edge visible, but keep it home-coded and not hotel-coded. Clothes on chair, shoes near mirror, small products, warm apartment light. No lit vanity bulbs, no glam mirror-bulb surround, and no full mirror border. Frame from chest-up to upper hip so the face stays dominant while bust, waist, and upper-hip curve remain readable. Face light must stay imperfect and asymmetrical with soft cheek-to-jaw shadow falloff, subtle under-eye shadow retention, slight forehead tone variation, and no fake freckle speckling. Preserve only the exact subtle reference beauty marks; do not add freckles. Keep the dusty rose off-shoulder top as a real fitted top over jeans, not a bra-like micro-crop."
-      },
       "scene_logic_contract": {
         "caption_intent": "Upper-half getting-ready save while checking hair, skin, and neckline in her own apartment before leaving",
         "required_visual_evidence": [
@@ -1097,9 +1051,6 @@
       ],
       "caption_angle": "A little accidental beauty save from the getting-ready process.",
       "caption_draft": "only meant to check one thing.",
-      "provider_rendering_notes": {
-        "kling_omni": "Bedroom makeup area, natural window light from the side, dresser with products arranged, bed edge blurred behind, curtain edge catching light. Keep it apartment-coded, not hotel-coded. Head-to-chest or waist-up only. One simple hand action near hair, neckline, or product on the counter. Real pores, normal under-eye retention, and reference-accurate beauty marks only."
-      },
       "scene_logic_contract": {
         "caption_intent": "A believable vanity or dresser beauty save during the real getting-ready process at home",
         "required_visual_evidence": [
@@ -1172,9 +1123,6 @@
       ],
       "caption_angle": "She looked too put together for an elevator save to stay private.",
       "caption_draft": "the elevator lighting kept the receipt.",
-      "provider_rendering_notes": {
-        "kling_omni": "Dark wood-panel elevator interior, warm amber recessed overhead light, brass handrail, wood grain visible, small mirror panel at back. Three-quarter or full-body, one simple hand action only. No readable floor indicator, no hotel signage, and no sterile studio cleanliness. Preserve skin texture and real shadow falloff."
-      },
       "scene_logic_contract": {
         "caption_intent": "An in-transit elevator save that feels like a real departure moment before a night out",
         "required_visual_evidence": [
@@ -1246,9 +1194,6 @@
       ],
       "caption_angle": "A transit save that feels better than whatever was waiting at the destination.",
       "caption_draft": "saved this before we even got there.",
-      "provider_rendering_notes": {
-        "kling_omni": "Car backseat at night, city lights streaking through the window in bokeh, warm interior ambient, visible headrest and seat texture. Head-to-waist or three-quarter only. No phone in hand. No limo stretch luxury fantasy. Keep the cowl neckline elegant and stable, and keep the skin real and textured."
-      },
       "scene_logic_contract": {
         "caption_intent": "A believable night-out transit save from the backseat, with real movement and city life implied beyond the window",
         "required_visual_evidence": [
@@ -1322,9 +1267,6 @@
       ],
       "caption_angle": "Outside for nothing that justified the outfit, which is exactly why it works.",
       "caption_draft": "the building looked expensive so i kept the photo.",
-      "provider_rendering_notes": {
-        "kling_omni": "Downtown glass facade with city reflection in the panels, visible panel seams, slight glass edge flare, clean sidewalk at feet. Full-body or three-quarter, 3/4 body angle. Keep the faux-leather trousers and cream fitted top clean and real. No readable company signage and no sterile showroom perfection."
-      },
       "scene_logic_contract": {
         "caption_intent": "A believable downtown fashion pause where the architecture helps, but the scene still feels like real street life",
         "required_visual_evidence": [
@@ -1398,9 +1340,6 @@
       ],
       "caption_angle": "A social rooftop moment that reads like it actually happened.",
       "caption_draft": "the lights made me save it.",
-      "provider_rendering_notes": {
-        "kling_omni": "Rooftop at twilight, overhead string lights creating warm orb bokeh, cool blue-gray sky, city edge visible at distance, rooftop texture. Full-body or three-quarter. Keep the ivory halter mini dress stable and believable, with no swimwear drift and no fake luxury-event branding."
-      },
       "scene_logic_contract": {
         "caption_intent": "A believable twilight rooftop social save with visible real-world atmosphere and attractive but not ad-like styling",
         "required_visual_evidence": [
@@ -1472,9 +1411,6 @@
       ],
       "caption_angle": "A quick public save from the part of the night that usually gets skipped.",
       "caption_draft": "this part of the night always looks better in photos.",
-      "provider_rendering_notes": {
-        "kling_omni": "City sidewalk at night, warm overhead sodium streetlight, blurred car lights and city glow in background, wet pavement sheen. Full-body or three-quarter. Keep the white dress readable under the open moto jacket. No readable signs, no flash-editorial garage look, and no hotel exterior energy."
-      },
       "scene_logic_contract": {
         "caption_intent": "A believable public night-out save from a city sidewalk between destinations",
         "required_visual_evidence": [
@@ -1546,9 +1482,6 @@
       ],
       "caption_angle": "Leaving-the-building energy, but the lobby ended up getting the save.",
       "caption_draft": "was just trying to get downstairs.",
-      "provider_rendering_notes": {
-        "kling_omni": "Residential building lobby, polished stone or marble floor with reflections, closed elevator doors in background, blurred lobby plant and minimal seating. Full-body. Keep it upscale residential, not hotel branded. Preserve the knit midi dress as a single continuous garment with a slight flare hem and subtle V-neck."
-      },
       "scene_logic_contract": {
         "caption_intent": "An elegant but believable building-departure save from the lobby before going out",
         "required_visual_evidence": [

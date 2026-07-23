@@ -3,10 +3,8 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
-import importlib
 import inspect
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 
@@ -114,16 +112,6 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
     assert "repository" in execution["description"].lower()
     assert execution["provider"] == "higgsfield"
 
-    kling = classifications["kling_omni_payload_prompt_policy_max_chars"]
-    assert kling["value"] == 2499
-    assert kling["provider"] == "kling_omni"
-    assert kling["provider_required"] is False
-    assert set(kling["known_consumers"]) == {
-        "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
-        "tools/strategy/lena_submit_kling_payload_v1.py",
-        "tools/strategy/lena_build_content_batch_review_report_v1.py",
-    }
-
     assert pose_provenance.PROVIDER_PROMPT_MAX_CHARS == prompt_limits.PROVIDER_PROMPT_PARSER_SAFETY_MAX_CHARS
     assert pose_provenance.PROVIDER_SECTION_BODY_MAX_CHARS == prompt_limits.PROVIDER_SECTION_BODY_MAX_CHARS
     assert (
@@ -138,92 +126,23 @@ def test_one_module_owns_every_active_and_legacy_prompt_limit() -> None:
     assert readiness.PAYLOAD_HEADROOM_HARD_BLOCK_BELOW == prompt_limits.RETRY_PROMPT_HEADROOM_HARD_BLOCK_BELOW
     assert readiness.PAYLOAD_HEADROOM_WARNING_BELOW == prompt_limits.RETRY_PROMPT_HEADROOM_WARNING_BELOW
     assert (
-        inspect.signature(packet_builder.build_structured_kling_prompt)
+        inspect.signature(packet_builder.build_structured_provider_prompt)
         .parameters["max_chars"]
         .default
         == prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     )
 
 
-def test_active_kling_consumers_use_central_limits_without_numeric_duplicates() -> None:
-    def load_worktree_module(name: str, relative_path: str):
-        path = audit.ROOT / relative_path
-        spec = importlib.util.spec_from_file_location(name, path)
-        assert spec is not None and spec.loader is not None
-        module = importlib.util.module_from_spec(spec)
-        original_sys_path = list(sys.path)
-        try:
-            spec.loader.exec_module(module)
-        finally:
-            sys.path[:] = original_sys_path
-        return module
+def test_higgsfield_batch_review_uses_central_execution_limit() -> None:
+    from tools.strategy import lena_build_content_batch_review_report_v1 as batch_review
 
-    kling_payload = load_worktree_module(
-        "budget_review_kling_payload",
-        "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
-    )
-    kling_submit = load_worktree_module(
-        "budget_review_kling_submit",
-        "tools/strategy/lena_submit_kling_payload_v1.py",
-    )
-    batch_review = load_worktree_module(
-        "budget_review_batch_report",
-        "tools/strategy/lena_build_content_batch_review_report_v1.py",
-    )
-
-    assert (
-        inspect.signature(kling_payload.fit_prompt_parts).parameters["max_chars"].default
-        == prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
-    )
+    limit = prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     assert batch_review.prompt_char_stats([
-        {"compact_kling_prompt_chars": prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS},
-    ])["all_under_2500"] is True
+        {"compact_provider_prompt_chars": limit},
+    ])["all_under_policy_limit"] is True
     assert batch_review.prompt_char_stats([
-        {"compact_kling_prompt_chars": prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS + 1},
-    ])["all_under_2500"] is False
-
-    consumer_paths = (
-        Path(kling_payload.__file__),
-        Path(kling_submit.__file__),
-        Path(batch_review.__file__),
-        audit.ROOT / "tools" / "lena_influencer_node_v1_3.py",
-    )
-    forbidden_by_file = {
-        "lena_build_kling_payload_dryrun_v1.py": {2499, 2500},
-        "lena_submit_kling_payload_v1.py": {2499, 2500},
-        "lena_build_content_batch_review_report_v1.py": {2499, 2500},
-        "lena_influencer_node_v1_3.py": {1900, 2500},
-    }
-    for path in consumer_paths:
-        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
-        integer_literals = {
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
-            and isinstance(node.value, int)
-            and not isinstance(node.value, bool)
-        }
-        assert integer_literals.isdisjoint(forbidden_by_file[path.name]), path
-
-    diagnostic_paths = (
-        Path(kling_payload.__file__),
-        Path(kling_submit.__file__),
-    )
-    for path in diagnostic_paths:
-        tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
-        string_literals = {
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        assert not any(
-            "2499" in value or "2500" in value
-            for value in string_literals
-        ), path
-        assert (
-            "KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS"
-            in path.read_text(encoding="utf-8-sig")
-        )
+        {"compact_provider_prompt_chars": limit + 1},
+    ])["all_under_policy_limit"] is False
 
 
 def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: dict) -> None:
@@ -417,7 +336,7 @@ def test_current_production_formatter_matches_zero_loss_authority() -> None:
                 audit.FIRST_GENERATION,
             )
             if len(expected) <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
-                actual = packet_builder.build_structured_kling_prompt(
+                actual = packet_builder.build_structured_provider_prompt(
                     recipe,
                     pose_binding=_pose_binding(pose),
                     expression_binding=_expression_binding(),
@@ -426,7 +345,7 @@ def test_current_production_formatter_matches_zero_loss_authority() -> None:
                 fit_count += 1
             else:
                 with pytest.raises(prompt_limits.PromptExecutionPolicyError) as excinfo:
-                    packet_builder.build_structured_kling_prompt(
+                    packet_builder.build_structured_provider_prompt(
                         recipe,
                         pose_binding=_pose_binding(pose),
                         expression_binding=_expression_binding(),
@@ -472,7 +391,7 @@ def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
     monkeypatch.setattr(packet_builder, "fit_prompt_units", forbidden)
     monkeypatch.setattr(packet_builder, "trim_fragment_to_chars", forbidden)
     first_expected, _ = audit.assemble_zero_loss_prompt(recipe, pose, audit.FIRST_GENERATION)
-    first_actual = packet_builder.build_structured_kling_prompt(
+    first_actual = packet_builder.build_structured_provider_prompt(
         recipe,
         pose_binding=_pose_binding(pose),
         expression_binding=_expression_binding(),
@@ -511,7 +430,7 @@ def test_legacy_2499_budget_cannot_gate_higgsfield_execution() -> None:
     recipe = next(item for item in recipes if item["id"] == "hcr_012")
     pose = next(item for item in poses if item["pose_body_language_id"] == "pose_p008")
     with pytest.raises(prompt_limits.PromptExecutionPolicyError) as excinfo:
-        packet_builder.build_structured_kling_prompt(
+        packet_builder.build_structured_provider_prompt(
             recipe,
             max_chars=2499,
             pose_binding=_pose_binding(pose),
@@ -562,7 +481,6 @@ def test_build_packet_uses_zero_loss_prompt_or_fails_before_packet_return() -> N
                 expression_binding=_expression_binding(),
             )
             assert packet["compact_provider_prompt_preview"] == expected
-            assert packet["compact_kling_prompt_preview"] == expected
             assert packet["compact_provider_prompt_budget"] == 4096
             assert packet["compact_provider_prompt_chars"] == len(expected)
             built += 1

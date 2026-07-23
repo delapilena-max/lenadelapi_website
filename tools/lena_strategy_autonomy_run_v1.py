@@ -49,20 +49,20 @@ def write_report(day: str, report: dict) -> Path:
     return path
 
 
-def post_kling_review_prep_report_path(day: str) -> Path:
-    return NEXT_ACTIONS / day / f"lena_post_kling_review_prep_{day}.json"
+def post_generation_review_prep_report_path(day: str) -> Path:
+    return NEXT_ACTIONS / day / f"lena_post_generation_review_prep_{day}.json"
 
 
-def post_kling_review_prep_markdown_path(day: str) -> Path:
-    return NEXT_ACTIONS / day / f"lena_post_kling_review_prep_{day}.md"
+def post_generation_review_prep_markdown_path(day: str) -> Path:
+    return NEXT_ACTIONS / day / f"lena_post_generation_review_prep_{day}.md"
 
 
-def apply_kling_review_packet_report_path(day: str) -> Path:
-    return NEXT_ACTIONS / day / f"lena_apply_kling_review_packet_{day}.json"
+def apply_generation_review_packet_report_path(day: str) -> Path:
+    return NEXT_ACTIONS / day / f"lena_apply_generation_review_packet_{day}.json"
 
 
-def apply_kling_review_packet_markdown_path(day: str) -> Path:
-    return NEXT_ACTIONS / day / f"lena_apply_kling_review_packet_{day}.md"
+def apply_generation_review_packet_markdown_path(day: str) -> Path:
+    return NEXT_ACTIONS / day / f"lena_apply_generation_review_packet_{day}.md"
 
 
 def main() -> int:
@@ -185,21 +185,21 @@ def main() -> int:
         result["next_live_image_handoff_markdown"] = summary.get(
             "next_live_image_handoff_markdown_path", ""
         )
-    if post_kling_review_prep_report_path(args.date).is_file():
-        result["post_kling_review_prep_report"] = str(
-            post_kling_review_prep_report_path(args.date)
+    if post_generation_review_prep_report_path(args.date).is_file():
+        result["post_generation_review_prep_report"] = str(
+            post_generation_review_prep_report_path(args.date)
         )
-    if post_kling_review_prep_markdown_path(args.date).is_file():
-        result["post_kling_review_prep_markdown"] = str(
-            post_kling_review_prep_markdown_path(args.date)
+    if post_generation_review_prep_markdown_path(args.date).is_file():
+        result["post_generation_review_prep_markdown"] = str(
+            post_generation_review_prep_markdown_path(args.date)
         )
-    if apply_kling_review_packet_report_path(args.date).is_file():
-        result["apply_kling_review_packet_report"] = str(
-            apply_kling_review_packet_report_path(args.date)
+    if apply_generation_review_packet_report_path(args.date).is_file():
+        result["apply_generation_review_packet_report"] = str(
+            apply_generation_review_packet_report_path(args.date)
         )
-    if apply_kling_review_packet_markdown_path(args.date).is_file():
-        result["apply_kling_review_packet_markdown"] = str(
-            apply_kling_review_packet_markdown_path(args.date)
+    if apply_generation_review_packet_markdown_path(args.date).is_file():
+        result["apply_generation_review_packet_markdown"] = str(
+            apply_generation_review_packet_markdown_path(args.date)
         )
     if step["stdout"].strip():
         result["stdout"] = step["stdout"]
@@ -227,24 +227,24 @@ def main() -> int:
                 "next_live_image_handoff_markdown": summary.get(
                     "next_live_image_handoff_markdown_path", ""
                 ),
-                "post_kling_review_prep_report": (
-                    str(post_kling_review_prep_report_path(args.date))
-                    if post_kling_review_prep_report_path(args.date).is_file()
+                "post_generation_review_prep_report": (
+                    str(post_generation_review_prep_report_path(args.date))
+                    if post_generation_review_prep_report_path(args.date).is_file()
                     else ""
                 ),
-                "post_kling_review_prep_markdown": (
-                    str(post_kling_review_prep_markdown_path(args.date))
-                    if post_kling_review_prep_markdown_path(args.date).is_file()
+                "post_generation_review_prep_markdown": (
+                    str(post_generation_review_prep_markdown_path(args.date))
+                    if post_generation_review_prep_markdown_path(args.date).is_file()
                     else ""
                 ),
-                "apply_kling_review_packet_report": (
-                    str(apply_kling_review_packet_report_path(args.date))
-                    if apply_kling_review_packet_report_path(args.date).is_file()
+                "apply_generation_review_packet_report": (
+                    str(apply_generation_review_packet_report_path(args.date))
+                    if apply_generation_review_packet_report_path(args.date).is_file()
                     else ""
                 ),
-                "apply_kling_review_packet_markdown": (
-                    str(apply_kling_review_packet_markdown_path(args.date))
-                    if apply_kling_review_packet_markdown_path(args.date).is_file()
+                "apply_generation_review_packet_markdown": (
+                    str(apply_generation_review_packet_markdown_path(args.date))
+                    if apply_generation_review_packet_markdown_path(args.date).is_file()
                     else ""
                 ),
                 "recommended_recipe_id": summary.get("recommended_recipe_id", ""),

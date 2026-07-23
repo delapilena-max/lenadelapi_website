@@ -9,9 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 # Read-only Higgsfield identity-verification module -- the Higgsfield
-# counterpart to the trust *concept* pipeline/identity/lena_identity.py
-# provides for Kling, deliberately architected the same way Kling's own
-# chain actually works: a real live-provider check happens ONCE, here, and
+# authority for Higgsfield generations. A real live-provider check happens
+# ONCE, here, and
 # leaves a durable evidence file behind. tools/lena_preflight.py reads and
 # validates that evidence file LOCALLY (validate_local_identity_evidence()
 # below) -- it never makes a live provider call itself.

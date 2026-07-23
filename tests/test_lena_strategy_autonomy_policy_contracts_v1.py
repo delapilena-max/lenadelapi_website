@@ -189,7 +189,9 @@ def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_po
     assert all(buckets["buckets"][name]["rules"] for name in buckets["buckets"])
 
     assert generation["generation"]["image_engine"] == "higgsfield_text2image_soul_v2"
-    assert generation["generation"]["video_engine"] == "kling_video_3.0"
+    assert generation["generation"]["video_engine"] is None
+    assert generation["generation"]["video_generation_enabled"] is False
+    assert generation["content_mix"]["daily_target"]["videos"] == 0
     assert generation["caption_rules"]["hashtag_count_min"] == 0
     assert generation["caption_rules"]["hashtag_count_max"] == 3
     assert generation["caption_rules"]["hashtag_count_min"] <= generation["caption_rules"]["hashtag_count_max"] <= 3

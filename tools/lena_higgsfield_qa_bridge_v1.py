@@ -6,7 +6,7 @@ from __future__ import annotations
 #
 # Mirrors tools/lena_review_proof_render_v1.py's shape and read-only
 # discipline exactly, but reads Higgsfield's real artifact shape instead of
-# Kling's workorder-manifest shape:
+# the historical workorder-manifest shape:
 #   pipeline/higgsfield_debug/<date>/<slot_id>/result_manifest.json
 #   (the saved_image_path field inside it, not a separate workorder lookup)
 #
@@ -14,7 +14,7 @@ from __future__ import annotations
 # does not define a second QA schema, does not duplicate validation logic.
 # The only new thing here is an adapter that reshapes a Higgsfield
 # result_manifest.json into the slot-shaped dict lena_photo_qa.py's
-# Kling-era functions expect (slot_id / media_type / metadata.wardrobe_
+# Historical functions expect (slot_id / media_type / metadata.wardrobe_
 # outfit_id / metadata.environment_id).
 #
 # Read-only except for creating an "unreviewed" QA scaffold if one doesn't

@@ -8,14 +8,13 @@ Run: python tools/strategy/lena_validate_wardrobe_guardrails_v1.py
 Exit 0 = all cases pass.  Exit 1 = any failure.
 
 Does NOT:
-  - call Kling or any API
+  - call Higgsfield or any API
   - read .env
   - write any files
   - generate images
   - mutate the recipe bank or wardrobe catalog
 """
 import contextlib
-import importlib.util
 import random
 import sys
 from pathlib import Path
@@ -25,22 +24,36 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 # ── Import from builder (safe: main() is __name__-gated; no I/O at import)
-_spec = importlib.util.spec_from_file_location(
-    "lena_build_kling_payload_dryrun_v1",
-    ROOT / "tools/strategy/lena_build_kling_payload_dryrun_v1.py",
-)
-_builder = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_builder)
-
-select_catalog_outfit = _builder.select_catalog_outfit
-load_catalog = _builder.load_catalog
-
 # ── Import from prompt brain ───────────────────────────────────────────────
 from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
+    load_wardrobe_catalog,
     pick_style,
     pick_style_production,
 )
+
+
+def load_catalog() -> dict:
+    return load_wardrobe_catalog()
+
+
+def select_catalog_outfit(catalog: dict, outfit_id: str, allow_high_risk: bool) -> dict:
+    outfit = next(
+        (item for item in catalog["outfits"] if item["outfit_id"] == outfit_id),
+        None,
+    )
+    if outfit is None:
+        raise SystemExit(f"[ABORT] wardrobe_outfit_id '{outfit_id}' not in catalog")
+    if outfit["status"] == "rejected":
+        raise SystemExit(f"[ABORT] outfit '{outfit_id}' status=rejected -- cannot use")
+    if outfit["status"] == "high_risk" and not allow_high_risk:
+        raise SystemExit(
+            f"[ABORT] outfit '{outfit_id}' is high_risk but "
+            "wardrobe_allow_high_risk is false"
+        )
+    if outfit["status"] == "untested":
+        raise SystemExit(f"[ABORT] outfit '{outfit_id}' status=untested")
+    return outfit
 
 # ── Synthetic catalog for rejected-outfit test (no real rejected exists) ──
 SYNTHETIC_CATALOG = {
@@ -220,7 +233,7 @@ run(
 def tc_10():
     synthetic_packet = {
         "recipe_id": "hcr_001",
-        "compact_kling_prompt_preview": "x",
+        "compact_provider_prompt_preview": "x",
     }
     outfit_id = synthetic_packet.get("wardrobe_outfit_id")
     assert not outfit_id, f"Expected falsy outfit_id, got: {outfit_id!r}"

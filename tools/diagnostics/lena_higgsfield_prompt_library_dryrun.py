@@ -15,7 +15,7 @@ from __future__ import annotations
 #   - No subprocess, no network (no requests/urllib/http import anywhere).
 #   - No Higgsfield SDK/CLI import or call of any kind.
 #   - No .env read (no pipeline.env_loader import).
-#   - No executor import (no pipeline.kling_apilena_api_executor import).
+#   - No retired executor import.
 #   - No file writes of any kind -- stdout-only. No directories created.
 #   - Default output never prints full prompt text -- lengths and IDs only.
 #     Full prompt text is only printed when --show-prompts is passed
@@ -441,7 +441,7 @@ def print_library_report(library: dict, show_prompts: bool) -> None:
                 print()
 
     print("=== RESULT: no subprocess call, no network call, no Higgsfield CLI/SDK use, "
-          "no Kling executor import/call, no file written. Dry-run only. ===")
+          "no provider executor import/call, no file written. Dry-run only. ===")
 
 
 # --- Multi-axis "model hook curator" (2026-07-08) ---------------------------

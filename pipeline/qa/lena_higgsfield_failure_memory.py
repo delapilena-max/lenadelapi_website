@@ -24,7 +24,7 @@ from __future__ import annotations
 #     "unreviewed" contributes nothing either way.
 #   - Chat history / informal review is NEVER treated as evidence -- only
 #     what is actually on disk in a real, schema-valid QA JSON file.
-#   - A QA record with no matching Higgsfield manifest (e.g. a Kling-era
+#   - A QA record with no matching Higgsfield manifest (e.g. a legacy
 #     record) is skipped, not guessed -- recorded in `skipped` with an
 #     explicit reason, never silently dropped.
 #   - A QA record that fails to parse or fails lena_photo_qa.validate_qa_
@@ -103,7 +103,7 @@ def compute_higgsfield_failure_memory(
 
         # Check manifest existence FIRST, purely from the path derived above
         # -- before ever parsing the QA JSON. This means a non-Higgsfield
-        # (e.g. Kling-era) record is skipped with an accurate "not
+        # legacy record is skipped with an accurate "not
         # Higgsfield" reason, not misreported as "invalid" just because it
         # predates a newer schema field. It also avoids spending validation
         # effort on records this aggregator can never use regardless.
@@ -111,7 +111,7 @@ def compute_higgsfield_failure_memory(
             skipped.append({
                 "qa_path": str(qa_path),
                 "reason": f"no Higgsfield result_manifest.json at {manifest_path} -- "
-                          "not a Higgsfield-sourced record (e.g. Kling-era or otherwise), "
+                          "not a Higgsfield-sourced record, "
                           "not Higgsfield failure evidence",
             })
             continue

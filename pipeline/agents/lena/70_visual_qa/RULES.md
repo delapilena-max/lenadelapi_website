@@ -283,17 +283,15 @@ treated as hard-fail conditions by the reviewer, not soft judgment calls:
 
 ## How canonical reference images should be used during identity/skin/hair review
 
-Grounded in the 2026-07-06 non-coding verification entry (changelog): before
-judging `identity_fidelity` or `skin_realism_no_invented_marks`, fetch and view the
-canonical reference images for the live element, not judge from memory of what
-Lena "should" look like.
+Before judging `identity_fidelity` or `skin_realism_no_invented_marks`, view the
+approved Lena identity references bound to the Higgsfield Soul approval and the
+actual rendered image. Do not judge from memory of what Lena "should" look like.
 
-1. The 4 resource images for the live approved element are already fetched during
-   generation and saved at
-   `pipeline/kling_debug/apilena_api/<date>/<slot_id>/live_apilena_lookup_response.json`
-   -- read this file's image URLs rather than re-fetching (no extra API cost).
-2. View all 4 references directly and compare them against the actual rendered
-   image side by side -- not from a written description of them.
+1. Use the exact identity evidence and command binding stored under
+   `pipeline/higgsfield_debug/<date>/<slot_id>/`; do not re-fetch provider data
+   merely to perform a routine visual review.
+2. View the approved references and rendered image side by side, not from a
+   written description of them.
 3. Use them to settle exactly the kind of question that goes wrong without a
    reference: is a given skin mark authentic (present in the references) or
    invented drift? Is hair color/pattern a genuine match (base color +

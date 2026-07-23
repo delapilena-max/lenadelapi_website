@@ -461,7 +461,6 @@ def main() -> int:
         "next_live_handoff_script_present": BUILD_NEXT_LIVE_HANDOFF.is_file(),
         "next_live_handoff_blocker": "" if BUILD_NEXT_LIVE_HANDOFF.is_file() else "missing_script",
         "provider_routing_mode": "higgsfield_forward_no_live",
-        "obsolete_kling_payload_branch_required": False,
     }
 
     save_report(report, args.date)

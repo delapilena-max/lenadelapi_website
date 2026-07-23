@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
 from pipeline.media_host.r2_uploader import upload_file_to_r2
 from pipeline.lena_publish_quality_gate import quality_gate_media, mark_published_fingerprint
 
-BASE_DIR = ROOT / "pipeline" / "kling_library" / "lena"
+BASE_DIR = ROOT / "pipeline" / "higgsfield_library" / "lena"
 STATE_PATH = ROOT / "pipeline" / "state" / "lena_r2_publish_state.json"
 LOG_DIR = ROOT / "pipeline" / "publish_logs"
 

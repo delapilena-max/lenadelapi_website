@@ -285,3 +285,20 @@ Rename the key only when the batch generator is updated at the same time.
 ---
 
 *Created: 2026-06-21*
+
+---
+
+## Supersession Note - Provider Surface Retirement 2026-07-23
+
+The provider references in this historical reset note are no longer active execution guidance.
+
+Current provider state:
+
+- Kling Omni is retired from active Lena generation paths.
+- OpenArt/Seedance is retired from active Lena generation paths.
+- BodyLock/Kling production notes above are historical only.
+- Higgsfield is the only configured Lena image-provider family after the 2026-07-23 cleanup.
+- Video generation is disabled.
+- Paid Lena generation through the current Higgsfield `text2image_soul_v2` lane is stopped pending an offline replacement/provider-boundary decision.
+
+Do not reintroduce the deleted Kling Omni, OpenArt, Seedance, BodyLock, or legacy video-provider files when continuing from this note.

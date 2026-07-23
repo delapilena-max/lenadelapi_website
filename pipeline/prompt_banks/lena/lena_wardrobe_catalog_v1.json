@@ -9,7 +9,7 @@
     "makeup": "Intentionally absent. Makeup is identity-adjacent and belongs in recipe direction, not the outfit catalog."
   },
   "status_values": {
-    "untested": "Designed but never sent to Kling. May be used only after explicit Nicolas approval.",
+    "untested": "Designed but never validated in a live Lena generation. May be used only after explicit Nicolas approval.",
     "approved": "QA passed — body lock held, no drift, explicitly confirmed by Nicolas.",
     "rejected": "Failed QA. Specific failure in notes. Do not use without reopening and re-approving.",
     "high_risk": "Structurally risky class. Requires explicit per-scene approval before any live use."

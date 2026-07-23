@@ -23,7 +23,6 @@ def test_all_required_canonical_assets_are_listed() -> None:
     assert set(assets) == {
         "prompt_brain",
         "persona",
-        "identity",
         "higgsfield_identity",
         "character_doctrine",
         "content_strategy",
@@ -75,7 +74,6 @@ def test_missing_required_assets_fail_closed_without_touching_runtime_surfaces(
     assert set(report["missing_required_assets"]) == {
         "prompt_brain",
         "persona",
-        "identity",
         "higgsfield_identity",
         "character_doctrine",
         "content_strategy",

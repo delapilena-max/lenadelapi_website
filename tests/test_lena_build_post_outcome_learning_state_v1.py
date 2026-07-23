@@ -60,7 +60,7 @@ def _memory_state_payload() -> dict:
                 "recipe_id": "hcr_011",
                 "outfit_id": "wc_p020",
                 "environment_id": "env_v008",
-                "provider": "kling",
+                "provider": "higgsfield",
                 "qa_status": "publishable_quality",
             },
             {
@@ -69,7 +69,7 @@ def _memory_state_payload() -> dict:
                 "recipe_id": "hcr_008",
                 "outfit_id": "wc_p062",
                 "environment_id": "env_r001",
-                "provider": "kling",
+                "provider": "higgsfield",
                 "qa_status": "approved",
             },
             {
@@ -78,7 +78,7 @@ def _memory_state_payload() -> dict:
                 "recipe_id": "hcr_002",
                 "outfit_id": "wc_p033",
                 "environment_id": "env_s001",
-                "provider": "kling",
+                "provider": "higgsfield",
                 "qa_status": "rejected",
             },
         ],

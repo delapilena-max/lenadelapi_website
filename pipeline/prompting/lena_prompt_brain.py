@@ -163,9 +163,8 @@ LENA_BODY_DESCRIPTOR = (
 # cap -- an overflow before any outfit-specific/public-lane term was even
 # added, meaning first-N-fit compaction silently dropped whatever fell past
 # the budget with no priority given to any category. Restructured into five
-# tiers so the executor (pipeline/kling_apilena_api_executor.py) can apply a
-# narrow reserved floor per tier, the same pattern already proven on the
-# positive-prompt side. NEGATIVE_PROMPT below is reconstructed as the exact
+# tiers so an executor can apply a narrow reserved floor per tier, the same
+# pattern already proven on the positive-prompt side. NEGATIVE_PROMPT below is reconstructed as the exact
 # concatenation of all five tiers, in the same order as before, so its value
 # and every consumer of it are unaffected by this refactor.
 #
@@ -238,8 +237,7 @@ OPTIONAL_FILL_NEGATIVE_TERMS = (
 # assembly logic byte-for-byte unchanged, at the cost of needing to keep this
 # constant in sync if those inline lists ever change. Does NOT include the
 # sleeveless-top-and-skirt garment-obedience terms, which are a separate,
-# already-floor-protected class (kling_apilena_api_executor.py's
-# _GARMENT_OBEDIENCE_NEGATIVE_TERMS) left untouched by this repair.
+# already-floor-protected garment-obedience class left untouched by this repair.
 OUTFIT_SPECIFIC_SUBSTITUTION_TERMS = (
     "dress split into top and skirt", "cutout dress drift", "two-piece outfit replacing dress",
     "crop top when full-length top is specified", "cropped sweater replacing named top",
@@ -1494,7 +1492,7 @@ def catalog_outfit_silhouette_class(entry: dict | None) -> str:
 # cleanup and any Higgsfield safe-wardrobe fallback substitution), not the
 # raw catalog entry. Deliberately separate from catalog_outfit_silhouette_class()
 # above, which must keep its current raw-catalog semantics unchanged --
-# confirmed downstream consumers (Kling sexy/skin-showing scoring, Kling
+# confirmed downstream consumers (legacy sexy/skin-showing scoring and
 # recency memory) depend on that field's exact legacy vocabulary. This is the
 # single source of truth for effective-wardrobe classification; originally
 # authored in tools/diagnostics/lena_higgsfield_prompt_library_dryrun.py to
@@ -1758,7 +1756,7 @@ FRAME_LOGIC_BANK_PATH = (
 POSE_BODY_LANGUAGE_BANK_PATH = (
     ROOT / "pipeline" / "prompt_banks" / "lena" / "lena_pose_body_language_bank_v1.json"
 )
-KLING_WORKORDERS_ROOT = ROOT / "pipeline" / "kling_workorders"
+WORKORDERS_ROOT = ROOT / "pipeline" / "workorders" / "lena"
 
 _PHOTO_SCENE_BANK_CACHE: dict | None = None
 _RECIPE_BANK_CACHE: dict | None = None
@@ -2021,7 +2019,7 @@ LANE_EXPRESSION_TAG_ALLOWLIST: dict[str, set[str]] = {
 DEFAULT_EXPRESSION_TAGS = {"calm_quiet", "candid_playful", "going_out_social", "in_motion"}
 
 # How many of the most recent real workorder slots (across the most recent dated
-# folders under pipeline/kling_workorders/) to scan when avoiding a repeat
+# folders under the provider-neutral Lena workorder root) to scan when avoiding a repeat
 # expression_gaze_id. Small and cheap -- reads real on-disk artifacts, no new
 # persistent state file.
 EXPRESSION_RECENCY_LOOKBACK_SLOTS = 6
@@ -2049,11 +2047,11 @@ def _recent_expression_gaze_ids(
     on disk for whatever expression_gaze_id each slot's metadata recorded. Returns
     an empty set if none found or the workorders root doesn't exist yet -- this
     must never hard-fail prompt generation just because history is thin."""
-    if not KLING_WORKORDERS_ROOT.exists():
+    if not WORKORDERS_ROOT.exists():
         return set()
 
     date_dirs = sorted(
-        (p for p in KLING_WORKORDERS_ROOT.iterdir() if p.is_dir()),
+        (p for p in WORKORDERS_ROOT.iterdir() if p.is_dir()),
         key=lambda p: p.name,
         reverse=True,
     )[:lookback_dates]
@@ -2449,11 +2447,11 @@ def _recent_pose_ids(
     Returns an empty set if none found -- must never hard-fail prompt
     generation just because history is thin. Mirrors
     _recent_expression_gaze_ids() exactly."""
-    if not KLING_WORKORDERS_ROOT.exists():
+    if not WORKORDERS_ROOT.exists():
         return set()
 
     date_dirs = sorted(
-        (p for p in KLING_WORKORDERS_ROOT.iterdir() if p.is_dir()),
+        (p for p in WORKORDERS_ROOT.iterdir() if p.is_dir()),
         key=lambda p: p.name,
         reverse=True,
     )[:lookback_dates]
@@ -2504,7 +2502,7 @@ def choose_pose_body_language_production(
     hard-bans neutral entries.
 
     exclude_tags (2026-07-09, Higgsfield pose-diversity Phase 1): optional,
-    defaults to None so the existing Kling call site is byte-identical in
+    defaults to None so the existing legacy call site is byte-identical in
     behavior. When given (Higgsfield civilian lanes only, see
     HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS), any combo carrying one of these
     compatibility_tags is removed from the pool *before* every other filter
@@ -2687,7 +2685,7 @@ def max_production_style_override_len() -> int:
 
 
 def format_style_override(entry: dict) -> str:
-    """Return wardrobe-override prompt line for BodyLock generation.
+    """Return a provider-neutral wardrobe-override prompt line.
 
     Prevents the model from defaulting to the anchor/reference image outfit.
     Inject this into the positive prompt before the scene description.
@@ -3516,14 +3514,6 @@ REFERENCE_MODE_POLICIES = {
 }
 
 
-REFERENCE_PRIORITY = {
-    "face_detail": ["kling_element_close_face", "kling_element_public_full_body", "kling_element_smile_upper_body"],
-    "upper_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_close_face"],
-    "full_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_relaxed_seated"],
-    "video_body": ["kling_element_public_full_body", "kling_element_smile_upper_body", "kling_element_relaxed_seated"],
-}
-
-
 def choose_reference_mode(
     media_type: str,
     scene: dict,
@@ -3596,10 +3586,6 @@ def choose_reference_mode(
 
 def reference_policy_for_mode(mode: str) -> str:
     return REFERENCE_MODE_POLICIES.get(mode, REFERENCE_MODE_POLICIES["upper_body"])
-
-
-def reference_priority_for_mode(mode: str) -> list[str]:
-    return REFERENCE_PRIORITY.get(mode, REFERENCE_PRIORITY["upper_body"])
 
 
 def framing_policy_for_mode(mode: str) -> str:
@@ -3708,7 +3694,6 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
         "environment_name": environment_entry.get("name") if environment_entry else None,
         "environment_production_lane": environment_entry.get("production_lane") if environment_entry else None,
         "reference_mode": reference_mode,
-        "reference_priority": reference_priority_for_mode(reference_mode),
         "scene_bank_version": scene_bank.get("version", "unknown"),
         "scene_bank_source": scene_bank.get("source", str(PHOTO_SCENE_BANK_PATH)),
         "expression_gaze_id": expression_gaze_entry.get("expression_gaze_id"),
@@ -3768,19 +3753,15 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
 
 # --- Higgsfield-native prompt path (2026-07-08) -----------------------------
 #
-# Forward provider doctrine correction: Higgsfield is the active forward
-# visual/video generation provider for Lena; Kling is legacy/historical
-# infrastructure only (kept on disk for old workorders/receipts/assets, not
-# extended). generate_prompt_package() above stays completely unchanged --
-# it remains the real Kling-path builder for as long as any historical Kling
-# artifact needs it. This is a separate, additive builder for the Higgsfield
-# path, not a rewrite of the Kling one.
+# Higgsfield is the only active generation provider for Lena.
+# generate_prompt_package() above remains a provider-neutral historical packet
+# builder; this is the dedicated Higgsfield photo builder.
 #
 # Deliberately does NOT reuse generate_prompt_package()'s long identity/body/
 # skin/realism paragraphs (IDENTITY_ANCHOR, LENA_MASTER_IDENTITY,
 # REFERENCE_MODE_POLICIES, SKIN_REALISM, PHOTO_REALISM, EXPRESSION_REALISM,
 # HAND_REALISM, PHONE_OBJECT_REALISM) or the tiered NEGATIVE_PROMPT
-# machinery -- those exist specifically to fight Kling's weak reference-image
+# machinery -- those exist for a retired reference-image path
 # conditioning. Per the manual Higgsfield findings, Soul 2.0 owns Lena's
 # identity/body directly and applies no negative prompt by default, so this
 # builder keeps the prompt short and limits itself to wardrobe silhouette,
@@ -3788,10 +3769,10 @@ def generate_prompt_package(date_str: str, slot_id: str, media_type: str, sequen
 # things a prompt should still control even with Soul handling identity.
 #
 # Reuses the same provider-agnostic scene/wardrobe/environment/pose/
-# expression selection functions the Kling path uses (choose_scene_production,
+# expression selection functions the historical path uses (choose_scene_production,
 # pick_catalog_outfit_production, choose_environment_production,
 # choose_pose_body_language_production, choose_expression_gaze_production) --
-# these already live outside any Kling-specific code and already bias toward
+# these already live outside any provider-specific code and already bias toward
 # fitted/bodycon silhouettes (_public_sexy_bias_weight/_body_visibility_hook_weight)
 # and high-attitude hip-shift poses (_pose_attitude_weight) for the reasons
 # documented at each function's definition above. No new weighting mechanism
@@ -3817,11 +3798,11 @@ HIGGSFIELD_MOOD_HOOK = (
 
 # Manual Higgsfield finding (2026-07-08): full-body/three-quarter framing
 # reads best on this provider. Always included, short, no per-mode branching --
-# unlike Kling's reference_mode system (face_detail/upper_body/full_body/
-# video_body), which exists to match Kling's own weak per-shot-type
+# unlike the historical reference_mode system (face_detail/upper_body/full_body/
+# video_body), which was designed for an older per-shot-type
 # conditioning. Deliberately not reusing framing_policy_for_mode()/
 # REFERENCE_MODE_POLICIES here: those are long identity/body paragraphs
-# scoped to Kling's needs, not a framing instruction.
+# scoped to the retired provider's needs, not a framing instruction.
 HIGGSFIELD_FRAMING_LINE = (
     "Full-body three-quarter vertical 9:16 fashion photo, showing the "
     "complete outfit from head to shoes with a little space below the shoes."
@@ -3861,7 +3842,7 @@ HIGGSFIELD_BODY_SILHOUETTE_ANCHOR = (
 HIGGSFIELD_HAIR_VARIETY_DIRECTIVE = LENA_HAIR_VARIETY_DIRECTIVE
 
 # Bug found during manual-test sample review (2026-07-08, same day): the
-# scene bank's own "camera" field (written for Kling, where medium-shot/
+# scene bank's own "camera" field (written for an older provider, where medium-shot/
 # waist-up framing is normal) can directly contradict HIGGSFIELD_FRAMING_LINE
 # above -- e.g. "medium shot" or "waist-up composition" appearing right after
 # a line that requires full-body head-to-shoes framing. Higgsfield-specific
@@ -3905,7 +3886,7 @@ def _higgsfield_safe_camera_text(camera_text: str) -> str:
 # the provider to both render and not render the same object. Operates
 # only on the in-memory environment_text string inside
 # generate_higgsfield_prompt_package(); does not touch
-# lena_photo_scene_bank_v1.json (shared with Kling) or Kling's own
+# lena_photo_scene_bank_v1.json or the provider-neutral historical
 # generate_prompt_package(), which reads that same scene-bank field
 # through a completely separate code path untouched by this function.
 HIGGSFIELD_TEXT_SURFACE_REPLACEMENTS: dict[str, str] = {
@@ -3957,7 +3938,7 @@ HIGGSFIELD_FRAMING_REINFORCEMENT = (
 # Corrective patch (2026-07-08, same day): a real manual Higgsfield test on a
 # builder-selected "bodysuit + relaxed straight jeans + coat" street lane came
 # back low-hook -- hips hidden, low sex appeal, dated/casual styling. The
-# underlying catalog entry/scene text is fine for Kling's variety goals, but
+# underlying catalog entry/scene text is fine for general variety goals, but
 # Higgsfield-forward Lena needs a much harder bias toward sexy-but-platform-
 # safe fitted/hip-hugging glam silhouettes and away from casual/shape-hiding
 # wardrobe by default. Two mechanisms, both wardrobe-text-only (does not touch
@@ -4000,7 +3981,7 @@ HIGGSFIELD_WARDROBE_HIP_HUGGING_ONLY_SUFFIX = ", hip-hugging silhouette"
 
 # Manual Higgsfield finding (2026-07-08, same corrective patch): a fixed,
 # always-on hip-forward pose reinforcement line reads more reliably on
-# Higgsfield than leaving pose entirely to the (Kling-tuned) pose bank's
+# Higgsfield than leaving pose entirely to the historically tuned pose bank's
 # per-combo text. Deliberately literal and short, not a paraphrase of any
 # bank combo.
 HIGGSFIELD_POSE_REINFORCEMENT_LINE = (
@@ -4011,7 +3992,7 @@ HIGGSFIELD_POSE_REINFORCEMENT_LINE = (
 # Pose-diversity Phase 1 (2026-07-09): the fixed line above, plus the
 # separate pack-level 5-variant substitution it was paired with, is being
 # replaced for Higgsfield civilian lanes by the real 18-combo pose bank
-# (already wired to Kling, previously selected-but-discarded for
+# (previously selected-but-discarded for
 # Higgsfield -- see choose_pose_body_language_production()'s exclude_tags
 # parameter). Motorcycle lanes are deliberately exempted and keep this
 # constant unchanged, since the bank has no moto-tagged combos at all.
@@ -4044,7 +4025,7 @@ HIGGSFIELD_POSE_PHASE1_EXCLUDED_TAGS = frozenset({"seated", "in_motion"})
 # entirely for them -- narrow, evidence-scoped, does not extend to any
 # other lane, the broader seated/in_motion categories generally, or
 # "apartment doorway" (a softer, unconfirmed case, left for a separate
-# Phase 2B). Does not touch the pose bank, scene bank, or Kling.
+# Phase 2B). Does not touch the pose bank or scene bank.
 HIGGSFIELD_REQUIRED_POSE_ID_BY_LANE = {
     "city bench": "pose_p012",
     "gym cooldown": "pose_p012",
@@ -4570,7 +4551,7 @@ HIGGSFIELD_MOTO_WARDROBE_VARIANTS = (
 
 
 # Bug found during manual-test sample review (2026-07-08, later same day): the
-# scene bank's own "action" field (written for Kling, where a plain candid
+# scene bank's own "action" field (written for an older provider, where a plain candid
 # moment like "pouring coffee" or "walking across" is normal) can directly
 # contradict the forced Higgsfield glam wardrobe/pose above -- e.g. "standing
 # barefoot ... pouring coffee" fighting a fitted mini dress and pointed heels,
@@ -4697,7 +4678,7 @@ def _higgsfield_sanitize_scene_action(scene_action: str) -> str:
 
 
 # Manual Higgsfield finding (2026-07-08, same corrective patch): expression/
-# gaze text drawn from the (Kling-tuned) expression bank can itself conflict
+# gaze text drawn from the historically tuned expression bank can itself conflict
 # with the forced glam pose -- e.g. "glancing back over one shoulder mid-step"
 # fighting a confident three-quarter hip-forward stance. At the time, the fix
 # was to discard ALL bank text and always use this one fixed line instead.
@@ -4919,7 +4900,7 @@ def generate_higgsfield_prompt_package(
     presence_plan: dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Forward Higgsfield-native prompt builder. Short prompt, no negative
-    prompt, no Kling-style identity/body/skin paragraphs -- Soul 2.0 owns
+    prompt, no legacy identity/body/skin paragraphs -- Soul 2.0 owns
     Lena's identity/body. Soul selection is recorded as package metadata
     (soul_name/soul_version/soul_selection_mode) only, never as prompt text.
     A dedicated HIGGSFIELD_BODY_SILHOUETTE_ANCHOR line is always inserted
@@ -4931,7 +4912,7 @@ def generate_higgsfield_prompt_package(
     comes from the selected bank entry or the narrow documented safe fallback
     and is not rewritten by lane. Scene-action text is sanitized against known
     Higgsfield-glam conflicts (see _higgsfield_sanitize_scene_action). Does not
-    touch or call any Kling executor code."""
+    touch or call any retired executor code."""
     rng = random.Random(
         _seed(date_str, slot_id, media_type, str(sequence_index or ""), "higgsfield")
     )
@@ -5116,7 +5097,7 @@ def generate_higgsfield_prompt_package(
         # decisions (e.g. pose selection) without re-parsing image_prompt.
         "scene_action": scene_action,
         # Exposed (2026-07-10) so callers can build a real, non-fabricated
-        # visual_style value (matching the Kling package builder's own
+        # visual_style value (matching the historical package builder's
         # f"{camera}; {lighting}" convention) without re-parsing the
         # "Camera: .../Lighting: ..." sentences out of image_prompt. Purely
         # additive -- these are the exact same local variables already used
@@ -5636,7 +5617,6 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["environment_production_lane"] = package.get("environment_production_lane")
     meta["lane"] = package["lane"]
     meta["reference_mode"] = package.get("reference_mode")
-    meta["reference_priority"] = package.get("reference_priority")
     meta["scene_bank_version"] = package.get("scene_bank_version")
     meta["scene_bank_source"] = package.get("scene_bank_source")
     meta["expression_gaze_id"] = package.get("expression_gaze_id")
@@ -5661,11 +5641,15 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
     meta["caption"] = package["caption"]
     meta["public_language_policy"] = package["public_language_policy"]
     if media_type == "video":
-        meta["kling_route"] = "https://kling.ai/app/video/new"
-        meta["estimated_credits"] = int(os.environ.get("LENA_ESTIMATED_VIDEO_CREDITS", "25"))
+        meta["provider_route"] = "disabled_no_higgsfield_video_path"
+        meta["generation_enabled"] = False
+        meta["estimated_credits"] = 0
     else:
-        meta["kling_route"] = "https://kling.ai/app/image/new"
-        meta["estimated_credits"] = int(os.environ.get("LENA_ESTIMATED_PHOTO_CREDITS", "2"))
+        meta["provider_route"] = "higgsfield_text2image_soul_v2"
+        meta["generation_enabled"] = True
+        meta["estimated_credits"] = int(
+            os.environ.get("LENA_ESTIMATED_HIGGSFIELD_PHOTO_CREDITS", "2")
+        )
 
     if media_type == "video":
         meta["video_prompt"] = package["video_prompt"]

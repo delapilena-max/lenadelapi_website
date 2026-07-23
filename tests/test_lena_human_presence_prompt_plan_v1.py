@@ -150,7 +150,6 @@ def test_legacy_video_prompt_package_path_remains_hpe_free(monkeypatch: pytest.M
     monkeypatch.setattr(prompt_brain, "public_wardrobe_continuity_lock", lambda wardrobe_entry, lane: "Wardrobe lock.")
     monkeypatch.setattr(prompt_brain, "build_body_visibility_rule", lambda reference_mode, frame_logic: "Body visibility rule.")
     monkeypatch.setattr(prompt_brain, "catalog_outfit_silhouette_class", lambda entry: "structured")
-    monkeypatch.setattr(prompt_brain, "reference_priority_for_mode", lambda mode: "priority")
     monkeypatch.setattr(prompt_brain, "VIDEO_MOTIONS", ("steady handheld drift",))
     monkeypatch.setattr(prompt_brain, "_clean_public_text", lambda text: text)
     monkeypatch.setattr(prompt_brain, "_hashtags", lambda rng, lane, count: "#one #two #three")

@@ -4,7 +4,7 @@ Lena Daily Photo Batch Generator v1
 Generates a dry-run daily photo production plan for 7 Lena images per day.
 No images are generated. No providers are called. No publishing occurs.
 
-Safe: no image generation, no OpenArt/Kling calls, no credits spent,
+Safe: no image generation, no provider calls, no credits spent,
 no R2 upload, no publishing, no Instagram/Facebook/Reels,
 no publisher file modification, not connected to any automatic queue.
 """
@@ -639,7 +639,7 @@ def build_batch(batch_id: str, run_date: str, photo_slots: list) -> dict:
         "daily_photo_target":                   7,
         "photo_slots":                          photo_slots,
         "video_generation_paused":              True,
-        "kling_generation_paused":              True,
+        "provider_generation_paused":           True,
         "audio_generation_required":            False,
         "publishing_approval":                  "not_approved",
         "requires_human_review_before_publish": True,
@@ -668,7 +668,7 @@ def save_batch(batch: dict, run_date: str) -> str:
 def validate(filepath: str) -> tuple[bool, list]:
     required_batch = [
         "batch_id", "date", "node", "production_mode", "daily_photo_target",
-        "photo_slots", "video_generation_paused", "kling_generation_paused",
+        "photo_slots", "video_generation_paused", "provider_generation_paused",
         "audio_generation_required", "publishing_approval",
         "requires_human_review_before_publish", "provider_call_enabled",
         "generation_call_performed", "credits_spent", "created_at",
@@ -703,8 +703,8 @@ def validate(filepath: str) -> tuple[bool, list]:
         errors.append(f"batch.publishing_approval must be 'not_approved'")
     if batch.get("video_generation_paused") is not True:
         errors.append("video_generation_paused must be true")
-    if batch.get("kling_generation_paused") is not True:
-        errors.append("kling_generation_paused must be true")
+    if batch.get("provider_generation_paused") is not True:
+        errors.append("provider_generation_paused must be true")
 
     slots = batch.get("photo_slots", [])
     if len(slots) != 7:
@@ -748,7 +748,7 @@ def print_summary(batch: dict, filepath: str, valid: bool, errors: list):
     print(f"  daily_photo_target       : {batch['daily_photo_target']}")
     print(f"  photo slots built        : {len(slots)}")
     print(f"  video_generation_paused  : {batch['video_generation_paused']}")
-    print(f"  kling_generation_paused  : {batch['kling_generation_paused']}")
+    print(f"  provider_generation_paused: {batch['provider_generation_paused']}")
     print(f"  provider_call_enabled    : {batch['provider_call_enabled']}")
     print(f"  generation_call_performed: {batch['generation_call_performed']}")
     print(f"  credits_spent            : {batch['credits_spent']}")
@@ -772,7 +772,7 @@ def print_summary(batch: dict, filepath: str, valid: bool, errors: list):
         for e in errors:
             print(f"    {e}")
     print()
-    print("  NO images generated.    NO OpenArt call.    NO Kling call.")
+    print("  NO images generated.    NO provider call.")
     print("  NO credits spent.       NO R2 upload.")
     print("  NO publishing.          NO Instagram / Facebook / Reels.")
     print("  NO publisher files modified.  NOT queued for automatic generation.")

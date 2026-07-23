@@ -2166,7 +2166,7 @@ def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language
         "scene_logic_contract": {"environment_realism_notes": "ordinary wall texture and a few products on a dresser"},
     }
 
-    prompt = packet_builder.build_structured_kling_prompt(recipe)
+    prompt = packet_builder.build_structured_provider_prompt(recipe)
 
     assert "[Environment]:" in prompt
     assert "[Action]:" in prompt

@@ -91,13 +91,6 @@ def canonical_brain_asset_specs() -> list[dict[str, object]]:
             "kind": "file",
         },
         {
-            "asset_id": "identity",
-            "path": ROOT / "pipeline" / "identity" / "lena_identity.py",
-            "category": "identity",
-            "required": True,
-            "kind": "file",
-        },
-        {
             "asset_id": "higgsfield_identity",
             "path": ROOT / "pipeline" / "identity" / "lena_higgsfield_identity.py",
             "category": "identity",

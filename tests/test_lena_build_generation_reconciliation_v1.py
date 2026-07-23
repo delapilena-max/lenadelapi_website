@@ -51,7 +51,6 @@ def _materialize_canonical_assets(tmp_path: Path) -> None:
 
     _write_text(prompting_root / "lena_prompt_brain.py", "PROMPT_BRAIN = True\n")
     _write_json(lena_root / "persona.json", {"persona": "Lena", "voice": "warm"})
-    _write_text(identity_root / "lena_identity.py", "EXPECTED_WIDTH = 1024\nEXPECTED_HEIGHT = 1024\n")
     _write_text(
         identity_root / "lena_higgsfield_identity.py",
         "EXPECTED_JOB_TYPE = 'higgsfield_text2image'\nEXPECTED_SOUL_NAME = 'Lena'\nEXPECTED_SOUL_TYPE = 'Soul 2.0'\nAPPROVED_CUSTOM_REFERENCE_IDS = {'ref'}\n",

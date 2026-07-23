@@ -8,7 +8,7 @@ import pipeline.prompting.lena_prompt_brain as prompt_brain
 RULES_PATH = Path(__file__).resolve().parents[1] / "pipeline" / "agents" / "lena" / "70_visual_qa" / "RULES.md"
 
 
-def _stub_kling_prompt_path(monkeypatch):
+def _stub_provider_neutral_prompt_path(monkeypatch):
     scene = {
         "lane": "city bench",
         "action": "standing by the bench",
@@ -135,13 +135,15 @@ def _stub_higgsfield_prompt_path(monkeypatch):
 
 
 def test_active_prompt_paths_embed_shared_hair_directive_once_and_keep_anchors(monkeypatch) -> None:
-    _stub_kling_prompt_path(monkeypatch)
-    kling = prompt_brain.generate_prompt_package("2026-07-18", "slot-kling", "photo")
-    kling_prompt = kling["prompt"]
+    _stub_provider_neutral_prompt_path(monkeypatch)
+    provider_neutral = prompt_brain.generate_prompt_package(
+        "2026-07-18", "slot-provider-neutral", "photo"
+    )
+    provider_neutral_prompt = provider_neutral["prompt"]
 
-    assert kling_prompt.count(prompt_brain.LENA_HAIR_VARIETY_DIRECTIVE) == 1
-    assert prompt_brain.IDENTITY_ANCHOR in kling_prompt
-    assert prompt_brain.LENA_MASTER_IDENTITY in kling_prompt
+    assert provider_neutral_prompt.count(prompt_brain.LENA_HAIR_VARIETY_DIRECTIVE) == 1
+    assert prompt_brain.IDENTITY_ANCHOR in provider_neutral_prompt
+    assert prompt_brain.LENA_MASTER_IDENTITY in provider_neutral_prompt
 
     _stub_higgsfield_prompt_path(monkeypatch)
     higgsfield = prompt_brain.generate_higgsfield_prompt_package("2026-07-18", "slot-higgsfield", "photo")

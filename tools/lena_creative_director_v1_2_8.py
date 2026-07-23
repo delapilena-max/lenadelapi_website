@@ -660,7 +660,7 @@ Wardrobe:
 {wardrobe}. Diverse public lifestyle wardrobe; always mouthwatering sexy, seductive, body-conscious, visually hooky, and platform-safe. Match Lena element reference; do not alter reference body proportions. Avoid timid, boxy, shapeless, bulky, high-waist-hiding, officewear, underwear/lingerie, nudity, explicit/fetish/crotch framing. Fabric: ribbed knit, seams, folds, tension, wrinkles. Accessories: earrings, jewelry, hair tie.{scene_note}
 
 Element identity:
-Preserve Lena's saved Kling element identity, face, hairstyle, body look, proportions, and character consistency. Do not redesign her. The Lena element is the visual source of truth.
+Preserve Lena's approved identity, face, hairstyle, body look, proportions, and character consistency. Do not redesign her. The approved Lena identity reference is the visual source of truth.
 
 Pose:
 {scenario["pose"]}

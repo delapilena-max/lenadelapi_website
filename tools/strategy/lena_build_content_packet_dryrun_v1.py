@@ -455,7 +455,7 @@ def build_structured_prompt_sections(
     )
 
 
-def build_structured_kling_prompt(
+def build_structured_provider_prompt(
     recipe,
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
@@ -511,7 +511,7 @@ def compute_style_bank_prompt_budget(
     if budget < prompt_limits.HIGGSFIELD_STYLE_BANK_PROMPT_MIN_BASE_CHARS:
         raise SystemExit(
             "[ABORT] style-bank reserved headroom leaves too little room "
-            f"for the base Kling prompt ({budget} chars). "
+            f"for the base provider prompt ({budget} chars). "
             "Shorten the style-bank wardrobe override text before live use."
         )
     return budget
@@ -751,13 +751,13 @@ def select_hook(hook_bank, linked_cats, hook_category, hook_id=None):
     return hook, reason
 
 
-def build_compact_kling_prompt(
+def build_compact_provider_prompt(
     recipe,
     max_chars=prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS,
     pose_binding=None,
     expression_binding=None,
 ):
-    return build_structured_kling_prompt(
+    return build_structured_provider_prompt(
         recipe,
         max_chars=max_chars,
         pose_binding=pose_binding,
@@ -873,27 +873,27 @@ def build_packet(
             "provider_authority_binding_incomplete",
             "content packets require pose and expression authority together",
         )
-    kling_prompt = build_compact_kling_prompt(
+    provider_prompt = build_compact_provider_prompt(
         recipe,
         max_chars=prompt_budget,
         pose_binding=bound_pose,
         expression_binding=bound_expression,
     )
     if bound_pose is not None:
-        pose_provenance.require_pose_bound_prompt(kling_prompt, bound_pose)
-        pose_provenance.require_expression_bound_prompt(kling_prompt, bound_expression)
-    provider_prompt_blocked_terms = check_packet_blocked_terms(kling_prompt)
+        pose_provenance.require_pose_bound_prompt(provider_prompt, bound_pose)
+        pose_provenance.require_expression_bound_prompt(provider_prompt, bound_expression)
+    provider_prompt_blocked_terms = check_packet_blocked_terms(provider_prompt)
     provider_prompt_contract = {
         "surface_status": "quarantined_provider_neutral_dry_run_packet",
         "provider_route": "higgsfield_forward_no_live",
         "live_authority": False,
-        "prompt_chars": len(kling_prompt),
+        "prompt_chars": len(provider_prompt),
         "prompt_headroom": (
             prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
-            - len(kling_prompt)
+            - len(provider_prompt)
         ),
         "scene_logic_contract_present": bool(recipe.get("scene_logic_contract", {})),
-        "master_identity_body_present": check_master_identity(kling_prompt),
+        "master_identity_body_present": check_master_identity(provider_prompt),
         "blocked_terms_absent": len(provider_prompt_blocked_terms) == 0,
         "blocked_terms_found": provider_prompt_blocked_terms,
         "outfit_controlled": bool(outfit_id),
@@ -910,7 +910,7 @@ def build_packet(
         ),
     }
     provider_prompt_sha256 = hashlib.sha256(
-        kling_prompt.encode("utf-8")
+        provider_prompt.encode("utf-8")
     ).hexdigest()
 
     locked_scene_context = recipe.get("scene_type", "scene_context")
@@ -998,11 +998,8 @@ def build_packet(
             "negative_constraints": recipe.get("negative_constraints", ""),
         },
         "prompt_structure_standard": "subject_action_environment_cinematography_lighting_technical_v1",
-        "compact_kling_prompt_preview": kling_prompt,
-        "compact_kling_prompt_chars": len(kling_prompt),
-        "compact_kling_prompt_budget": prompt_budget,
-        "compact_provider_prompt_preview": kling_prompt,
-        "compact_provider_prompt_chars": len(kling_prompt),
+        "compact_provider_prompt_preview": provider_prompt,
+        "compact_provider_prompt_chars": len(provider_prompt),
         "compact_provider_prompt_budget": prompt_budget,
         "compact_provider_prompt_sha256": provider_prompt_sha256,
         "strong_hook_id": hook["id"],
@@ -1118,27 +1115,14 @@ def rebuild_packet_from_authoritative_sources(
                 "pose_bound_packet_prompt_chars_mismatch",
                 "already-bound content packet provider prompt character count does not match its prompt bytes",
             )
-        kling_prompt = packet.get("compact_kling_prompt_preview")
-        if not isinstance(kling_prompt, str) or kling_prompt != provider_prompt:
-            raise pose_provenance.PoseProvenanceError(
-                "pose_bound_packet_retained_prompt_mismatch",
-                "already-bound compact_kling_prompt_preview must remain an exact retained copy of the provider prompt",
-            )
-        pose_provenance.require_pose_bound_prompt(kling_prompt, existing_pose)
-        if packet.get("compact_kling_prompt_chars") != len(kling_prompt):
-            raise pose_provenance.PoseProvenanceError(
-                "pose_bound_packet_retained_prompt_chars_mismatch",
-                "already-bound Kling prompt character count does not match its retained prompt bytes",
-            )
         provider_budget = packet.get("compact_provider_prompt_budget")
         if (
             type(provider_budget) is not int
             or provider_budget <= 0
-            or packet.get("compact_kling_prompt_budget") != provider_budget
         ):
             raise pose_provenance.PoseProvenanceError(
                 "pose_bound_packet_prompt_budget_mismatch",
-                "already-bound retained prompt budgets must be identical positive integers",
+                "already-bound provider prompt budget must be a positive integer",
             )
         provider_contract = packet.get("provider_prompt_contract")
         if (
@@ -1379,12 +1363,12 @@ def validate_packet(packet, output_path):
     else:
         flags["provider_action_pose_bound"] = False
 
-    kling_len = packet.get("compact_kling_prompt_chars", 9999)
+    provider_len = packet.get("compact_provider_prompt_chars", 9999)
     flags["higgsfield_prompt_within_execution_policy"] = (
-        kling_len <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+        provider_len <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
     )
-    if kling_len > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
-        errors.append(f"kling prompt too long: {kling_len} chars")
+    if provider_len > prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS:
+        errors.append(f"provider prompt too long: {provider_len} chars")
 
     norm = os.path.normpath(output_path)
     norm_base = os.path.normpath(OUTPUT_BASE)
@@ -1447,7 +1431,7 @@ def print_summary(packet, filepath, flags, errors):
                 f"{len(lane['outfit_options'])} outfits)"
             )
         print()
-    print(f"  Kling prompt chars   : {packet['compact_kling_prompt_chars']}")
+    print(f"  Provider prompt chars: {packet['compact_provider_prompt_chars']}")
     print(
         "  Higgsfield policy fit: "
         f"{flags.get('higgsfield_prompt_within_execution_policy')}"

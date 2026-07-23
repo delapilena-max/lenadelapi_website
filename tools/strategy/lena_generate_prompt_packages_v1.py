@@ -44,7 +44,7 @@ QUALITY_GUARDRAILS = [
     "Lena-specific anchors must appear in frame (see lena_world_anchors field)",
     "Soft glam aesthetic: polished but not sterile, warm not clinical",
     "Camera energy matches format: handheld for chaotic/GRWM, steadier for aesthetic/reset",
-    "OpenArt/Seedance-compatible prompt structure — no Higgsfield or Google Flow specific syntax",
+    "provider-neutral prompt structure with no provider-specific syntax",
     "Phone-captured UGC feel — ordinary handheld framing, not studio or editorial",
     "Natural room light: apartment lamp, window light, or real bathroom light — no studio lighting",
     "Imperfect crop preferred over centered perfection — casual social media composition",

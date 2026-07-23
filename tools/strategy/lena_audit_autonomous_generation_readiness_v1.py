@@ -166,12 +166,9 @@ def audit_lane(recipe_id: str, recipes: dict, date: str) -> dict:
 
     payload_chars = provider_prompt_contract.get(
         "prompt_chars",
-        packet.get("compact_provider_prompt_chars", packet.get("compact_kling_prompt_chars")),
+        packet.get("compact_provider_prompt_chars"),
     )
-    packet_chars = packet.get(
-        "compact_provider_prompt_chars",
-        packet.get("compact_kling_prompt_chars"),
-    )
+    packet_chars = packet.get("compact_provider_prompt_chars")
     proof_mode = packet.get("production_proof_mode", False)
     outfit_used = packet.get("wardrobe_outfit_id")
     env_used = packet.get("environment_id")

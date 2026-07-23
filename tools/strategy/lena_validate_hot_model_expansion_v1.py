@@ -7,7 +7,7 @@ Validates wardrobe catalog expansion + environment catalog.
 Run: python tools/strategy/lena_validate_hot_model_expansion_v1.py
 Exit 0 = all pass.  Exit 1 = any failure.
 
-Does NOT: call Kling, read .env, generate, upload, publish, queue, schedule.
+Does NOT: call a provider, read .env, generate, upload, publish, queue, schedule.
 """
 import json, sys
 from pathlib import Path

@@ -61,8 +61,8 @@ def test_build_packet_is_deterministic_and_safe() -> None:
     assert first["provider_call_enabled"] is False
     assert first["generation_call_performed"] is False
     assert first["publishing_approval"] == "not_approved"
-    assert first["compact_kling_prompt_chars"] <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
-    assert first["compact_provider_prompt_chars"] == first["compact_kling_prompt_chars"]
+    assert first["compact_provider_prompt_chars"] <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
+    assert first["compact_provider_prompt_chars"] == len(first["compact_provider_prompt_preview"])
     assert first["provider_prompt_contract"]["provider_route"] == "higgsfield_forward_no_live"
     assert first["provider_prompt_contract"]["live_authority"] is False
     assert first["provider_prompt_contract"]["scene_logic_contract_present"] is True
@@ -134,7 +134,7 @@ def test_non_proof_mode_prompt_excludes_subject_presence_section() -> None:
     recipe = _recipe()
     hook = _hook()
 
-    structured = packet_builder.build_structured_kling_prompt(copy.deepcopy(recipe))
+    structured = packet_builder.build_structured_provider_prompt(copy.deepcopy(recipe))
     packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
 
     assert "[Subject Presence]:" not in structured
@@ -157,7 +157,7 @@ def test_structured_prompt_preserves_complete_hcr_011_cinematography_clause() ->
     recipe_bank = json.loads(Path(packet_builder.RECIPE_BANK).read_text(encoding="utf-8-sig"))
     recipe = next(item for item in recipe_bank["recipes"] if item["id"] == "hcr_011")
 
-    prompt = packet_builder.build_structured_kling_prompt(recipe)
+    prompt = packet_builder.build_structured_provider_prompt(recipe)
 
     assert "blue-hour ambient mixed with warm lamp fill, candid apartment realism, non-studio." in prompt
     assert "blue-hour ambient mixed with warm [Lighting/Style]:" not in prompt

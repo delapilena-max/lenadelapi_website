@@ -227,7 +227,7 @@ def test_build_report_marks_missing_artifacts_blocked_and_emits_safe_flags(
     _write_json(
         packet_dir / f"lena_content_packet_dryrun_{DATE}_hcr_001.json",
         {
-            "compact_kling_prompt_chars": 2400,
+            "compact_provider_prompt_chars": 2400,
             "provider_prompt_contract": {
                 "prompt_chars": 2440,
                 "prompt_headroom": 59,

@@ -49,7 +49,6 @@ def _materialize_canonical_assets(tmp_path: Path) -> None:
 
     _write_text(prompting_root / "lena_prompt_brain.py", "PROMPT_BRAIN = True\n")
     _write_json(lena_root / "persona.json", {"persona": "Lena", "voice": "warm"})
-    _write_text(identity_root / "lena_identity.py", "EXPECTED_WIDTH = 1024\nEXPECTED_HEIGHT = 1024\n")
     _write_text(identity_root / "lena_higgsfield_identity.py", "EXPECTED_JOB_TYPE = 'higgsfield_text2image'\nEXPECTED_SOUL_NAME = 'Lena'\nEXPECTED_SOUL_TYPE = 'Soul 2.0'\nAPPROVED_CUSTOM_REFERENCE_IDS = {'ref'}\n")
     _write_json(identity_root / "lena_character_doctrine_v1.json", {"version": "v1"})
     _write_json(lena_root / "lena_content_strategy_v1.json", {"version": "v1"})
@@ -216,7 +215,6 @@ def _build_fixture_tree(
         target = {
             "prompt_brain": tmp_path / "pipeline" / "prompting" / "lena_prompt_brain.py",
             "persona": tmp_path / "pipeline" / "influencer_nodes" / "lena" / "persona.json",
-            "identity": tmp_path / "pipeline" / "identity" / "lena_identity.py",
             "higgsfield_identity": tmp_path / "pipeline" / "identity" / "lena_higgsfield_identity.py",
             "content_strategy": tmp_path / "pipeline" / "influencer_nodes" / "lena" / "lena_content_strategy_v1.json",
             "world_continuity_policy": tmp_path / "pipeline" / "influencer_nodes" / "lena" / "world_continuity_policy_v1.json",

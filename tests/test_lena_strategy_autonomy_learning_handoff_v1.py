@@ -119,8 +119,6 @@ def test_prep_builds_learning_before_recommendation_and_threads_exact_artifact_p
 
     step_names = [step for step, _ in calls]
     assert step_names.index("build_post_outcome_learning_state") < step_names.index("recommend_next_generation_step")
-    assert not any(step.startswith("build_kling_payload_dryrun") for step in step_names)
-    assert not any(step.startswith("build_kling_video_payload_dryrun") for step in step_names)
     assert step_names.index("build_autonomous_generation_queue_dryrun") < step_names.index("build_next_live_image_handoff")
     assert "select_pre_generation_candidate" not in step_names
 

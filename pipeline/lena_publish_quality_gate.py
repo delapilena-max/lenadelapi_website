@@ -66,7 +66,7 @@ class QualityGateConfig:
         root = Path(self.project_root).resolve()
         object.__setattr__(self, "project_root", root)
         if self.library_root is None:
-            object.__setattr__(self, "library_root", root / "pipeline" / "kling_library" / "lena")
+            object.__setattr__(self, "library_root", root / "pipeline" / "higgsfield_library" / "lena")
         else:
             object.__setattr__(self, "library_root", Path(self.library_root).resolve())
         if self.publish_state_path is None:
@@ -364,7 +364,7 @@ def quality_gate_media(
     if not path.is_file():
         result.errors.append(f"path is not a file: {path}")
     if not _is_under(path, config.library_root):
-        result.errors.append(f"file is outside Lena Kling library: {config.library_root}")
+        result.errors.append(f"file is outside Lena Higgsfield library: {config.library_root}")
     if ext not in VALID_EXTS:
         result.errors.append(f"invalid media extension: {ext}")
     if media_type == "video" and ext not in VIDEO_EXTS:

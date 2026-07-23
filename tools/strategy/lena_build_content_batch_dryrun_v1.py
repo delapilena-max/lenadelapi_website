@@ -186,7 +186,7 @@ def print_table(rows):
             f"{r['scene_type']:<{col_w['scene_type']}}  "
             f"{r['strong_hook_id']:<{col_w['hook_id']}}  "
             f"{r['hook_total_score']:<{col_w['score']}}  "
-            f"{r['compact_kling_prompt_chars']:<{col_w['chars']}}  "
+            f"{r['compact_provider_prompt_chars']:<{col_w['chars']}}  "
             f"{val_str:<{col_w['val']}}  "
             f"{fname}"
         )
@@ -296,7 +296,7 @@ def main():
             "hook_text": hook.get("hook_text", ""),
             "hook_total_score": hook["scores"]["total_score"],
             "output_path": filepath,
-            "compact_kling_prompt_chars": packet["compact_kling_prompt_chars"],
+            "compact_provider_prompt_chars": packet["compact_provider_prompt_chars"],
             "validation_passed": passed,
             "validation_errors": errors,
         }

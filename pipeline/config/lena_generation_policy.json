@@ -26,10 +26,11 @@
   },
   "generation": {
     "image_engine": "higgsfield_text2image_soul_v2",
-    "video_engine": "kling_video_3.0",
-    "video_motion_control_required": true,
-    "video_resolution": "1080p",
-    "video_fps": 30,
+    "video_engine": null,
+    "video_generation_enabled": false,
+    "video_motion_control_required": false,
+    "video_resolution": null,
+    "video_fps": null,
     "voice_enabled": "sparse_random",
     "voice_consistency_required": true,
     "speech_prompt_usage": "sparse_random"
@@ -37,14 +38,12 @@
   "content_mix": {
     "daily_target": {
       "photos": 3,
-      "videos": 2
+      "videos": 0
     },
     "allowed_formats": [
       "selfie_style_photo",
       "mirror_selfie",
       "outfit_check",
-      "tiktok_style_dance",
-      "mini_vlog",
       "daily_lifestyle_moment",
       "creator_desk_moment",
       "coffee_or_kitchen",
@@ -52,13 +51,7 @@
       "beauty_or_get_ready",
       "evening_reset"
     ],
-    "video_bias": [
-      "tiktok_style_dance",
-      "selfie_style_reel",
-      "mini_vlog",
-      "motion_control_pose_transition",
-      "outfit_check"
-    ]
+    "video_bias": []
   },
   "anti_repetition": {
     "max_same_activity_in_last_10_posts": 2,

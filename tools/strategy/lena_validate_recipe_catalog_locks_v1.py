@@ -11,7 +11,7 @@ Run:
 
 Exit 0 = all pass. Exit 1 = any failure.
 
-Does NOT: call Kling, read .env, generate, upload, publish, queue, schedule.
+Does NOT: call a provider, read .env, generate, upload, publish, queue, schedule.
 """
 from __future__ import annotations
 

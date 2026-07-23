@@ -1072,7 +1072,7 @@ def test_first_generation_and_retry_reconstruction_reject_line_separators(
     recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
     recipe["setting_background"] = f"left{separator}right"
     with pytest.raises(pose_provenance.PoseProvenanceError) as first_generation:
-        packet_builder.build_structured_kling_prompt(
+        packet_builder.build_structured_provider_prompt(
             recipe,
             pose_binding=pose_fixture.static_pose_provenance(),
             expression_binding=pose_fixture.static_expression_provenance(),
@@ -1316,7 +1316,7 @@ def test_governed_recipe_inputs_satisfy_plain_text_policy() -> None:
 def test_real_recipe_emits_one_exact_canonical_action() -> None:
     recipe_bank = packet_builder.load_json(packet_builder.RECIPE_BANK)
     recipe = dict(packet_builder.select_recipe(recipe_bank, "hcr_011"))
-    prompt = packet_builder.build_structured_kling_prompt(
+    prompt = packet_builder.build_structured_provider_prompt(
         recipe,
         pose_binding=pose_fixture.static_pose_provenance(),
         expression_binding=pose_fixture.static_expression_provenance(),
@@ -1363,10 +1363,8 @@ def test_conflicting_already_bound_content_packet_fails_closed() -> None:
     [
         lambda packet: packet.update(compact_provider_prompt_sha256="f" * 64),
         lambda packet: packet.update(compact_provider_prompt_chars=0),
-        lambda packet: packet.update(compact_kling_prompt_preview=packet["compact_kling_prompt_preview"].replace(pose_fixture.POSE_TEXT, "arms raised overhead")),
-        lambda packet: packet.update(compact_kling_prompt_chars=0),
+        lambda packet: packet.update(compact_provider_prompt_preview=packet["compact_provider_prompt_preview"].replace(pose_fixture.POSE_TEXT, "arms raised overhead")),
         lambda packet: packet.update(compact_provider_prompt_budget=1),
-        lambda packet: packet.update(compact_kling_prompt_budget=1),
         lambda packet: packet["provider_prompt_contract"].update(prompt_chars=0),
         lambda packet: packet["provider_prompt_contract"].update(pose_binding_status="unbound"),
         lambda packet: packet["provider_prompt_contract"].update(pose_authority_source="wrong"),
@@ -1419,7 +1417,6 @@ def test_production_selector_candidate_packet_handoff_executor_manifest_qa_chain
         chain["handoff"]["pose_bound_content_packet_sha256"]
     )
     prompt = chain["packet"]["compact_provider_prompt_preview"]
-    assert chain["packet"]["compact_kling_prompt_preview"] == prompt
     assert chain["handoff"]["structured_executor_inputs"]["selected_prompt_text"] == prompt
     assert chain["executor_source"]["image"]["image_prompt"] == prompt
     assert chain["manifest"]["image_prompt"] == prompt

@@ -13,7 +13,7 @@ from __future__ import annotations
 #
 # This is a dedicated Higgsfield-only executor, not a generic provider
 # abstraction -- it does not share code with, and never imports from,
-# pipeline/kling_apilena_api_executor.py. It does not modify prompt
+# the former provider executor. It does not modify prompt
 # generation (pipeline/prompting/lena_prompt_brain.py) or any diagnostic
 # tool; it only reads their already-committed, already-validated output.
 #
@@ -2093,7 +2093,7 @@ def build_manifest(
             "expression_bound_content_packet_sha256"
         ),
         # Persisted (2026-07-10) so a real, non-fabricated visual_style
-        # (f"{camera_text}; {lighting_text}", matching the Kling package
+        # (f"{camera_text}; {lighting_text}", matching the provider package
         # builder's own convention) can be built later without re-parsing
         # the "Camera: .../Lighting: ..." sentences out of image_prompt.
         # None (not a fabricated default) if the source package predates

@@ -116,9 +116,9 @@ def platform_coverage(packets):
 
 def prompt_char_stats(manifest_packets):
     chars = [
-        p.get("compact_kling_prompt_chars", 0)
+        p.get("compact_provider_prompt_chars", 0)
         for p in manifest_packets
-        if p.get("compact_kling_prompt_chars")
+        if p.get("compact_provider_prompt_chars")
     ]
     if not chars:
         return None
@@ -126,8 +126,8 @@ def prompt_char_stats(manifest_packets):
         "min": min(chars),
         "max": max(chars),
         "avg": round(statistics.mean(chars), 1),
-        "all_under_2500": all(
-            c <= prompt_limits.KLING_OMNI_PAYLOAD_PROMPT_POLICY_MAX_CHARS
+        "all_under_policy_limit": all(
+            c <= prompt_limits.HIGGSFIELD_PROMPT_EXECUTION_POLICY_MAX_CHARS
             for c in chars
         ),
     }
@@ -262,10 +262,10 @@ def human_review_notes(
                 "Review before publishing."
             )
 
-    if prompt_stats and not prompt_stats["all_under_2500"]:
+    if prompt_stats and not prompt_stats["all_under_policy_limit"]:
         notes.append(
-            "WARNING: One or more compact Kling prompts exceed 2500 "
-            "chars. Trim before generation."
+            "WARNING: One or more provider prompts exceed the Higgsfield "
+            "execution-policy limit. Revise before generation."
         )
 
     heavy_cats = {c: n for c, n in cat_dist.items() if n >= 4}
@@ -282,8 +282,8 @@ def human_review_notes(
         "platform-safe."
     )
     notes.append(
-        "Review compact_kling_prompt_preview per packet before "
-        "submitting to Kling. Check scene realism and identity language."
+        "Review compact_provider_prompt_preview per packet before "
+        "submitting to Higgsfield. Check scene realism and identity language."
     )
     notes.append(
         "No image has been generated. No API call was made. "
@@ -428,8 +428,8 @@ def print_report(report):
         print(f"  chars min  : {ps['min']}")
         print(f"  chars max  : {ps['max']}")
         print(f"  chars avg  : {ps['avg']}")
-        ok = "YES" if ps["all_under_2500"] else "NO -- ACTION REQUIRED"
-        print(f"  all <2500  : {ok}")
+        ok = "YES" if ps["all_under_policy_limit"] else "NO -- ACTION REQUIRED"
+        print(f"  all within provider policy: {ok}")
     else:
         print("  (no prompt stats available)")
     print()

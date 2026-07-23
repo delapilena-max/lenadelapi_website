@@ -419,12 +419,9 @@ def build_recommendation(
                 "python tools/strategy/lena_build_content_packet_dryrun_v1.py "
                 f"--recipe {recipe_id} --date {utc_date()}"
             ),
-            "recommended_payload_command": (
-                "python tools/strategy/lena_build_kling_payload_dryrun_v1.py "
-                f"--recipe {recipe_id} --date {utc_date()}"
-            ),
+            "recommended_payload_command": "",
             "next_live_gate": (
-                "Ready to widen into the next non-proof rotation lane after Nicolas reviews the packet and payload."
+                "Provider execution is blocked until an approved Higgsfield replacement path exists."
             ),
         }, learning_context)
 
@@ -514,7 +511,7 @@ def build_recommendation(
             )
             rationale = [
                 "The same full-body mirror lane has now produced repeated rejects after the earlier strong candidate.",
-                "Kling keeps trading realism for glam drift, body exaggeration, or wardrobe/composition drift in this lane.",
+                "The rejected provider outputs keep trading realism for glam drift, body exaggeration, or wardrobe/composition drift in this lane.",
                 "The next efficient move is a simpler face-priority proof shot that isolates skin realism and hand stability without overfitting to the same exact look."
             ]
             hold_constant = [
@@ -541,10 +538,7 @@ def build_recommendation(
                     "python tools/strategy/lena_build_content_packet_dryrun_v1.py "
                     f"--recipe {recipe_id} --date {utc_date()}"
                 )
-                recommended_payload_cmd = (
-                    "python tools/strategy/lena_build_kling_payload_dryrun_v1.py "
-                    f"--recipe {recipe_id} --date {utc_date()}"
-                )
+                recommended_payload_cmd = ""
             else:
                 recommended_packet_cmd = ""
                 recommended_payload_cmd = ""
@@ -601,13 +595,10 @@ def build_recommendation(
             "python tools/strategy/lena_build_content_packet_dryrun_v1.py "
             f"--recipe {recipe_id} --outfit-id {outfit_id} --env-id {environment_id} --date {utc_date()}"
         )
-        recommended_payload_cmd = (
-            "python tools/strategy/lena_build_kling_payload_dryrun_v1.py "
-            f"--recipe {recipe_id} --date {utc_date()}"
-        )
+        recommended_payload_cmd = ""
         next_live_gate = (
-            "Ready for one controlled live Kling generation only after Nicolas approves "
-            "this exact locked lane packet/payload review."
+            "Provider execution is blocked until an approved Higgsfield replacement "
+            "path exists and Nicolas approves the exact request."
         )
     else:
         action_type = "collect_first_controlled_proof"
