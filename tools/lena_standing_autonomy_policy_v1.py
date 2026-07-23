@@ -739,6 +739,17 @@ def validate_cycle_authorization_artifact(
         canonical_sha = _sha256_bytes(
             (json.dumps(reconstructed_for_hash, indent=2, ensure_ascii=True) + "\n").encode("utf-8")
         )
+        cycle_authorization_sha = str(auth.get("cycle_authorization_sha256") or "").strip()
+        if cycle_authorization_sha:
+            _require(
+                len(cycle_authorization_sha) == 64 and all(ch in "0123456789abcdef" for ch in cycle_authorization_sha),
+                "authorization_sha_mismatch",
+                "cycle authorization SHA must be a lowercase sha256 digest",
+            )
+        else:
+            consumed_payload_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
+            if str(auth.get("authorization_artifact_sha256") or "") == consumed_payload_sha:
+                canonical_sha = consumed_payload_sha
     else:
         canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
     _require(str(auth.get("authorization_artifact_sha256") or "") == canonical_sha, "authorization_sha_mismatch", "authorization SHA does not match canonical artifact bytes")

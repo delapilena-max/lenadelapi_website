@@ -204,7 +204,7 @@ def run_recovery(
         "expected_output_stem": paths["image"].stem,
         "allowed_output_extensions": list(authorization.get("allowed_output_extensions") or []),
     }
-    approval_result = cycle._build_autonomous_approval_result(auth, live_requirements)
+    approval_result = cycle._build_uncontrolled_autonomous_approval_result(auth, live_requirements)
     _assert_no_prior_downstream_evidence(paths, contract, report_root)
 
     identity_path, _, _ = cycle._build_local_identity_evidence(
