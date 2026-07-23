@@ -1868,16 +1868,12 @@ def _write_json_no_overwrite(path: Path, payload: dict[str, Any]) -> None:
             temp_path.unlink()
 
 
-def _persist_and_validate_submitted_prompt(
-    date_str: str,
-    slot_id: str,
+def _validate_submitted_prompt_binding(
     image: dict[str, Any],
     prompt: str,
 ) -> dict[str, Any]:
     prompt_bytes = prompt.encode("utf-8")
     prompt_sha256 = hashlib.sha256(prompt_bytes).hexdigest()
-    path = submitted_prompt_path(date_str, slot_id)
-    _write_bytes_no_overwrite(path, prompt_bytes)
 
     expected_sha256 = str(image.get("prompt_sha256") or "").strip()
     if not expected_sha256:
@@ -1895,10 +1891,24 @@ def _persist_and_validate_submitted_prompt(
             provider_submission_may_have_occurred=False,
         )
     return {
-        "submitted_prompt_path": _repo_relative_path(path),
         "submitted_prompt_sha256": prompt_sha256,
         "submitted_prompt_byte_length": len(prompt_bytes),
         "submitted_prompt_char_length": len(prompt),
+    }
+
+
+def _persist_and_validate_submitted_prompt(
+    date_str: str,
+    slot_id: str,
+    image: dict[str, Any],
+    prompt: str,
+) -> dict[str, Any]:
+    binding = _validate_submitted_prompt_binding(image, prompt)
+    path = submitted_prompt_path(date_str, slot_id)
+    _write_bytes_no_overwrite(path, prompt.encode("utf-8"))
+    return {
+        "submitted_prompt_path": _repo_relative_path(path),
+        **binding,
     }
 
 

@@ -2068,6 +2068,26 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(
     assert submitted_prompt.read_text(encoding="utf-8") == "prompt"
 
 
+def test_preflight_prompt_binding_does_not_create_live_submission_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    source = _approved_live_source("complete approved prompt")
+
+    binding = executor._validate_submitted_prompt_binding(
+        source["image"],
+        "complete approved prompt",
+    )
+
+    assert binding == {
+        "submitted_prompt_sha256": hashlib.sha256(b"complete approved prompt").hexdigest(),
+        "submitted_prompt_byte_length": len(b"complete approved prompt"),
+        "submitted_prompt_char_length": len("complete approved prompt"),
+    }
+    assert not (tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt").exists()
+    assert not (tmp_path / "pipeline" / "approvals" / "lena" / "generation" / DATE).exists()
+
+
 def test_old_shortened_provider_prompt_stops_before_provider_call_when_full_prompt_was_approved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2105,7 +2125,7 @@ def test_old_shortened_provider_prompt_stops_before_provider_call_when_full_prom
 
     assert exc_info.value.stage == "submitted_prompt_approval_sha_mismatch"
     submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
-    assert submitted_prompt.read_text(encoding="utf-8") == old_provider_record_prompt
+    assert not submitted_prompt.exists()
 
 
 def test_prompt_sha_mismatch_stops_before_provider_call(
@@ -2128,7 +2148,7 @@ def test_prompt_sha_mismatch_stops_before_provider_call(
 
     assert exc_info.value.stage == "submitted_prompt_approval_sha_mismatch"
     submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
-    assert submitted_prompt.read_text(encoding="utf-8") == "complete approved prompt"
+    assert not submitted_prompt.exists()
 
 
 def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language() -> None:
@@ -2221,6 +2241,69 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
     assert "--soul-id" in binding["resolved_argv_redacted"]
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
     assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
+
+
+def test_live_after_preflight_writes_submitted_prompt_once_and_second_attempt_stops_before_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "f1d9ac32-8683-4b1a-96c4-2c40ddde7148"
+    calls: list[list[str]] = []
+
+    class Completed:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+            return Completed(f"{job_id}\n")
+        if argv[1:] == ["generate", "list", "--image", "--json"]:
+            return Completed(json.dumps([{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png", "params": {}}]))
+        raise AssertionError(f"unexpected argv: {argv}")
+
+    def fake_download(url: str, destination: Path) -> bytes:
+        assert url == "https://example.invalid/final.png"
+        image_bytes = b"\x89PNG\r\n\x1a\nfixture"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(image_bytes)
+        return image_bytes
+
+    source = _approved_live_source()
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    monkeypatch.setattr(executor, "_download", fake_download)
+
+    preflight = executor._validate_submitted_prompt_binding(source["image"], "prompt")
+    assert preflight["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
+    submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
+    assert not submitted_prompt.exists()
+
+    result = executor.run_live(
+        DATE,
+        SLOT_ID,
+        source,
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+    )
+
+    assert result["job_id"] == job_id
+    assert submitted_prompt.read_text(encoding="utf-8") == "prompt"
+    first_call_count = len(calls)
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.run_live(
+            DATE,
+            SLOT_ID,
+            source,
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        )
+
+    assert exc_info.value.stage == "submitted_prompt_already_exists"
+    assert exc_info.value.subprocess_start_attempted is False
+    assert exc_info.value.provider_submission_may_have_occurred is False
+    assert len(calls) == first_call_count
 
 
 def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
