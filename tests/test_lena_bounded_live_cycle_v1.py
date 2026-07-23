@@ -1744,6 +1744,58 @@ def test_live_failure_keeps_authorization_consumed(tmp_path: Path, monkeypatch: 
     assert int(state["qa_calls"]) == (1 if stage in {"qa", "publish"} else 0)
 
 
+def test_controlled_provider_failure_report_serializes_path_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    claim_path = tmp_path / "pipeline" / "approvals" / "lena" / "generation" / DATE / "failed_claim.json"
+    receipt_path = tmp_path / "pipeline" / "approvals" / "lena" / "generation" / DATE / "failed_receipt.json"
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "failed_manifest.json"
+
+    def fail_provider_with_path_values(*args, **kwargs):
+        state["provider_calls"] = int(state["provider_calls"]) + 1
+        return {
+            "ok": False,
+            "failure_stage": "provider_output_parse_failure",
+            "failure_error_text": "Failed to parse --json output as JSON",
+            "claim_info": {
+                "claim_path": claim_path,
+                "claim_repo_path": claim_path.relative_to(tmp_path).as_posix(),
+            },
+            "claim_path": claim_path,
+            "manifest_path": manifest_path,
+            "receipt_info": {
+                "receipt_path": receipt_path,
+                "receipt_repo_path": receipt_path.relative_to(tmp_path).as_posix(),
+            },
+            "receipt_path": receipt_path,
+            "receipt_repo_path": receipt_path.relative_to(tmp_path).as_posix(),
+            "provider_submission_may_have_occurred": True,
+            "subprocess_start_attempted": True,
+            "provider_call_performed": True,
+            "receipt_written": True,
+        }
+
+    monkeypatch.setattr(higgsfield_executor, "execute_approved_handoff_live_generation", fail_provider_with_path_values)
+
+    report = _run_cycle(bundle, simulate=False, report_root=tmp_path / "reports")
+
+    assert report["ok"] is False
+    assert report["failed_stage"] == "provider_generation"
+    assert report["failure"]["code"] == "provider_output_parse_failure"
+    assert report["provider_generation_result"]["claim_path"] == str(claim_path)
+    assert report["provider_generation_result"]["claim_info"]["claim_path"] == str(claim_path)
+    assert report["provider_generation_result"]["receipt_path"] == str(receipt_path)
+    assert report["provider_generation_result"]["receipt_info"]["receipt_path"] == str(receipt_path)
+    persisted = json.loads(Path(report["report_path"]).read_text(encoding="utf-8"))
+    assert persisted["provider_generation_result"]["claim_path"] == str(claim_path)
+    assert persisted["provider_generation_result"]["receipt_info"]["receipt_path"] == str(receipt_path)
+    assert int(state["provider_calls"]) == 1
+    assert int(state["qa_calls"]) == 0
+    assert int(state["publish_calls"]) == 0
+
+
 def test_live_blocked_human_visual_review_stops_without_publish_or_retry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

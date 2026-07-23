@@ -116,6 +116,16 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
                 pass
 
 
+def _json_safe_report_value(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe_report_value(nested) for key, nested in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_report_value(nested) for nested in value]
+    return value
+
+
 def _validate_iso_datetime(raw: str) -> datetime:
     try:
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
@@ -1218,7 +1228,7 @@ def _build_fail_report(
         "human_per_cycle_approval_present": False,
     }
     if extra:
-        report.update(extra)
+        report.update(_json_safe_report_value(extra))
     _write_json_atomic(report_path, report)
     report["report_path"] = str(report_path)
     return report
