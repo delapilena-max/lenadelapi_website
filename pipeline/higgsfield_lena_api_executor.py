@@ -1579,7 +1579,7 @@ def build_provider_argv(prompt: str, custom_reference_id: str) -> list[str]:
         HIGGSFIELD_IMAGE_JOB_TYPE,
         "--prompt",
         prompt,
-        "--custom_reference_id",
+        "--soul-id",
         custom_reference_id,
         "--aspect_ratio",
         HIGGSFIELD_ASPECT_RATIO,

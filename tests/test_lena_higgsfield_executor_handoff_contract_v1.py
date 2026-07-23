@@ -2000,8 +2000,8 @@ def test_provider_argv_attaches_verified_lena_soul_reference_id() -> None:
     argv = executor.build_provider_argv("prompt", executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
 
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "e45ec580-a6db-4063-a9b2-f9163856daae"
-    assert "--custom_reference_id" in argv
-    assert argv[argv.index("--custom_reference_id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert "--soul-id" in argv
+    assert argv[argv.index("--soul-id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
 
 
 def test_provider_argv_rejects_missing_or_wrong_lena_soul_before_subprocess(
