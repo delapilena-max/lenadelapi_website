@@ -167,10 +167,9 @@ STRUCTURED_TECHNICAL_REALISM = (
 )
 
 PROVIDER_PROMPT_REQUIRED_GUARDRAILS = (
-    "Tasteful complete styling: clothing is fully fastened, polished, and wearable. "
-    "No black or empty background, no isolated cutout, no stiff front-facing catalog pose, "
-    "no open jeans, no exposed zipper, no underwear visibility, no wardrobe-malfunction styling, "
-    "and no unnecessary sexualized emphasis."
+    "Fastened tasteful clothing. Setting, natural action/expression, "
+    "and light/camera direction. No black/empty background, cutout, stiff catalog pose; "
+    "no open jeans, no exposed zipper, no underwear, wardrobe malfunction, no unnecessary sexualized emphasis."
 )
 
 # Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
