@@ -8,10 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.influencer_nodes.lena import canonical_brain_assets
-
-
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from pipeline.influencer_nodes.lena import canonical_brain_assets  # noqa: E402
 
 REPORT_TYPE = "lena_generation_reconciliation"
 SCHEMA_VERSION = "lena_generation_reconciliation_v1"

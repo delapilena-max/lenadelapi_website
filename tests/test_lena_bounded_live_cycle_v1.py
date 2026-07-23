@@ -11,9 +11,11 @@ from PIL import Image
 
 import pipeline.identity.lena_higgsfield_identity as identity
 import pipeline.higgsfield_lena_api_executor as higgsfield_executor
+from tests.fixtures import lena_pose_provenance as pose_fixture
 import tools.lena_bounded_live_cycle_v1 as cycle
 import tools.lena_autopublish_approved_queue_v2_8 as autonomous_publisher
 import tools.lena_higgsfield_generation_approval_v1 as approval
+import tools.lena_higgsfield_standing_autonomy_generation_approval_v1 as standing_generation_approval
 import tools.lena_photo_qa_disposition_v1 as photo_qa
 import tools.lena_standing_autonomy_policy_v1 as standing_autonomy
 
@@ -75,6 +77,8 @@ def _patch_roots(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(photo_qa, "OUTPUT_ROOT", tmp_path / "pipeline" / "asset_review" / "lena" / "hpe_closure" / "presence_output_qa")
     monkeypatch.setattr(approval, "ROOT", tmp_path)
     monkeypatch.setattr(approval, "DEFAULT_APPROVAL_ROOT", tmp_path / "pipeline" / "approvals" / "lena" / "generation")
+    monkeypatch.setattr(standing_generation_approval, "ROOT", tmp_path)
+    monkeypatch.setattr(standing_generation_approval, "DEFAULT_APPROVAL_ROOT", tmp_path / "pipeline" / "approvals" / "lena" / "generation")
     monkeypatch.setattr(standing_autonomy, "ROOT", tmp_path)
     monkeypatch.setattr(standing_autonomy, "POLICY_ROOT", tmp_path / "pipeline" / "config")
     monkeypatch.setattr(standing_autonomy, "AUTH_ROOT", tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles")
@@ -168,8 +172,51 @@ def _build_bundle(
         "final_action": "prepare_higgsfield_still_dry_run_for_review",
         "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --date {date_str} --slot-id {slot_id}",
     }
-    candidate_file = {"candidate": candidate} if nested_candidate else candidate
+    if controlled:
+        candidate.update(
+            {
+                "pose_body_language_id": pose_fixture.POSE_ID,
+                "pose_body_language_label": pose_fixture.POSE_LABEL,
+                "expression_gaze_id": pose_fixture.EXPRESSION_ID,
+                "expression_gaze_label": pose_fixture.EXPRESSION_LABEL,
+                "expression_canonical_text": pose_fixture.EXPRESSION_TEXT,
+                "expression_text": pose_fixture.EXPRESSION_TEXT,
+                "expression_safe_fallback_used": False,
+                "expression_safe_fallback_reason": None,
+                "expression_scene_conflict_terms": [],
+                "expression_derivation_scene_action": "standing in a controlled studio portrait",
+            }
+        )
+    candidate_file = {"candidate": dict(candidate)} if controlled or nested_candidate else dict(candidate)
+    candidate_file["schema_version"] = "lena_pre_generation_candidate_gate_v1"
+    candidate_file["candidate_status"] = "selected"
+    if controlled:
+        candidate_file["authority_commit"] = AUTHORITY_COMMIT
+        candidate_file["decision_fingerprint_sha256"] = "d" * 64
     _write_json(candidate_path, candidate_file)
+    candidate_repo_path = candidate_path.relative_to(tmp_path).as_posix()
+    candidate_sha = _sha(candidate_path)
+    pose_binding = pose_fixture.static_pose_provenance(
+        candidate_path=candidate_repo_path,
+        candidate_sha256=candidate_sha,
+        authority_commit=AUTHORITY_COMMIT,
+    )
+    expression_binding = pose_fixture.static_expression_provenance(
+        candidate_path=candidate_repo_path,
+        candidate_sha256=candidate_sha,
+        authority_commit=AUTHORITY_COMMIT,
+    )
+    # A separate copy for embedding as the handoff's selected_candidate: real
+    # production handoffs embed the candidate's own artifact_path/sha256
+    # (computed after the candidate file is written), never inside the
+    # candidate file itself.
+    candidate_for_handoff = dict(
+        candidate,
+        schema_version="lena_pre_generation_candidate_gate_v1",
+        candidate_status="selected",
+        artifact_path=candidate_repo_path,
+        artifact_sha256=candidate_sha,
+    )
     policy = _policy_payload(daily_spend_ceiling=daily_spend_ceiling)
     if controlled:
         model_authority = tmp_path / "pipeline" / "identity" / "lena_visual_model_authority_v1.json"
@@ -215,9 +262,11 @@ def _build_bundle(
         "date": date_str,
         "selected_slot_id": slot_id,
         "selected_recipe_id": RECIPE_ID,
-        "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
-        "selected_candidate_sha256": _sha(candidate_path),
-        "selected_candidate": candidate,
+        "selected_candidate_path": candidate_repo_path,
+        "selected_candidate_sha256": candidate_sha,
+        "selected_candidate": candidate_for_handoff,
+        "source_selected_candidate_artifact_path": candidate_repo_path,
+        "source_selected_candidate_artifact_sha256": candidate_sha,
         "prompt_sha256": PROMPT_SHA,
         "custom_reference_id": CUSTOM_REFERENCE_ID,
         "platform": platform,
@@ -235,8 +284,10 @@ def _build_bundle(
             "date": date_str,
             "selected_slot_id": slot_id,
             "selected_recipe_id": RECIPE_ID,
-            "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
-            "selected_candidate_sha256": _sha(candidate_path),
+            "selected_candidate_path": candidate_repo_path,
+            "selected_candidate_sha256": candidate_sha,
+            "selected_candidate_artifact_path": candidate_repo_path,
+            "selected_candidate_artifact_sha256": candidate_sha,
             "prompt_sha256": PROMPT_SHA,
             "selected_prompt_sha256": PROMPT_SHA,
             "expected_output_directory": (Path("pipeline") / "higgsfield_library" / "lena" / date_str).as_posix(),
@@ -244,6 +295,7 @@ def _build_bundle(
             "allowed_output_extensions": list(approval.ALLOWED_OUTPUT_EXTENSIONS),
             "model": "text2image_soul_v2",
             "aspect_ratio": "9:16",
+            "custom_reference_id": CUSTOM_REFERENCE_ID,
             "provider": "higgsfield",
             "executor_type": "higgsfield_cli",
             "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
@@ -267,8 +319,8 @@ def _build_bundle(
         "compact_provider_prompt_preview": "provider prompt preview",
         "recipe_id": RECIPE_ID,
         "lane": "bounded-live",
-        "selected_candidate_artifact_path": str(candidate_path),
-        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "selected_candidate_artifact_path": candidate_repo_path,
+        "selected_candidate_artifact_sha256": candidate_sha,
         "image": {
             "slot_id": slot_id,
             "lane": "bounded-live",
@@ -280,20 +332,29 @@ def _build_bundle(
         },
     }
     _write_json(packet_path, packet)
+    packet_bound_sha = hashlib.sha256(
+        json.dumps(packet, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
 
     recommendation_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_next_generation_step_{date_str}.json"
     learning_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_post_outcome_learning_state_{date_str}.json"
     queue_path = tmp_path / "pipeline" / "strategy" / "lena" / "next_actions" / date_str / f"lena_autonomous_generation_queue_dryrun_{date_str}.json"
 
     candidate_selection_binding = {
-        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
-        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "selected_candidate_artifact_path": candidate_repo_path,
+        "selected_candidate_artifact_sha256": candidate_sha,
         "candidate_id": candidate["candidate_id"],
         "slot_id": slot_id,
         "recipe_id": RECIPE_ID,
         "candidate_prompt_sha256": PROMPT_SHA,
         "candidate_lane": candidate["lane"],
         "source_prompt_family": "prompt_library_candidate",
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_body_language_label": pose_binding["pose_body_language_label"],
+        "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_gaze_label": expression_binding["expression_gaze_label"],
+        "expression_provenance_fingerprint_sha256": expression_binding["expression_provenance_fingerprint_sha256"],
     }
     provider_execution_binding = {
         "content_packet_artifact_path": packet_repo_path.as_posix(),
@@ -305,14 +366,18 @@ def _build_bundle(
         "source_prompt_family": "compact_provider_prompt",
         "provider": "higgsfield",
         "model": "text2image_soul_v2",
+        "pose_bound_content_packet_sha256": packet_bound_sha,
+        "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+        "expression_bound_content_packet_sha256": packet_bound_sha,
+        "expression_provenance_fingerprint_sha256": expression_binding["expression_provenance_fingerprint_sha256"],
     }
     binding_linkage = {
         "recommendation_artifact_path": recommendation_path.relative_to(tmp_path).as_posix(),
         "recommendation_artifact_sha256": "",
         "queue_artifact_path": queue_path.relative_to(tmp_path).as_posix(),
         "queue_artifact_sha256": "",
-        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
-        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "selected_candidate_artifact_path": candidate_repo_path,
+        "selected_candidate_artifact_sha256": candidate_sha,
         "content_packet_artifact_path": packet_repo_path.as_posix(),
         "content_packet_artifact_sha256": _sha(packet_path),
         "recipe_id": RECIPE_ID,
@@ -325,12 +390,22 @@ def _build_bundle(
         "candidate_prompt_family": "prompt_library_candidate",
         "provider_prompt_family": "compact_provider_prompt",
         "prompt_family_relationship": "candidate prompt family and provider prompt family are intentionally distinct for the same recipe/slot chain",
+        "pose_body_language_id": pose_binding["pose_body_language_id"],
+        "pose_provenance_fingerprint_sha256": pose_binding["pose_provenance_fingerprint_sha256"],
+        "pose_bound_content_packet_sha256": packet_bound_sha,
+        "expression_gaze_id": expression_binding["expression_gaze_id"],
+        "expression_provenance_fingerprint_sha256": expression_binding["expression_provenance_fingerprint_sha256"],
+        "expression_bound_content_packet_sha256": packet_bound_sha,
     }
     selected_prompt_input = {
         "artifact_path": packet_repo_path.as_posix(),
         "artifact_sha256": _sha(packet_path),
-        "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
-        "selected_candidate_artifact_sha256": _sha(candidate_path),
+        "selected_candidate_artifact_path": candidate_repo_path,
+        "selected_candidate_artifact_sha256": candidate_sha,
+        "pose_provenance": pose_binding,
+        "pose_bound_content_packet_sha256": packet_bound_sha,
+        "expression_provenance": expression_binding,
+        "expression_bound_content_packet_sha256": packet_bound_sha,
         "artifact_report_type": packet["report_type"],
         "packet_id": packet["packet_id"],
         "prompt_sha256": PROMPT_SHA,
@@ -352,9 +427,21 @@ def _build_bundle(
             "selected_prompt_input_artifact_path": packet_repo_path.as_posix(),
             "selected_prompt_input_artifact_sha256": _sha(packet_path),
             "selected_prompt_input": selected_prompt_input,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": packet_bound_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_bound_sha,
             "candidate_selection_binding": candidate_selection_binding,
             "provider_execution_binding": provider_execution_binding,
             "binding_linkage": binding_linkage,
+        }
+    )
+    handoff["structured_executor_inputs"].update(
+        {
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": packet_bound_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_bound_sha,
         }
     )
     _write_json(handoff_path, handoff)
@@ -437,9 +524,15 @@ def _build_bundle(
             "date": date_str,
             "selected_slot_id": slot_id,
             "selected_recipe_id": RECIPE_ID,
-            "selected_candidate_path": candidate_path.relative_to(tmp_path).as_posix(),
-            "selected_candidate_sha256": _sha(candidate_path),
-            "selected_candidate": candidate,
+            "selected_candidate_path": candidate_repo_path,
+            "selected_candidate_sha256": candidate_sha,
+            "selected_candidate": candidate_for_handoff,
+            "source_selected_candidate_artifact_path": candidate_repo_path,
+            "source_selected_candidate_artifact_sha256": candidate_sha,
+            "pose_provenance": pose_binding,
+            "pose_bound_content_packet_sha256": packet_bound_sha,
+            "expression_provenance": expression_binding,
+            "expression_bound_content_packet_sha256": packet_bound_sha,
             "candidate_selection_binding": candidate_selection_binding,
             "provider_execution_binding": provider_execution_binding,
             "binding_linkage": binding_linkage,
@@ -456,6 +549,12 @@ def _build_bundle(
                 "caption_seed": packet["caption_draft"],
                 "prompt_sha256": PROMPT_SHA,
                 "artifact_path": packet_repo_path.as_posix(),
+                "selected_candidate_artifact_path": candidate_repo_path,
+                "selected_candidate_artifact_sha256": candidate_sha,
+                "pose_provenance": pose_binding,
+                "pose_bound_content_packet_sha256": packet_bound_sha,
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_sha256": packet_bound_sha,
                 "lane": packet["lane"],
                 "recipe_id": RECIPE_ID,
                 "exact_proposed_dry_run_command": f"python pipeline/higgsfield_lena_api_executor.py --handoff-artifact {handoff_repo_path.as_posix()}",
@@ -477,8 +576,12 @@ def _build_bundle(
                 "date": date_str,
                 "slot_id": slot_id,
                 "handoff_artifact_path": handoff_repo_path.as_posix(),
-                "selected_candidate_artifact_path": candidate_path.relative_to(tmp_path).as_posix(),
-                "selected_candidate_artifact_sha256": _sha(candidate_path),
+                "selected_candidate_artifact_path": candidate_repo_path,
+                "selected_candidate_artifact_sha256": candidate_sha,
+                "pose_provenance": pose_binding,
+                "pose_bound_content_packet_sha256": packet_bound_sha,
+                "expression_provenance": expression_binding,
+                "expression_bound_content_packet_sha256": packet_bound_sha,
                 "soul_metadata": {
                     "name": "Lena",
                     "type": "Soul 2.0",
@@ -570,6 +673,126 @@ def _build_bundle(
         "handoff": handoff,
         "image_path": image_path,
     }
+
+
+def _selected_candidate_bound_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path | dict]:
+    _patch_roots(monkeypatch, tmp_path)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    candidate_path = Path(bundle["candidate_path"])
+    handoff_path = Path(bundle["handoff_path"])
+    candidate_body = dict(bundle["candidate"])  # type: ignore[arg-type]
+    candidate_doc = {
+        "schema_version": approval.SELECTED_CANDIDATE_SCHEMA_VERSION,
+        "candidate_status": "selected",
+        "authority_commit": AUTHORITY_COMMIT,
+        "decision_fingerprint_sha256": "d" * 64,
+        "candidate": candidate_body,
+    }
+    _write_json(candidate_path, candidate_doc)
+    candidate_sha = _sha(candidate_path)
+    candidate_repo_path = candidate_path.relative_to(tmp_path).as_posix()
+
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff["selected_candidate_path"] = candidate_repo_path
+    handoff["selected_candidate_sha256"] = candidate_sha
+    handoff["source_selected_candidate_artifact_path"] = candidate_repo_path
+    handoff["source_selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["selected_candidate"].update(
+        {
+            "schema_version": approval.SELECTED_CANDIDATE_SCHEMA_VERSION,
+            "candidate_status": "selected",
+            "artifact_path": candidate_repo_path,
+            "artifact_sha256": candidate_sha,
+        }
+    )
+    handoff["selected_prompt_input"]["selected_candidate_artifact_path"] = candidate_repo_path
+    handoff["selected_prompt_input"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["structured_executor_inputs"]["selected_candidate_artifact_path"] = candidate_repo_path
+    handoff["structured_executor_inputs"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["candidate_selection_binding"]["selected_candidate_artifact_path"] = candidate_repo_path
+    handoff["candidate_selection_binding"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["binding_linkage"]["selected_candidate_artifact_path"] = candidate_repo_path
+    handoff["binding_linkage"]["selected_candidate_artifact_sha256"] = candidate_sha
+    _write_json(handoff_path, handoff)
+
+    bundle["handoff"] = handoff
+    return bundle
+
+
+def _sync_selected_candidate_sha(handoff: dict, candidate_sha: str) -> None:
+    handoff["selected_candidate_sha256"] = candidate_sha
+    handoff["source_selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["selected_candidate"]["artifact_sha256"] = candidate_sha
+    handoff["selected_prompt_input"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["structured_executor_inputs"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["candidate_selection_binding"]["selected_candidate_artifact_sha256"] = candidate_sha
+    handoff["binding_linkage"]["selected_candidate_artifact_sha256"] = candidate_sha
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_code"),
+    [
+        ("missing_source_path", "handoff_selected_candidate_path_missing"),
+        ("missing_source_sha", "handoff_selected_candidate_sha_missing"),
+        ("embedded_path_mismatch", "handoff_selected_candidate_binding_mismatch"),
+        ("embedded_sha_mismatch", "handoff_selected_candidate_sha_binding_mismatch"),
+        ("embedded_candidate_disagreement", "handoff_selected_candidate_id_mismatch"),
+        ("selected_prompt_path_mismatch", "handoff_selected_candidate_binding_mismatch"),
+        ("structured_sha_mismatch", "handoff_structured_selected_candidate_sha_mismatch"),
+        ("stale_candidate_artifact", "handoff_selected_candidate_sha_mismatch"),
+        ("malformed_candidate_envelope", "handoff_selected_candidate_body_missing"),
+        ("caller_candidate_path_mismatch", "candidate_path_binding_mismatch"),
+    ],
+)
+def test_standing_autonomy_inspection_enforces_selected_candidate_binding_equivalence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+    expected_code: str,
+) -> None:
+    bundle = _selected_candidate_bound_bundle(tmp_path, monkeypatch)
+    candidate_path = Path(bundle["candidate_path"])
+    handoff_path = Path(bundle["handoff_path"])
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    candidate_arg = candidate_path
+
+    if case == "missing_source_path":
+        handoff.pop("source_selected_candidate_artifact_path")
+    elif case == "missing_source_sha":
+        handoff.pop("source_selected_candidate_artifact_sha256")
+    elif case == "embedded_path_mismatch":
+        handoff["selected_candidate"]["artifact_path"] = "pipeline/strategy/lena/pre_generation_candidates/2099-01-01/other.json"
+    elif case == "embedded_sha_mismatch":
+        handoff["selected_candidate"]["artifact_sha256"] = "f" * 64
+    elif case == "embedded_candidate_disagreement":
+        handoff["selected_candidate"]["candidate_id"] = "substituted-candidate"
+    elif case == "selected_prompt_path_mismatch":
+        handoff["selected_prompt_input"]["selected_candidate_artifact_path"] = "pipeline/strategy/lena/pre_generation_candidates/2099-01-01/other.json"
+    elif case == "structured_sha_mismatch":
+        handoff["structured_executor_inputs"]["selected_candidate_artifact_sha256"] = "e" * 64
+    elif case == "stale_candidate_artifact":
+        candidate_doc = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate_doc["candidate"]["candidate_id"] = "substituted-candidate"
+        _write_json(candidate_path, candidate_doc)
+    elif case == "malformed_candidate_envelope":
+        candidate_doc = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate_doc.pop("candidate")
+        _write_json(candidate_path, candidate_doc)
+        _sync_selected_candidate_sha(handoff, _sha(candidate_path))
+    elif case == "caller_candidate_path_mismatch":
+        candidate_arg = candidate_path.with_name("other_selected_candidate.json")
+        _write_json(candidate_arg, json.loads(candidate_path.read_text(encoding="utf-8")))
+    else:
+        raise AssertionError(f"unhandled case: {case}")
+
+    _write_json(handoff_path, handoff)
+
+    with pytest.raises(standing_generation_approval.HiggsfieldStandingAutonomyGenerationApprovalError) as exc_info:
+        standing_generation_approval.inspect_generation_handoff_for_standing_autonomy(
+            handoff_path,
+            candidate_arg,
+        )
+    assert exc_info.value.code == expected_code
 
 
 def _rewrite_candidate_shape_and_bindings(bundle: dict[str, Path | dict], *, nested_candidate: dict) -> None:
@@ -725,10 +948,15 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
     reference_path = tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png"
 
     def fake_execute_approved_handoff_live_generation(context: dict[str, object], *, custom_reference_id=None, live_executor=None):
-        assert context["approval_result"]["approval"]["authorization_mode"] == "standing_autonomy_policy"
-        assert Path(context["approval_result"]["approval_path"]).resolve() == Path(bundle["auth_path"]).resolve()
+        approval_result = context["approval_result"]
+        approval_record = approval_result["approval"]
+        if approval_record.get("authorization_identity_mode") == "standing_autonomy_policy":
+            assert Path(approval_result["approval_path"]).resolve() == standing_generation_approval.approval_output_path(DATE, SLOT_ID).resolve()
+        else:
+            assert approval_record["authorization_mode"] == "standing_autonomy_policy"
+            assert Path(approval_result["approval_path"]).resolve() == Path(bundle["auth_path"]).resolve()
         handoff_facts = context["approval_result"]["handoff_facts"]
-        assert handoff_facts["handoff_path"] == str(Path(bundle["handoff_path"]).resolve())
+        assert Path(str(handoff_facts["handoff_path"])).resolve() == Path(bundle["handoff_path"]).resolve()
         assert handoff_facts["handoff_repo_path"] == state["expected_handoff_repo_path"]
         state["provider_contexts"].append(context)
         state["provider_calls"] = int(state["provider_calls"]) + 1
@@ -939,6 +1167,7 @@ def test_controlled_live_success_autonomously_cleans_queues_schedules_and_publis
         report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
     )
 
+    assert report["ok"] is True, report.get("failure")
     assert report["autonomous_disposition"] == "accept_and_publish"
     assert report["human_review_required"] is False
     assert report["human_per_cycle_approval_required"] is False
@@ -1169,7 +1398,10 @@ def test_live_success_consumes_authorization_and_binds_all_artifacts(tmp_path: P
     report = _run_cycle(bundle, simulate=False, report_root=tmp_path / "reports")
 
     auth_after = json.loads(Path(bundle["auth_path"]).read_text(encoding="utf-8"))
-    sidecar_path = Path(bundle["image_path"]).with_suffix(".status.json")
+    sidecar_artifact = report["child_artifacts"]["publish_sidecar"]
+    sidecar_path = Path(sidecar_artifact["path"])
+    assert sidecar_path.exists()
+    assert sidecar_artifact["sha256"] == _sha(sidecar_path)
     sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
     assert report["ok"] is True
     assert report["live_execution"] is True
