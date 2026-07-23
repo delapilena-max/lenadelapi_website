@@ -725,30 +725,35 @@ def validate_cycle_authorization_artifact(
     # match) before recomputing, so this check still proves nothing *else*
     # was tampered with post-issuance.
     if consumed is True:
-        reconstructed_for_hash = dict(auth)
-        reconstructed_for_hash["consumed"] = False
-        reconstructed_for_hash["consumed_at_utc"] = None
-        reconstructed_for_hash["authorization_consumed"] = False
-        reconstructed_for_hash["authorization_state_after"] = {
+        reconstructed_pre_consumption = dict(auth)
+        reconstructed_pre_consumption["consumed"] = False
+        reconstructed_pre_consumption["consumed_at_utc"] = None
+        reconstructed_pre_consumption["authorization_consumed"] = False
+        reconstructed_pre_consumption["authorization_state_after"] = {
             "single_use": True,
             "consumed": False,
             "consumed_at_utc": None,
         }
-        reconstructed_for_hash.pop("cycle_authorization_sha256", None)
+        reconstructed_pre_consumption.pop("cycle_authorization_sha256", None)
+        reconstructed_for_hash = dict(reconstructed_pre_consumption)
         reconstructed_for_hash.pop("authorization_artifact_sha256", None)
         canonical_sha = _sha256_bytes(
             (json.dumps(reconstructed_for_hash, indent=2, ensure_ascii=True) + "\n").encode("utf-8")
         )
+        pre_consumption_text = json.dumps(reconstructed_pre_consumption, indent=2, ensure_ascii=True) + "\n"
+        if b"\r\n" in auth_path.read_bytes():
+            pre_consumption_text = pre_consumption_text.replace("\n", "\r\n")
+        pre_consumption_file_sha = _sha256_bytes(pre_consumption_text.encode("utf-8"))
         cycle_authorization_sha = str(auth.get("cycle_authorization_sha256") or "").strip()
         if cycle_authorization_sha:
             _require(
-                len(cycle_authorization_sha) == 64 and all(ch in "0123456789abcdef" for ch in cycle_authorization_sha),
+                cycle_authorization_sha == pre_consumption_file_sha,
                 "authorization_sha_mismatch",
-                "cycle authorization SHA must be a lowercase sha256 digest",
+                "cycle authorization SHA does not match reconstructed pre-consumption authorization bytes",
             )
         else:
             consumed_payload_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
-            if str(auth.get("authorization_artifact_sha256") or "") == consumed_payload_sha:
+            if str(auth.get("authorization_artifact_sha256") or "") == consumed_payload_sha and auth.get("cycle_id"):
                 canonical_sha = consumed_payload_sha
     else:
         canonical_sha = _sha256_json_without_keys(auth_path, {"authorization_artifact_sha256"})
