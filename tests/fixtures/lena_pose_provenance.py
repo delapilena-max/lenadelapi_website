@@ -51,7 +51,7 @@ def static_pose_provenance(
     return {**core, "pose_provenance_fingerprint_sha256": fingerprint}
 
 
-def candidate_pose_provenance(candidate_path: Path, *, root: Path) -> dict[str, Any]:
+def candidate_pose_provenance(candidate_path: Path, *, root: Path, **kwargs) -> dict[str, Any]:
     payload = json.loads(candidate_path.read_text(encoding="utf-8"))
     return static_pose_provenance(
         candidate_path=candidate_path.resolve().relative_to(root.resolve()).as_posix(),
@@ -64,6 +64,7 @@ def candidate_expression_provenance(
     candidate_path: Path,
     *,
     root: Path,
+    **kwargs,
 ) -> dict[str, Any]:
     payload = json.loads(candidate_path.read_text(encoding="utf-8"))
     return static_expression_provenance(

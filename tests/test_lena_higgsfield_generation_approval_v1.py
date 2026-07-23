@@ -626,7 +626,7 @@ def test_inspect_rejects_candidate_derived_provider_authority_mismatch(
     if authority == "pose":
         original = pose_fixture.candidate_pose_provenance
 
-        def derive(candidate_path: Path, *, root: Path) -> dict:
+        def derive(candidate_path: Path, *, root: Path, **kwargs) -> dict:
             value = original(candidate_path, root=root)
             value["pose_authority_artifact_sha256"] = "f" * 64
             return _reseal_provenance(
@@ -643,7 +643,7 @@ def test_inspect_rejects_candidate_derived_provider_authority_mismatch(
     else:
         original = pose_fixture.candidate_expression_provenance
 
-        def derive(candidate_path: Path, *, root: Path) -> dict:
+        def derive(candidate_path: Path, *, root: Path, **kwargs) -> dict:
             value = original(candidate_path, root=root)
             value["expression_authority_artifact_sha256"] = "f" * 64
             return _reseal_provenance(

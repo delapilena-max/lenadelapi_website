@@ -311,7 +311,11 @@ def _validate_bound_provider_prompt_copies(
     return validated[0][1]
 
 
-def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
+def inspect_handoff_artifact(
+    handoff_path: Path,
+    *,
+    selected_candidate_freshness_mode: str | None = None,
+) -> dict[str, Any]:
     handoff_path = handoff_path.resolve()
     report = read_json_object(
         handoff_path,
@@ -428,10 +432,12 @@ def inspect_handoff_artifact(handoff_path: Path) -> dict[str, Any]:
         derived_pose = pose_provenance.build_candidate_pose_provenance(
             selected_candidate_path,
             root=ROOT,
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
         )
         derived_expression = pose_provenance.build_candidate_expression_provenance(
             selected_candidate_path,
             root=ROOT,
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
         )
         pose_provenance.validate_pose_provenance(derived_pose)
         pose_provenance.validate_expression_provenance(derived_expression)

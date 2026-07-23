@@ -571,7 +571,8 @@ def _resolve_generation_binding_context(
             require_not_expired=False,
         )
         handoff_facts = approval.inspect_handoff_artifact(
-            Path(str(auth["artifact"]["generation_handoff_artifact_path"]))
+            Path(str(auth["artifact"]["generation_handoff_artifact_path"])),
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
         )
         decision, candidate = _validate_selected_decision(
             Path(handoff_facts["selected_candidate_path"]),

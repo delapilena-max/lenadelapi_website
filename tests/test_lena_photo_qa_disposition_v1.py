@@ -504,12 +504,12 @@ def _production_dual_binding_fixture(
     monkeypatch.setattr(
         disposition.approval.pose_provenance,
         "build_candidate_pose_provenance",
-        lambda candidate_path, *, root: dict(pose_binding),
+        lambda candidate_path, *, root, **kwargs: dict(pose_binding),
     )
     monkeypatch.setattr(
         disposition.approval.pose_provenance,
         "build_candidate_expression_provenance",
-        lambda candidate_path, *, root: dict(expression_binding),
+        lambda candidate_path, *, root, **kwargs: dict(expression_binding),
     )
     handoff["repo_executor_path"] = "pipeline/higgsfield_lena_api_executor.py"
     handoff["created_at"] = "2026-07-19T00:00:00Z"

@@ -259,6 +259,8 @@ def _build_bundle(
         "execution_owner": "claude",
         "provider": "higgsfield",
         "executor_type": "higgsfield_cli",
+        "repo_executor_path": "pipeline/higgsfield_lena_api_executor.py",
+        "created_at": "2026-07-18T01:00:00Z",
         "date": date_str,
         "selected_slot_id": slot_id,
         "selected_recipe_id": RECIPE_ID,
@@ -267,6 +269,7 @@ def _build_bundle(
         "selected_candidate": candidate_for_handoff,
         "source_selected_candidate_artifact_path": candidate_repo_path,
         "source_selected_candidate_artifact_sha256": candidate_sha,
+        "expected_handoff_artifact_path": handoff_path.relative_to(tmp_path).as_posix(),
         "prompt_sha256": PROMPT_SHA,
         "custom_reference_id": CUSTOM_REFERENCE_ID,
         "platform": platform,
@@ -282,6 +285,8 @@ def _build_bundle(
         "live_execution_state": "blocked",
         "structured_executor_inputs": {
             "date": date_str,
+            "slot_id": slot_id,
+            "handoff_artifact_path": handoff_path.relative_to(tmp_path).as_posix(),
             "selected_slot_id": slot_id,
             "selected_recipe_id": RECIPE_ID,
             "selected_candidate_path": candidate_repo_path,
@@ -1188,6 +1193,115 @@ def test_controlled_live_success_autonomously_cleans_queues_schedules_and_publis
     assert report["queue_mutated"] is True
     assert report["publish_performed"] is True
     assert admissions and state["qa_calls"] == 1
+
+
+def test_controlled_live_post_generation_qa_uses_frozen_candidate_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    manifest_path = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "result_manifest.json"
+    modes: list[str] = []
+    inspect_modes: list[str | None] = []
+
+    def validate_selected_candidate_after_generation(artifact: dict, **kwargs):
+        mode = kwargs.get("freshness_mode", cycle.selected_candidate.FRESHNESS_MODE_CURRENT)
+        modes.append(mode)
+        if manifest_path.exists() and mode != cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT:
+            raise cycle.selected_candidate.ConsumerError(
+                "stale_decision",
+                "current decision-critical evidence does not reproduce the stored decision",
+            )
+        return {
+            "candidate": cycle._resolve_candidate_artifact(artifact),
+            "stored_core": {},
+            "recomputed_fingerprint_sha256": "d" * 64,
+            "fresh_fingerprint_sha256": "d" * 64,
+            "executor_validation": {"ok": True},
+        }
+
+    def inspect_handoff_after_generation(handoff_path: Path, **kwargs):
+        mode = kwargs.get("selected_candidate_freshness_mode")
+        inspect_modes.append(mode)
+        assert manifest_path.exists()
+        assert mode == cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT
+        candidate_artifact = json.loads(Path(bundle["candidate_path"]).read_text(encoding="utf-8"))
+        cycle.selected_candidate.validate_selected_candidate_issuance(
+            candidate_artifact,
+            root=tmp_path,
+            freshness_mode=mode,
+        )
+        return {
+            "report": json.loads(Path(bundle["handoff_path"]).read_text(encoding="utf-8")),
+            "selected_candidate_path": Path(bundle["candidate_path"]),
+        }
+
+    def qa_resolves_authorization_bound_decision(**kwargs):
+        state["qa_calls"] = int(state["qa_calls"]) + 1
+        assert kwargs["selected_candidate_freshness_mode"] == cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT
+        photo_qa._resolve_generation_binding_context(
+            Path(kwargs["decision_path"]).resolve(),
+            selected_candidate_freshness_mode=kwargs["selected_candidate_freshness_mode"],
+        )
+        return {
+            "report_type": "lena_presence_output_qa",
+            "schema_version": "v2",
+            "slot_id": SLOT_ID,
+            "date": DATE,
+            "disposition": "accept",
+            "overall": "pass",
+            "provider_job_id": "job-123",
+            "image_sha256": _sha(bundle["image_path"]),  # type: ignore[arg-type]
+            "generation_provenance": {"date": DATE},
+            "reason_codes": [],
+            "exact_next_allowed_action": "existing_downstream_qa_and_human_review_gates_only",
+            "production_scoring": {},
+        }
+
+    monkeypatch.setattr(cycle.selected_candidate, "validate_selected_candidate_issuance", validate_selected_candidate_after_generation)
+    monkeypatch.setattr(photo_qa.approval, "inspect_handoff_artifact", inspect_handoff_after_generation)
+    monkeypatch.setattr(photo_qa, "evaluate_photo_qa_disposition", qa_resolves_authorization_bound_decision)
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "_validate_policy_artifact",
+        lambda path: {
+            "path": Path(path),
+            "sha256": "p" * 64,
+            "artifact": {
+                "policy_id": "lena_approved_queue_auto_publisher_policy_v2_8",
+                "policy_version": "v2.8.0",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "admit_controlled_photo",
+        lambda **kwargs: {"queue_path": str(tmp_path / "queue.csv"), "queue_id": "controlled-queue-1", "created": True},
+    )
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "run_scheduled_autonomous",
+        lambda **kwargs: {
+            "ok": True,
+            "posted_count": 1,
+            "publish_calls_performed": 1,
+            "receipt_paths": [str(tmp_path / "publish-receipt.json")],
+        },
+    )
+
+    report = _run_cycle(
+        bundle,
+        simulate=False,
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+
+    assert report["ok"] is True, report.get("failure")
+    assert manifest_path.exists()
+    assert cycle.selected_candidate.FRESHNESS_MODE_CURRENT in modes
+    assert cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT in modes
+    assert inspect_modes == [cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT]
 
 
 def test_controlled_hair_rejection_executes_one_retry_then_publishes_without_human_review(

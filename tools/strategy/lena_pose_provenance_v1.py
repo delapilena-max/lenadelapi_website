@@ -228,12 +228,16 @@ def _validate_selected_candidate_issuance(
     artifact: dict[str, Any],
     *,
     root: Path,
+    freshness_mode: str | None = None,
 ) -> dict[str, Any]:
     from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
+    if freshness_mode is None:
+        freshness_mode = selected_candidate.FRESHNESS_MODE_CURRENT
     try:
         issuance = selected_candidate.validate_selected_candidate_issuance(
             artifact,
             root=root,
+            freshness_mode=freshness_mode,
         )
     except selected_candidate.ConsumerError as exc:
         code = {
@@ -323,7 +327,12 @@ def validate_pose_provenance(
     return dict(value)
 
 
-def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) -> dict[str, Any]:
+def build_candidate_pose_provenance(
+    candidate_path: Path,
+    *,
+    root: Path = ROOT,
+    selected_candidate_freshness_mode: str | None = None,
+) -> dict[str, Any]:
     candidate_path = candidate_path.resolve()
     candidate_repo_path = _repo_relative(candidate_path, root)
     try:
@@ -332,7 +341,11 @@ def build_candidate_pose_provenance(candidate_path: Path, *, root: Path = ROOT) 
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise PoseProvenanceError("pose_candidate_unreadable", f"could not read selected candidate artifact: {exc}") from exc
     _require(isinstance(artifact, dict), "pose_candidate_invalid", "selected candidate artifact must contain a JSON object")
-    candidate = _validate_selected_candidate_issuance(artifact, root=root)
+    candidate = _validate_selected_candidate_issuance(
+        artifact,
+        root=root,
+        freshness_mode=selected_candidate_freshness_mode,
+    )
     authority_commit = str(artifact["authority_commit"])
 
     pose_id = str(candidate.get("pose_body_language_id") or "").strip()
@@ -524,6 +537,7 @@ def build_candidate_expression_provenance(
     candidate_path: Path,
     *,
     root: Path = ROOT,
+    selected_candidate_freshness_mode: str | None = None,
 ) -> dict[str, Any]:
     candidate_path = candidate_path.resolve()
     candidate_repo_path = _repo_relative(candidate_path, root)
@@ -540,7 +554,11 @@ def build_candidate_expression_provenance(
         "expression_candidate_invalid",
         "selected candidate artifact must contain a JSON object",
     )
-    candidate = _validate_selected_candidate_issuance(artifact, root=root)
+    candidate = _validate_selected_candidate_issuance(
+        artifact,
+        root=root,
+        freshness_mode=selected_candidate_freshness_mode,
+    )
     authority_commit = str(artifact["authority_commit"])
     expression_id = str(candidate.get("expression_gaze_id") or "").strip()
     candidate_label = str(candidate.get("expression_gaze_label") or "").strip()
