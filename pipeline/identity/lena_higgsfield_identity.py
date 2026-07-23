@@ -43,12 +43,16 @@ EXPECTED_SOUL_TYPE = "soul_2"
 EXPECTED_JOB_TYPE = soul_cinema_contract.MODEL
 HISTORICAL_JOB_TYPES = frozenset({"text2image_soul_v2"})
 APPROVED_JOB_TYPES = frozenset({EXPECTED_JOB_TYPE, *HISTORICAL_JOB_TYPES})
-# Both are real, provider-confirmed Lena Soul ids -- not interchangeable
-# by convenience, but both genuinely valid depending on WHEN a given piece
-# of evidence was recorded. The account's live Soul id rotated at some
-# point after the original 2026-07-09/10 confirmation and again after the
-# 2026-07-12 confirmation (re-confirmed via `higgsfield soul-id list --json`
-# on 2026-07-23: only the third id below is present on the account today).
+# These are real, provider-confirmed Lena Soul ids -- not interchangeable
+# by convenience, but each genuinely valid for evidence recorded while it
+# was the account's live Soul. The account's live Soul id rotated after the
+# original 2026-07-09/10 confirmation, again after the 2026-07-12
+# confirmation, again on 2026-07-23 (re-confirmed via `higgsfield soul-id
+# list --json` that day), and again later the same day when Nicolas erased
+# the account's Souls and retrained a fresh Lena Soul 2.0 because the
+# 2026-07-23 id did not visually match Lena in either of the two real
+# generations run under it -- only the fourth id below is present on the
+# account today.
 # Historical evidence recorded under prior ids remains genuinely correct for
 # what was actually verified at that time and must never be rewritten to
 # match current provider truth.
@@ -58,8 +62,9 @@ APPROVED_JOB_TYPES = frozenset({EXPECTED_JOB_TYPE, *HISTORICAL_JOB_TYPES})
 # exists only for read-only, local evidence validation below.
 APPROVED_CUSTOM_REFERENCE_IDS = {
     "1f1200e4-1cc9-4504-ac1c-3304b687e3c1",  # historical Lena Soul id (2026-07-09/10 confirmation)
-    "90a293d7-f3af-4377-8751-3304a27b6f31",  # historical Lena Soul id (2026-07-12 confirmation)
-    "e45ec580-a6db-4063-a9b2-f9163856daae",  # current live Lena Soul id (re-confirmed 2026-07-23)
+    "90a293d7-f3af-4377-8751-3304a27b6f31",  # historical Lena Soul id (2026-07-12 confirmation; produced the canonical reference photo)
+    "e45ec580-a6db-4063-a9b2-f9163856daae",  # historical Lena Soul id (2026-07-20 - 2026-07-23; did not visually match Lena, retired same-day)
+    "79119c27-64fc-47f8-9ff3-c174d12932aa",  # current live Lena Soul id (retrained 2026-07-23)
 }
 # The one real, approved Higgsfield photo resolution proven so far -- see
 # tools/lena_build_publish_packet_v1.py's resolve_packet_inputs_higgsfield(),

@@ -1083,7 +1083,7 @@ def test_hair_retry_handoff_binds_current_completed_soul_and_preserves_history(
     receipt["handoff_artifact_sha256"] = hashlib.sha256(seeded["handoff_path"].read_bytes()).hexdigest()
     seeded["receipt_path"].write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     current_soul = {
-        "id": "e45ec580-a6db-4063-a9b2-f9163856daae",
+        "id": "79119c27-64fc-47f8-9ff3-c174d12932aa",
         "name": "Lena",
         "type": "soul_2",
         "status": "completed",
@@ -1141,7 +1141,7 @@ def test_current_soul_resolution_fails_closed(records: list[dict], code: str) ->
 
 
 def test_current_soul_resolution_accepts_single_completed_lena_soul_2() -> None:
-    expected = {"id": "e45ec580-a6db-4063-a9b2-f9163856daae", "name": "Lena", "type": "soul_2", "status": "completed"}
+    expected = {"id": "79119c27-64fc-47f8-9ff3-c174d12932aa", "name": "Lena", "type": "soul_2", "status": "completed"}
 
     class Completed:
         returncode = 0

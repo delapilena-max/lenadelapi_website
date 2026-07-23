@@ -96,3 +96,11 @@ Do not stage or modify them unless Nicolas explicitly names an artifact.
 - Do not call Anthropic, queue, publish, or activate the scheduler as part of the first proof.
 - Do not print or edit `.env`.
 - Do not stage untracked runtime evidence by accident.
+
+## Addendum (Claude, later same day 2026-07-23) - Soul ID rotation
+
+Action 3 above ran: job `64084207-2b32-4ed4-bcfa-c32fa66eeedd` under Soul id `e45ec580-a6db-4063-a9b2-f9163856daae`, slot `lenagate2026072382b626ca-pack000-00-photo`, completed and downloaded. Nicolas reviewed it and it did not look like Lena. Free, read-only `higgsfield` CLI checks (no spend) showed `e45ec580` was itself a fresh Soul (created 2026-07-20) that had never produced an accepted Lena image -- every prior accepted image, including the pinned reference photo, was generated under an older id, `90a293d7-f3af-4377-8751-3304a27b6f31`, which by 2026-07-23 no longer existed on the account (`soul-id get` returned "Soul not found").
+
+Nicolas erased the account's Souls and retrained a fresh Lena Soul 2.0: `79119c27-64fc-47f8-9ff3-c174d12932aa` (`type: soul_2`, `status: completed`, confirmed via `higgsfield soul-id list --json`). Claude updated the current-id constant (`pipeline/identity/lena_higgsfield_soul_cinema_contract_v1.py::CUSTOM_REFERENCE_ID`), the historical-evidence set (`pipeline/identity/lena_higgsfield_identity.py::APPROVED_CUSTOM_REFERENCE_IDS`, which now retains `e45ec580` only as historical fact), the executor's doc comment, and the pinned test literals in `tests/test_lena_build_next_live_image_handoff_v1.py`, `tests/test_lena_higgsfield_executor_handoff_contract_v1.py`, and `tests/test_lena_prepare_higgsfield_retry_handoff_v1.py`.
+
+Next safe action: this new Soul id has NOT yet been proven with any live generation. Do not assume it visually matches Lena until a fresh paid, executor-only test is explicitly authorized, run, and reviewed by Nicolas -- same process as before (fresh handoff/approval, stop after download, no queue/publish/second job).

@@ -12,7 +12,11 @@ MODEL = "soul_cinema_studio"
 ASPECT_RATIO = "9:16"
 QUALITY = "2k"
 ENHANCE_PROMPT = False
-CUSTOM_REFERENCE_ID = "e45ec580-a6db-4063-a9b2-f9163856daae"
+# Rotated 2026-07-23: Nicolas retrained Lena's Soul 2.0 from scratch on the
+# provider account (the prior e45ec580 Soul did not visually match Lena and
+# is preserved only as historical fact -- see APPROVED_CUSTOM_REFERENCE_IDS
+# in pipeline/identity/lena_higgsfield_identity.py).
+CUSTOM_REFERENCE_ID = "79119c27-64fc-47f8-9ff3-c174d12932aa"
 REFERENCE_AUTHORITY_PATH = (
     ROOT / "pipeline" / "identity" / "lena_visual_reference_authority_v1.json"
 )

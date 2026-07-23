@@ -28,11 +28,12 @@ from __future__ import annotations
 #   This executor requires exactly one SHA-bound image reference and forces
 #   enhance_prompt=false. No negative-prompt parameter exists.
 #   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
-#   id=e45ec580-a6db-4063-a9b2-f9163856daae (`soul-id list --json`,
-#   re-confirmed 2026-07-23 -- the provider account's live Soul ID rotated
-#   after the 2026-07-12 confirmation; prior IDs are preserved only as
-#   historical fact in already-recorded manifests/evidence -- never used as
-#   a default for new live submissions).
+#   id=79119c27-64fc-47f8-9ff3-c174d12932aa (`soul-id list --json`,
+#   confirmed 2026-07-23 -- Nicolas erased the account's prior Souls and
+#   retrained a fresh Lena Soul 2.0 the same day because the immediately
+#   prior id (e45ec580) did not visually match Lena; prior IDs are
+#   preserved only as historical fact in already-recorded manifests/
+#   evidence -- never used as a default for new live submissions).
 #
 # PROMPT ENHANCER DOCTRINE: Soul Cinema Studio exposes enhance_prompt as a
 # real boolean parameter. This executor always submits false so the approved

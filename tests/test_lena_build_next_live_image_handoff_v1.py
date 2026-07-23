@@ -364,7 +364,7 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
         == report["generation_reference"]
     )
     assert report["structured_executor_inputs"]["aspect_ratio"] == "9:16"
-    assert report["structured_executor_inputs"]["soul_metadata"]["custom_reference_id"] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert report["structured_executor_inputs"]["soul_metadata"]["custom_reference_id"] == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     assert report["packet_state"] == "packet_valid_for_claude_review"
     assert report["dry_run_executor_contract_state"] == "ready"
     assert report["live_execution_state"] == "blocked"

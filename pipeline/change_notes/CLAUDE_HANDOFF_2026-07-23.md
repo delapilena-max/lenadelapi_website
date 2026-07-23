@@ -64,3 +64,9 @@ Do not stage:
 ## Next Safe Step
 
 Review and commit only the intended integration. A first paid proof, if Nicolas explicitly approves it, must be one executor-only generation followed by download and human review. No Anthropic, queue, publish, or scheduler action.
+
+## Addendum (Claude, later same day) - Soul ID rotation
+
+The paid proof above ran (job `64084207-2b32-4ed4-bcfa-c32fa66eeedd`, slot `lenagate2026072382b626ca-pack000-00-photo`, completed, image downloaded). Nicolas reviewed the image and it did not look like Lena. Investigation (read-only `higgsfield` CLI lookups, no spend) found that `e45ec580-a6db-4063-a9b2-f9163856daae` was itself a fresh Soul (created 2026-07-20) that had never produced a generation matching Lena's known appearance -- every historically-accepted Lena image, including the pinned reference photo, traces to the older, by-then-already-retired id `90a293d7-f3af-4377-8751-3304a27b6f31`.
+
+Nicolas then erased the account's Souls and retrained a new Lena Soul 2.0: `79119c27-64fc-47f8-9ff3-c174d12932aa` (confirmed via `higgsfield soul-id list --json`, `type: soul_2`, `status: completed`). Production code now points at this id (`pipeline/identity/lena_higgsfield_soul_cinema_contract_v1.py::CUSTOM_REFERENCE_ID`); `e45ec580` is preserved as historical fact in `pipeline/identity/lena_higgsfield_identity.py::APPROVED_CUSTOM_REFERENCE_IDS`, same as every prior rotation. This new id has not yet been proven with a live generation -- do not treat it as visually confirmed until one is run and reviewed.

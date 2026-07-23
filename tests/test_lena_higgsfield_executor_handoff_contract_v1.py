@@ -2022,11 +2022,11 @@ def test_provider_argv_attaches_verified_lena_soul_and_authoritative_source_imag
     argv = executor.build_provider_argv(prompt, executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
     reference = executor.soul_cinema_contract.load_generation_reference_binding()
 
-    assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     assert argv[1:4] == ["generate", "create", "soul_cinema_studio"]
     assert argv[argv.index("--prompt") + 1] == prompt
     assert "--custom_reference_id" in argv
-    assert argv[argv.index("--custom_reference_id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert argv[argv.index("--custom_reference_id") + 1] == "79119c27-64fc-47f8-9ff3-c174d12932aa"
     assert "--image-references" in argv
     assert (
         Path(argv[argv.index("--image-references") + 1]).resolve()
