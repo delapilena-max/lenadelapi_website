@@ -1996,6 +1996,37 @@ def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> 
     assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
 
 
+def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+    stdout = "\x1b[32mQueued by Higgsfield\x1b[0m\r\n      "
+    stderr = "provider stderr\tline\r\n"
+    assert len(stdout) == 37
+
+    class Completed:
+        returncode = 0
+
+    completed = Completed()
+    completed.stdout = stdout
+    completed.stderr = stderr
+
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    monkeypatch.setattr(executor.subprocess, "run", lambda *args, **kwargs: completed)
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.run_live(
+            DATE,
+            SLOT_ID,
+            {"image": {"image_prompt": "prompt"}},
+            "90a293d7-f3af-4377-8751-3304a27b6f31",
+        )
+
+    exc = exc_info.value
+    assert exc.stage == "provider_output_parse_failure"
+    assert exc.provider_stdout_length == 37
+    assert exc.provider_stderr_length == len(stderr)
+    assert exc.provider_stdout_escaped == stdout.encode("unicode_escape").decode("ascii")
+    assert exc.provider_stderr_escaped == stderr.encode("unicode_escape").decode("ascii")
+
+
 def test_existing_claim_blocks_reuse_without_provider_call(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

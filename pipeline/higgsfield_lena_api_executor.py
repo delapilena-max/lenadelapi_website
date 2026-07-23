@@ -185,6 +185,10 @@ class ProviderCallError(Exception):
         provider_status: str | None = None,
         output_path: str | None = None,
         image_format_detected: str | None = None,
+        provider_stdout_escaped: str | None = None,
+        provider_stderr_escaped: str | None = None,
+        provider_stdout_length: int | None = None,
+        provider_stderr_length: int | None = None,
     ) -> None:
         super().__init__(message)
         self.stage = stage
@@ -194,6 +198,10 @@ class ProviderCallError(Exception):
         self.provider_status = provider_status
         self.output_path = output_path
         self.image_format_detected = image_format_detected
+        self.provider_stdout_escaped = provider_stdout_escaped
+        self.provider_stderr_escaped = provider_stderr_escaped
+        self.provider_stdout_length = provider_stdout_length
+        self.provider_stderr_length = provider_stderr_length
 
 
 class HandoffArtifactError(Exception):
@@ -669,6 +677,10 @@ def _sanitize_operational_error_text(value: Any) -> str:
     )
 
 
+def _escape_provider_diagnostic_text(value: str) -> str:
+    return (value or "").encode("unicode_escape").decode("ascii")
+
+
 def _create_generation_claim(approval_result: dict[str, Any]) -> dict[str, Any]:
     handoff_facts = approval_result["handoff_facts"]
     if approval_result.get("approval", {}).get("authorization_identity_mode") == "standing_autonomy_policy":
@@ -840,6 +852,10 @@ def execute_approved_handoff_live_generation(
         provider_status = getattr(exc, "provider_status", None)
         output_path = getattr(exc, "output_path", None)
         image_format_detected = getattr(exc, "image_format_detected", None)
+        provider_stdout_escaped = getattr(exc, "provider_stdout_escaped", None)
+        provider_stderr_escaped = getattr(exc, "provider_stderr_escaped", None)
+        provider_stdout_length = getattr(exc, "provider_stdout_length", None)
+        provider_stderr_length = getattr(exc, "provider_stderr_length", None)
         result.update(
             {
                 "provider_submission_may_have_occurred": provider_submission_may_have_occurred,
@@ -851,6 +867,10 @@ def execute_approved_handoff_live_generation(
                 "failure_provider_status": provider_status,
                 "failure_output_path": output_path,
                 "failure_image_format_detected": image_format_detected,
+                "failure_provider_stdout_escaped": provider_stdout_escaped,
+                "failure_provider_stderr_escaped": provider_stderr_escaped,
+                "failure_provider_stdout_length": provider_stdout_length,
+                "failure_provider_stderr_length": provider_stderr_length,
             }
         )
         try:
@@ -2007,6 +2027,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     try:
         parsed = _parse_provider_json_stdout(stdout)
     except json.JSONDecodeError as exc:
+        stderr = result.stderr or ""
         raise ProviderCallError(
             f"Failed to parse --json output as JSON: {exc}. "
             f"stdout length was {len(stdout)} chars."
@@ -2014,6 +2035,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             stage="provider_output_parse_failure",
             subprocess_start_attempted=True,
             provider_submission_may_have_occurred=True,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
         ) from exc
 
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
