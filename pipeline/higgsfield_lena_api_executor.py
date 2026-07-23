@@ -83,6 +83,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -118,6 +119,8 @@ HIGGSFIELD_CLI_BINARY = "higgsfield"
 HIGGSFIELD_IMAGE_JOB_TYPE = "text2image_soul_v2"
 HIGGSFIELD_ASPECT_RATIO = "9:16"
 _UUID_STDOUT_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+HIGGSFIELD_JOB_LOOKUP_MAX_ATTEMPTS = 30
+HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS = 10.0
 HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
 HANDOFF_SCHEMA_VERSION = "v1"
 HANDOFF_EXECUTION_OWNER = "claude"
@@ -1687,7 +1690,7 @@ def _matching_provider_job_record(parsed: Any, job_id: str) -> dict[str, Any] | 
     return None
 
 
-def _lookup_provider_job_record(resolved_binary: str, job_id: str) -> dict[str, Any]:
+def _lookup_provider_job_record_once(resolved_binary: str, job_id: str) -> dict[str, Any]:
     lookup_argv = [resolved_binary, "generate", "list", "--image", "--json"]
     try:
         result = subprocess.run(lookup_argv, capture_output=True, text=True, shell=False, check=False)
@@ -1746,6 +1749,32 @@ def _lookup_provider_job_record(resolved_binary: str, job_id: str) -> dict[str, 
             provider_status=_find_first_str_field(match, ("status",)),
         )
     return match
+
+
+def _lookup_provider_job_record(
+    resolved_binary: str,
+    job_id: str,
+    *,
+    max_attempts: int | None = None,
+    interval_seconds: float | None = None,
+    sleep_func: Any | None = None,
+) -> dict[str, Any]:
+    attempts = max(1, int(max_attempts or HIGGSFIELD_JOB_LOOKUP_MAX_ATTEMPTS))
+    sleep_seconds = HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS if interval_seconds is None else interval_seconds
+    sleeper = time.sleep if sleep_func is None else sleep_func
+    last_error: ProviderCallError | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return _lookup_provider_job_record_once(resolved_binary, job_id)
+        except ProviderCallError as exc:
+            if exc.stage != "provider_job_lookup_pending_or_invalid":
+                raise
+            last_error = exc
+            if attempt == attempts:
+                raise
+            if sleep_seconds > 0:
+                sleeper(sleep_seconds)
+    raise last_error  # pragma: no cover - attempts is always at least one.
 
 
 def _detect_image_extension(data: bytes) -> str:

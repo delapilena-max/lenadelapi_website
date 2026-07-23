@@ -2080,6 +2080,61 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     assert calls[1][1:] == ["generate", "list", "--image", "--json"]
 
 
+def test_run_live_polls_bare_uuid_until_result_url_is_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "56ed45c2-53b5-4f79-bf91-0fa26170c275"
+    calls: list[list[str]] = []
+    sleeps: list[float] = []
+
+    class Completed:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
+
+    lookup_responses = [
+        [{"id": job_id, "status": "queued"}],
+        [{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png"}],
+    ]
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+            return Completed(f"{job_id}\n")
+        if argv[1:] == ["generate", "list", "--image", "--json"]:
+            return Completed(json.dumps(lookup_responses.pop(0)))
+        raise AssertionError(f"unexpected argv: {argv}")
+
+    def fake_download(url: str, destination: Path) -> bytes:
+        assert url == "https://example.invalid/final.png"
+        image_bytes = b"\x89PNG\r\n\x1a\nfixture"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(image_bytes)
+        return image_bytes
+
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(executor, "HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS", 0.25)
+    monkeypatch.setattr(executor.time, "sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    monkeypatch.setattr(executor, "_download", fake_download)
+
+    result = executor.run_live(
+        DATE,
+        SLOT_ID,
+        {"image": {"image_prompt": "prompt"}},
+        "90a293d7-f3af-4377-8751-3304a27b6f31",
+    )
+
+    lookup_calls = [call for call in calls if call[1:] == ["generate", "list", "--image", "--json"]]
+    assert len(lookup_calls) == 2
+    assert sleeps == [0.25]
+    assert result["job_id"] == job_id
+    assert result["status"] == "completed"
+    assert result["result_urls"] == ["https://example.invalid/final.png"]
+
+
 def test_existing_claim_blocks_reuse_without_provider_call(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
