@@ -841,7 +841,6 @@ def build_handoff(
             "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
             "negative_prompt_enabled": NEGATIVE_PROMPT_ENABLED,
             "quality": soul_cinema_contract.QUALITY,
-            "enhance_prompt": soul_cinema_contract.ENHANCE_PROMPT,
             "generation_reference": generation_reference,
             "soul_metadata": {
                 "name": SOUL_NAME,

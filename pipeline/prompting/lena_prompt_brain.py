@@ -5645,7 +5645,7 @@ def apply_prompt_package_to_slot(slot: Dict[str, Any], package: Dict[str, Any]) 
         meta["generation_enabled"] = False
         meta["estimated_credits"] = 0
     else:
-        meta["provider_route"] = "higgsfield_soul_cinema_studio_reference_guided"
+        meta["provider_route"] = "higgsfield_text2image_soul_v2_reference_guided"
         meta["generation_enabled"] = True
         meta["estimated_credits"] = int(
             os.environ.get("LENA_ESTIMATED_HIGGSFIELD_PHOTO_CREDITS", "2")

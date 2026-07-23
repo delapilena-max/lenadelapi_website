@@ -9,7 +9,7 @@
   "kill_switch_enabled": true,
   "emergency_stop": false,
   "allowed_provider": "Higgsfield",
-  "allowed_model": "soul_cinema_studio",
+  "allowed_model": "text2image_soul_v2",
   "allowed_soul": "Lena",
   "allowed_platforms": [
     "Instagram Feed",

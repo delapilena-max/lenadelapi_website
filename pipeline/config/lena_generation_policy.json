@@ -25,7 +25,7 @@
     "reject_if_avatar_mismatch": true
   },
   "generation": {
-    "image_engine": "higgsfield_soul_cinema_studio_reference_guided",
+    "image_engine": "higgsfield_text2image_soul_v2_reference_guided",
     "video_engine": null,
     "video_generation_enabled": false,
     "video_motion_control_required": false,

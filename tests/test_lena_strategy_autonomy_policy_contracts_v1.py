@@ -190,7 +190,7 @@ def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_po
 
     assert (
         generation["generation"]["image_engine"]
-        == "higgsfield_soul_cinema_studio_reference_guided"
+        == "higgsfield_text2image_soul_v2_reference_guided"
     )
     assert generation["generation"]["video_engine"] is None
     assert generation["generation"]["video_generation_enabled"] is False

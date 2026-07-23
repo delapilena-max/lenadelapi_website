@@ -8,9 +8,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
-MODEL = "soul_cinema_studio"
+MODEL = "text2image_soul_v2"
 ASPECT_RATIO = "9:16"
 QUALITY = "2k"
+# text2image_soul_v2 (Higgsfield Soul 2.0 photo gen) has no enhance_prompt
+# parameter; kept only so importers referencing this name do not break.
 ENHANCE_PROMPT = False
 # Rotated 2026-07-23: Nicolas retrained Lena's Soul 2.0 from scratch on the
 # provider account (the prior e45ec580 Soul did not visually match Lena and

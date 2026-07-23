@@ -17,16 +17,18 @@ from __future__ import annotations
 # generation (pipeline/prompting/lena_prompt_brain.py) or any diagnostic
 # tool; it only reads their already-committed, already-validated output.
 #
-# CONFIRMED REPLACEMENT PROVIDER CONTRACT (authenticated Higgsfield CLI
-# v1.1.13, `workflow get soul_cinema_studio --json`, inspected read-only
-# 2026-07-23):
-#   job_type: soul_cinema_studio
+# CONFIRMED PROVIDER CONTRACT (authenticated Higgsfield CLI v1.1.13,
+# `model get text2image_soul_v2 --json`, display name "Higgsfield Soul 2.0",
+# inspected read-only 2026-07-23):
+#   job_type: text2image_soul_v2
 #   params:   prompt (string, required), custom_reference_id (string|null),
-#             image_references (array), aspect_ratio (enum incl. "9:16"),
-#             quality (enum "1.5k"/"2k"), enhance_prompt (boolean), and
-#             style_id (string|null).
-#   This executor requires exactly one SHA-bound image reference and forces
-#   enhance_prompt=false. No negative-prompt parameter exists.
+#             image_references (array, max 1), aspect_ratio (enum incl.
+#             "9:16"), quality (enum "1.5k"/"2k").
+#   This executor requires exactly one SHA-bound image reference. No
+#   enhance_prompt parameter and no negative-prompt parameter exist on this
+#   model -- neither is ever sent. (soul_cinema_studio was briefly used on
+#   2026-07-23 and reverted: it is a cinema/video-oriented workflow, wrong
+#   for still photos.)
 #   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
 #   id=79119c27-64fc-47f8-9ff3-c174d12932aa (`soul-id list --json`,
 #   confirmed 2026-07-23 -- Nicolas erased the account's prior Souls and
@@ -35,9 +37,9 @@ from __future__ import annotations
 #   preserved only as historical fact in already-recorded manifests/
 #   evidence -- never used as a default for new live submissions).
 #
-# PROMPT ENHANCER DOCTRINE: Soul Cinema Studio exposes enhance_prompt as a
-# real boolean parameter. This executor always submits false so the approved
-# prompt bytes remain the provider request rather than being rewritten.
+# PROMPT ENHANCER DOCTRINE: text2image_soul_v2 exposes no enhance_prompt
+# parameter at all. Nothing enhancer-shaped is ever sent; the approved
+# prompt bytes are the provider request.
 #
 # NEGATIVE PROMPT DOCTRINE: no negative-prompt parameter exists either.
 # Omission is the correct (and only possible) behavior -- never invented,
@@ -117,7 +119,6 @@ HIGGSFIELD_CLI_BINARY = "higgsfield"
 HIGGSFIELD_IMAGE_JOB_TYPE = soul_cinema_contract.MODEL
 HIGGSFIELD_ASPECT_RATIO = soul_cinema_contract.ASPECT_RATIO
 HIGGSFIELD_QUALITY = soul_cinema_contract.QUALITY
-HIGGSFIELD_ENHANCE_PROMPT = soul_cinema_contract.ENHANCE_PROMPT
 _UUID_STDOUT_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 HIGGSFIELD_JOB_LOOKUP_MAX_ATTEMPTS = 30
 HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS = 10.0
@@ -1612,8 +1613,6 @@ def build_provider_argv(
         HIGGSFIELD_ASPECT_RATIO,
         "--quality",
         HIGGSFIELD_QUALITY,
-        "--enhance_prompt",
-        "true" if HIGGSFIELD_ENHANCE_PROMPT else "false",
         "--wait",
         "--json",
     ]
@@ -2139,7 +2138,6 @@ def build_manifest(
         "cli_soul_type": CONFIRMED_LENA_CLI_SOUL_TYPE,
         "aspect_ratio": HIGGSFIELD_ASPECT_RATIO,
         "quality": HIGGSFIELD_QUALITY,
-        "enhance_prompt": HIGGSFIELD_ENHANCE_PROMPT,
         "generation_reference": generation_reference,
         "prompt_sha256": hashlib.sha256(prompt_bytes).hexdigest(),
         "prompt_length": len(prompt),
@@ -2515,7 +2513,6 @@ def print_dry_run_report(date_str: str, slot_id: str, source: dict, custom_refer
     print(f"cli soul identity       : name={CONFIRMED_LENA_SOUL_NAME!r} type={CONFIRMED_LENA_SOUL_TYPE!r}")
     print(f"aspect_ratio            : {HIGGSFIELD_ASPECT_RATIO}")
     print(f"quality                 : {HIGGSFIELD_QUALITY}")
-    print(f"enhance_prompt          : {HIGGSFIELD_ENHANCE_PROMPT}")
     print(
         "generation_reference    : "
         f"{soul_cinema_contract.load_generation_reference_binding()['reference_image_path']}"
