@@ -385,6 +385,56 @@ def test_changed_decision_critical_evidence_blocks_as_stale(canonical_decision, 
     assert error.value.code == "stale_decision"
 
 
+def test_current_generation_result_manifest_does_not_stale_stored_snapshot_mode(canonical_decision, monkeypatch):
+    artifact = canonical_decision[1]
+    stored_core = consumer._decision_core(artifact)
+    changed_core = copy.deepcopy(stored_core)
+    changed_core["recent_content_inputs"] = [
+        {
+            "path": "pipeline/higgsfield_debug/2026-07-23/current-authorized-generation/result_manifest.json",
+            "sha256": "a" * 64,
+        }
+    ]
+    changed_core["input_provenance"] = list(changed_core["input_provenance"]) + [
+        {
+            "path": "pipeline/higgsfield_debug/2026-07-23/current-authorized-generation/result_manifest.json",
+            "sha256": "a" * 64,
+            "semantics": "same authorized provider generation result",
+        }
+    ]
+    selected = copy.deepcopy(artifact["candidate"])
+    selected["_prompt"] = "synthetic prompt bytes"
+
+    def rebuild_with_current_generation_output(value):
+        return changed_core, selected
+
+    monkeypatch.setattr(consumer, "_rebuild_current_decision", rebuild_with_current_generation_output)
+    issuance = consumer.validate_selected_candidate_issuance(
+        artifact,
+        freshness_mode=consumer.FRESHNESS_MODE_STORED_SNAPSHOT,
+    )
+
+    assert issuance["candidate"]["candidate_id"] == artifact["candidate"]["candidate_id"]
+    assert issuance["fresh_fingerprint_sha256"] == artifact["decision_fingerprint_sha256"]
+
+
+def test_pre_provider_current_mode_still_blocks_genuine_stale_decision(canonical_decision, monkeypatch):
+    artifact = canonical_decision[1]
+    stored_core = consumer._decision_core(artifact)
+    changed_core = copy.deepcopy(stored_core)
+    changed_core["candidate"]["lane"] = "different published-sequence choice"
+    selected = copy.deepcopy(artifact["candidate"])
+    selected["_prompt"] = "synthetic prompt bytes"
+
+    def rebuild_with_pre_generation_drift(value):
+        return changed_core, selected
+
+    monkeypatch.setattr(consumer, "_rebuild_current_decision", rebuild_with_pre_generation_drift)
+    with pytest.raises(consumer.ConsumerError) as error:
+        consumer.validate_selected_candidate_issuance(artifact)
+    assert error.value.code == "stale_decision"
+
+
 def test_unchanged_decision_critical_evidence_preserves_readiness(canonical_decision):
     report = accepted(canonical_decision[0])
     assert report["validation_results"]["deterministic_reselection_match"] is True

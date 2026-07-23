@@ -29,6 +29,8 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 EXECUTOR_DRY_RUN_HEADER = "=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ==="
 EXECUTOR_PROVIDER_ARGV_HEADER = "provider argv (would be invoked under --live; prompt redacted for display):"
 EXECUTOR_DRY_RUN_SENTINEL = "=== RESULT: no subprocess call, no network call, no file written. Dry-run only. ==="
+FRESHNESS_MODE_CURRENT = "current"
+FRESHNESS_MODE_STORED_SNAPSHOT = "stored_pre_generation_snapshot"
 
 
 class ConsumerError(RuntimeError):
@@ -287,12 +289,19 @@ def _validate_regenerated_candidate(
     candidate: dict[str, Any],
     *,
     root: Path | None = None,
+    freshness_mode: str = FRESHNESS_MODE_CURRENT,
 ) -> tuple[dict[str, Any], str]:
-    fresh_core, selected = (
-        _rebuild_current_decision(artifact)
-        if root is None
-        else _rebuild_current_decision(artifact, root=root)
-    )
+    if freshness_mode == FRESHNESS_MODE_CURRENT:
+        fresh_core, selected = (
+            _rebuild_current_decision(artifact)
+            if root is None
+            else _rebuild_current_decision(artifact, root=root)
+        )
+    elif freshness_mode == FRESHNESS_MODE_STORED_SNAPSHOT:
+        fresh_core = stored_core
+        selected = candidate
+    else:
+        raise ConsumerError("freshness_mode_invalid", f"unsupported selected-candidate freshness mode: {freshness_mode}")
     fresh_fingerprint = _sha256_bytes(selector._canonical_bytes(fresh_core))
     # Selector internals may contain tuples that JSON persists as arrays.
     # Its canonical-byte contract, not Python container identity, is authoritative.
@@ -334,7 +343,7 @@ def _validate_regenerated_candidate(
         raise ConsumerError("slot_mismatch", "executor-resolved slot does not match decision")
     if image.get("lane") != candidate["lane"]:
         raise ConsumerError("lane_mismatch", "executor-resolved lane does not match decision")
-    if selected.get("_prompt") != prompt:
+    if freshness_mode == FRESHNESS_MODE_CURRENT and selected.get("_prompt") != prompt:
         raise ConsumerError("regenerated_prompt_mismatch", "selector and executor regenerated different prompt bytes")
     prompt_sha = _sha256_bytes(prompt.encode("utf-8"))
     if prompt_sha != candidate["prompt_sha256"]:
@@ -353,6 +362,7 @@ def validate_selected_candidate_issuance(
     artifact: dict[str, Any],
     *,
     root: Path | None = None,
+    freshness_mode: str = FRESHNESS_MODE_CURRENT,
 ) -> dict[str, Any]:
     candidate = _validate_shape(artifact)
     stored_core, recomputed = _validate_fingerprint(artifact)
@@ -362,6 +372,7 @@ def validate_selected_candidate_issuance(
             artifact,
             stored_core,
             candidate,
+            freshness_mode=freshness_mode,
         )
     else:
         _validate_authority(artifact, root=root)
@@ -370,6 +381,7 @@ def validate_selected_candidate_issuance(
             stored_core,
             candidate,
             root=root,
+            freshness_mode=freshness_mode,
         )
     return {
         "candidate": candidate,

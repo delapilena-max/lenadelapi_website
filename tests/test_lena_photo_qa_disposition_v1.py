@@ -216,7 +216,7 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     _write_json(decision_path, decision)
     monkeypatch.setattr(handoff, "_validate_authority", lambda artifact: None)
 
-    def validate_fixture_issuance(artifact, root=None):
+    def validate_fixture_issuance(artifact, root=None, **kwargs):
         candidate_value = handoff._validate_shape(artifact)
         stored_core, recomputed = handoff._validate_fingerprint(artifact)
         return {
@@ -474,7 +474,7 @@ def _production_dual_binding_fixture(
     candidate_file["decision_fingerprint_sha256"] = hashlib.sha256(selector._canonical_bytes(candidate_file_core)).hexdigest()
     _write_json(candidate_path, candidate_file)
 
-    def validate_fixture_issuance(artifact, root=None):
+    def validate_fixture_issuance(artifact, root=None, **kwargs):
         candidate_value = disposition.handoff._validate_shape(artifact)
         stored_core, recomputed = disposition.handoff._validate_fingerprint(artifact)
         return {

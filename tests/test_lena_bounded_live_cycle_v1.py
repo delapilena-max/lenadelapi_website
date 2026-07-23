@@ -1044,8 +1044,19 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
     def fake_load_reference_specs():
         return state["reference_authority"], _sha(Path(state["reference_authority"])), [(reference_path, _sha(reference_path))]  # type: ignore[arg-type]
 
+    def fake_validate_selected_candidate_issuance(artifact: dict, **kwargs):
+        assert kwargs.get("freshness_mode", cycle.selected_candidate.FRESHNESS_MODE_CURRENT) == cycle.selected_candidate.FRESHNESS_MODE_CURRENT
+        return {
+            "candidate": cycle._resolve_candidate_artifact(artifact),
+            "stored_core": {},
+            "recomputed_fingerprint_sha256": "d" * 64,
+            "fresh_fingerprint_sha256": "d" * 64,
+            "executor_validation": {"ok": True},
+        }
+
     def fake_evaluate_photo_qa_disposition(**kwargs):
         state["qa_calls"] = int(state["qa_calls"]) + 1
+        assert kwargs["selected_candidate_freshness_mode"] == cycle.selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT
         artifact = {
             "report_type": "lena_presence_output_qa",
             "schema_version": "v2",
@@ -1103,6 +1114,7 @@ def _install_live_fakes(monkeypatch: pytest.MonkeyPatch, bundle: dict[str, Path 
 
     monkeypatch.setattr(higgsfield_executor, "execute_approved_handoff_live_generation", fake_execute_approved_handoff_live_generation)
     monkeypatch.setattr(cycle, "_load_reference_specs", fake_load_reference_specs)
+    monkeypatch.setattr(cycle.selected_candidate, "validate_selected_candidate_issuance", fake_validate_selected_candidate_issuance)
     monkeypatch.setattr(photo_qa, "evaluate_photo_qa_disposition", fake_evaluate_photo_qa_disposition)
     monkeypatch.setattr(photo_qa, "write_disposition_artifact", fake_write_disposition_artifact)
     monkeypatch.setattr(cycle, "_run_publisher", fake_run_publisher)
@@ -1532,6 +1544,41 @@ def test_live_nested_candidate_binding_mismatches_fail_closed_without_provider_c
         assert consumed is True
     else:
         assert consumed is False
+
+
+def test_live_pre_provider_stale_decision_fails_before_provider_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+
+    def stale_selected_candidate(*args, **kwargs):
+        assert kwargs.get("freshness_mode", cycle.selected_candidate.FRESHNESS_MODE_CURRENT) == cycle.selected_candidate.FRESHNESS_MODE_CURRENT
+        raise cycle.selected_candidate.ConsumerError(
+            "stale_decision",
+            "current decision-critical evidence does not reproduce the stored decision",
+        )
+
+    monkeypatch.setattr(
+        cycle.selected_candidate,
+        "validate_selected_candidate_issuance",
+        stale_selected_candidate,
+    )
+
+    report = _run_cycle(
+        bundle,
+        simulate=False,
+        report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles",
+    )
+
+    assert report["ok"] is False
+    assert report["failed_stage"] == "approved_candidate_resolution"
+    assert report["failure"]["code"] == "stale_decision"
+    assert int(state["provider_calls"]) == 0
+    assert int(state["publish_calls"]) == 0
+    assert int(state["qa_calls"]) == 0
 
 
 def test_non_expiring_standing_policy_validates_and_issues_short_lived_cycle_authorization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

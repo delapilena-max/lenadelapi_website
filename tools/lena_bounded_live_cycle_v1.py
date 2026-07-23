@@ -19,6 +19,7 @@ from tools import lena_autopublish_approved_queue_v2_8 as autonomous_publisher
 from tools import lena_photo_qa_disposition_v1 as photo_qa
 from tools import lena_prepare_privacy_clean_photo_v1 as clean_photo
 from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
 from tools.strategy import lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff
 import pipeline.higgsfield_lena_api_executor as executor
 
@@ -1280,6 +1281,19 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
     resolved_candidate = _resolve_candidate_artifact(candidate)
     _require(str(resolved_candidate.get("candidate_id") or "") == str(auth_data["candidate_id"]), "candidate_id_mismatch", "candidate_id does not match the authorization binding")
     _require(str(resolved_candidate.get("slot_id") or "") == str(auth_data["slot_id"]), "slot_id_mismatch", "slot_id does not match the authorization binding")
+    try:
+        selected_candidate.validate_selected_candidate_issuance(candidate, root=ROOT)
+    except selected_candidate.ConsumerError as exc:
+        return _build_fail_report(
+            auth=auth,
+            report_path=report_path,
+            started_at=started_at,
+            cycle_id=cycle_id,
+            stages=stages,
+            failed_stage="approved_candidate_resolution",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
     stages.append(
         _stage_summary(
             "approved_candidate_resolution",
@@ -1409,6 +1423,7 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             reference_authority_artifact=reference_authority_path,
             reference_authority_sha256=reference_authority_sha256,
             expected_image_sha256=generated_image_sha256,
+            selected_candidate_freshness_mode=selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT,
             **_controlled_visual_qa_kwargs(auth, candidate, reference_authority_path),
         )
         qa_path, qa_written_artifact, _qa_written = photo_qa.write_disposition_artifact(qa_artifact)

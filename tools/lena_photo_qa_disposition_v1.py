@@ -483,10 +483,18 @@ def _validate_model_authority(path: Path, expected_sha: str, commit: str, provid
     return {"path": str(path.resolve()), "sha256": expected_sha, "provider": provider, "approved_model": approved_model}
 
 
-def _validate_selected_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def _validate_selected_decision(
+    path: Path,
+    *,
+    freshness_mode: str = handoff.FRESHNESS_MODE_CURRENT,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     try:
         artifact = handoff._read_artifact(path)
-        issuance = handoff.validate_selected_candidate_issuance(artifact, root=ROOT)
+        issuance = handoff.validate_selected_candidate_issuance(
+            artifact,
+            root=ROOT,
+            freshness_mode=freshness_mode,
+        )
         candidate = issuance["candidate"]
     except handoff.ConsumerError as exc:
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
@@ -527,14 +535,18 @@ def _validate_retry_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any]
     return artifact, candidate
 
 
-def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]:
+def _validate_decision(
+    path: Path,
+    *,
+    freshness_mode: str = handoff.FRESHNESS_MODE_CURRENT,
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     try:
         artifact = handoff._read_artifact(path)
     except handoff.ConsumerError as exc:
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     schema_version = artifact.get("schema_version")
     if schema_version == selector.SCHEMA_VERSION:
-        decision, candidate = _validate_selected_decision(path)
+        decision, candidate = _validate_selected_decision(path, freshness_mode=freshness_mode)
         return decision, candidate, "selected_candidate"
     if schema_version == retry_handoff.SCHEMA_VERSION:
         decision, candidate = _validate_retry_decision(path)
@@ -544,6 +556,8 @@ def _validate_decision(path: Path) -> tuple[dict[str, Any], dict[str, Any], str]
 
 def _resolve_generation_binding_context(
     decision_path: Path,
+    *,
+    selected_candidate_freshness_mode: str = handoff.FRESHNESS_MODE_CURRENT,
 ) -> tuple[dict[str, Any], dict[str, Any], str, dict[str, Any] | None]:
     try:
         artifact = handoff._read_artifact(decision_path)
@@ -559,7 +573,10 @@ def _resolve_generation_binding_context(
         handoff_facts = approval.inspect_handoff_artifact(
             Path(str(auth["artifact"]["generation_handoff_artifact_path"]))
         )
-        decision, candidate = _validate_selected_decision(Path(handoff_facts["selected_candidate_path"]))
+        decision, candidate = _validate_selected_decision(
+            Path(handoff_facts["selected_candidate_path"]),
+            freshness_mode=selected_candidate_freshness_mode,
+        )
         standing_autonomy.validate_cycle_authorization_artifact(
             decision_path,
             handoff_report=handoff_facts["report"],
@@ -575,7 +592,10 @@ def _resolve_generation_binding_context(
                 pose["selected_candidate_artifact_path"],
                 label="typed retry selected candidate artifact",
             )
-            selected_decision, source_candidate = _validate_selected_decision(candidate_path)
+            selected_decision, source_candidate = _validate_selected_decision(
+                candidate_path,
+                freshness_mode=selected_candidate_freshness_mode,
+            )
         except (typed_retry_handoff.RetryHandoffError, pose_provenance.PoseProvenanceError) as exc:
             raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
         decision = dict(typed_retry)
@@ -598,7 +618,10 @@ def _resolve_generation_binding_context(
             "expression_provenance_fingerprint_sha256": typed_retry["expression_provenance_fingerprint_sha256"],
         }
         return decision, candidate, "typed_retry_handoff", provider_binding
-    decision, candidate, decision_kind = _validate_decision(decision_path)
+    decision, candidate, decision_kind = _validate_decision(
+        decision_path,
+        freshness_mode=selected_candidate_freshness_mode,
+    )
     return decision, candidate, decision_kind, None
 
 
@@ -1483,6 +1506,7 @@ def evaluate_photo_qa_disposition(
     expected_decision_fingerprint: Optional[str] = None,
     expected_reference_set_sha256: Optional[str] = None,
     failure_memory_loader: Callable[[], dict[str, Any]] = failure_memory.compute_higgsfield_failure_memory,
+    selected_candidate_freshness_mode: str = handoff.FRESHNESS_MODE_CURRENT,
 ) -> dict[str, Any]:
     provider_called = False
     try:
@@ -1493,7 +1517,10 @@ def evaluate_photo_qa_disposition(
         )
         if not isinstance(reference_authority_artifact, Path) or not SHA256_RE.fullmatch(str(reference_authority_sha256)):
             raise BoundaryError("identity_evidence_invalid", "committed identity-reference authority path and SHA-256 are required")
-        decision, candidate, decision_kind, binding_context = _resolve_generation_binding_context(decision_path.resolve())
+        decision, candidate, decision_kind, binding_context = _resolve_generation_binding_context(
+            decision_path.resolve(),
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
+        )
         provider_binding = None
         if binding_context is not None:
             provider_binding = binding_context.get("provider_execution_binding")
