@@ -138,6 +138,53 @@ def load_selected_candidate_report(date_str: str) -> tuple[Path, dict]:
     return path, report
 
 
+def load_reconciled_selected_candidate_report(date_str: str, reconciliation_artifact_path: str) -> tuple[Path, dict]:
+    _reconciliation_path, reconciliation_report, _reconciliation_sha256 = reconciliation_contract.load_reconciliation_report(
+        reconciliation_artifact_path,
+        date_str=date_str,
+    )
+    source_artifacts = reconciliation_report.get("source_artifacts", {})
+    selected_source = source_artifacts.get("selected_candidate", {}) if isinstance(source_artifacts, dict) else {}
+    selected_path_value = str(selected_source.get("source_artifact_path", "")).strip() if isinstance(selected_source, dict) else ""
+    _require(
+        bool(selected_path_value),
+        "reconciliation_selected_candidate_missing",
+        "reconciliation selected candidate source path is missing",
+    )
+    selected_path = Path(selected_path_value)
+    if not selected_path.is_absolute():
+        selected_path = ROOT / selected_path
+    selected_path = selected_path.resolve()
+    _require(
+        selected_path.is_relative_to(ROOT.resolve()),
+        "selected_candidate_path_escape",
+        f"reconciliation selected candidate path escapes repo root: {selected_path}",
+    )
+    _require(
+        selected_path.is_file(),
+        "missing_selected_candidate",
+        f"selected candidate artifact from reconciliation does not exist: {selected_path}",
+    )
+    selected_candidate = read_json(selected_path)
+    _require(
+        selected_candidate.get("schema_version") == "lena_pre_generation_candidate_gate_v1",
+        "selected_candidate_schema_invalid",
+        "reconciled selected candidate artifact has invalid schema_version",
+    )
+    _require(
+        selected_candidate.get("candidate_status") == "selected",
+        "selected_candidate_status_invalid",
+        "reconciled selected candidate artifact is not selected",
+    )
+    expected_sha = str(selected_source.get("source_artifact_sha256", "")).strip() if isinstance(selected_source, dict) else ""
+    _require(
+        sha256_file(selected_path) == expected_sha,
+        "reconciliation_source_drift",
+        "reconciliation selected candidate source sha does not match artifact bytes",
+    )
+    return selected_path, selected_candidate
+
+
 def repo_relative_path(path: Path) -> str:
     resolved = Path(path).resolve()
     try:
@@ -426,7 +473,10 @@ def build_handoff(
 
     learning_path, learning = load_learning_report(recommendation, date_str)
     queue_path, queue_report = load_queue_report(date_str)
-    selected_candidate_path_value, selected_candidate = load_selected_candidate_report(date_str)
+    selected_candidate_path_value, selected_candidate = load_reconciled_selected_candidate_report(
+        date_str,
+        reconciliation_artifact_path,
+    )
     selected_candidate_body = selected_candidate.get("candidate", {})
     if not isinstance(selected_candidate_body, dict):
         selected_candidate_body = {}

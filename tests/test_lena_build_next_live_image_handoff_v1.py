@@ -419,13 +419,16 @@ def test_missing_selected_candidate_fails_closed(tmp_path: Path, monkeypatch: py
         handoff.build_handoff(DATE, RECONCILIATION_PATH)
 
 
-def test_multiple_selected_candidates_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reconciliation_selected_candidate_is_authoritative_when_stale_selected_candidates_exist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _patch_layout(monkeypatch, tmp_path)
     _build_fixture_tree(tmp_path)
     extra_selected = tmp_path / "pipeline" / "strategy" / "lena" / "pre_generation_candidates" / DATE / "lena_pre_generation_candidate_extra.json"
     _write_json(extra_selected, _selected_candidate_payload(generated_at_utc="2026-07-14T13:00:00Z"))
-    with pytest.raises(SystemExit, match="ambiguous_selected_candidate"):
-        handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    report = handoff.build_handoff(DATE, RECONCILIATION_PATH)
+    assert report["source_selected_candidate_artifact_path"] == SELECTED_CANDIDATE_PATH
+    assert report["selected_candidate"]["artifact_path"] == SELECTED_CANDIDATE_PATH
 
 
 def test_malformed_and_non_selected_candidate_artifacts_are_ignored_when_one_selected_remains(
