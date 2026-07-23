@@ -1625,6 +1625,29 @@ def _find_first_str_field(obj: Any, keys: tuple[str, ...]) -> Optional[str]:
     return None
 
 
+def _parse_provider_json_stdout(stdout: str) -> Any:
+    raw = stdout or ""
+    decoder = json.JSONDecoder()
+    index = 0
+    parsed_values: list[Any] = []
+    while True:
+        while index < len(raw) and raw[index].isspace():
+            index += 1
+        if index >= len(raw):
+            break
+        if raw[index] not in "{[":
+            if parsed_values:
+                break
+            return json.loads(raw)
+        parsed, index = decoder.raw_decode(raw, index)
+        parsed_values.append(parsed)
+        if _canonical_result_urls(parsed):
+            return parsed
+    if parsed_values:
+        return parsed_values[-1]
+    return json.loads(raw)
+
+
 def _detect_image_extension(data: bytes) -> str:
     """Never blindly rename bytes as .png. Sniffs real magic bytes."""
     if data.startswith(_PNG_MAGIC):
@@ -1982,7 +2005,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
 
     stdout = result.stdout or ""
     try:
-        parsed = json.loads(stdout)
+        parsed = _parse_provider_json_stdout(stdout)
     except json.JSONDecodeError as exc:
         raise ProviderCallError(
             f"Failed to parse --json output as JSON: {exc}. "

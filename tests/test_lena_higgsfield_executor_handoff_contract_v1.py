@@ -1986,6 +1986,16 @@ def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
     assert "receipt written" in stdout
 
 
+def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> None:
+    stdout = '{} {"result_url":"https://x.y/a"}    '
+    assert len(stdout) == 37
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        json.loads(stdout)
+    assert exc_info.value.pos == 3
+
+    assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
+
+
 def test_existing_claim_blocks_reuse_without_provider_call(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
