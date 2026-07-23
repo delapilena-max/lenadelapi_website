@@ -111,7 +111,7 @@ FACE_PRIORITY_FRAMING = (
 )
 
 HPE_SUBJECT_PRESENCE_COMPACT = (
-    "Camera-aware, self-possessed, quietly sensual; gaze, expression, posture, object interaction, "
+    "Camera-aware, self-possessed, relaxed, and tasteful; gaze, expression, posture, object interaction, "
     "viewer relationship, and framing read as a private getting-ready moment."
 )
 
@@ -149,10 +149,9 @@ HAND_REALISM_COMPACT = (
 )
 
 STRUCTURED_SUBJECT_BRIEF = (
-    "Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult "
-    "slim-thick hourglass body and face. Do not reinterpret her as a different "
-    "person. Do not slim her into petite, narrow-hipped proportions. Keep full "
-    "natural lifted bust, defined waist, and wide hips. Hair stays reference-true "
+    "Lena (Magdalena Delapi). Identity is fixed by the approved Lena Soul character element; "
+    "preserve her recognizable adult face, realistic proportions, and natural clothing fit without "
+    "sexualized body emphasis. Do not reinterpret her as a different person. Hair stays reference-true "
     "warm medium-brown with visible honey/caramel highlights and lighter face-framing pieces."
 )
 
@@ -165,6 +164,13 @@ STRUCTURED_TECHNICAL_REALISM = (
     "clean thumb placement, and relaxed wrists. Avoid plastic skin, beauty-filter "
     "poreless retouching, deformed hands, identity drift, body-slimming drift, "
     "or environment/wardrobe contradictions."
+)
+
+PROVIDER_PROMPT_REQUIRED_GUARDRAILS = (
+    "Tasteful complete styling: clothing is fully fastened, polished, and wearable. "
+    "No black or empty background, no isolated cutout, no stiff front-facing catalog pose, "
+    "no open jeans, no exposed zipper, no underwear visibility, no wardrobe-malfunction styling, "
+    "and no unnecessary sexualized emphasis."
 )
 
 # Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
@@ -208,15 +214,10 @@ PACKET_BLOCKED_TERMS = (
 )
 MASTER_IDENTITY_CHECKS = (
     "identity is fixed",
-    "do not slim",
-    "petite",
-    "hourglass",
+    "approved lena soul character",
+    "recognizable adult face",
+    "realistic proportions",
     "do not reinterpret",
-    "full natural lifted bust",
-    "slim-thick",
-    "narrow-hipped",
-    "defined waist",
-    "wide hips",
 )
 
 
@@ -359,6 +360,7 @@ def _assemble_structured_prompt_sections(
     lighting = recipe_section_inputs["style_lighting"]
     technical_parts = [
         STRUCTURED_TECHNICAL_REALISM,
+        PROVIDER_PROMPT_REQUIRED_GUARDRAILS,
         recipe_section_inputs["negative_constraints"],
     ]
     technical = " ".join(part for part in technical_parts if part)

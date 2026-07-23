@@ -13,6 +13,7 @@ import pipeline.higgsfield_lena_api_executor as executor
 import tools.lena_higgsfield_generation_approval_v1 as approval_mod
 import tools.lena_higgsfield_retry_generation_approval_v1 as retry_approval_mod
 import tools.lena_photo_qa_disposition_v1 as disposition_mod
+import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
 import tools.strategy.lena_build_next_live_image_handoff_v1 as handoff_builder
 import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
@@ -30,6 +31,15 @@ EXECUTOR_PATH = "pipeline/higgsfield_lena_api_executor.py"
 HANDOFF_COMMAND = f"python {EXECUTOR_PATH} --handoff-artifact pipeline/strategy/lena/next_actions/{DATE}/{HANDOFF_NAME}"
 PROMPT_TEXT = pose_fixture.canonical_prompt()
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
+
+
+def _approved_live_source(prompt: str = "prompt") -> dict:
+    return {
+        "image": {
+            "image_prompt": prompt,
+            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        }
+    }
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -2022,7 +2032,9 @@ def test_provider_argv_rejects_missing_or_wrong_lena_soul_before_subprocess(
     assert exc.provider_submission_may_have_occurred is False
 
 
-def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     stdout = "\x1b[32mQueued by Higgsfield\x1b[0m\r\n      "
     stderr = "provider stderr\tline\r\n"
     assert len(stdout) == 37
@@ -2034,6 +2046,7 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
     completed.stdout = stdout
     completed.stderr = stderr
 
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
     monkeypatch.setattr(executor.subprocess, "run", lambda *args, **kwargs: completed)
 
@@ -2041,7 +2054,7 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
         executor.run_live(
             DATE,
             SLOT_ID,
-            {"image": {"image_prompt": "prompt"}},
+            _approved_live_source(),
             executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         )
 
@@ -2051,9 +2064,117 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
     assert exc.provider_stderr_length == len(stderr)
     assert exc.provider_stdout_escaped == stdout.encode("unicode_escape").decode("ascii")
     assert exc.provider_stderr_escaped == stderr.encode("unicode_escape").decode("ascii")
+    submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
+    assert submitted_prompt.read_text(encoding="utf-8") == "prompt"
 
 
-def test_run_live_rejects_provider_record_without_verified_lena_soul_binding(
+def test_old_shortened_provider_prompt_stops_before_provider_call_when_full_prompt_was_approved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old_provider_record_prompt = (
+        "[Subject]: Lena (Magdalena Delapi). Identity is fixed: preserve her approved adult slim-thick hourglass body and face. "
+        "Do not reinterpret her as a different person. Do not slim her into petite, narrow-hipped proportions. "
+        "Keep full natural lifted bust, defined waist, and wide hips. Hair stays reference-true warm medium-brown with visible "
+        "honey/caramel highlights and lighter face-framing pieces. Wardrobe and accessories: Dusty rose fitted off-shoulder knit top "
+        "as the hero garment, with clean stone-wash straight-leg jeans. A natural waist reveal is acceptable if it still reads like "
+        "a real fitted top over jeans rather than a bra-like crop. Thin gold chain necklace, small gold hoops, soft natural lip finish. "
+        "No extra jacket layer, no bulky knit, no turtleneck fallback, no separate glam prop, and no belly jewelry."
+    )
+    assert len(old_provider_record_prompt) == 819
+    approved_full_prompt = old_provider_record_prompt + "\n[Environment]: Home getting-ready corner.\n[Action]: touching her hair."
+
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        executor.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider subprocess must not start")),
+    )
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.run_live(
+            DATE,
+            SLOT_ID,
+            {
+                "image": {
+                    "image_prompt": old_provider_record_prompt,
+                    "prompt_sha256": hashlib.sha256(approved_full_prompt.encode("utf-8")).hexdigest(),
+                }
+            },
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        )
+
+    assert exc_info.value.stage == "submitted_prompt_approval_sha_mismatch"
+    submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
+    assert submitted_prompt.read_text(encoding="utf-8") == old_provider_record_prompt
+
+
+def test_prompt_sha_mismatch_stops_before_provider_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        executor.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider subprocess must not start")),
+    )
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.run_live(
+            DATE,
+            SLOT_ID,
+            {"image": {"image_prompt": "complete approved prompt", "prompt_sha256": "0" * 64}},
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        )
+
+    assert exc_info.value.stage == "submitted_prompt_approval_sha_mismatch"
+    submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
+    assert submitted_prompt.read_text(encoding="utf-8") == "complete approved prompt"
+
+
+def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language() -> None:
+    recipe = {
+        "production_proof_mode": True,
+        "subject_pose": "standing near the dresser and touching her hair with one hand",
+        "fashion_accessories": (
+            "Dusty rose fitted off-shoulder knit top as the hero garment, styled as a tasteful, "
+            "fully fastened fitted top with clean stone-wash straight-leg jeans fully buttoned and zipped."
+        ),
+        "setting_background": "Home getting-ready corner with a dresser edge, clothes on a chair, and warm apartment light.",
+        "technical_keywords": "85mm portrait compression, chest-up to upper-hip framing, candid apartment realism.",
+        "style_lighting": "Soft window spill and warm practical lamp fill.",
+        "negative_constraints": "No black or empty background, no isolated cutout, no stiff front-facing catalog pose.",
+        "scene_logic_contract": {"environment_realism_notes": "ordinary wall texture and a few products on a dresser"},
+    }
+
+    prompt = packet_builder.build_structured_kling_prompt(recipe)
+
+    assert "[Environment]:" in prompt
+    assert "[Action]:" in prompt
+    assert "[Expression]:" in prompt
+    assert "[Cinematography]:" in prompt
+    assert "[Lighting/Style]:" in prompt
+    assert "fully fastened" in prompt
+    assert "fully buttoned and zipped" in prompt
+    assert "No black or empty background" in prompt
+    assert "no isolated cutout" in prompt
+    assert "no stiff front-facing catalog pose" in prompt
+    assert "no open jeans" in prompt
+    assert "no exposed zipper" in prompt
+    for rejected in (
+        "natural waist reveal is acceptable",
+        "full natural lifted bust",
+        "slim-thick",
+        "wide hips",
+        "defined waist",
+        "unnecessary sexualized emphasis",
+    ):
+        if rejected == "unnecessary sexualized emphasis":
+            assert "no unnecessary sexualized emphasis" in prompt
+        else:
+            assert rejected not in prompt
+
+
+def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_soul_field(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     job_id = "3cf4fbd4-dd13-4b62-82bd-bdf9390ea401"
@@ -2071,27 +2192,35 @@ def test_run_live_rejects_provider_record_without_verified_lena_soul_binding(
             return Completed(json.dumps([{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png", "params": {}}]))
         raise AssertionError(f"unexpected argv: {argv}")
 
+    def fake_download(url: str, destination: Path) -> bytes:
+        assert url == "https://example.invalid/final.png"
+        image_bytes = b"\x89PNG\r\n\x1a\nfixture"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(image_bytes)
+        return image_bytes
+
     monkeypatch.setattr(executor, "ROOT", tmp_path)
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
-    monkeypatch.setattr(
-        executor,
-        "_download",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("download must not start without Soul binding")),
+    monkeypatch.setattr(executor, "_download", fake_download)
+
+    result = executor.run_live(
+        DATE,
+        SLOT_ID,
+        _approved_live_source(),
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
     )
 
-    with pytest.raises(executor.ProviderCallError) as exc_info:
-        executor.run_live(
-            DATE,
-            SLOT_ID,
-            {"image": {"image_prompt": "prompt"}},
-            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
-        )
-
-    exc = exc_info.value
-    assert exc.stage == "provider_soul_reference_missing_or_mismatch"
-    assert exc.provider_job_id == job_id
-    assert exc.provider_status == "completed"
+    assert result["job_id"] == job_id
+    binding = json.loads(
+        (tmp_path / result["provider_command_binding_path"]).read_text(encoding="utf-8")
+    )
+    assert binding["provider_job_id"] == job_id
+    assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
+    assert binding["soul_id_flag"] == "--soul-id"
+    assert "--soul-id" in binding["resolved_argv_redacted"]
+    assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
+    assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 
 
 def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
@@ -2141,9 +2270,21 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     result = executor.run_live(
         DATE,
         SLOT_ID,
-        {"image": {"image_prompt": "prompt"}},
+        _approved_live_source(),
         executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
     )
+
+    assert result["job_id"] == job_id
+    assert result["provider_command_binding_path"].endswith("/provider_command_binding.json")
+    binding = json.loads(
+        (tmp_path / result["provider_command_binding_path"]).read_text(encoding="utf-8")
+    )
+    assert binding["provider_job_id"] == job_id
+    assert binding["custom_reference_id"] == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
+    assert binding["soul_id_flag"] == "--soul-id"
+    assert "--soul-id" in binding["resolved_argv_redacted"]
+    assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
+    assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
 
     assert result["job_id"] == job_id
     assert result["status"] == "completed"
@@ -2202,7 +2343,7 @@ def test_run_live_polls_bare_uuid_until_result_url_is_available(
     result = executor.run_live(
         DATE,
         SLOT_ID,
-        {"image": {"image_prompt": "prompt"}},
+        _approved_live_source(),
         executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
     )
 
@@ -2659,7 +2800,7 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """_rebuild_packet_prompt_source must copy pose/expression from the candidate artifact
-    and derive wardrobe name/silhouette from the catalog — not hardcode nulls."""
+    and derive wardrobe name/silhouette from the catalog â€” not hardcode nulls."""
     import tools.strategy.lena_build_content_packet_dryrun_v1 as packet_builder
     import pipeline.prompting.lena_prompt_brain as prompt_brain
 

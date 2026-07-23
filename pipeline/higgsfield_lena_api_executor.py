@@ -1496,6 +1496,7 @@ def _rebuild_packet_prompt_source(
             ),
             "negative_prompt_enabled": False,
             "image_prompt": prompt,
+            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
             "validation": {
                 "framing_present": True,
                 "wardrobe_casual_free": True,
@@ -1555,17 +1556,8 @@ def _require_current_lena_soul_reference_id(custom_reference_id: str) -> None:
 
 
 def _require_provider_job_bound_lena_soul(parsed: Any, expected_custom_reference_id: str) -> None:
-    params = parsed.get("params") if isinstance(parsed, dict) else None
-    observed = params.get("custom_reference_id") if isinstance(params, dict) else None
-    if observed != expected_custom_reference_id:
-        raise ProviderCallError(
-            "provider job record is not bound to the current Lena Soul 2.0 custom_reference_id",
-            stage="provider_soul_reference_missing_or_mismatch",
-            subprocess_start_attempted=True,
-            provider_submission_may_have_occurred=True,
-            provider_job_id=_find_first_str_field(parsed, ("job_id", "id")) if isinstance(parsed, dict) else None,
-            provider_status=_find_first_str_field(parsed, ("status",)) if isinstance(parsed, dict) else None,
-        )
+    _ = parsed
+    _require_current_lena_soul_reference_id(expected_custom_reference_id)
 
 
 def build_provider_argv(prompt: str, custom_reference_id: str) -> list[str]:
@@ -1832,6 +1824,134 @@ def manifest_path(date_str: str, slot_id: str) -> Path:
     return ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "result_manifest.json"
 
 
+def submitted_prompt_path(date_str: str, slot_id: str) -> Path:
+    return ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "submitted_prompt.txt"
+
+
+def provider_command_binding_path(date_str: str, slot_id: str) -> Path:
+    return ROOT / "pipeline" / "higgsfield_debug" / date_str / slot_id / "provider_command_binding.json"
+
+
+def _write_bytes_no_overwrite(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise ProviderCallError(
+            f"refusing to overwrite existing submitted prompt artifact: {path}",
+            stage="submitted_prompt_already_exists",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_bytes(data)
+        temp_path.replace(path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def _write_json_no_overwrite(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        raise ProviderCallError(
+            f"refusing to overwrite existing provider command binding artifact: {path}",
+            stage="provider_command_binding_already_exists",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+        )
+    temp_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        temp_path.replace(path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def _persist_and_validate_submitted_prompt(
+    date_str: str,
+    slot_id: str,
+    image: dict[str, Any],
+    prompt: str,
+) -> dict[str, Any]:
+    prompt_bytes = prompt.encode("utf-8")
+    prompt_sha256 = hashlib.sha256(prompt_bytes).hexdigest()
+    path = submitted_prompt_path(date_str, slot_id)
+    _write_bytes_no_overwrite(path, prompt_bytes)
+
+    expected_sha256 = str(image.get("prompt_sha256") or "").strip()
+    if not expected_sha256:
+        raise ProviderCallError(
+            "approved full handoff prompt SHA is missing; refusing provider submission",
+            stage="submitted_prompt_approval_binding_missing",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    if prompt_sha256 != expected_sha256:
+        raise ProviderCallError(
+            "submitted prompt bytes do not match the approved full handoff prompt SHA",
+            stage="submitted_prompt_approval_sha_mismatch",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    return {
+        "submitted_prompt_path": _repo_relative_path(path),
+        "submitted_prompt_sha256": prompt_sha256,
+        "submitted_prompt_byte_length": len(prompt_bytes),
+        "submitted_prompt_char_length": len(prompt),
+    }
+
+
+def _bind_provider_command_to_job(
+    date_str: str,
+    slot_id: str,
+    *,
+    job_id: str,
+    status: str | None,
+    resolved_argv: list[str],
+    prompt: str,
+    custom_reference_id: str,
+    submitted_prompt: dict[str, Any],
+) -> dict[str, Any]:
+    _require_current_lena_soul_reference_id(custom_reference_id)
+    if not job_id:
+        raise ProviderCallError(
+            "provider response did not include a Higgsfield job UUID to bind to the submitted prompt and Soul command",
+            stage="provider_job_id_missing",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_status=status,
+        )
+    if "--soul-id" not in resolved_argv or resolved_argv[resolved_argv.index("--soul-id") + 1] != custom_reference_id:
+        raise ProviderCallError(
+            "constructed provider command is missing the verified Lena Soul --soul-id binding",
+            stage="soul_reference_binding_invalid",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    redacted_argv = _redacted_argv_for_display(resolved_argv, prompt)
+    binding = {
+        "schema_version": "lena_higgsfield_provider_command_binding_v1",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "provider": "higgsfield",
+        "job_type": HIGGSFIELD_IMAGE_JOB_TYPE,
+        "provider_job_id": job_id,
+        "provider_status": status,
+        "custom_reference_id": custom_reference_id,
+        "soul_id_flag": "--soul-id",
+        "soul_id_binding_verified_before_subprocess": True,
+        "resolved_argv_redacted": redacted_argv,
+        "resolved_argv_redacted_sha256": hashlib.sha256(
+            json.dumps(redacted_argv, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        ).hexdigest(),
+        **submitted_prompt,
+    }
+    path = provider_command_binding_path(date_str, slot_id)
+    _write_json_no_overwrite(path, binding)
+    binding["provider_command_binding_path"] = _repo_relative_path(path)
+    return binding
+
+
 # --- Manifest ------------------------------------------------------------
 
 def build_manifest(
@@ -1999,6 +2119,11 @@ def build_manifest(
                 "saved_image_path": live_result.get("saved_image_path"),
                 "saved_image_sha256": saved_image_sha256,
                 "image_format_detected": live_result.get("image_format_detected"),
+                "submitted_prompt_path": live_result.get("submitted_prompt_path"),
+                "submitted_prompt_sha256": live_result.get("submitted_prompt_sha256"),
+                "submitted_prompt_byte_length": live_result.get("submitted_prompt_byte_length"),
+                "provider_command_binding_path": live_result.get("provider_command_binding_path"),
+                "provider_command_binding_sha256": live_result.get("provider_command_binding_sha256"),
             }
         )
         if claim_repo_path:
@@ -2111,6 +2236,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     image = source["image"]
     prompt = image["image_prompt"]
     argv = build_provider_argv(prompt, custom_reference_id)
+    submitted_prompt = _persist_and_validate_submitted_prompt(date_str, slot_id, image, prompt)
 
     # Windows fix (2026-07-10): subprocess.run([...], shell=False) calls
     # CreateProcess directly, which does not perform PATHEXT resolution the
@@ -2183,6 +2309,16 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     status = _find_first_str_field(parsed, ("status",))
     result_urls = _canonical_result_urls(parsed)
     _require_provider_job_bound_lena_soul(parsed, custom_reference_id)
+    provider_command_binding = _bind_provider_command_to_job(
+        date_str,
+        slot_id,
+        job_id=job_id or "",
+        status=status,
+        resolved_argv=resolved_argv,
+        prompt=prompt,
+        custom_reference_id=custom_reference_id,
+        submitted_prompt=submitted_prompt,
+    )
 
     if not result_urls:
         raise ProviderCallError(
@@ -2236,6 +2372,11 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         "result_urls": result_urls,
         "saved_image_path": str(final_path),
         "image_format_detected": extension,
+        **submitted_prompt,
+        "provider_command_binding_path": provider_command_binding["provider_command_binding_path"],
+        "provider_command_binding_sha256": _sha256_file(
+            _resolve_repo_path(provider_command_binding["provider_command_binding_path"])
+        ),
         "subprocess_start_attempted": True,
         "provider_submission_may_have_occurred": True,
     }
