@@ -356,6 +356,7 @@ def test_build_handoff_creates_matching_json_and_markdown(tmp_path: Path, monkey
     assert report["structured_executor_inputs"]["live_argv"] == ["python", EXECUTOR_PATH, "--handoff-artifact", HANDOFF_PATH, "--live"]
     assert report["structured_executor_inputs"]["model"] == "text2image_soul_v2"
     assert report["structured_executor_inputs"]["aspect_ratio"] == "9:16"
+    assert report["structured_executor_inputs"]["soul_metadata"]["custom_reference_id"] == "e45ec580-a6db-4063-a9b2-f9163856daae"
     assert report["packet_state"] == "packet_valid_for_claude_review"
     assert report["dry_run_executor_contract_state"] == "ready"
     assert report["live_execution_state"] == "blocked"

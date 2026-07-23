@@ -17,7 +17,7 @@ from __future__ import annotations
 # generation (pipeline/prompting/lena_prompt_brain.py) or any diagnostic
 # tool; it only reads their already-committed, already-validated output.
 #
-# CONFIRMED REAL PROVIDER CONTRACT (authenticated `higgsfield` CLI v1.1.10,
+# CONFIRMED REAL PROVIDER CONTRACT (authenticated `higgsfield` CLI v1.1.13,
 # `model get text2image_soul_v2 --json`, inspected read-only this session --
 # not guessed):
 #   job_type: text2image_soul_v2
@@ -27,12 +27,11 @@ from __future__ import annotations
 #   No Prompt Enhancer parameter exists in this schema -- see doctrine note
 #   below. No negative-prompt parameter exists either.
 #   Lena's confirmed Soul: name="Lena", type="Soul 2.0",
-#   id=90a293d7-f3af-4377-8751-3304a27b6f31 (`soul-id list --json`,
-#   re-confirmed 2026-07-12 -- the provider account's live Soul ID rotated
-#   at some point after the original 2026-07-09/10 confirmation; the prior
-#   id, 1f1200e4-1cc9-4504-ac1c-3304b687e3c1, is no longer present on the
-#   account and is preserved only as historical fact in already-recorded
-#   manifests/evidence -- never used as a default for new live submissions).
+#   id=e45ec580-a6db-4063-a9b2-f9163856daae (`soul-id list --json`,
+#   re-confirmed 2026-07-23 -- the provider account's live Soul ID rotated
+#   after the 2026-07-12 confirmation; prior IDs are preserved only as
+#   historical fact in already-recorded manifests/evidence -- never used as
+#   a default for new live submissions).
 #
 # PROMPT ENHANCER DOCTRINE: the authenticated schema for text2image_soul_v2
 # exposes no enhancer-shaped parameter at all (searched for enhance/
@@ -127,23 +126,22 @@ HANDOFF_EXECUTION_OWNER = "claude"
 HANDOFF_EXECUTOR_TYPE = "higgsfield_cli"
 
 # Confirmed once during the authenticated contract-inspection session
-# (2026-07-09/10 later session). Not re-verified per invocation -- calling
+# (2026-07-23 authenticated inspection). Not re-verified per invocation -- calling
 # `higgsfield version` here would be an extra CLI call beyond the one
 # approved generation call this executor is allowed to make.
-HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.10"
+HIGGSFIELD_CLI_CONFIRMED_VERSION = "1.1.13"
 
 # Lena's confirmed Soul (`higgsfield soul-id list --json`, authenticated,
-# re-confirmed 2026-07-12 -- the account's live Soul ID rotated since the
-# original 2026-07-09/10 confirmation; the prior id
-# 1f1200e4-1cc9-4504-ac1c-3304b687e3c1 is no longer present on the
-# provider account). Non-secret identity/config metadata, not read from or
-# written to .env (see SOUL ID DOCTRINE above). This is the single, current
-# default used for every NEW live submission -- it is never chosen from a
-# set, and historical evidence recorded under the prior id remains valid
-# historical fact (see pipeline/identity/lena_higgsfield_identity.py's
+# re-confirmed 2026-07-23 -- the account's live Soul ID rotated since the
+# 2026-07-12 confirmation; the prior id 90a293d7-f3af-4377-8751-3304a27b6f31
+# now returns "Soul not found"). Non-secret identity/config metadata, not
+# read from or written to .env (see SOUL ID DOCTRINE above). This is the
+# single, current default used for every NEW live submission -- it is never
+# chosen from a set, and historical evidence recorded under prior ids remains
+# valid historical fact (see pipeline/identity/lena_higgsfield_identity.py's
 # APPROVED_CUSTOM_REFERENCE_IDS for the separate, read-only evidence-side
-# policy that accepts either id).
-DEFAULT_LENA_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+# policy).
+DEFAULT_LENA_CUSTOM_REFERENCE_ID = "e45ec580-a6db-4063-a9b2-f9163856daae"
 CONFIRMED_LENA_SOUL_NAME = "Lena"
 CONFIRMED_LENA_SOUL_TYPE = "Soul 2.0"
 CONFIRMED_LENA_CLI_SOUL_TYPE = "soul_2"
@@ -802,6 +800,7 @@ def execute_approved_handoff_live_generation(
     slot_id = str(context["slot_id"])
     source = context["source"]
     resolved_custom_reference_id = custom_reference_id or str(context["custom_reference_id"])
+    _require_current_lena_soul_reference_id(resolved_custom_reference_id)
     manifest_repo_path = context["manifest_path"]
 
     claim_info = _create_generation_claim(approval_result)
@@ -1006,6 +1005,7 @@ def execute_approved_retry_live_generation(
     approval_result = _validate_retry_approval_artifact(retry_handoff_path, retry_approval_path)
     retry_facts = approval_result["retry_facts"]
     custom_reference_id = str(retry_facts["custom_reference_id"])
+    _require_current_lena_soul_reference_id(custom_reference_id)
     claim_info = _create_retry_generation_claim(approval_result)
     claim_path = Path(claim_info["claim_path"])
     manifest_path_obj = manifest_path(date_str, slot_id)
@@ -1544,9 +1544,34 @@ def _load_handoff_report(handoff_path: Path) -> dict[str, Any]:
 
 # --- Provider argv construction ---------------------------------------------
 
+def _require_current_lena_soul_reference_id(custom_reference_id: str) -> None:
+    if custom_reference_id != DEFAULT_LENA_CUSTOM_REFERENCE_ID:
+        raise ProviderCallError(
+            "Lena Soul 2.0 custom_reference_id is missing or not the current provider-confirmed Lena Soul ID",
+            stage="soul_reference_binding_invalid",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+
+
+def _require_provider_job_bound_lena_soul(parsed: Any, expected_custom_reference_id: str) -> None:
+    params = parsed.get("params") if isinstance(parsed, dict) else None
+    observed = params.get("custom_reference_id") if isinstance(params, dict) else None
+    if observed != expected_custom_reference_id:
+        raise ProviderCallError(
+            "provider job record is not bound to the current Lena Soul 2.0 custom_reference_id",
+            stage="provider_soul_reference_missing_or_mismatch",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=_find_first_str_field(parsed, ("job_id", "id")) if isinstance(parsed, dict) else None,
+            provider_status=_find_first_str_field(parsed, ("status",)) if isinstance(parsed, dict) else None,
+        )
+
+
 def build_provider_argv(prompt: str, custom_reference_id: str) -> list[str]:
     """Constructed as a list, never shell-concatenated text. subprocess is
     invoked with this list and shell=False."""
+    _require_current_lena_soul_reference_id(custom_reference_id)
     return [
         HIGGSFIELD_CLI_BINARY,
         "generate",
@@ -2157,6 +2182,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
     status = _find_first_str_field(parsed, ("status",))
     result_urls = _canonical_result_urls(parsed)
+    _require_provider_job_bound_lena_soul(parsed, custom_reference_id)
 
     if not result_urls:
         raise ProviderCallError(

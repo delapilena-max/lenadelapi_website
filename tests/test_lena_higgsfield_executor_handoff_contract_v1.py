@@ -810,7 +810,7 @@ def test_validate_handoff_packet_rejects_selected_candidate_recommendation_misma
     slot_id = "higgsfield-20260715-hcr_008-photo"
     recommendation_recipe_id = "hcr_011"
     selected_recipe_id = "hcr_008"
-    custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
+    custom_reference_id = executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
     prompt_text = "Scene: candlelit arrival. Wardrobe: structured black set. Lighting: realistic low-light skin texture."
     prompt_sha = hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
 
@@ -1321,7 +1321,7 @@ def _build_retry_fixture(
     _patch_roots(tmp_root, monkeypatch)
     retry_date = "2026-07-14"
     original_slot = "higgsfield-20260714-hcr_011-photo"
-    custom_reference_id = "90a293d7-f3af-4377-8751-3304a27b6f31"
+    custom_reference_id = executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
     original_prompt = (
         ORIGINAL_PROMPT
         if safe_prompt
@@ -1996,6 +1996,32 @@ def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> 
     assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
 
 
+def test_provider_argv_attaches_verified_lena_soul_reference_id() -> None:
+    argv = executor.build_provider_argv("prompt", executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID)
+
+    assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID == "e45ec580-a6db-4063-a9b2-f9163856daae"
+    assert "--custom_reference_id" in argv
+    assert argv[argv.index("--custom_reference_id") + 1] == "e45ec580-a6db-4063-a9b2-f9163856daae"
+
+
+def test_provider_argv_rejects_missing_or_wrong_lena_soul_before_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        executor.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider subprocess must not start")),
+    )
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.build_provider_argv("prompt", "90a293d7-f3af-4377-8751-3304a27b6f31")
+
+    exc = exc_info.value
+    assert exc.stage == "soul_reference_binding_invalid"
+    assert exc.subprocess_start_attempted is False
+    assert exc.provider_submission_may_have_occurred is False
+
+
 def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     stdout = "\x1b[32mQueued by Higgsfield\x1b[0m\r\n      "
     stderr = "provider stderr\tline\r\n"
@@ -2016,7 +2042,7 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
             DATE,
             SLOT_ID,
             {"image": {"image_prompt": "prompt"}},
-            "90a293d7-f3af-4377-8751-3304a27b6f31",
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         )
 
     exc = exc_info.value
@@ -2025,6 +2051,47 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
     assert exc.provider_stderr_length == len(stderr)
     assert exc.provider_stdout_escaped == stdout.encode("unicode_escape").decode("ascii")
     assert exc.provider_stderr_escaped == stderr.encode("unicode_escape").decode("ascii")
+
+
+def test_run_live_rejects_provider_record_without_verified_lena_soul_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "3cf4fbd4-dd13-4b62-82bd-bdf9390ea401"
+
+    class Completed:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
+
+    def fake_run(argv, **kwargs):
+        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+            return Completed(f"{job_id}\n")
+        if argv[1:] == ["generate", "list", "--image", "--json"]:
+            return Completed(json.dumps([{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png", "params": {}}]))
+        raise AssertionError(f"unexpected argv: {argv}")
+
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        executor,
+        "_download",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("download must not start without Soul binding")),
+    )
+
+    with pytest.raises(executor.ProviderCallError) as exc_info:
+        executor.run_live(
+            DATE,
+            SLOT_ID,
+            {"image": {"image_prompt": "prompt"}},
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+        )
+
+    exc = exc_info.value
+    assert exc.stage == "provider_soul_reference_missing_or_mismatch"
+    assert exc.provider_job_id == job_id
+    assert exc.provider_status == "completed"
 
 
 def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
@@ -2048,7 +2115,12 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
                 json.dumps(
                     [
                         {"id": "other-job", "status": "completed", "result_url": "https://example.invalid/other.png"},
-                        {"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png"},
+                        {
+                            "id": job_id,
+                            "status": "completed",
+                            "result_url": "https://example.invalid/final.png",
+                            "params": {"custom_reference_id": executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID},
+                        },
                     ]
                 )
             )
@@ -2070,7 +2142,7 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
         DATE,
         SLOT_ID,
         {"image": {"image_prompt": "prompt"}},
-        "90a293d7-f3af-4377-8751-3304a27b6f31",
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
     )
 
     assert result["job_id"] == job_id
@@ -2095,7 +2167,14 @@ def test_run_live_polls_bare_uuid_until_result_url_is_available(
 
     lookup_responses = [
         [{"id": job_id, "status": "queued"}],
-        [{"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png"}],
+        [
+            {
+                "id": job_id,
+                "status": "completed",
+                "result_url": "https://example.invalid/final.png",
+                "params": {"custom_reference_id": executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID},
+            }
+        ],
     ]
 
     def fake_run(argv, **kwargs):
@@ -2124,7 +2203,7 @@ def test_run_live_polls_bare_uuid_until_result_url_is_available(
         DATE,
         SLOT_ID,
         {"image": {"image_prompt": "prompt"}},
-        "90a293d7-f3af-4377-8751-3304a27b6f31",
+        executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
     )
 
     lookup_calls = [call for call in calls if call[1:] == ["generate", "list", "--image", "--json"]]
