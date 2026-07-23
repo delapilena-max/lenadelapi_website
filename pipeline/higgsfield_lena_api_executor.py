@@ -117,6 +117,7 @@ from lena_higgsfield_prompt_library_dryrun import _hard_exclude_reasons  # noqa:
 HIGGSFIELD_CLI_BINARY = "higgsfield"
 HIGGSFIELD_IMAGE_JOB_TYPE = "text2image_soul_v2"
 HIGGSFIELD_ASPECT_RATIO = "9:16"
+_UUID_STDOUT_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 HANDOFF_REPORT_TYPE = "lena_next_live_image_handoff"
 HANDOFF_SCHEMA_VERSION = "v1"
 HANDOFF_EXECUTION_OWNER = "claude"
@@ -1668,6 +1669,85 @@ def _parse_provider_json_stdout(stdout: str) -> Any:
     return json.loads(raw)
 
 
+def _bare_provider_job_id(stdout: str) -> str | None:
+    value = (stdout or "").strip()
+    if _UUID_STDOUT_PATTERN.fullmatch(value):
+        return value.lower()
+    return None
+
+
+def _matching_provider_job_record(parsed: Any, job_id: str) -> dict[str, Any] | None:
+    candidates = parsed if isinstance(parsed, list) else [parsed]
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        candidate_id = _find_first_str_field(candidate, ("job_id", "id"))
+        if str(candidate_id or "").lower() == job_id.lower():
+            return candidate
+    return None
+
+
+def _lookup_provider_job_record(resolved_binary: str, job_id: str) -> dict[str, Any]:
+    lookup_argv = [resolved_binary, "generate", "list", "--image", "--json"]
+    try:
+        result = subprocess.run(lookup_argv, capture_output=True, text=True, shell=False, check=False)
+    except OSError as exc:
+        raise ProviderCallError(
+            f"Failed to spawn the Higgsfield CLI job lookup process ({resolved_binary!r}): {exc}",
+            stage="provider_job_lookup_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+        ) from exc
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    if result.returncode != 0:
+        raise ProviderCallError(
+            f"higgsfield generate list exited {result.returncode}. stderr (tail): {stderr.strip()[-2000:]}",
+            stage="provider_job_lookup_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+        )
+    try:
+        parsed = _parse_provider_json_stdout(stdout)
+    except json.JSONDecodeError as exc:
+        raise ProviderCallError(
+            f"Failed to parse Higgsfield job lookup JSON: {exc}. stdout length was {len(stdout)} chars.",
+            stage="provider_job_lookup_parse_failure",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+        ) from exc
+    match = _matching_provider_job_record(parsed, job_id)
+    if not match:
+        raise ProviderCallError(
+            "Higgsfield job lookup did not return the submitted job id",
+            stage="provider_job_lookup_missing",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+        )
+    if not _canonical_result_urls(match):
+        raise ProviderCallError(
+            "Higgsfield job lookup returned the submitted job without a canonical result_url",
+            stage="provider_job_lookup_pending_or_invalid",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_status=_find_first_str_field(match, ("status",)),
+        )
+    return match
+
+
 def _detect_image_extension(data: bytes) -> str:
     """Never blindly rename bytes as .png. Sniffs real magic bytes."""
     if data.startswith(_PNG_MAGIC):
@@ -2024,22 +2104,26 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         )
 
     stdout = result.stdout or ""
-    try:
-        parsed = _parse_provider_json_stdout(stdout)
-    except json.JSONDecodeError as exc:
-        stderr = result.stderr or ""
-        raise ProviderCallError(
-            f"Failed to parse --json output as JSON: {exc}. "
-            f"stdout length was {len(stdout)} chars."
-            ,
-            stage="provider_output_parse_failure",
-            subprocess_start_attempted=True,
-            provider_submission_may_have_occurred=True,
-            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
-            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
-            provider_stdout_length=len(stdout),
-            provider_stderr_length=len(stderr),
-        ) from exc
+    stdout_job_id = _bare_provider_job_id(stdout)
+    if stdout_job_id:
+        parsed = _lookup_provider_job_record(resolved_binary, stdout_job_id)
+    else:
+        try:
+            parsed = _parse_provider_json_stdout(stdout)
+        except json.JSONDecodeError as exc:
+            stderr = result.stderr or ""
+            raise ProviderCallError(
+                f"Failed to parse --json output as JSON: {exc}. "
+                f"stdout length was {len(stdout)} chars."
+                ,
+                stage="provider_output_parse_failure",
+                subprocess_start_attempted=True,
+                provider_submission_may_have_occurred=True,
+                provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+                provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+                provider_stdout_length=len(stdout),
+                provider_stderr_length=len(stderr),
+            ) from exc
 
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
     status = _find_first_str_field(parsed, ("status",))

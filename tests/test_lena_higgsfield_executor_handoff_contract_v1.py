@@ -2027,6 +2027,59 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(monkey
     assert exc.provider_stderr_escaped == stderr.encode("unicode_escape").decode("ascii")
 
 
+def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = "78d321d2-68c3-4b95-a92d-4f0a68fa8ac7"
+    calls: list[list[str]] = []
+
+    class Completed:
+        def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+            self.stdout = stdout
+            self.stderr = stderr
+            self.returncode = returncode
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if argv[1:4] == ["generate", "create", "text2image_soul_v2"]:
+            return Completed(f"{job_id}\n")
+        if argv[1:] == ["generate", "list", "--image", "--json"]:
+            return Completed(
+                json.dumps(
+                    [
+                        {"id": "other-job", "status": "completed", "result_url": "https://example.invalid/other.png"},
+                        {"id": job_id, "status": "completed", "result_url": "https://example.invalid/final.png"},
+                    ]
+                )
+            )
+        raise AssertionError(f"unexpected argv: {argv}")
+
+    def fake_download(url: str, destination: Path) -> bytes:
+        assert url == "https://example.invalid/final.png"
+        image_bytes = b"\x89PNG\r\n\x1a\nfixture"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(image_bytes)
+        return image_bytes
+
+    monkeypatch.setattr(executor, "ROOT", tmp_path)
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    monkeypatch.setattr(executor, "_download", fake_download)
+
+    result = executor.run_live(
+        DATE,
+        SLOT_ID,
+        {"image": {"image_prompt": "prompt"}},
+        "90a293d7-f3af-4377-8751-3304a27b6f31",
+    )
+
+    assert result["job_id"] == job_id
+    assert result["status"] == "completed"
+    assert result["result_urls"] == ["https://example.invalid/final.png"]
+    assert result["saved_image_path"] == str(tmp_path / "pipeline" / "higgsfield_library" / "lena" / DATE / f"{SLOT_ID}_seed.png")
+    assert calls[1][1:] == ["generate", "list", "--image", "--json"]
+
+
 def test_existing_claim_blocks_reuse_without_provider_call(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
