@@ -1580,6 +1580,118 @@ def _require_provider_job_bound_lena_soul(parsed: Any, expected_custom_reference
     _require_current_lena_soul_reference_id(expected_custom_reference_id)
 
 
+_PROMPT_PLACEHOLDER_MARKERS = (
+    "<FULL PROMPT>",
+    "<full prompt>",
+    "<redacted",
+    "<PROMPT>",
+    "<prompt>",
+)
+
+
+def resolve_provider_launcher() -> list[str]:
+    """Resolve an argv prefix that preserves arguments byte-for-byte.
+
+    WINDOWS ARGV-TRANSPORT FIX (2026-07-24, proven, not inferred): the
+    Higgsfield CLI on PATH is `higgsfield.CMD`, a batch shim whose last line
+    forwards arguments with `%*`. Batch `%*` expansion truncates a multiline
+    argument at its first newline AND drops every argument after it. Job
+    e7310322 proved this in production: a 3514-char prompt with 7 newlines
+    arrived at the provider as exactly 695 chars (SHA-matching the prompt cut
+    at its first newline), and --soul-id / --aspect_ratio / --quality never
+    reached the job at all -- the Soul was silently never attached.
+
+    The shim's own last line is:
+        "%dp0%\\node.exe" "%dp0%\\node_modules\\@higgsfield\\cli\\bin\\higgsfield.js" %*
+    so the real program is node.exe plus that JS entry point. node.exe is a
+    genuine PE executable: CreateProcess passes its argv intact, newlines and
+    all. We therefore launch that pair directly and never route through the
+    .CMD shim.
+
+    Fails closed. If a safe launcher cannot be resolved this raises rather
+    than silently falling back to the shim that corrupts arguments.
+    """
+    resolved = shutil.which(HIGGSFIELD_CLI_BINARY)
+    if not resolved:
+        raise ProviderCallError(
+            f"Could not resolve {HIGGSFIELD_CLI_BINARY!r} via shutil.which() -- "
+            "the Higgsfield CLI does not appear to be on PATH.",
+            stage="subprocess_start_failure",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+
+    resolved_path = Path(resolved)
+    if resolved_path.suffix.lower() not in {".cmd", ".bat"}:
+        # Already a real executable -- CreateProcess preserves argv.
+        return [str(resolved_path)]
+
+    shim_dir = resolved_path.parent
+    node_exe = shim_dir / "node.exe"
+    node_path = str(node_exe) if node_exe.is_file() else shutil.which("node")
+    js_entry = shim_dir / "node_modules" / "@higgsfield" / "cli" / "bin" / "higgsfield.js"
+
+    if not node_path or not js_entry.is_file():
+        raise ProviderCallError(
+            f"{resolved_path} is a Windows batch shim that corrupts multiline "
+            "arguments, and the underlying node.exe + higgsfield.js entry point "
+            f"could not be resolved (node={node_path!r}, js={str(js_entry)!r}). "
+            "Refusing to invoke through the shim.",
+            stage="provider_launcher_unsafe",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    return [str(node_path), str(js_entry)]
+
+
+def _require_prompt_survives_argv_boundary(resolved_argv: list[str], approved_prompt: str) -> None:
+    """Fail before spend unless the prompt in the outgoing argv is exactly
+    the approved prompt -- same length, same SHA-256, no placeholder."""
+    if "--prompt" not in resolved_argv:
+        raise ProviderCallError(
+            "constructed provider command has no --prompt argument",
+            stage="prompt_argv_binding_missing",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    index = resolved_argv.index("--prompt")
+    if index + 1 >= len(resolved_argv):
+        raise ProviderCallError(
+            "constructed provider command has --prompt with no value",
+            stage="prompt_argv_binding_missing",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    outgoing = resolved_argv[index + 1]
+
+    for marker in _PROMPT_PLACEHOLDER_MARKERS:
+        if marker in outgoing:
+            raise ProviderCallError(
+                f"outgoing prompt contains the placeholder {marker!r} instead of the approved prompt",
+                stage="prompt_argv_placeholder_rejected",
+                subprocess_start_attempted=False,
+                provider_submission_may_have_occurred=False,
+            )
+
+    if len(outgoing) != len(approved_prompt):
+        raise ProviderCallError(
+            "outgoing prompt length does not match the approved prompt "
+            f"({len(outgoing)} != {len(approved_prompt)}) -- refusing to spend",
+            stage="prompt_argv_length_mismatch",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    outgoing_sha = hashlib.sha256(outgoing.encode("utf-8")).hexdigest()
+    approved_sha = hashlib.sha256(approved_prompt.encode("utf-8")).hexdigest()
+    if outgoing_sha != approved_sha:
+        raise ProviderCallError(
+            "outgoing prompt SHA-256 does not match the approved prompt -- refusing to spend",
+            stage="prompt_argv_sha_mismatch",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+
+
 def build_provider_argv(
     prompt: str,
     custom_reference_id: str,
@@ -1595,13 +1707,15 @@ def build_provider_argv(
     reference overrode the Soul's identity. generation_reference is retained
     only as the recorded identity anchor of provenance, never transmitted."""
     _require_current_lena_soul_reference_id(custom_reference_id)
+    # --prompt is placed LAST as a defence-in-depth safeguard so that any
+    # future argv-mangling layer can only ever damage the prompt itself,
+    # never silently swallow the Soul/aspect/quality flags behind it. This
+    # ordering is NOT the transport fix -- resolve_provider_launcher() is.
     return [
         HIGGSFIELD_CLI_BINARY,
         "generate",
         "create",
         HIGGSFIELD_IMAGE_JOB_TYPE,
-        "--prompt",
-        prompt,
         "--soul-id",
         custom_reference_id,
         "--aspect_ratio",
@@ -1610,6 +1724,8 @@ def build_provider_argv(
         HIGGSFIELD_QUALITY,
         "--wait",
         "--json",
+        "--prompt",
+        prompt,
     ]
 
 
@@ -2343,23 +2459,10 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
     argv = build_provider_argv(prompt, custom_reference_id, generation_reference)
     submitted_prompt = _persist_and_validate_submitted_prompt(date_str, slot_id, image, prompt)
 
-    # Windows fix (2026-07-10): subprocess.run([...], shell=False) calls
-    # CreateProcess directly, which does not perform PATHEXT resolution the
-    # way a shell or shutil.which() does -- a bare "higgsfield" fails with
-    # FileNotFoundError ([WinError 2]) when the real executable on PATH is
-    # higgsfield.CMD. Resolve the actual executable path once, here, right
-    # at the subprocess boundary, and swap only argv[0] -- the logical
-    # provider command contract (build_provider_argv()) is unchanged.
-    resolved_binary = shutil.which(HIGGSFIELD_CLI_BINARY)
-    if not resolved_binary:
-        raise ProviderCallError(
-            f"Could not resolve {HIGGSFIELD_CLI_BINARY!r} via shutil.which() -- "
-            "the Higgsfield CLI does not appear to be on PATH.",
-            stage="subprocess_start_failure",
-            subprocess_start_attempted=False,
-            provider_submission_may_have_occurred=False,
-        )
-    resolved_argv = [resolved_binary, *argv[1:]]
+    launcher = resolve_provider_launcher()
+    resolved_binary = launcher[0]
+    resolved_argv = [*launcher, *argv[1:]]
+    _require_prompt_survives_argv_boundary(resolved_argv, prompt)
 
     print(f"[LIVE] resolved executable: {resolved_binary}")
     print(f"[LIVE] invoking: {_redacted_argv_for_display(resolved_argv, prompt)}")
