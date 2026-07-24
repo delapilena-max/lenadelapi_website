@@ -119,7 +119,7 @@ def run_controlled_cycle(
     _require(isinstance(controlled, dict) and controlled.get("enabled") is True, "controlled_autonomy_disabled", "controlled photo autonomy is disabled")
     _require(controlled.get("recipe_id") == CONTROLLED_RECIPE_ID, "controlled_recipe_policy_invalid", "policy recipe is not hcr_012")
     _require(controlled.get("wardrobe_outfit_id") == CONTROLLED_WARDROBE_ID, "controlled_wardrobe_policy_invalid", "policy wardrobe is not wc_p050")
-    _require(schedule_slot == controlled.get("schedule_slot"), "schedule_slot_not_authorized", "invocation does not match the authorized schedule slot")
+    _require(schedule_slot in set(controlled.get("schedule_slots", [])), "schedule_slot_not_authorized", "invocation does not match an authorized schedule slot")
     _require(policy.get("emergency_stop") is not True, "emergency_stop_active", "controlled photo autonomy emergency stop is active")
 
     lock_path = _acquire_lock(day)
@@ -131,6 +131,7 @@ def run_controlled_cycle(
             authorization = standing_autonomy.issue_cycle_authorization(
                 policy_path,
                 handoff_path,
+                schedule_slot=schedule_slot,
             )
         except standing_autonomy.StandingAutonomyPolicyError as exc:
             raise FullPhotoAutonomyError(exc.code, exc.detail) from exc

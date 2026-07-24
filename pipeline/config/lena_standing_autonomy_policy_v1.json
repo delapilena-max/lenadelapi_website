@@ -18,10 +18,10 @@
   "provider_call_cap_per_cycle": 2,
   "publish_action_cap_per_cycle": 1,
   "retry_cap_per_cycle": 1,
-  "maximum_cycles_per_day": 1,
-  "maximum_provider_calls_per_day": 2,
-  "maximum_publish_actions_per_day": 1,
-  "daily_spend_ceiling": 1,
+  "maximum_cycles_per_day": 3,
+  "maximum_provider_calls_per_day": 6,
+  "maximum_publish_actions_per_day": 3,
+  "daily_spend_ceiling": 3,
   "spend_unit": "provider_credits",
   "allowed_media_types": [
     "photo"
@@ -47,7 +47,11 @@
     "publish_action_cap_per_cycle": 1,
     "privacy_clean_derivative_required": true,
     "human_review_is_exception_only": true,
-    "schedule_slot": "morning"
+    "schedule_slots": [
+      "morning",
+      "afternoon",
+      "evening"
+    ]
   },
   "effective_at_utc": "2026-07-18T00:00:00Z",
   "expires_at_utc": null

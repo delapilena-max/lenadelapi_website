@@ -1677,7 +1677,7 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         admission = autonomous_publisher.admit_controlled_photo(
             day=day,
             slot_id=str(auth_data["slot_id"]),
-            schedule_slot=str(controlled["schedule_slot"]),
+            schedule_slot=str(auth_data["schedule_slot"]),
             platform=str(auth_data["platform"]),
             lane=str(resolved_candidate.get("lane") or ""),
             asset_path=clean_path,
@@ -1702,7 +1702,7 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
         )
         publish_result = autonomous_publisher.run_scheduled_autonomous(
             day=day,
-            slot_keyword=str(controlled["schedule_slot"]),
+            slot_keyword=str(auth_data["schedule_slot"]),
             limit=1,
             dry_run=False,
             policy_path=autonomous_publisher.POLICY_PATH,

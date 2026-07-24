@@ -246,7 +246,7 @@ def _build_bundle(
                     "publish_action_cap_per_cycle": 1,
                     "privacy_clean_derivative_required": True,
                     "human_review_is_exception_only": True,
-                    "schedule_slot": "morning",
+                    "schedule_slots": ["morning", "afternoon", "evening"],
                 },
             }
         )
@@ -648,7 +648,7 @@ def _build_bundle(
 
     monkeypatch.setattr(higgsfield_executor, "_validate_handoff_packet", fake_validate_handoff_packet)
 
-    auth_bundle = standing_autonomy.issue_cycle_authorization(policy_path, handoff_path, auth_root=tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles", report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles")
+    auth_bundle = standing_autonomy.issue_cycle_authorization(policy_path, handoff_path, auth_root=tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles", report_root=tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles", schedule_slot="morning" if controlled else None)
     auth_path = Path(auth_bundle["path"])
     auth = json.loads(auth_path.read_text(encoding="utf-8"))
     auth.update(
@@ -1772,6 +1772,62 @@ def test_second_cycle_same_day_is_refused_by_the_persistent_daily_cap(
         )
 
     assert exc_info.value.code == "daily_cycle_cap_reached"
+
+
+def test_second_authorization_for_the_same_schedule_slot_is_refused_same_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-07-24 (3x/day expansion): maximum_cycles_per_day alone (now 3,
+    one per authorized slot) no longer stops the SAME schedule_slot (e.g.
+    "morning") from being authorized twice in one day while another slot
+    never runs -- exactly what a misfiring or manually rerun per-slot
+    scheduled task would do. _build_bundle(controlled=True) already issues
+    one real "morning" authorization to disk; this proves a second
+    "morning" authorization the same day is refused before any provider
+    call, via collect_daily_authorized_slots reading real files, not
+    in-memory state."""
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    report_root = tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles"
+    auth_root = tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles"
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.issue_cycle_authorization(
+            Path(bundle["policy_path"]),
+            Path(bundle["handoff_path"]),
+            auth_root=auth_root,
+            report_root=report_root,
+            schedule_slot="morning",
+        )
+
+    assert exc_info.value.code == "schedule_slot_already_used_today"
+
+
+def test_collect_daily_authorized_slots_reads_schedule_slot_per_authorization_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unit-level proof that distinct schedule_slots on the same day do
+    NOT collide in the per-slot scan -- each authorized slot is tracked
+    independently, so authorizing "afternoon" after "morning" is not
+    blocked by this mechanism."""
+    _patch_roots(monkeypatch, tmp_path)
+    auth_root = tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles"
+    day_root = auth_root / DATE
+    day_root.mkdir(parents=True)
+    for slot, slot_id in (("morning", "pack000-00-photo"), ("afternoon", "pack000-01-photo")):
+        _write_json(
+            day_root / f"lena_bounded_live_cycle_authorization_{DATE}_{slot_id}.json",
+            {
+                "report_type": standing_autonomy.AUTH_REPORT_TYPE,
+                "date": DATE,
+                "slot_id": slot_id,
+                "schedule_slot": slot,
+            },
+        )
+
+    assert standing_autonomy.collect_daily_authorized_slots(auth_root, DATE) == {"morning", "afternoon"}
+    assert standing_autonomy.collect_daily_authorized_slots(auth_root, "2026-07-19") == set()
 
 
 @pytest.mark.parametrize(

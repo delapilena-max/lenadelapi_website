@@ -29,7 +29,7 @@ def _controlled_policy() -> dict:
             "enabled": True,
             "recipe_id": "hcr_012",
             "wardrobe_outfit_id": "wc_p050",
-            "schedule_slot": "morning",
+            "schedule_slots": ["morning", "afternoon", "evening"],
         },
     }
 
@@ -84,9 +84,10 @@ def test_scheduler_starts_complete_controlled_cycle_without_per_photo_human_inpu
         lambda path: {"path": Path(path), "sha256": "a" * 64, "artifact": _controlled_policy()},
     )
 
-    def issue(policy_path, handoff_path):
+    def issue(policy_path, handoff_path, *, schedule_slot=None):
         calls.append("approval")
         assert Path(handoff_path) == handoff
+        assert schedule_slot == "morning"
         return {"path": auth_path}
 
     def execute(path, *, report_root):

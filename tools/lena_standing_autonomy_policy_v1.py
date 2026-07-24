@@ -230,7 +230,15 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
         _require(int(controlled.get("publish_action_cap_per_cycle", 0)) == 1, "policy_controlled_publish_cap_invalid", "controlled photo autonomy publish cap must be one")
         _require(controlled.get("privacy_clean_derivative_required") is True, "policy_clean_derivative_invalid", "controlled photo autonomy requires a privacy-clean derivative")
         _require(controlled.get("human_review_is_exception_only") is True, "policy_human_review_mode_invalid", "routine human review must be disabled for controlled photo autonomy")
-        _require(controlled.get("schedule_slot") in {"morning", "afternoon", "evening"}, "policy_schedule_slot_invalid", "controlled photo autonomy schedule_slot is invalid")
+        schedule_slots = controlled.get("schedule_slots")
+        _require(
+            isinstance(schedule_slots, list)
+            and 1 <= len(schedule_slots) <= 3
+            and len(schedule_slots) == len(set(schedule_slots))
+            and set(schedule_slots) <= {"morning", "afternoon", "evening"},
+            "policy_schedule_slots_invalid",
+            "controlled photo autonomy schedule_slots must be a non-empty, duplicate-free subset of morning/afternoon/evening",
+        )
         for key in ("visual_model_authority_path", "identity_reference_authority_path"):
             authority_path = _path_from_repo_text(str(controlled.get(key) or ""))
             _ensure_path_within_root(authority_path, ROOT, code=f"policy_{key}_escape", label=key, must_exist=True)
@@ -302,6 +310,34 @@ def collect_daily_usage(report_root: Path, day: str) -> dict[str, Any]:
                 raise StandingAutonomyPolicyError("daily_accounting_spend_unit_mismatch", f"daily accounting spend unit mismatch in {path}")
         usage["files"].append(str(path))
     return usage
+
+
+def collect_daily_authorized_slots(auth_root: Path, day: str) -> set[str]:
+    # 2026-07-24 (3x/day expansion): with maximum_cycles_per_day raised
+    # above 1, the raw count cap alone no longer stops the SAME
+    # schedule_slot (e.g. "morning") from being authorized twice in one
+    # day while another slot never runs -- exactly what a misfiring or
+    # rerun scheduled task would do. Scans issued authorizations (not
+    # completed reports) so a slot is locked out the moment it is
+    # authorized, before any provider call, matching the fail-closed
+    # posture of the existing daily cap checks.
+    root = _ensure_path_within_root(auth_root, AUTH_ROOT, code="auth_root_escape", label="cycle authorization root", must_exist=False)
+    day_root = root / day
+    slots: set[str] = set()
+    if not day_root.exists():
+        return slots
+    for path in sorted(day_root.glob("*.json")):
+        if path.name.endswith(".lock"):
+            continue
+        artifact = _read_json_object(path, code="daily_authorization_artifact_invalid", label="daily authorization artifact")
+        if artifact.get("report_type") != AUTH_REPORT_TYPE:
+            continue
+        if str(artifact.get("date") or "") != day:
+            continue
+        slot = artifact.get("schedule_slot")
+        if slot:
+            slots.add(str(slot))
+    return slots
 
 
 def _prepare_authorization_scope(
@@ -414,8 +450,21 @@ def issue_cycle_authorization(
     *,
     auth_root: Path | None = None,
     report_root: Path | None = None,
+    schedule_slot: str | None = None,
 ) -> dict[str, Any]:
     policy_result = validate_policy_artifact(policy_artifact)
+    # 2026-07-24 (3x/day expansion): controlled photo autonomy now
+    # authorizes a SET of slots, not one -- the caller must say which one
+    # this specific cycle is for, and it must be in that set. Uncontrolled
+    # (general) policies have no slot concept, so this is a no-op for them.
+    controlled_policy = policy_result["artifact"].get("controlled_photo_autonomy")
+    controlled_enabled = isinstance(controlled_policy, dict) and controlled_policy.get("enabled") is True
+    if controlled_enabled:
+        _require(
+            schedule_slot in set(controlled_policy.get("schedule_slots", [])),
+            "schedule_slot_not_authorized",
+            "requested schedule_slot is not in the policy's authorized schedule_slots",
+        )
     handoff_path = _ensure_path_within_root(
         handoff_artifact,
         ROOT / "pipeline" / "strategy" / "lena" / "next_actions",
@@ -516,6 +565,13 @@ def issue_cycle_authorization(
     _require(usage_before["declared_spend_total"] < float(policy_result["artifact"]["daily_spend_ceiling"]), "daily_spend_cap_reached", "daily spend cap reached")
 
     auth_root = auth_root or AUTH_ROOT
+    if controlled_enabled:
+        used_slots = collect_daily_authorized_slots(auth_root, day)
+        _require(
+            schedule_slot not in used_slots,
+            "schedule_slot_already_used_today",
+            f"schedule_slot {schedule_slot!r} already has an authorization issued for {day}",
+        )
     auth_path = default_auth_path(day, slot_id)
     auth_path = _ensure_path_within_root(auth_path, auth_root, code="authorization_path_escape", label="cycle authorization artifact", must_exist=False)
     auth_path.parent.mkdir(parents=True, exist_ok=True)
@@ -546,6 +602,7 @@ def issue_cycle_authorization(
             "provider_execution_binding": scope["provider_execution_binding"],
             "binding_linkage": scope["binding_linkage"],
             "controlled_photo_autonomy": scope["controlled_photo_autonomy"],
+            "schedule_slot": schedule_slot,
             "expected_output_directory": str(expected_output_directory),
             "expected_output_stem": expected_output_stem,
             "allowed_output_extensions": allowed_output_extensions,
@@ -958,10 +1015,12 @@ def issue_cycle_authorization_report(
     *,
     auth_root: Path | None = None,
     report_root: Path | None = None,
+    schedule_slot: str | None = None,
 ) -> dict[str, Any]:
     return issue_cycle_authorization(
         policy_artifact,
         handoff_artifact,
         auth_root=auth_root,
         report_root=report_root,
+        schedule_slot=schedule_slot,
     )
