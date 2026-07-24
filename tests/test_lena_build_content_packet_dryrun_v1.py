@@ -82,12 +82,22 @@ def test_validate_packet_rejects_hashtags_in_public_fields() -> None:
     assert any("hashtags not allowed in public fields" in error for error in errors)
 
 
-def test_realism_contract_keeps_freckle_filter_plastic_and_identity_blocks() -> None:
+def test_realism_contract_keeps_freckle_filter_and_plastic_blocks() -> None:
     assert "fake freckles" in packet_builder.SKIN_REALISM_COMPACT.lower()
     assert "beauty-filter speckling" in packet_builder.SKIN_REALISM_COMPACT.lower()
     assert "plastic" in packet_builder.SKIN_REALISM_COMPACT.lower()
-    assert "identity drift" in packet_builder.STRUCTURED_TECHNICAL_REALISM.lower()
-    assert "plastic skin" in packet_builder.STRUCTURED_TECHNICAL_REALISM.lower() or "plastic" in packet_builder.STRUCTURED_TECHNICAL_REALISM.lower()
+
+
+def test_structured_technical_realism_is_positive_only() -> None:
+    # 2026-07-24: text2image_soul_v2 has no negative-prompt parameter, so
+    # "Avoid identity drift"-style clauses are read as positive prompt text
+    # and can summon the very thing they name. STRUCTURED_TECHNICAL_REALISM
+    # now states only what the image should contain.
+    text = packet_builder.STRUCTURED_TECHNICAL_REALISM.lower()
+    assert "identity drift" not in text
+    assert "avoid" not in text
+    assert "natural skin texture" in text
+    assert "five fingers" in text
 
 
 def test_proof_prompt_budget_no_longer_reserves_noninjected_overlay_text() -> None:

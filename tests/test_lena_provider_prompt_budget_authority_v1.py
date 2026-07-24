@@ -159,9 +159,11 @@ def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: di
         == pose_provenance.PROVIDER_SECTION_ORDER
         for row in governed_report["rows"]
     )
-    assert governed_report["summary"]["fit_count"] == 1638
-    assert governed_report["summary"]["over_budget_count"] == 72
-    assert governed_report["summary"]["parser_safety_over_budget_count"] == 72
+    # 2026-07-24: positive-only source migration shortened every prompt, so all
+    # 1710 governed routes now fit the 4096 budget (proven by the full sweep).
+    assert governed_report["summary"]["fit_count"] == 1710
+    assert governed_report["summary"]["over_budget_count"] == 0
+    assert governed_report["summary"]["parser_safety_over_budget_count"] == 0
 
     hcr_012_p008 = [
         row["assembled_prompt_length"]
@@ -169,7 +171,8 @@ def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: di
         if row["recipe_id"] == "hcr_012"
         and row["pose_body_language_id"] == "pose_p008"
     ]
-    assert hcr_012_p008 == [3432, 3343, 3716, 3712, 3716]
+    # Shorter after the positive-only source migration; all routes still fit.
+    assert hcr_012_p008 == [2366, 2471, 2650, 2646, 2650]
     assert all(
         row["fits_execution_budget"]
         for row in governed_report["rows"]
@@ -232,16 +235,20 @@ def test_hcr_012_fits_zero_loss_and_carries_required_semantic_inventory(
 
     inventory = governed_report["hcr_012_semantic_inventory"]
     assert inventory["all_required_concepts_present"] is True
+    # 2026-07-24 doctrine migration: body-shape concepts ("body_silhouette",
+    # "anti_slimming") are retired because physical description competes with
+    # the trained Lena Soul, and the "anti_*" negative concepts are retired
+    # because this model has no negative-prompt channel. The inventory now
+    # tracks the canonical positive concepts. Every authored source field is
+    # still required to survive verbatim -- zero-loss is unchanged.
     assert set(inventory["required_concepts"]) == {
-        "identity",
-        "body_silhouette",
+        "identity_anchored_to_soul",
         "wardrobe",
-        "environment_exclusions",
+        "environment",
         "realism",
-        "anti_plastic_skin",
-        "anti_identity_drift",
-        "anti_slimming",
-        "negative_constraints",
+        "natural_skin_texture",
+        "covered_styling_and_framing",
+        "authored_scene_constraints",
     }
     assert all(
         concept["must_survive_authored_migration"]
@@ -352,7 +359,11 @@ def test_current_production_formatter_matches_zero_loss_authority() -> None:
                     )
                 assert excinfo.value.code == "higgsfield_prompt_execution_policy_exceeded"
                 over_count += 1
-    assert (fit_count, over_count) == (324, 18)
+    # 2026-07-24: positive-only source migration shortened every prompt, so
+    # all governed combinations now fit the 4096 execution budget. The full
+    # sweep proves 342/342 fit and 0 rejected; counts updated to the proven
+    # values. The budget gate itself is unchanged.
+    assert (fit_count, over_count) == (342, 0)
 
 
 def test_all_zero_loss_routes_use_the_shared_execution_gate(governed_report: dict) -> None:
@@ -375,7 +386,11 @@ def test_all_zero_loss_routes_use_the_shared_execution_gate(governed_report: dic
                 prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
             assert excinfo.value.code == "higgsfield_prompt_execution_policy_exceeded"
             rejected += 1
-    assert (accepted, rejected) == (1638, 72)
+    # 2026-07-24: positive-only source migration shortened every prompt, so
+    # all governed combinations now fit the 4096 execution budget. The full
+    # sweep proves 342/342 fit and 0 rejected; counts updated to the proven
+    # values. The budget gate itself is unchanged.
+    assert (accepted, rejected) == (1710, 0)
 
 
 def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
@@ -422,7 +437,10 @@ def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
         for retry_type in audit.RETRY_TYPES
     ]
     assert actual == expected
-    assert [len(prompt) for prompt in actual] == [3432, 3343, 3716, 3712, 3716]
+    # Lengths shrank with the positive-only source migration; all five
+    # retry routes still fit the 4096 execution budget.
+    assert [len(prompt) for prompt in actual] == [2366, 2471, 2650, 2646, 2650]
+    assert all(len(prompt) <= 4096 for prompt in actual)
 
 
 def test_legacy_2499_budget_cannot_gate_higgsfield_execution() -> None:
@@ -484,4 +502,8 @@ def test_build_packet_uses_zero_loss_prompt_or_fails_before_packet_return() -> N
             assert packet["compact_provider_prompt_budget"] == 4096
             assert packet["compact_provider_prompt_chars"] == len(expected)
             built += 1
-    assert (built, blocked) == (324, 18)
+    # 2026-07-24: positive-only source migration shortened every prompt, so
+    # all governed combinations now fit the 4096 execution budget. The full
+    # sweep proves 342/342 fit and 0 rejected; counts updated to the proven
+    # values. The budget gate itself is unchanged.
+    assert (built, blocked) == (342, 0)

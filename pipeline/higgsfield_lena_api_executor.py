@@ -104,6 +104,7 @@ if str(DIAGNOSTICS_DIR) not in sys.path:
 
 from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract  # noqa: E402
+from pipeline.prompting import lena_canonical_prompt_contract_v1 as canonical_prompt_contract  # noqa: E402
 
 # Reuses the already-committed, already-validated pack builder/report --
 # the single source of truth for what a photo-dump-pack slot's final
@@ -2458,6 +2459,22 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         ) from exc
     argv = build_provider_argv(prompt, custom_reference_id, generation_reference)
     submitted_prompt = _persist_and_validate_submitted_prompt(date_str, slot_id, image, prompt)
+
+    # HARD GATE: no prompt reaches Higgsfield without satisfying the one
+    # canonical contract. Unconditional, and positioned after the approval/SHA
+    # bindings (so their more specific failures surface first) but before any
+    # launcher resolution or subprocess -- every spend path passes through
+    # here, so no prompt route can bypass it. Validation only; never rewrites,
+    # so zero-loss byte-exactness is preserved.
+    try:
+        canonical_prompt_contract.validate_prompt_contract(prompt)
+    except canonical_prompt_contract.PromptContractError as exc:
+        raise ProviderCallError(
+            exc.detail,
+            stage=f"prompt_contract_{exc.code}",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        ) from exc
 
     launcher = resolve_provider_launcher()
     resolved_binary = launcher[0]

@@ -26,6 +26,9 @@ from pipeline.prompting.lena_prompt_brain import (
     format_catalog_wardrobe_override,
     max_production_style_override_len,
 )
+from pipeline.prompting import (
+    lena_canonical_prompt_contract_v1 as canonical_prompt_contract,
+)
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
 
@@ -148,28 +151,29 @@ HAND_REALISM_COMPACT = (
     "avoid clasped hands or complex interlocked fingers. "
 )
 
+# POSITIVE-ONLY PROMPT DOCTRINE (2026-07-24)
+# text2image_soul_v2 has no negative-prompt parameter, so any "no X" clause is
+# read as ordinary positive prompt text and can summon the very thing it names.
+# These briefs therefore state only what the image SHOULD contain. They also
+# stay deliberately free of body-shape and physical-feature description: the
+# trained Lena Soul is the sole identity authority, and competing text drags
+# the render away from it.
 STRUCTURED_SUBJECT_BRIEF = (
-    "Lena (Magdalena Delapi). Identity is fixed by the approved Lena Soul character element; "
-    "preserve her recognizable adult face, realistic proportions, and natural clothing fit without "
-    "sexualized body emphasis. Do not reinterpret her as a different person. Hair stays reference-true "
-    "warm medium-brown with visible honey/caramel highlights and lighter face-framing pieces."
+    "Lena (Magdalena Delapi), a real adult woman photographed candidly. "
+    "Her face, hair, and likeness come from the Lena Soul."
 )
 
 STRUCTURED_TECHNICAL_REALISM = (
-    "Photorealistic high-resolution image with visible pores, fine facial texture, "
-    "natural under-eye retention, imperfect lip texture, tiny tone variation, "
-    "stray hair strands, realistic catchlights, and scene-true shadow falloff. "
-    "Face detail comes from the Lena character element; keep the facial surface faithful to the approved references. "
-    "Hands remain anatomically correct with five fingers, believable knuckles, "
-    "clean thumb placement, and relaxed wrists. Avoid plastic skin, beauty-filter "
-    "poreless retouching, deformed hands, identity drift, body-slimming drift, "
-    "or environment/wardrobe contradictions."
+    "Photorealistic candid photograph with natural skin texture, "
+    "realistic catchlights, and true-to-scene shadows. Hands are natural and "
+    "relaxed with five fingers."
 )
 
 PROVIDER_PROMPT_REQUIRED_GUARDRAILS = (
-    "Fastened tasteful clothing. Setting, natural action/expression, "
-    "and light/camera direction. No black/empty background, cutout, stiff catalog pose; "
-    "no open jeans, no exposed zipper, no underwear, wardrobe malfunction, no unnecessary sexualized emphasis."
+    "Tasteful covered styling: a fully buttoned crew-neck top and high-rise "
+    "jeans buttoned and zipped. Face-led composition with the complete head "
+    "and face visible in frame. Natural apartment environment with everyday "
+    "detail behind her."
 )
 
 # Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
@@ -357,6 +361,10 @@ def _assemble_structured_prompt_sections(
     environment = " ".join(part for part in environment_parts if part)
     cinematography = recipe_section_inputs["technical_keywords"]
     lighting = recipe_section_inputs["style_lighting"]
+    # ZERO-LOSS: every authored source field flows through verbatim. Nothing is
+    # transformed here. The recipe bank's negative_constraints field is itself
+    # authored as positive text (see the positive-source doctrine note above),
+    # so no runtime stripping is needed or permitted.
     technical_parts = [
         STRUCTURED_TECHNICAL_REALISM,
         PROVIDER_PROMPT_REQUIRED_GUARDRAILS,
@@ -488,7 +496,16 @@ def build_structured_provider_prompt(
         serialized_length
     )
     prompt = pose_provenance.serialize_provider_prompt_sections(sections)
-    return prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
+    prompt = prompt_limits.require_higgsfield_prompt_within_execution_policy(prompt)
+    # A fully bound prompt is a production prompt: it must satisfy the one
+    # canonical contract here, at construction. An unbound preview still
+    # carries the "expression authority required" placeholder by design and
+    # is never sent to a provider -- the executor re-validates unconditionally
+    # before spend, so no path reaches Higgsfield uncontracted.
+    # Validation only; never rewrites, so zero-loss byte-exactness holds.
+    if pose_binding is not None and expression_binding is not None:
+        canonical_prompt_contract.validate_prompt_contract(prompt)
+    return prompt
 
 
 def compute_proof_prompt_budget(

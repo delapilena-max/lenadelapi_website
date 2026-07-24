@@ -33,7 +33,23 @@ PROMPT_TEXT = pose_fixture.canonical_prompt()
 RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_generation_reconciliation_fixture.json"
 
 
-def _approved_live_source(prompt: str = "prompt") -> dict:
+# A minimal prompt that satisfies the canonical prompt contract. run_live
+# gates every spend path on that contract, so live-path fixtures must carry a
+# realistic structured prompt rather than a bare placeholder string.
+CONTRACT_VALID_PROMPT = "\n".join(
+    [
+        "[Subject]: Lena (Magdalena Delapi), a real adult woman photographed candidly. Her face, hair, and likeness come from the Lena Soul.",
+        "[Action]: weight shifted onto one hip, stance easy and unforced",
+        "[Expression]: confident direct gaze at the camera, faint smile",
+        "[Environment]: Warm apartment bedroom with everyday furniture and lived-in detail.",
+        "[Cinematography]: 85mm portrait, shallow depth of field, candid apartment realism.",
+        "[Lighting/Style]: Soft window light with a warm lamp fill shaping one side of the face.",
+        "[Technical]: Photorealistic candid photograph with natural skin texture and relaxed hands.",
+    ]
+)
+
+
+def _approved_live_source(prompt: str = CONTRACT_VALID_PROMPT) -> dict:
     return {
         "image": {
             "image_prompt": prompt,
@@ -2078,7 +2094,9 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(
     completed.stderr = stderr
 
     monkeypatch.setattr(executor, "ROOT", tmp_path)
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    # The launcher now refuses .CMD shims (they corrupt argv), so tests that
+    # only need *a* runnable provider command stub the resolved launcher.
+    monkeypatch.setattr(executor, "resolve_provider_launcher", lambda: ["higgsfield.CMD"])
     monkeypatch.setattr(executor.subprocess, "run", lambda *args, **kwargs: completed)
 
     with pytest.raises(executor.ProviderCallError) as exc_info:
@@ -2096,7 +2114,7 @@ def test_provider_parse_failure_preserves_exact_escaped_stdout_and_stderr(
     assert exc.provider_stdout_escaped == stdout.encode("unicode_escape").decode("ascii")
     assert exc.provider_stderr_escaped == stderr.encode("unicode_escape").decode("ascii")
     submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
-    assert submitted_prompt.read_text(encoding="utf-8") == "prompt"
+    assert submitted_prompt.read_text(encoding="utf-8") == CONTRACT_VALID_PROMPT
 
 
 def test_preflight_prompt_binding_does_not_create_live_submission_artifacts(
@@ -2213,11 +2231,19 @@ def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language
     assert "[Lighting/Style]:" in prompt
     assert "fully fastened" in prompt
     assert "fully buttoned and zipped" in prompt
-    assert "No black or empty background" in prompt
-    assert "no isolated cutout" in prompt
-    assert "no stiff front-facing catalog pose" in prompt
-    assert "no open jeans" in prompt
-    assert "no exposed zipper" in prompt
+    # This recipe's own negative_constraints field is deliberately old-style
+    # ("No black or empty background...") -- zero-loss requires it survive
+    # into the prompt byte-for-byte regardless of doctrine, same as any other
+    # authored source field.
+    assert "No black or empty background, no isolated cutout, no stiff front-facing catalog pose." in prompt
+    # 2026-07-24 doctrine migration: PROVIDER_PROMPT_REQUIRED_GUARDRAILS itself
+    # is positive-only (this model has no negative-prompt channel, so "no X"
+    # is delivered as positive conditioning). It no longer contributes any
+    # "no open jeans" / "no exposed zipper" wording -- confirm the new
+    # positive requirements are present instead.
+    assert "fully buttoned crew-neck top" in prompt
+    assert "high-rise jeans buttoned and zipped" in prompt
+    assert "complete head and face visible" in prompt
     for rejected in (
         "natural waist reveal is acceptable",
         "full natural lifted bust",
@@ -2225,11 +2251,10 @@ def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language
         "wide hips",
         "defined waist",
         "unnecessary sexualized emphasis",
+        "no open jeans",
+        "no exposed zipper",
     ):
-        if rejected == "unnecessary sexualized emphasis":
-            assert "no unnecessary sexualized emphasis" in prompt
-        else:
-            assert rejected not in prompt
+        assert rejected not in prompt
 
 
 def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_soul_field(
@@ -2258,7 +2283,9 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
         return image_bytes
 
     monkeypatch.setattr(executor, "ROOT", tmp_path)
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    # The launcher now refuses .CMD shims (they corrupt argv), so tests that
+    # only need *a* runnable provider command stub the resolved launcher.
+    monkeypatch.setattr(executor, "resolve_provider_launcher", lambda: ["higgsfield.CMD"])
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
     monkeypatch.setattr(executor, "_download", fake_download)
 
@@ -2280,7 +2307,7 @@ def test_run_live_binds_verified_lena_soul_command_when_provider_record_omits_so
     assert "--image-references" not in binding["resolved_argv_redacted"]
     assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
-    assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
+    assert binding["submitted_prompt_sha256"] == hashlib.sha256(CONTRACT_VALID_PROMPT.encode("utf-8")).hexdigest()
 
 
 def test_live_after_preflight_writes_submitted_prompt_once_and_second_attempt_stops_before_provider(
@@ -2312,12 +2339,14 @@ def test_live_after_preflight_writes_submitted_prompt_once_and_second_attempt_st
 
     source = _approved_live_source()
     monkeypatch.setattr(executor, "ROOT", tmp_path)
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    # The launcher now refuses .CMD shims (they corrupt argv), so tests that
+    # only need *a* runnable provider command stub the resolved launcher.
+    monkeypatch.setattr(executor, "resolve_provider_launcher", lambda: ["higgsfield.CMD"])
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
     monkeypatch.setattr(executor, "_download", fake_download)
 
-    preflight = executor._validate_submitted_prompt_binding(source["image"], "prompt")
-    assert preflight["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
+    preflight = executor._validate_submitted_prompt_binding(source["image"], CONTRACT_VALID_PROMPT)
+    assert preflight["submitted_prompt_sha256"] == hashlib.sha256(CONTRACT_VALID_PROMPT.encode("utf-8")).hexdigest()
     submitted_prompt = tmp_path / "pipeline" / "higgsfield_debug" / DATE / SLOT_ID / "submitted_prompt.txt"
     assert not submitted_prompt.exists()
 
@@ -2329,7 +2358,7 @@ def test_live_after_preflight_writes_submitted_prompt_once_and_second_attempt_st
     )
 
     assert result["job_id"] == job_id
-    assert submitted_prompt.read_text(encoding="utf-8") == "prompt"
+    assert submitted_prompt.read_text(encoding="utf-8") == CONTRACT_VALID_PROMPT
     first_call_count = len(calls)
 
     with pytest.raises(executor.ProviderCallError) as exc_info:
@@ -2386,7 +2415,9 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
         return image_bytes
 
     monkeypatch.setattr(executor, "ROOT", tmp_path)
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    # The launcher now refuses .CMD shims (they corrupt argv), so tests that
+    # only need *a* runnable provider command stub the resolved launcher.
+    monkeypatch.setattr(executor, "resolve_provider_launcher", lambda: ["higgsfield.CMD"])
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
     monkeypatch.setattr(executor, "_download", fake_download)
 
@@ -2409,7 +2440,7 @@ def test_run_live_resolves_bare_uuid_stdout_through_read_only_job_lookup(
     assert "--image-references" not in binding["resolved_argv_redacted"]
     assert binding["generation_reference_transmitted"] is False
     assert executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID in binding["resolved_argv_redacted"]
-    assert binding["submitted_prompt_sha256"] == hashlib.sha256(b"prompt").hexdigest()
+    assert binding["submitted_prompt_sha256"] == hashlib.sha256(CONTRACT_VALID_PROMPT.encode("utf-8")).hexdigest()
 
     assert result["job_id"] == job_id
     assert result["status"] == "completed"
@@ -2461,7 +2492,9 @@ def test_run_live_polls_bare_uuid_until_result_url_is_available(
     monkeypatch.setattr(executor, "ROOT", tmp_path)
     monkeypatch.setattr(executor, "HIGGSFIELD_JOB_LOOKUP_INTERVAL_SECONDS", 0.25)
     monkeypatch.setattr(executor.time, "sleep", lambda seconds: sleeps.append(seconds))
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "higgsfield.CMD")
+    # The launcher now refuses .CMD shims (they corrupt argv), so tests that
+    # only need *a* runnable provider command stub the resolved launcher.
+    monkeypatch.setattr(executor, "resolve_provider_launcher", lambda: ["higgsfield.CMD"])
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
     monkeypatch.setattr(executor, "_download", fake_download)
 

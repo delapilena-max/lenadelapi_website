@@ -258,18 +258,23 @@ def build_hcr_012_semantic_inventory(
         expression_entry,
     )
     scene_logic = recipe.get("scene_logic_contract") or {}
+    # 2026-07-24 doctrine migration. This inventory previously required the
+    # literal old strings -- body-shape description ("slim-thick hourglass",
+    # "wide hips") and negative wording ("Avoid plastic skin", "No poreless or
+    # plastic skin"). Both are now prohibited: body description competes with
+    # the trained Lena Soul for identity, and this model has no negative-prompt
+    # channel so "no X" is delivered as positive conditioning. The inventory now
+    # asserts the canonical positive concepts instead. Zero-loss is unchanged --
+    # every authored source field must still survive into the prompt verbatim.
     evidence = {
-        "identity": (
-            ("structured_subject_brief", "Identity is fixed: preserve her approved adult slim-thick hourglass body and face."),
-            ("structured_subject_brief", "Do not reinterpret her as a different person."),
-        ),
-        "body_silhouette": (
-            ("structured_subject_brief", "Keep full natural lifted bust, defined waist, and wide hips."),
+        "identity_anchored_to_soul": (
+            ("structured_subject_brief", "Lena (Magdalena Delapi)"),
+            ("structured_subject_brief", "Lena Soul"),
         ),
         "wardrobe": (
             ("recipe.fashion_accessories", recipe["fashion_accessories"]),
         ),
-        "environment_exclusions": (
+        "environment": (
             ("recipe.setting_background", recipe["setting_background"]),
             ("recipe.scene_logic_contract.environment_realism_notes", scene_logic["environment_realism_notes"]),
         ),
@@ -277,18 +282,13 @@ def build_hcr_012_semantic_inventory(
             ("recipe.style_lighting", recipe["style_lighting"]),
             ("structured_technical_realism", packet_builder.STRUCTURED_TECHNICAL_REALISM),
         ),
-        "anti_plastic_skin": (
-            ("structured_technical_realism", "Avoid plastic skin, beauty-filter poreless retouching"),
-            ("recipe.negative_constraints", "No poreless or plastic skin."),
+        "natural_skin_texture": (
+            ("structured_technical_realism", "natural skin texture"),
         ),
-        "anti_identity_drift": (
-            ("structured_technical_realism", "identity drift"),
+        "covered_styling_and_framing": (
+            ("provider_prompt_required_guardrails", packet_builder.PROVIDER_PROMPT_REQUIRED_GUARDRAILS),
         ),
-        "anti_slimming": (
-            ("structured_subject_brief", "Do not slim her into petite, narrow-hipped proportions."),
-            ("structured_technical_realism", "body-slimming drift"),
-        ),
-        "negative_constraints": (
+        "authored_scene_constraints": (
             ("recipe.negative_constraints", recipe["negative_constraints"]),
         ),
     }
