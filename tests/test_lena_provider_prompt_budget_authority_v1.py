@@ -171,8 +171,9 @@ def test_auditor_covers_every_governed_recipe_pose_and_route(governed_report: di
         if row["recipe_id"] == "hcr_012"
         and row["pose_body_language_id"] == "pose_p008"
     ]
-    # Shorter after the positive-only source migration; all routes still fit.
-    assert hcr_012_p008 == [2366, 2471, 2650, 2646, 2650]
+    # 2026-07-24 same-day: lengths grew again with the mandatory canonical
+    # identity/body block (+~800 chars in [Subject]); all routes still fit.
+    assert hcr_012_p008 == [3169, 3274, 3453, 3449, 3453]
     assert all(
         row["fits_execution_budget"]
         for row in governed_report["rows"]
@@ -437,9 +438,10 @@ def test_hcr_012_production_retry_routes_preserve_zero_loss_bytes(
         for retry_type in audit.RETRY_TYPES
     ]
     assert actual == expected
-    # Lengths shrank with the positive-only source migration; all five
-    # retry routes still fit the 4096 execution budget.
-    assert [len(prompt) for prompt in actual] == [2366, 2471, 2650, 2646, 2650]
+    # 2026-07-24 same-day: lengths grew again with the mandatory canonical
+    # identity/body block (+~800 chars in [Subject]); all five retry routes
+    # still fit the 4096 execution budget.
+    assert [len(prompt) for prompt in actual] == [3169, 3274, 3453, 3449, 3453]
     assert all(len(prompt) <= 4096 for prompt in actual)
 
 

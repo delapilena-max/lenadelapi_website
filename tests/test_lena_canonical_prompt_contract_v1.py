@@ -148,12 +148,44 @@ def test_contract_rejects_negative_wording(negative: str) -> None:
     assert excinfo.value.code == "prompt_negative_wording"
 
 
-@pytest.mark.parametrize("term", ["hourglass", "slim-thick", "wide hips", "cleavage"])
-def test_contract_rejects_body_shape_description_competing_with_the_soul(term: str) -> None:
-    prompt = _valid_prompt().replace("[Subject]: ", f"[Subject]: {term} figure. ")
+def test_contract_requires_the_canonical_identity_body_block_verbatim() -> None:
+    prompt = _valid_prompt()
+    assert contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK in prompt
+    altered = prompt.replace(
+        contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK,
+        contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK.replace("bombshell", "woman"),
+    )
+    with pytest.raises(contract.PromptContractError) as excinfo:
+        contract.validate_prompt_contract(altered)
+    assert excinfo.value.code == "prompt_canonical_identity_block_missing"
+
+
+def test_contract_rejects_missing_canonical_identity_body_block() -> None:
+    prompt = _valid_prompt()
+    stripped = prompt.replace(contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK, "")
+    with pytest.raises(contract.PromptContractError) as excinfo:
+        contract.validate_prompt_contract(stripped)
+    assert excinfo.value.code == "prompt_canonical_identity_block_missing"
+
+
+@pytest.mark.parametrize(
+    "term",
+    ["narrow hips", "slim-hipped", "thigh gap", "flat butt", "petite frame"],
+)
+def test_contract_rejects_terms_that_contradict_the_canonical_identity_block(term: str) -> None:
+    prompt = _valid_prompt().rstrip() + f" She has a {term} today."
     with pytest.raises(contract.PromptContractError) as excinfo:
         contract.validate_prompt_contract(prompt)
-    assert excinfo.value.code == "prompt_body_shape_description"
+    assert excinfo.value.code == "prompt_identity_contradiction"
+
+
+def test_contract_rejects_prompts_over_the_max_char_ceiling() -> None:
+    prompt = _valid_prompt()
+    padded = prompt[:-1] + (" filler word" * 400) + "."
+    assert len(padded) > contract.MAX_PROMPT_CHARS
+    with pytest.raises(contract.PromptContractError) as excinfo:
+        contract.validate_prompt_contract(padded)
+    assert excinfo.value.code == "prompt_exceeds_max_chars"
 
 
 def test_contract_requires_identity_and_soul_anchor() -> None:

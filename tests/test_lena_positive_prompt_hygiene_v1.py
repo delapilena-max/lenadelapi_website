@@ -57,24 +57,30 @@ def test_prompt_constants_are_positive_only(constant_name: str) -> None:
     _assert_clean(getattr(packet_builder, constant_name), constant_name)
 
 
-def test_guardrails_state_the_required_positive_wardrobe_and_framing() -> None:
+def test_guardrails_state_the_required_positive_framing() -> None:
+    # 2026-07-24: the guardrails no longer force one specific garment (a
+    # blanket "crew-neck top and high-rise jeans" on every image) -- that
+    # fought recipes' own locked wardrobe. Wardrobe now varies per recipe;
+    # only genuinely universal platform-safety/framing requirements remain.
     text = packet_builder.PROVIDER_PROMPT_REQUIRED_GUARDRAILS.lower()
 
-    assert "fully buttoned crew-neck top" in text
-    assert "high-rise jeans buttoned and zipped" in text
     assert "complete head and face visible" in text
     assert "natural apartment environment" in text
     assert "face-led composition" in text
-    assert "tasteful covered styling" in text
+    assert "tasteful" in text
+    assert "platform-safe" in text
 
 
-def test_subject_brief_defers_identity_to_the_soul_without_body_description() -> None:
-    """Body-shape text competes with the trained Soul identity."""
-    text = packet_builder.STRUCTURED_SUBJECT_BRIEF.lower()
+def test_subject_brief_embeds_the_canonical_identity_body_block() -> None:
+    """2026-07-24: Nicolas's mandate reverses the prior no-body-description
+    doctrine -- CANONICAL_LENA_IDENTITY_BODY_BLOCK is now required verbatim
+    in every [Subject], carrying explicit figure description on purpose."""
+    from pipeline.prompting import lena_canonical_prompt_contract_v1 as contract
 
-    assert "lena soul" in text
-    for competing in ("hourglass", "bust", "waist", "hips", "thighs", "curvy", "d-cup", "proportions"):
-        assert competing not in text, f"subject brief describes body shape ({competing!r})"
+    text = packet_builder.STRUCTURED_SUBJECT_BRIEF
+
+    assert "lena soul" in text.lower()
+    assert contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK in text
 
 
 def test_no_runtime_sanitizer_exists() -> None:

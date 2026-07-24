@@ -19,6 +19,7 @@ import tools.strategy.lena_reconciliation_contract_v1 as reconciliation_contract
 import tools.strategy.lena_record_generation_reconciliation_decision_v1 as decision_mod
 import tools.strategy.lena_prepare_higgsfield_retry_handoff_v1 as retry_handoff_mod
 from tools.strategy import lena_provider_prompt_limits_v1 as prompt_limits
+from pipeline.prompting import lena_canonical_prompt_contract_v1 as canonical_prompt_contract
 from tests.fixtures import lena_pose_provenance as pose_fixture
 from tests.test_lena_prepare_higgsfield_retry_handoff_v1 import ORIGINAL_PROMPT
 
@@ -36,9 +37,13 @@ RECONCILIATION_PATH = f"pipeline/strategy/lena/reconciliations/{DATE}/lena_gener
 # A minimal prompt that satisfies the canonical prompt contract. run_live
 # gates every spend path on that contract, so live-path fixtures must carry a
 # realistic structured prompt rather than a bare placeholder string.
+# 2026-07-24: [Subject] must also carry the mandatory canonical identity/body
+# block verbatim -- imported from the single authoritative source rather
+# than retyped, so this fixture can never silently drift out of sync with it.
 CONTRACT_VALID_PROMPT = "\n".join(
     [
-        "[Subject]: Lena (Magdalena Delapi), a real adult woman photographed candidly. Her face, hair, and likeness come from the Lena Soul.",
+        "[Subject]: Lena (Magdalena Delapi), a real adult woman photographed candidly. Her face, hair, and likeness come from the Lena Soul. "
+        + canonical_prompt_contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK,
         "[Action]: weight shifted onto one hip, stance easy and unforced",
         "[Expression]: confident direct gaze at the camera, faint smile",
         "[Environment]: Warm apartment bedroom with everyday furniture and lived-in detail.",
@@ -2238,18 +2243,19 @@ def test_corrected_higgsfield_prompt_removes_rejected_body_and_wardrobe_language
     assert "No black or empty background, no isolated cutout, no stiff front-facing catalog pose." in prompt
     # 2026-07-24 doctrine migration: PROVIDER_PROMPT_REQUIRED_GUARDRAILS itself
     # is positive-only (this model has no negative-prompt channel, so "no X"
-    # is delivered as positive conditioning). It no longer contributes any
-    # "no open jeans" / "no exposed zipper" wording -- confirm the new
-    # positive requirements are present instead.
-    assert "fully buttoned crew-neck top" in prompt
-    assert "high-rise jeans buttoned and zipped" in prompt
+    # is delivered as positive conditioning). It no longer forces one
+    # specific garment on every image -- confirm the universal positive
+    # framing/platform-safety requirements are present instead.
     assert "complete head and face visible" in prompt
+    assert "Face-led composition" in prompt
+    # 2026-07-24 same-day: Nicolas's canonical identity/body block is now
+    # mandatory verbatim in every [Subject] -- "slim-thick"/"wide hips" are
+    # no longer rejected, they're required (see
+    # test_lena_canonical_prompt_contract_v1.py).
+    assert canonical_prompt_contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK in prompt
     for rejected in (
         "natural waist reveal is acceptable",
         "full natural lifted bust",
-        "slim-thick",
-        "wide hips",
-        "defined waist",
         "unnecessary sexualized emphasis",
         "no open jeans",
         "no exposed zipper",

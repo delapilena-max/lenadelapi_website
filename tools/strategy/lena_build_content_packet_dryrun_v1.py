@@ -154,13 +154,16 @@ HAND_REALISM_COMPACT = (
 # POSITIVE-ONLY PROMPT DOCTRINE (2026-07-24)
 # text2image_soul_v2 has no negative-prompt parameter, so any "no X" clause is
 # read as ordinary positive prompt text and can summon the very thing it names.
-# These briefs therefore state only what the image SHOULD contain. They also
-# stay deliberately free of body-shape and physical-feature description: the
-# trained Lena Soul is the sole identity authority, and competing text drags
-# the render away from it.
+# These briefs therefore state only what the image SHOULD contain.
+#
+# IDENTITY/BODY MANDATE (2026-07-24, same day): Nicolas's exact
+# CANONICAL_LENA_IDENTITY_BODY_BLOCK is embedded here, not re-typed --
+# lena_canonical_prompt_contract_v1 is the single authoritative source and
+# validates that this exact text survives into every [Subject] section.
 STRUCTURED_SUBJECT_BRIEF = (
     "Lena (Magdalena Delapi), a real adult woman photographed candidly. "
-    "Her face, hair, and likeness come from the Lena Soul."
+    "Her face, hair, and likeness come from the Lena Soul. "
+    + canonical_prompt_contract.CANONICAL_LENA_IDENTITY_BODY_BLOCK
 )
 
 STRUCTURED_TECHNICAL_REALISM = (
@@ -169,11 +172,17 @@ STRUCTURED_TECHNICAL_REALISM = (
     "relaxed with five fingers."
 )
 
+# 2026-07-24: no longer forces one specific garment (a "crew-neck top and
+# high-rise jeans") on every image -- that blanket wardrobe mandate fought
+# recipes with their own locked wardrobe and produced contradictory prompts
+# (a recipe's off-shoulder top vs. this guardrail's crew-neck). Per Nicolas's
+# instruction, wardrobe should vary by recipe -- some tasteful skin exposure
+# and curve-emphasizing styling, some more covered -- so only genuinely
+# universal platform-safety requirements remain here.
 PROVIDER_PROMPT_REQUIRED_GUARDRAILS = (
-    "Tasteful covered styling: a fully buttoned crew-neck top and high-rise "
-    "jeans buttoned and zipped. Face-led composition with the complete head "
-    "and face visible in frame. Natural apartment environment with everyday "
-    "detail behind her."
+    "Tasteful, platform-safe styling appropriate to the scene. Face-led "
+    "composition with the complete head and face visible in frame. Natural "
+    "apartment environment with everyday detail behind her."
 )
 
 # Compatibility aliases; authority lives in lena_provider_prompt_limits_v1.
