@@ -1726,6 +1726,54 @@ def test_non_expiring_standing_policy_validates_and_issues_short_lived_cycle_aut
     assert auth["consumed"] is False
 
 
+def test_second_cycle_same_day_is_refused_by_the_persistent_daily_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-07-24: proves rerunning an authorized slot cannot duplicate
+    provider spend. collect_daily_usage reads real report files from disk
+    (not in-memory state), so this holds across separate process
+    invocations -- exactly the "run the scheduled command again" scenario,
+    not just same-process concurrency (already covered by
+    test_live_concurrent_invocation_rejected_after_consumption_begins)."""
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(
+        tmp_path, monkeypatch, policy_overrides={"maximum_cycles_per_day": 1}
+    )
+    report_root = tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles"
+    auth_root = tmp_path / "pipeline" / "approvals" / "lena" / "bounded_live_cycles"
+
+    # Simulate a prior, already-completed real cycle for this same day by
+    # writing exactly the report shape collect_daily_usage scans for --
+    # no mocking of the cap-check function itself, so this proves the real
+    # disk-based accounting, not a stubbed-out assumption of it.
+    completed_report = report_root / DATE / "lena_bounded_live_cycle_2026-07-18_000000.json"
+    completed_report.parent.mkdir(parents=True, exist_ok=True)
+    completed_report.write_text(
+        json.dumps(
+            {
+                "report_type": "lena_bounded_live_cycle",
+                "date": DATE,
+                "live_execution": True,
+                "provider_calls_performed": 1,
+                "publish_calls_performed": 1,
+                "retries_performed": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(standing_autonomy.StandingAutonomyPolicyError) as exc_info:
+        standing_autonomy.issue_cycle_authorization(
+            Path(bundle["policy_path"]),
+            Path(bundle["handoff_path"]),
+            auth_root=auth_root,
+            report_root=report_root,
+        )
+
+    assert exc_info.value.code == "daily_cycle_cap_reached"
+
+
 @pytest.mark.parametrize(
     "mutator, expected_code",
     [
