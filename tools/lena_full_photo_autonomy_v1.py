@@ -107,6 +107,8 @@ def run_controlled_cycle(
     day: str,
     schedule_slot: str,
     policy_path: Path = POLICY_PATH,
+    hold_for_publish: bool = False,
+    auth_root: Path | None = None,
     prep_runner: Callable[[str], dict[str, Any]] = _run_prep,
     cycle_runner: Callable[..., dict[str, Any]] = live_cycle._run_live_cycle,
 ) -> dict[str, Any]:
@@ -126,12 +128,22 @@ def run_controlled_cycle(
     try:
         prep = prep_runner(day)
         handoff_path = Path(prep["handoff_path"]).resolve()
-        _validate_controlled_handoff(handoff_path)
+        handoff = _validate_controlled_handoff(handoff_path)
+        resolved_auth_root = auth_root or standing_autonomy.AUTH_ROOT
+        candidate_id = str((handoff.get("selected_candidate") or {}).get("candidate_id") or "")
+        _require(bool(candidate_id), "controlled_candidate_id_missing", "handoff selected_candidate is missing a candidate_id")
+        used_candidate_ids = standing_autonomy.collect_daily_authorized_candidate_ids(resolved_auth_root, day)
+        _require(
+            candidate_id not in used_candidate_ids,
+            "distinct_candidate_unavailable",
+            f"candidate_id {candidate_id!r} was already authorized for another slot on {day}",
+        )
         try:
             authorization = standing_autonomy.issue_cycle_authorization(
                 policy_path,
                 handoff_path,
                 schedule_slot=schedule_slot,
+                auth_root=auth_root,
             )
         except standing_autonomy.StandingAutonomyPolicyError as exc:
             raise FullPhotoAutonomyError(exc.code, exc.detail) from exc
@@ -139,6 +151,7 @@ def run_controlled_cycle(
             result = cycle_runner(
                 authorization["path"],
                 report_root=standing_autonomy.default_daily_report_root(),
+                hold_for_publish=hold_for_publish,
             )
         except Exception as exc:
             result = {

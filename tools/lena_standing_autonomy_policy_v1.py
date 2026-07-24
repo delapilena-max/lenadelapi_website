@@ -340,6 +340,32 @@ def collect_daily_authorized_slots(auth_root: Path, day: str) -> set[str]:
     return slots
 
 
+def collect_daily_authorized_candidate_ids(auth_root: Path, day: str) -> set[str]:
+    # 2026-07-24 (3x/day expansion): morning/afternoon/evening must use
+    # DISTINCT candidates. Scans the same issued-authorization files as
+    # collect_daily_authorized_slots (each authorization already records
+    # its candidate_id) so a caller can refuse to authorize a slot whose
+    # selected candidate was already committed to a different slot today
+    # -- before that slot's provider call, not after.
+    root = _ensure_path_within_root(auth_root, AUTH_ROOT, code="auth_root_escape", label="cycle authorization root", must_exist=False)
+    day_root = root / day
+    candidate_ids: set[str] = set()
+    if not day_root.exists():
+        return candidate_ids
+    for path in sorted(day_root.glob("*.json")):
+        if path.name.endswith(".lock"):
+            continue
+        artifact = _read_json_object(path, code="daily_authorization_artifact_invalid", label="daily authorization artifact")
+        if artifact.get("report_type") != AUTH_REPORT_TYPE:
+            continue
+        if str(artifact.get("date") or "") != day:
+            continue
+        candidate_id = artifact.get("candidate_id")
+        if candidate_id:
+            candidate_ids.add(str(candidate_id))
+    return candidate_ids
+
+
 def _prepare_authorization_scope(
     *,
     handoff_report: dict[str, Any],

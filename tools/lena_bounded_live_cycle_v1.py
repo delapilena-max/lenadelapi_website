@@ -1238,7 +1238,7 @@ def _build_fail_report(
     return report
 
 
-def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]:
+def _run_live_cycle(auth_artifact: Path, *, report_root: Path, hold_for_publish: bool = False) -> dict[str, Any]:
     auth = _validate_authorization_artifact(auth_artifact, simulate=False)
     auth_data = auth["artifact"]
     day = str(auth_data["date"])
@@ -1700,16 +1700,33 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
                 clean_export_report_sha256=clean_export["report_sha256"],
             )
         )
-        publish_result = autonomous_publisher.run_scheduled_autonomous(
-            day=day,
-            slot_keyword=str(auth_data["schedule_slot"]),
-            limit=1,
-            dry_run=False,
-            policy_path=autonomous_publisher.POLICY_PATH,
-        )
-        _require(int(publish_result.get("posted_count", 0)) == 1, "autonomous_publish_not_completed", "scheduled autonomous publisher did not record exactly one posted item")
-        _require(int(publish_result.get("publish_calls_performed", 0)) == 1, "autonomous_publish_count_invalid", "scheduled autonomous publisher must perform exactly one publish call")
-        stages.append(_stage_summary("scheduled_publish", True, publish_report=publish_result))
+        if hold_for_publish:
+            publish_result = None
+            publish_performed = False
+            publish_calls_performed = 0
+            autonomous_disposition = "accept_and_hold_for_publish"
+            stages.append(
+                _stage_summary(
+                    "scheduled_publish",
+                    True,
+                    held_for_publish=True,
+                    schedule_slot=str(auth_data["schedule_slot"]),
+                )
+            )
+        else:
+            publish_result = autonomous_publisher.run_scheduled_autonomous(
+                day=day,
+                slot_keyword=str(auth_data["schedule_slot"]),
+                limit=1,
+                dry_run=False,
+                policy_path=autonomous_publisher.POLICY_PATH,
+            )
+            _require(int(publish_result.get("posted_count", 0)) == 1, "autonomous_publish_not_completed", "scheduled autonomous publisher did not record exactly one posted item")
+            _require(int(publish_result.get("publish_calls_performed", 0)) == 1, "autonomous_publish_count_invalid", "scheduled autonomous publisher must perform exactly one publish call")
+            stages.append(_stage_summary("scheduled_publish", True, publish_report=publish_result))
+            publish_performed = True
+            publish_calls_performed = 1
+            autonomous_disposition = "accept_and_publish"
         finished_at = _now_utc().replace(microsecond=0).isoformat().replace("+00:00", "Z")
         report = {
             "ok": True,
@@ -1725,13 +1742,13 @@ def _run_live_cycle(auth_artifact: Path, *, report_root: Path) -> dict[str, Any]
             "started_at": started_at,
             "finished_at": finished_at,
             "cycle_id": cycle_id,
-            "autonomous_disposition": "accept_and_publish",
+            "autonomous_disposition": autonomous_disposition,
             "provider_calls_performed": provider_calls_performed,
-            "publish_calls_performed": 1,
+            "publish_calls_performed": publish_calls_performed,
             "retries_performed": retries_performed,
             "qa_lifecycle_status": "accepted",
             "publish_authorized": True,
-            "publish_performed": True,
+            "publish_performed": publish_performed,
             "queue_mutated": True,
             "retry_executed": retries_performed == 1,
             "provider_original": {"path": str(generated_image_path), "sha256": generated_image_sha256},

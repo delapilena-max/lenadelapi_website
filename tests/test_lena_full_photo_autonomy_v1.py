@@ -34,11 +34,12 @@ def _controlled_policy() -> dict:
     }
 
 
-def _controlled_handoff(path: Path) -> Path:
+def _controlled_handoff(path: Path, *, candidate_id: str = "candidate-001") -> Path:
     return _write_json(
         path,
         {
             "selected_candidate": {
+                "candidate_id": candidate_id,
                 "recipe_id": "hcr_012",
                 "wardrobe_outfit_id": "wc_p050",
             },
@@ -84,15 +85,16 @@ def test_scheduler_starts_complete_controlled_cycle_without_per_photo_human_inpu
         lambda path: {"path": Path(path), "sha256": "a" * 64, "artifact": _controlled_policy()},
     )
 
-    def issue(policy_path, handoff_path, *, schedule_slot=None):
+    def issue(policy_path, handoff_path, *, schedule_slot=None, auth_root=None):
         calls.append("approval")
         assert Path(handoff_path) == handoff
         assert schedule_slot == "morning"
         return {"path": auth_path}
 
-    def execute(path, *, report_root):
+    def execute(path, *, report_root, hold_for_publish=False):
         calls.append("cycle")
         assert Path(path) == auth_path
+        assert hold_for_publish is False
         return {
             "ok": True,
             "autonomous_disposition": "accept_and_publish",
@@ -102,10 +104,12 @@ def test_scheduler_starts_complete_controlled_cycle_without_per_photo_human_inpu
 
     monkeypatch.setattr(autonomy.standing_autonomy, "issue_cycle_authorization", issue)
     monkeypatch.setattr(autonomy.standing_autonomy, "default_daily_report_root", lambda: tmp_path / "reports")
+    monkeypatch.setattr(autonomy.standing_autonomy, "AUTH_ROOT", tmp_path / "auth")
     result = autonomy.run_controlled_cycle(
         day="2026-07-21",
         schedule_slot="morning",
         policy_path=tmp_path / "policy.json",
+        auth_root=tmp_path / "auth",
         prep_runner=lambda day: {"handoff_path": handoff},
         cycle_runner=execute,
     )
@@ -155,16 +159,101 @@ def test_scheduler_converts_cycle_exception_to_terminal_operational_failure(
     monkeypatch.setattr(autonomy.standing_autonomy, "validate_policy_artifact", lambda path: {"artifact": _controlled_policy()})
     monkeypatch.setattr(autonomy.standing_autonomy, "issue_cycle_authorization", lambda *args, **kwargs: {"path": auth_path})
     monkeypatch.setattr(autonomy.standing_autonomy, "default_daily_report_root", lambda: tmp_path / "reports")
+    monkeypatch.setattr(autonomy.standing_autonomy, "AUTH_ROOT", tmp_path / "auth")
     result = autonomy.run_controlled_cycle(
         day="2026-07-21",
         schedule_slot="morning",
         policy_path=tmp_path / "policy.json",
+        auth_root=tmp_path / "auth",
         prep_runner=lambda day: {"handoff_path": handoff},
         cycle_runner=lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("publisher unavailable")),
     )
     assert result["autonomous_disposition"] == "operational_failure"
     assert result["human_review_required"] is False
     assert result["exceptional_escalation_required"] is True
+
+
+def _fake_issue_that_writes_real_authorization(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, auth_root: Path, calls: list[str]) -> None:
+    # Not a full issue_cycle_authorization -- just enough of a stand-in
+    # (writes a real report_type/date/schedule_slot/candidate_id file to
+    # auth_root) that the REAL, unmocked collect_daily_authorized_candidate_ids
+    # scan run_controlled_cycle performs before issuance can see it.
+    def fake_issue(policy_path, handoff_path, *, schedule_slot=None, auth_root=None):
+        calls.append(str(schedule_slot))
+        handoff = json.loads(Path(handoff_path).read_text(encoding="utf-8"))
+        candidate_id = handoff["selected_candidate"]["candidate_id"]
+        resolved_root = auth_root or autonomy.standing_autonomy.AUTH_ROOT
+        auth_path = Path(resolved_root) / "2026-07-24" / f"auth_{schedule_slot}.json"
+        _write_json(
+            auth_path,
+            {
+                "report_type": autonomy.standing_autonomy.AUTH_REPORT_TYPE,
+                "date": "2026-07-24",
+                "schedule_slot": schedule_slot,
+                "candidate_id": candidate_id,
+            },
+        )
+        return {"path": auth_path}
+
+    monkeypatch.setattr(autonomy.standing_autonomy, "issue_cycle_authorization", fake_issue)
+
+
+def _held_execute(path, *, report_root, hold_for_publish=False):
+    return {"ok": True, "autonomous_disposition": "accept_and_hold_for_publish", "publish_performed": False}
+
+
+def test_distinct_candidates_across_slots_are_authorized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(autonomy, "LOCK_ROOT", tmp_path / "locks")
+    monkeypatch.setattr(autonomy.standing_autonomy, "validate_policy_artifact", lambda path: {"path": Path(path), "sha256": "a" * 64, "artifact": _controlled_policy()})
+    monkeypatch.setattr(autonomy.standing_autonomy, "default_daily_report_root", lambda: tmp_path / "reports")
+    auth_root = tmp_path / "auth"
+    monkeypatch.setattr(autonomy.standing_autonomy, "AUTH_ROOT", auth_root)
+    calls: list[str] = []
+    _fake_issue_that_writes_real_authorization(tmp_path, monkeypatch, auth_root, calls)
+
+    handoff_morning = _controlled_handoff(tmp_path / "handoff_morning.json", candidate_id="candidate-001")
+    result_morning = autonomy.run_controlled_cycle(
+        day="2026-07-24", schedule_slot="morning", policy_path=tmp_path / "policy.json",
+        auth_root=auth_root, prep_runner=lambda day: {"handoff_path": handoff_morning}, cycle_runner=_held_execute,
+    )
+    assert result_morning["ok"] is True
+
+    handoff_afternoon = _controlled_handoff(tmp_path / "handoff_afternoon.json", candidate_id="candidate-002")
+    result_afternoon = autonomy.run_controlled_cycle(
+        day="2026-07-24", schedule_slot="afternoon", policy_path=tmp_path / "policy.json",
+        auth_root=auth_root, prep_runner=lambda day: {"handoff_path": handoff_afternoon}, cycle_runner=_held_execute,
+    )
+    assert result_afternoon["ok"] is True
+    assert calls == ["morning", "afternoon"]
+
+
+def test_duplicate_candidate_across_slots_fails_before_authorization_issue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(autonomy, "LOCK_ROOT", tmp_path / "locks")
+    monkeypatch.setattr(autonomy.standing_autonomy, "validate_policy_artifact", lambda path: {"path": Path(path), "sha256": "a" * 64, "artifact": _controlled_policy()})
+    monkeypatch.setattr(autonomy.standing_autonomy, "default_daily_report_root", lambda: tmp_path / "reports")
+    auth_root = tmp_path / "auth"
+    monkeypatch.setattr(autonomy.standing_autonomy, "AUTH_ROOT", auth_root)
+    calls: list[str] = []
+    _fake_issue_that_writes_real_authorization(tmp_path, monkeypatch, auth_root, calls)
+
+    handoff_morning = _controlled_handoff(tmp_path / "handoff_morning.json", candidate_id="candidate-001")
+    autonomy.run_controlled_cycle(
+        day="2026-07-24", schedule_slot="morning", policy_path=tmp_path / "policy.json",
+        auth_root=auth_root, prep_runner=lambda day: {"handoff_path": handoff_morning}, cycle_runner=_held_execute,
+    )
+    assert calls == ["morning"]
+
+    # afternoon's strategy prep (hypothetically) selected the SAME
+    # candidate morning already committed to -- must fail BEFORE any
+    # authorization/provider call, never silently reuse or duplicate.
+    handoff_afternoon = _controlled_handoff(tmp_path / "handoff_afternoon.json", candidate_id="candidate-001")
+    with pytest.raises(autonomy.FullPhotoAutonomyError) as exc:
+        autonomy.run_controlled_cycle(
+            day="2026-07-24", schedule_slot="afternoon", policy_path=tmp_path / "policy.json",
+            auth_root=auth_root, prep_runner=lambda day: {"handoff_path": handoff_afternoon}, cycle_runner=_held_execute,
+        )
+    assert exc.value.code == "distinct_candidate_unavailable"
+    assert calls == ["morning"]  # afternoon never reached issue_cycle_authorization
 
 
 def test_privacy_clean_derivative_is_separate_metadata_free_and_lineage_bound(tmp_path: Path) -> None:
