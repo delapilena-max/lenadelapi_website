@@ -215,13 +215,14 @@ PACKET_BLOCKED_TERMS = (
     "/v1/images/generations",
     ".env.txt",
 )
-MASTER_IDENTITY_CHECKS = (
-    "identity is fixed",
-    "approved lena soul character",
-    "recognizable adult face",
-    "realistic proportions",
-    "do not reinterpret",
-)
+# 2026-07-24: the exact-phrase list this used to check for was the pre-
+# migration STRUCTURED_SUBJECT_BRIEF wording ("Identity is fixed...", "Do
+# not reinterpret..."), which the positive-only doctrine migration removed
+# by design (negative construction; body-shape-adjacent "realistic
+# proportions"). The still-valid invariant -- identity anchored to Lena and
+# the trained Soul -- is now the canonical contract's own IDENTITY_REQUIRED/
+# SOUL_ANCHOR checks; check_master_identity defers to those instead of a
+# second, independently-maintained phrase list.
 
 
 def load_json(path):
@@ -306,8 +307,15 @@ def trim_fragment_to_chars(text, max_chars):
 
 
 def check_master_identity(prompt: str) -> bool:
-    prompt_lower = (prompt or "").lower()
-    return all(marker in prompt_lower for marker in MASTER_IDENTITY_CHECKS)
+    try:
+        sections = canonical_prompt_contract.parse_sections(prompt or "")
+    except canonical_prompt_contract.PromptContractError:
+        return False
+    subject = sections.get("Subject", "")
+    return bool(
+        canonical_prompt_contract.IDENTITY_REQUIRED.search(subject)
+        and canonical_prompt_contract.SOUL_ANCHOR.search(subject)
+    )
 
 
 def check_packet_blocked_terms(prompt: str) -> list[str]:
