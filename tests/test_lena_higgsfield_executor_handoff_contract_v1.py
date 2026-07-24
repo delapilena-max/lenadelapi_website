@@ -3001,15 +3001,19 @@ def test_rebuild_packet_prompt_source_populates_candidate_provenance(
     )
     expected_pose = pose_fixture.static_pose_provenance()
     expected_expression = pose_fixture.static_expression_provenance()
+    # 2026-07-24 (stale_decision fix): the real call sites now pass
+    # selected_candidate_freshness_mode explicitly; these stubs ignore
+    # derivation entirely (return static fixtures), so just accept and
+    # discard it.
     monkeypatch.setattr(
         handoff_builder.pose_provenance,
         "build_candidate_pose_provenance",
-        lambda _path, root=None: expected_pose,
+        lambda _path, root=None, selected_candidate_freshness_mode=None: expected_pose,
     )
     monkeypatch.setattr(
         handoff_builder.pose_provenance,
         "build_candidate_expression_provenance",
-        lambda _path, root=None: expected_expression,
+        lambda _path, root=None, selected_candidate_freshness_mode=None: expected_expression,
     )
     fake_wf_entry = {
         "outfit_id": "wc_p050",

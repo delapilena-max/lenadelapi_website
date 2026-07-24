@@ -1362,6 +1362,7 @@ def _rebuild_packet_prompt_source(
     from pipeline.prompting.lena_prompt_brain import catalog_outfit_silhouette_class  # noqa: E402
     from tools.strategy import lena_build_content_packet_dryrun_v1 as packet_builder  # noqa: E402
     from tools.strategy import lena_pose_provenance_v1 as pose_provenance  # noqa: E402
+    from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate  # noqa: E402
 
     packet_report = load_content_packet_report(
         packet_path,
@@ -1372,15 +1373,26 @@ def _rebuild_packet_prompt_source(
         "handoff_candidate_pose_missing",
         "a selected candidate artifact is required to reconstruct provider pose authority",
     )
+    # 2026-07-24 (stale_decision fix): re-deriving against LIVE current
+    # state (the default) re-runs the whole selector, including "recent
+    # content" evidence -- and this handoff-inspection path is itself part
+    # of what writes fresh evidence under pipeline/higgsfield_debug/ once a
+    # generation completes, making it self-invalidating. The candidate is
+    # already SHA-pinned into the handoff (checked immediately below and by
+    # validate_selected_candidate_binding); once selected, its identity is
+    # frozen, so re-validate against that frozen snapshot instead of asking
+    # "would selection still choose this right now."
     try:
         derived_pose_provenance = pose_provenance.build_candidate_pose_provenance(
             candidate_path,
             root=ROOT,
+            selected_candidate_freshness_mode=selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT,
         )
         derived_expression_provenance = (
             pose_provenance.build_candidate_expression_provenance(
                 candidate_path,
                 root=ROOT,
+                selected_candidate_freshness_mode=selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT,
             )
         )
         pose_provenance.validate_pose_provenance(expected_pose_provenance)

@@ -18,6 +18,7 @@ from pipeline.influencer_nodes.lena import autonomy_ladder  # noqa: E402
 from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract  # noqa: E402
 from tools.strategy import lena_pose_provenance_v1 as pose_provenance
 from tools.strategy import lena_reconciliation_contract_v1 as reconciliation_contract
+from tools.strategy import lena_execute_selected_candidate_v1 as selected_candidate
 
 DEFAULT_APPROVAL_ROOT = ROOT / "pipeline" / "approvals" / "lena" / "generation"
 
@@ -1263,7 +1264,17 @@ def validate_generation_approval_artifact(
         code="approval_handoff_path_missing",
         label="approval handoff_artifact_path",
     )
-    handoff_facts = inspect_handoff_artifact(handoff_path)
+    # 2026-07-24 (stale_decision fix): an approval already SHA-pins the
+    # candidate; re-deriving live selection freshness here re-runs the
+    # selector against current "recent content" evidence, which the act of
+    # generating (writing pipeline/higgsfield_debug/.../result_manifest.json)
+    # itself changes -- self-invalidating. Validate against the frozen
+    # pre-generation snapshot instead; the approval's own TTL (not this) is
+    # the intended staleness guard for an already-recorded approval.
+    handoff_facts = inspect_handoff_artifact(
+        handoff_path,
+        selected_candidate_freshness_mode=selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT,
+    )
     reconciliation_facts = reconciliation_contract.validate_handoff_reconciliation_provenance(
         handoff_facts["report"],
         validate_selected_candidate_binding(handoff_facts["report"]),
