@@ -15,7 +15,7 @@ Revision summary:
 - Deterministic local assembly boundary: approved video plus approved music may be assembled locally for review, without new provider calls or publication authority.
 - Candidate Lena ElevenLabs voice: a voice named `Lena` exists as a future speech-lane candidate, without production approval or speech authority.
 - Private PC/phone dashboard doctrine: the dashboard is a local-first, read-only in V1 operator console, not production authority.
-- Immediate priority: close the published Attempt 04 photo lifecycle, then finish Lena Reels/video proof and private observability without broadening into unproven nodes.
+- Immediate priority: preserve the closed Attempt 04 photo lifecycle, finish the current Lena Reels/video proof, and keep private observability subordinate to the video lane without broadening into unproven nodes.
 
 ## 1. Authority and Precedence
 
@@ -139,6 +139,8 @@ Final publication status is proven. The original scheduled task and failed corre
 - published JPEG URL: `https://media.nicnodes.us/lena/instagram-feed/2026-07-27/attempt04-instagram-feed-3x4-center-review-4b7435bc1223927f6ad57265b8fea3a64306d6eac37caba7f343f4bff3d9e7cb.jpg`
 - published JPEG SHA-256: `4b7435bc1223927f6ad57265b8fea3a64306d6eac37caba7f343f4bff3d9e7cb`
 - final publication verdict: `ATTEMPT_04_CORRECTIVE_INSTAGRAM_POST_PUBLISHED_ONCE`
+- lifecycle status: `ATTEMPT_04_PHOTO_LIFECYCLE_PUBLISHED_AND_CLOSED; CONTROLLED_END_TO_END_PHOTO_PROOF_COMPLETED`
+- final publication closure-manifest SHA-256: `0a443d58f334ff2409b9b8a1a48edb24a757d392202c581cd6f7d7f2ab170c3e`
 
 The publication proof was controlled end-to-end. It does not by itself prove the entire photo lane is fully autonomous.
 
@@ -395,20 +397,44 @@ Current controlled route requirements:
 
 Do not require or introduce a start-image identity workaround for the governed Seedance Character Element route.
 
-Canonical visual benchmark:
+Current verified video worktree:
 
 - video repository: `C:\projects\ai\content_bot\lenadelapi_website_video_element_hpe_v2`
 - branch: `codex/lena-video-element-hpe-v2`
-- current protected video HEAD: `a81abf8828470fc163ef6fcc2c3a356dab0bbe19`
+- current video HEAD: `ec0af36c762ee855bfa72effcd9a401b82c2d197`
+- current HEAD meaning: governed 720p / 6-second / 9:16 production contract is implemented; downstream Reel workflow is proven offline; no real 720p/6s production video has yet been generated; provider generation remains subject to fresh Nic authorization.
+- historical production-contract milestone commit: `a81abf8828470fc163ef6fcc2c3a356dab0bbe19`
+
+Canonical audiovisual benchmark:
+
+- benchmark role: approved 480p audiovisual benchmark, held from publication and not a production-resolution publishable Reel
 - Attempt 04 provider job: `bb34630d-c7ba-464a-9d2a-cc2b0aa7def0`
 - provider prompt SHA-256: `2f7a3d744dc21fad9660aeac3d32bfbd00544983baff4f1629b2faca24170e76`
 - canonical MP4 SHA-256: `333679eb2628ec7f77f6fbab781484cfcc26c651f324408bfc70d1ec5c5892ff`
+- canonical audiovisual benchmark SHA-256: `753ff5cea41abf7dd5263cdc9940e05bb5bd3fa7824da2ba4f57a3fc8fdf1e86`
 - media: `496x864`, `7.041667` seconds, `24 fps`, H.264, no source audio
-- verdict: `SEEDANCE_SENSUAL_CREATIVE_DIRECTION_PROVEN; ATTEMPT_04_CANONICAL_BENCHMARK_HELD_FROM_PUBLICATION`
+- verdict: `ATTEMPT_04_CANONICAL_AUDIOVISUAL_BENCHMARK_APPROVED; HELD_FROM_PUBLICATION_480P`
 
 Seedance 2.0 Character Element delivery is proven. Lena identity remained stable. HPE-based temporal presence is proven at the controlled benchmark level. The sensual creative direction is proven.
 
-The asset remains a 480p benchmark. It is not a production-resolution publishable Reel. The production video target remains 720p, 6 seconds, and 9:16. Production video generation remains deferred. No video-lane autonomy declaration follows yet. Production-resolution and full downstream proof remain outstanding.
+The benchmark audio remains bound to the 7.041667-second benchmark and must not be automatically reused for a future six-second asset.
+
+The production video target remains Seedance 2.0, 720p, 6 seconds, 9:16, generated audio disabled, Lena Character Element, no start image, and no media input. Production video generation remains deferred until a real publication candidate receives fresh Nic authorization. No video-lane autonomy declaration follows yet.
+
+Current first production Reel candidate:
+
+- candidate ID: `lenavid20260727_seedance_first_real_720p6s::hvr_002_golden_hour_colonnade_turn`
+- concept: `Golden-Hour Colonnade Turn`
+- candidate source video HEAD: `ec0af36c762ee855bfa72effcd9a401b82c2d197`
+- preflight root: `C:\projects\ai\content_bot\lenadelapi_website_video_element_hpe_v2\pipeline\higgsfield_debug\2026-07-27\golden_hour_colonnade_turn_ec0af36c_6a76cdab_01`
+- provider prompt SHA-256: `6a76cdabe1597ed8c6362449756c1acf4d31a1f85d14fc9f8f119db66431d6ee`
+- request-preview SHA-256: `9087dd129143961ddd7a9f717c1bebc40f07576da50f6e8c59ffc2bff736233f`
+- preflight-manifest SHA-256: `5c2b7bf3f082c9a4b64df2bd6050fb904cfa91496a90711a53e3b61536fde90b`
+- unsigned Nic approval SHA-256: `d288005cb85e17c0119c9606d02799534b05d45bf1c240b55e08714c3a5d347d`
+- candidate state: `AWAITING_NIC_CONCEPT_AND_COST_APPROVAL`
+- known maximum cost: `27 Higgsfield credits`
+
+This candidate is not approved, not generated, and not generation authority. The earlier candidate `lenavid20260727_seedance_first_real_720p6s::hvr_001_daylight_studio_lunge` is a superseded, unselected draft; its supersession receipt SHA-256 is `bb6288551d9b9ada7d737f2ec5c688673d7d0dff9a0b78af7742034bca2a2d13`.
 
 ## 22. Audio, Music, Voice, Synchronization, and Assembly
 
