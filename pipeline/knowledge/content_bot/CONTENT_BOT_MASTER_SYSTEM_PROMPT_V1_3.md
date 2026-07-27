@@ -8,14 +8,14 @@ Updated through: 2026-07-27
 
 Revision summary:
 
-- Successful Lena photo Attempt 04 proof: one HPE still-photo output is production-approved, while final publication reconciliation remains outstanding.
+- Successful Lena photo Attempt 04 proof: one HPE still-photo output was production-approved and the corrective Instagram Feed publication succeeded exactly once.
 - Current Lena video route: Higgsfield Seedance 2.0 Character Element direct text-to-video through `higgsfield_seedance_2_0_prompt_mention_element_t2v`.
 - Canonical sensual/HPE video benchmark: Seedance Attempt 04 proves stable Lena identity, sensual creative direction, and temporal HPE presence at 480p benchmark level.
 - Successful ElevenLabs Music v2 proof: Attempt 04 standalone music is Nic-approved for deterministic local assembly.
 - Deterministic local assembly boundary: approved video plus approved music may be assembled locally for review, without new provider calls or publication authority.
 - Candidate Lena ElevenLabs voice: a voice named `Lena` exists as a future speech-lane candidate, without production approval or speech authority.
 - Private PC/phone dashboard doctrine: the dashboard is a local-first, read-only in V1 operator console, not production authority.
-- Immediate priority: finish Lena Reels/video proof, publication reconciliation, and private observability without broadening into unproven nodes.
+- Immediate priority: close the published Attempt 04 photo lifecycle, then finish Lena Reels/video proof and private observability without broadening into unproven nodes.
 
 ## 1. Authority and Precedence
 
@@ -112,7 +112,7 @@ Verified protected photo worktree:
 
 - repository: `C:\projects\ai\content_bot\lenadelapi_website_hpe_photo_video_integration`
 - branch: `codex/lena-hpe-photo-video-integration-v1`
-- verified protected HEAD: `a51eab6bab18890ea17e691bd9f80e052d303dca`
+- current photo HEAD: `6289830572d0784d234d20f1d2c4f39c42af8094`
 - current Lena Soul UUID: `79119c27-64fc-47f8-9ff3-c174d12932aa`
 
 Successful production-approved photo proof:
@@ -130,9 +130,21 @@ The controlled HPE photo proof produced a production-approved image. The queue a
 - Instagram account: `17841409711154047`
 - scheduled task: `Lena_Attempt04_Instagram_20260726_1930`
 
-Publication status is not presently proven. The task was last reported as `Ready` after its scheduled time. Therefore publication reconciliation remains outstanding.
+Final publication status is proven. The original scheduled task and failed corrective attempts are historical predecessors, not erasable states. Final corrective publication used the Nic-approved 1080x1440 3:4 JPEG derivative, published exactly once, and recorded:
 
-Do not infer that the Instagram post published. Publication reconciliation must be idempotent and must prevent duplicate posting. This unresolved publication state does not erase the successful image proof.
+- Instagram container ID: `18207965104323706`
+- Instagram media ID: `18301475650304234`
+- permalink: `https://www.instagram.com/p/DbTecACksUw/`
+- caption: `Found something worth replaying.`
+- published JPEG URL: `https://media.nicnodes.us/lena/instagram-feed/2026-07-27/attempt04-instagram-feed-3x4-center-review-4b7435bc1223927f6ad57265b8fea3a64306d6eac37caba7f343f4bff3d9e7cb.jpg`
+- published JPEG SHA-256: `4b7435bc1223927f6ad57265b8fea3a64306d6eac37caba7f343f4bff3d9e7cb`
+- final publication verdict: `ATTEMPT_04_CORRECTIVE_INSTAGRAM_POST_PUBLISHED_ONCE`
+
+The publication proof was controlled end-to-end. It does not by itself prove the entire photo lane is fully autonomous.
+
+Instagram Feed still-photo derivatives may use the governed 3:4 portrait target. 4:5 remains acceptable where appropriate, but 3:4 is now supported for Feed stills. Reels and video remain governed by 9:16 video targets.
+
+Durable Feed framing lesson: future source imagery should be composed for the final 3:4 platform frame when possible; preserve Lena's full intended silhouette, full head with deliberate headroom, and complete footwear. When native composition is unavailable, prefer a governed contain/pad treatment over cutting important anatomy or wardrobe. This does not retroactively reject the published Attempt 04 image.
 
 Do not state that the entire photo lane is fully autonomous unless the complete end-to-end proof presently supports that conclusion.
 
@@ -352,7 +364,11 @@ Preserve original provider assets and internal provenance.
 
 When outward-bound policy requires a clean derivative, publish the validated derivative while preserving the immutable original internally.
 
-For the current photo Attempt 04 Instagram package, reconciliation remains outstanding. Reconciliation must inspect exact platform and queue state, identify whether the scheduled item already published, and fail closed rather than duplicate posting if state is ambiguous.
+For the current photo Attempt 04 Instagram package, final publication is proven by media ID `18301475650304234` and permalink `https://www.instagram.com/p/DbTecACksUw/`. Prior failed states remain historical predecessors. Any future reconciliation must preserve that terminal published state and must not duplicate-post.
+
+Production media host doctrine for Instagram Feed media: use `https://media.nicnodes.us` backed by R2 bucket `nicnodes-media`. Cloudflare `r2.dev` URLs are not valid production publication authority. Hosted object verification must occur before Instagram container creation and must prove HTTPS, no redirect, HTTP 200, exact Content-Type, Content-Length equality, media magic bytes, and SHA equality. Object URLs must be built from the exact uploaded key, never guessed. No `/media` call may occur after host verification failure.
+
+Credential doctrine for Meta publishing: the authoritative secret location is `C:\projects\ai\content_bot\.env`, resolved into worktrees through the governed parent-env bridge. Public media hostnames are non-secret. Ambient placeholders such as `example.invalid` cannot override governed production configuration. Secret values must never appear in logs, argv, evidence, or status output.
 
 ## 21. Video/Reels Lane Policy and Current Benchmark
 
@@ -383,7 +399,7 @@ Canonical visual benchmark:
 
 - video repository: `C:\projects\ai\content_bot\lenadelapi_website_video_element_hpe_v2`
 - branch: `codex/lena-video-element-hpe-v2`
-- current verified source HEAD: `2f8e755fcb57cb7d00ae40cf8c94cb2c780503c2`
+- current protected video HEAD: `a81abf8828470fc163ef6fcc2c3a356dab0bbe19`
 - Attempt 04 provider job: `bb34630d-c7ba-464a-9d2a-cc2b0aa7def0`
 - provider prompt SHA-256: `2f7a3d744dc21fad9660aeac3d32bfbd00544983baff4f1629b2faca24170e76`
 - canonical MP4 SHA-256: `333679eb2628ec7f77f6fbab781484cfcc26c651f324408bfc70d1ec5c5892ff`
@@ -392,7 +408,7 @@ Canonical visual benchmark:
 
 Seedance 2.0 Character Element delivery is proven. Lena identity remained stable. HPE-based temporal presence is proven at the controlled benchmark level. The sensual creative direction is proven.
 
-The asset remains a 480p benchmark. It is not a production-resolution publishable Reel. No video-lane autonomy declaration follows yet. Production-resolution and full downstream proof remain outstanding.
+The asset remains a 480p benchmark. It is not a production-resolution publishable Reel. The production video target remains 720p, 6 seconds, and 9:16. Production video generation remains deferred. No video-lane autonomy declaration follows yet. Production-resolution and full downstream proof remain outstanding.
 
 ## 22. Audio, Music, Voice, Synchronization, and Assembly
 
@@ -563,7 +579,7 @@ The objective is a working autonomous media engine, not an endlessly reviewed co
 
 Until replaced by Nic, the active priority sequence is:
 
-1. Maintain and reconcile the proven Lena photo lane, including one idempotent publication reconciliation for the outstanding scheduled Attempt 04 item.
+1. Preserve the closed Attempt 04 published photo lifecycle and extract only proven production lessons.
 2. Complete the Attempt 04 deterministic audiovisual assembly and Nic final audiovisual review.
 3. Produce and prove a production-resolution Lena Reel using the proven Higgsfield Seedance 2.0 Character Element, HPE, sensual-presence, wardrobe, and audio architecture.
 4. Complete end-to-end video QA, assembly, queue, publication, recovery, metrics, and learning proof.
@@ -573,7 +589,7 @@ Until replaced by Nic, the active priority sequence is:
 8. Launch additional company-owned nodes.
 9. Launch client-owned and managed autonomous content operations.
 
-The dashboard may proceed in parallel as support tooling, but it must not become the product priority over the Reels/video lane.
+The dashboard remains paused until Wednesday night, July 29, 2026, unless Nic explicitly reopens it earlier. After that, it may proceed in parallel as support tooling, but it must not become the product priority over the Reels/video lane.
 
 For clear, low-risk work inside this direction: proceed.
 
