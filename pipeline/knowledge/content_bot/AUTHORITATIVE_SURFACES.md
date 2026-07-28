@@ -10,7 +10,7 @@ Grounded in direct reads of each module's header/docstring on 2026-07-06.
 
 | Concern | File |
 |---|---|
-| Master system prompt / permanent doctrine | `pipeline/knowledge/content_bot/CONTENT_BOT_MASTER_SYSTEM_PROMPT_V1_3.md` |
+| Master system prompt / permanent doctrine | `pipeline/knowledge/content_bot/CONTENT_BOT_MASTER_SYSTEM_PROMPT_V1_4.md` |
 | Session start / current blocker / next step | `pipeline/change_notes/NEXT_SESSION_START.md` |
 | Mandatory repo warm-up procedure for new chats | `pipeline/knowledge/content_bot/SESSION_BOOT_PROTOCOL.md` |
 | Full pivot doctrine, architecture, current state (§0) | `pipeline/change_notes/lena_filesystem_native_agent_pivot_master.md` |
