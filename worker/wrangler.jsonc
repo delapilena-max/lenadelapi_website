@@ -5,7 +5,7 @@
   "compatibility_date": "2026-07-29",
   "workers_dev": true,
   "vars": {
-    "TIKTOK_CLIENT_KEY": "sbaw22warhcfv3ggeu",
+    "TIKTOK_CLIENT_KEY": "sbawm13rqul6prs3g9",
     "TIKTOK_REDIRECT_URI": "https://lenadelapi-tiktok-oauth.delapilena.workers.dev/auth/tiktok/callback",
     "PUBLIC_SUCCESS_REDIRECT": "https://delapilena-max.github.io/lenadelapi_website/auth/tiktok/callback.html",
     "PUBLIC_ERROR_REDIRECT": "https://delapilena-max.github.io/lenadelapi_website/auth/tiktok/callback.html"
