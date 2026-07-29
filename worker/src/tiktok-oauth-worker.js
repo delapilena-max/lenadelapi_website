@@ -18,7 +18,6 @@ const SENSITIVE_FIELDS = new Set([
   'access_token',
   'refresh_token',
   'client_secret',
-  'code',
   'authorization',
   'upload_url',
 ]);
@@ -234,30 +233,38 @@ export async function getTikTokSession(request, env) {
 
 export async function getCreatorInfo(request, env, runtime = {}) {
   const { tokenRecord } = await loadPostingToken(request, env, runtime);
-  const payload = await callTikTokJson(
+  const upstream = await callTikTokJson(
     TIKTOK_CREATOR_INFO_URL,
     tokenRecord.access_token,
     {},
     runtime.fetcher || globalThis.fetch,
   );
-  return jsonResponse({ ok: isTikTokOk(payload), creator: payload.data || null, tiktok: redactTikTokPayload(payload) }, 200, request);
+  const payload = upstream.payload;
+  return jsonResponse({
+    ok: upstream.ok,
+    stage: 'creator_info',
+    creator: payload.data || null,
+    tiktok: publicTikTokUpstream(upstream),
+  }, upstream.ok ? 200 : upstream.httpStatus || 502, request);
 }
 
 export async function publishDirectPost(request, env, runtime = {}) {
   const { tokenRecord } = await loadPostingToken(request, env, runtime);
   const form = await readVideoForm(request);
-  const creatorPayload = await callTikTokJson(
+  const creatorUpstream = await callTikTokJson(
     TIKTOK_CREATOR_INFO_URL,
     tokenRecord.access_token,
     {},
     runtime.fetcher || globalThis.fetch,
   );
-  if (!isTikTokOk(creatorPayload)) {
-    return jsonResponse({ ok: false, error: 'creator_info_failed', tiktok: creatorPayload }, 502, request);
+  if (!creatorUpstream.ok) {
+    logTikTokStage('direct_post_creator_info_failed', creatorUpstream);
+    return tiktokStageFailure(request, 'creator_info_failed', 'creator_info', creatorUpstream);
   }
+  const creatorPayload = creatorUpstream.payload;
   const creator = creatorPayload.data || {};
-  const privacyLevel = normalizePrivacyLevel(form.privacyLevel, creator.privacy_level_options || []);
-  const initPayload = await callTikTokJson(
+  const privacyLevel = requireSelfOnlyPrivacy(creator.privacy_level_options || []);
+  const initUpstream = await callTikTokJson(
     TIKTOK_DIRECT_POST_INIT_URL,
     tokenRecord.access_token,
     {
@@ -275,37 +282,77 @@ export async function publishDirectPost(request, env, runtime = {}) {
     },
     runtime.fetcher || globalThis.fetch,
   );
+  if (!initUpstream.ok) {
+    logTikTokStage('direct_post_init_failed', initUpstream);
+    return tiktokStageFailure(request, 'post_initialization_failed', 'post_init', initUpstream);
+  }
+  const initPayload = initUpstream.payload;
   const uploadResult = await uploadFileIfNeeded(initPayload, form.file, runtime.fetcher || globalThis.fetch);
+  if (!uploadResult.ok) {
+    logTikTokUploadFailure('direct_post_upload_failed', uploadResult);
+    return jsonResponse({
+      ok: false,
+      error: 'file_upload_transfer_failed',
+      message: uploadResult.public.message || 'TikTok file upload transfer failed.',
+      stage: 'file_upload',
+      mode: 'direct_post',
+      publish_id: initPayload.data?.publish_id || null,
+      upload_id: extractUploadId(initPayload.data?.upload_url || ''),
+      upload: uploadResult.public,
+      tiktok: publicTikTokUpstream(initUpstream),
+    }, uploadResult.public.http_status || 502, request);
+  }
   return jsonResponse({
-    ok: isTikTokOk(initPayload) && uploadResult.ok,
+    ok: true,
+    stage: 'complete',
     mode: 'direct_post',
     publish_id: initPayload.data?.publish_id || null,
     upload_id: extractUploadId(initPayload.data?.upload_url || ''),
     creator,
-    tiktok: redactTikTokPayload(initPayload),
+    tiktok: publicTikTokUpstream(initUpstream),
     upload: uploadResult.public,
-  }, isTikTokOk(initPayload) && uploadResult.ok ? 200 : 502, request);
+  }, 200, request);
 }
 
 export async function uploadDraft(request, env, runtime = {}) {
   const { tokenRecord } = await loadPostingToken(request, env, runtime);
   const form = await readVideoForm(request);
-  const initPayload = await callTikTokJson(
+  const initUpstream = await callTikTokJson(
     TIKTOK_DRAFT_UPLOAD_INIT_URL,
     tokenRecord.access_token,
     { source_info: sourceInfoForFile(form.file) },
     runtime.fetcher || globalThis.fetch,
   );
+  if (!initUpstream.ok) {
+    logTikTokStage('draft_upload_init_failed', initUpstream);
+    return tiktokStageFailure(request, 'draft_initialization_failed', 'draft_init', initUpstream);
+  }
+  const initPayload = initUpstream.payload;
   const uploadResult = await uploadFileIfNeeded(initPayload, form.file, runtime.fetcher || globalThis.fetch);
+  if (!uploadResult.ok) {
+    logTikTokUploadFailure('draft_upload_transfer_failed', uploadResult);
+    return jsonResponse({
+      ok: false,
+      error: 'file_upload_transfer_failed',
+      message: uploadResult.public.message || 'TikTok draft upload transfer failed.',
+      stage: 'file_upload',
+      mode: 'draft_upload',
+      publish_id: initPayload.data?.publish_id || null,
+      upload_id: extractUploadId(initPayload.data?.upload_url || ''),
+      upload: uploadResult.public,
+      tiktok: publicTikTokUpstream(initUpstream),
+    }, uploadResult.public.http_status || 502, request);
+  }
   return jsonResponse({
-    ok: isTikTokOk(initPayload) && uploadResult.ok,
+    ok: true,
+    stage: 'complete',
     mode: 'draft_upload',
     publish_id: initPayload.data?.publish_id || null,
     upload_id: extractUploadId(initPayload.data?.upload_url || ''),
     caption_note: form.caption ? 'TikTok draft upload does not accept a caption in the init API; caption is entered in TikTok when completing the draft.' : '',
-    tiktok: redactTikTokPayload(initPayload),
+    tiktok: publicTikTokUpstream(initUpstream),
     upload: uploadResult.public,
-  }, isTikTokOk(initPayload) && uploadResult.ok ? 200 : 502, request);
+  }, 200, request);
 }
 
 export async function fetchPostStatus(request, env, runtime = {}) {
@@ -315,19 +362,22 @@ export async function fetchPostStatus(request, env, runtime = {}) {
   if (!publishId) {
     return jsonResponse({ ok: false, error: 'missing_publish_id' }, 400, request);
   }
-  const payload = await callTikTokJson(
+  const upstream = await callTikTokJson(
     TIKTOK_POST_STATUS_URL,
     tokenRecord.access_token,
     { publish_id: publishId },
     runtime.fetcher || globalThis.fetch,
   );
+  const payload = upstream.payload;
   return jsonResponse({
-    ok: isTikTokOk(payload),
+    ok: upstream.ok,
+    stage: 'status_fetch',
     publish_id: publishId,
     status: payload.data?.status || null,
+    fail_reason: payload.data?.fail_reason || null,
     data: payload.data || null,
-    tiktok: redactTikTokPayload(payload),
-  }, isTikTokOk(payload) ? 200 : 502, request);
+    tiktok: publicTikTokUpstream(upstream),
+  }, upstream.ok ? 200 : upstream.httpStatus || 502, request);
 }
 
 async function exchangeCodeForToken(code, env, fetcher) {
@@ -405,12 +455,22 @@ async function callTikTokJson(url, accessToken, body, fetcher) {
   try {
     payload = JSON.parse(rawText || '{}');
   } catch {
-    throw new PublicOAuthError('malformed_tiktok_response', 'TikTok response was not valid JSON.', 502);
+    return {
+      ok: false,
+      httpStatus: response.status,
+      payload: { error: { code: 'malformed_tiktok_response', message: 'TikTok response was not valid JSON.' } },
+      rawText: sanitizeText(rawText),
+    };
   }
   if (!response.ok && !payload.error) {
     payload.error = { code: `http_${response.status}`, message: 'TikTok request failed.' };
   }
-  return payload;
+  return {
+    ok: response.ok && isTikTokOk(payload),
+    httpStatus: response.status,
+    payload,
+    rawText: sanitizeText(rawText),
+  };
 }
 
 async function readJson(request) {
@@ -455,9 +515,8 @@ function isFileLike(value) {
   );
 }
 
-function normalizePrivacyLevel(requested, options) {
+function requireSelfOnlyPrivacy(options) {
   const available = Array.isArray(options) ? options : [];
-  if (available.includes(requested)) return requested;
   if (available.includes('SELF_ONLY')) return 'SELF_ONLY';
   throw new PublicOAuthError('privacy_level_unavailable', 'SELF_ONLY/private posting is not available for this TikTok account.', 400);
 }
@@ -480,23 +539,92 @@ async function uploadFileIfNeeded(initPayload, file, fetcher) {
     return { ok: true, public: { skipped: true, transfer: 'PULL_FROM_URL_or_no_upload_url' } };
   }
   const bytes = await file.arrayBuffer();
-  const uploadResponse = await fetcher(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': file.type,
-      'Content-Length': String(file.size),
-      'Content-Range': `bytes 0-${file.size - 1}/${file.size}`,
-    },
-    body: bytes,
-  });
+  let uploadResponse;
+  try {
+    uploadResponse = await fetcher(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'video/mp4',
+        'Content-Length': String(file.size),
+        'Content-Range': `bytes 0-${file.size - 1}/${file.size}`,
+      },
+      body: bytes,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      public: {
+        http_status: 502,
+        error: 'upload_fetch_failed',
+        message: sanitizeText(error?.message || 'Worker could not transfer the file to TikTok upload_url.'),
+      },
+    };
+  }
+  const uploadText = await uploadResponse.text().catch(() => '');
+  const uploadedRange = uploadResponse.headers.get('Content-Range') || uploadResponse.headers.get('content-range') || '';
   return {
     ok: uploadResponse.ok,
     public: {
-      status: uploadResponse.status,
+      http_status: uploadResponse.status,
       status_text: uploadResponse.statusText,
+      content_range: sanitizeText(uploadedRange),
+      response_body: sanitizeText(uploadText),
       uploaded_bytes: uploadResponse.ok ? file.size : 0,
+      message: uploadResponse.ok ? 'TikTok accepted the file upload.' : 'TikTok rejected the file upload transfer.',
     },
   };
+}
+
+function tiktokStageFailure(request, error, stage, upstream) {
+  return jsonResponse({
+    ok: false,
+    error,
+    message: upstream.payload?.error?.message || `${stage} failed.`,
+    stage,
+    tiktok: publicTikTokUpstream(upstream),
+  }, upstream.httpStatus || 502, request);
+}
+
+function publicTikTokUpstream(upstream) {
+  return redactTikTokPayload({
+    http_status: upstream.httpStatus || null,
+    error: upstream.payload?.error || null,
+    data: sanitizeTikTokData(upstream.payload?.data || null),
+    raw_body: upstream.rawText || null,
+  });
+}
+
+function sanitizeTikTokData(data) {
+  if (!data || typeof data !== 'object') return data;
+  const sanitized = { ...data };
+  if (sanitized.upload_url) {
+    sanitized.upload_url = '[REDACTED]';
+  }
+  return sanitized;
+}
+
+function sanitizeText(value) {
+  return String(value || '').replace(/upload_token=[^&\s"]+/g, 'upload_token=[REDACTED]').slice(0, 800);
+}
+
+function logTikTokStage(event, upstream) {
+  console.log(JSON.stringify({
+    event,
+    http_status: upstream.httpStatus || null,
+    tiktok_error_code: upstream.payload?.error?.code || null,
+    tiktok_error_message: sanitizeText(upstream.payload?.error?.message || ''),
+    tiktok_log_id: upstream.payload?.error?.log_id || upstream.payload?.error?.logid || null,
+  }));
+}
+
+function logTikTokUploadFailure(event, uploadResult) {
+  console.log(JSON.stringify({
+    event,
+    http_status: uploadResult.public?.http_status || null,
+    status_text: uploadResult.public?.status_text || null,
+    content_range: uploadResult.public?.content_range || null,
+    response_body: uploadResult.public?.response_body || null,
+  }));
 }
 
 function isTikTokOk(payload) {

@@ -132,14 +132,12 @@
 
     function renderPrivacyOptions(options) {
       privacy.innerHTML = '';
-      const ordered = options.includes('SELF_ONLY') ? ['SELF_ONLY', ...options.filter((item) => item !== 'SELF_ONLY')] : options;
-      for (const option of ordered) {
-        const node = document.createElement('option');
-        node.value = option;
-        node.textContent = option === 'SELF_ONLY' ? 'SELF_ONLY — private' : option;
-        privacy.appendChild(node);
-      }
-      privacy.value = options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0];
+      const node = document.createElement('option');
+      node.value = 'SELF_ONLY';
+      node.textContent = options.includes('SELF_ONLY') ? 'SELF_ONLY — private review post' : 'SELF_ONLY unavailable for this creator';
+      privacy.appendChild(node);
+      privacy.value = 'SELF_ONLY';
+      privacy.disabled = true;
     }
 
     directButton.addEventListener('click', () => submitVideo('/api/tiktok/publish/direct'));
@@ -162,15 +160,7 @@
         body.set('disable_stitch', String(disableStitch.checked));
         const response = await workerJson(path, { method: 'POST', body });
         progress.value = 70;
-        result.textContent = JSON.stringify({
-          ok: response.ok,
-          mode: response.mode,
-          publish_id: response.publish_id,
-          upload_id: response.upload_id,
-          upload: response.upload,
-          caption_note: response.caption_note || undefined,
-          tiktok: response.tiktok,
-        }, null, 2);
+        result.textContent = JSON.stringify(publicResult(response), null, 2);
         if (response.publish_id) {
           await pollStatus(response.publish_id);
         } else {
@@ -178,7 +168,7 @@
         }
         progress.value = 100;
       } catch (error) {
-        result.textContent = `Failed: ${error.message}`;
+        result.textContent = `Failed: ${error.message}\n\n${error.payload ? JSON.stringify(publicResult(error.payload), null, 2) : ''}`;
         statusBox.textContent = 'No final status available.';
       } finally {
         setBusy(false);
@@ -202,8 +192,28 @@
     async function workerJson(path, options) {
       const response = await fetch(`${WORKER_BASE}${path}`, { credentials: 'include', ...options });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(payload.message || payload.error || `HTTP ${response.status}`);
+        error.payload = { http_status: response.status, ...payload };
+        throw error;
+      }
       return payload;
+    }
+
+    function publicResult(response) {
+      return {
+        ok: response.ok,
+        http_status: response.http_status,
+        error: response.error,
+        message: response.message,
+        stage: response.stage,
+        mode: response.mode,
+        publish_id: response.publish_id,
+        upload_id: response.upload_id,
+        upload: response.upload,
+        caption_note: response.caption_note || undefined,
+        tiktok: response.tiktok,
+      };
     }
 
     function setBusy(busy) {

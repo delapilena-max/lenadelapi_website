@@ -292,7 +292,7 @@ test('direct post initializes private FILE_UPLOAD, uploads bytes, and returns pu
   const form = new FormData();
   form.set('video', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'video/mp4' }), 'review.mp4');
   form.set('caption', 'Private demo caption');
-  form.set('privacy_level', 'SELF_ONLY');
+  form.set('privacy_level', 'PUBLIC_TO_EVERYONE');
   form.set('disable_comment', 'true');
   form.set('disable_duet', 'false');
   form.set('disable_stitch', 'true');
@@ -357,6 +357,72 @@ test('direct post initializes private FILE_UPLOAD, uploads bytes, and returns pu
   assert.equal(payload.publish_id, 'v_pub_file~v2-1.123');
   assert.equal(payload.upload_id, 'upload-123');
   assert.doesNotMatch(JSON.stringify(payload), /secret-upload-token|access-token-secret|refresh-token-secret/);
+});
+
+test('direct post init failure returns actionable sanitized stage evidence', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({ open_id: 'open-id-123' }));
+  await env.TIKTOK_TOKEN_KV.put('tiktok:user:open-id-123', JSON.stringify({
+    open_id: 'open-id-123',
+    access_token: 'access-token-secret',
+    refresh_token: 'refresh-token-secret',
+    expires_at: '2026-07-30T00:00:00.000Z',
+  }));
+  const form = new FormData();
+  form.set('video', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'video/mp4' }), 'review.mp4');
+  form.set('caption', 'Private demo caption');
+  form.set('privacy_level', 'PUBLIC_TO_EVERYONE');
+  let uploadCalled = false;
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/publish/direct', {
+      method: 'POST',
+      headers: { Cookie: `${internalsForTests.SESSION_COOKIE}=session-123` },
+      body: form,
+    }),
+    env,
+    {
+      now: () => Date.parse('2026-07-29T00:00:00Z'),
+      fetcher: async (url) => {
+        if (url === internalsForTests.TIKTOK_CREATOR_INFO_URL) {
+          return new Response(JSON.stringify({
+            data: {
+              creator_username: 'lena_test',
+              privacy_level_options: ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'],
+              comment_disabled: false,
+              duet_disabled: false,
+              stitch_disabled: false,
+            },
+            error: { code: 'ok', message: '', log_id: 'log-creator' },
+          }), { status: 200 });
+        }
+        if (url === internalsForTests.TIKTOK_DIRECT_POST_INIT_URL) {
+          return new Response(JSON.stringify({
+            data: {},
+            error: {
+              code: 'unaudited_client_can_only_post_to_private_accounts',
+              message: 'Unaudited clients can only post to private accounts.',
+              log_id: 'log-init-failure',
+            },
+          }), { status: 403 });
+        }
+        if (String(url).startsWith('https://open-upload.tiktokapis.com/video/')) {
+          uploadCalled = true;
+          return new Response('', { status: 201 });
+        }
+        throw new Error(`unexpected url ${url}`);
+      },
+    },
+  );
+
+  assert.equal(response.status, 403);
+  assert.equal(uploadCalled, false);
+  const payload = await response.json();
+  assert.equal(payload.ok, false);
+  assert.equal(payload.error, 'post_initialization_failed');
+  assert.equal(payload.stage, 'post_init');
+  assert.equal(payload.tiktok.http_status, 403);
+  assert.equal(payload.tiktok.error.code, 'unaudited_client_can_only_post_to_private_accounts');
+  assert.doesNotMatch(JSON.stringify(payload), /access-token-secret|refresh-token-secret/);
 });
 
 test('draft upload uses video.upload inbox endpoint and returns caption note', async () => {
