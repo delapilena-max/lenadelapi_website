@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LenaDelApi — TikTok Login Result</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 40px; line-height: 1.6; color: #222; }
+    .container { max-width: 680px; margin: 0 auto; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 24px; background: #fff; }
+    .ok { color: #087f5b; }
+    .error { color: #c92a2a; }
+    code { background: #f6f6f6; padding: 2px 5px; border-radius: 4px; }
+    a.button {
+      display: inline-block;
+      padding: 10px 16px;
+      background: #000;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card" aria-live="polite">
+      <h1 id="title">Checking TikTok login…</h1>
+      <p id="message">Please wait while the login result is read.</p>
+      <p id="detail"></p>
+      <a class="button" href="../../login.html">Back to login</a>
+    </section>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const title = document.getElementById('title');
+    const message = document.getElementById('message');
+    const detail = document.getElementById('detail');
+    const safe = (value) => (value || '').replace(/[^\w .,:@/-]/g, '').slice(0, 180);
+
+    if (params.has('code')) {
+      title.textContent = 'TikTok callback misconfigured';
+      title.className = 'error';
+      message.textContent = 'GitHub Pages cannot exchange OAuth codes. Register the backend callback URL in the TikTok Developer Portal and start login again.';
+      detail.textContent = 'No OAuth code or token was stored by this static page.';
+    } else if (params.get('status') === 'success') {
+      title.textContent = 'TikTok connected';
+      title.className = 'ok';
+      message.textContent = 'The backend completed TikTok Login Kit authorization and stored tokens server-side.';
+      const openId = safe(params.get('open_id'));
+      detail.innerHTML = openId ? `Connected TikTok account: <code>${openId}</code>` : '';
+    } else {
+      title.textContent = 'TikTok login did not complete';
+      title.className = 'error';
+      message.textContent = 'The backend rejected or could not complete the TikTok login.';
+      const error = safe(params.get('error') || 'unknown_error');
+      const description = safe(params.get('error_description') || params.get('message') || '');
+      detail.innerHTML = `Reason: <code>${error}</code>${description ? ` — ${description}` : ''}`;
+    }
+  </script>
+</body>
+</html>

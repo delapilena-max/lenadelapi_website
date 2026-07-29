@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lenadelapi-tiktok-oauth",
+  "main": "src/tiktok-oauth-worker.js",
+  "compatibility_date": "2026-07-29",
+  "workers_dev": true,
+  "vars": {
+    "TIKTOK_CLIENT_KEY": "sbaw22warhcfv3ggeu",
+    "TIKTOK_REDIRECT_URI": "https://lenadelapi-tiktok-oauth.delapilena.workers.dev/auth/tiktok/callback",
+    "PUBLIC_SUCCESS_REDIRECT": "https://delapilena-max.github.io/lenadelapi_website/auth/tiktok/callback.html",
+    "PUBLIC_ERROR_REDIRECT": "https://delapilena-max.github.io/lenadelapi_website/auth/tiktok/callback.html"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_STATE_KV",
+      "id": "2057d2a1e64147c1b042a33fd221a458"
+    },
+    {
+      "binding": "TIKTOK_TOKEN_KV",
+      "id": "474b57c1f30e4c78a1c4947274fab340"
+    }
+  ]
+}

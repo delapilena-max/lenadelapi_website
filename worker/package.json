@@ -1,0 +1,9 @@
+{
+  "name": "lenadelapi-tiktok-oauth-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/tiktok-oauth-worker.test.mjs"
+  }
+}

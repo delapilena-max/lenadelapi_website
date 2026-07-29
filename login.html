@@ -26,9 +26,14 @@
   <div class="container">
     <h1>Log in to LenaDelApi</h1>
     <p>Use TikTok Login to authenticate securely and access your content tools.</p>
+    <p class="note">
+      TikTok authorization starts on the LenaDelApi backend so OAuth state,
+      token exchange, and refresh-token storage never happen on GitHub Pages.
+    </p>
 
     <a class="button"
-       href="https://www.tiktok.com/auth/authorize?client_key=sbaw22warhcfv3ggeu&response_type=code&scope=user.info.basic&redirect_uri=https%3A%2F%2Fdelapilena-max.github.io%2Flenadelapi_website%2Fauth%2Ftiktok%2Fcallback.html&state=login">
+       href="https://lenadelapi-tiktok-oauth.delapilena.workers.dev/auth/tiktok/start"
+       rel="noopener">
       Log in with TikTok
     </a>
 
