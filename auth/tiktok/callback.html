@@ -3,59 +3,220 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LenaDelApi — TikTok Login Result</title>
+  <title>LenaDelApi — TikTok Posting Demo</title>
   <style>
-    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 40px; line-height: 1.6; color: #222; }
-    .container { max-width: 680px; margin: 0 auto; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 24px; background: #fff; }
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; margin: 32px; line-height: 1.5; color: #222; background: #fafafa; }
+    main { max-width: 820px; margin: 0 auto; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 24px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.04); }
     .ok { color: #087f5b; }
     .error { color: #c92a2a; }
-    code { background: #f6f6f6; padding: 2px 5px; border-radius: 4px; }
-    a.button {
-      display: inline-block;
-      padding: 10px 16px;
-      background: #000;
-      color: #fff;
-      border-radius: 6px;
-      text-decoration: none;
-      margin-top: 16px;
-    }
+    .muted { color: #666; }
+    label { display: block; font-weight: 700; margin-top: 16px; }
+    input[type="text"], textarea, select { box-sizing: border-box; width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #bbb; border-radius: 8px; font: inherit; }
+    input[type="file"] { display: block; margin-top: 8px; }
+    textarea { min-height: 96px; resize: vertical; }
+    fieldset { margin-top: 16px; border: 1px solid #ddd; border-radius: 10px; padding: 12px 16px; }
+    button, a.button { display: inline-block; border: 0; border-radius: 8px; padding: 11px 16px; margin: 16px 8px 0 0; background: #000; color: #fff; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+    button.secondary { background: #444; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    progress { width: 100%; height: 16px; margin-top: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f4f4f4; border-radius: 10px; padding: 12px; }
+    .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } body { margin: 16px; } }
   </style>
 </head>
 <body>
-  <main class="container">
+  <main>
     <section class="card" aria-live="polite">
-      <h1 id="title">Checking TikTok login…</h1>
-      <p id="message">Please wait while the login result is read.</p>
-      <p id="detail"></p>
-      <a class="button" href="../../login.html">Back to login</a>
+      <h1 id="title">Checking TikTok connection…</h1>
+      <p id="message">Please wait while LenaDelApi verifies the server-side TikTok session.</p>
+      <p id="account" class="muted"></p>
+      <a class="button" href="../../login.html">Reconnect TikTok</a>
+    </section>
+
+    <section id="posting" class="card" style="margin-top: 20px; display: none;">
+      <h2>Post a private TikTok review video</h2>
+      <p class="muted">
+        This demo uses the server-side TikTok token. Access tokens, refresh tokens, and client secrets are never exposed in this page.
+        Direct Post defaults to <strong>SELF_ONLY</strong> for app-review testing.
+      </p>
+
+      <form id="postForm">
+        <label for="video">Video file (MP4 or MOV)</label>
+        <input id="video" name="video" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" required />
+
+        <label for="caption">Caption</label>
+        <textarea id="caption" name="caption" maxlength="2200" placeholder="Caption for Direct Post. Draft uploads are completed inside TikTok.">Lena DeLapi private app-review posting test.</textarea>
+
+        <label for="privacy">Privacy</label>
+        <select id="privacy" name="privacy_level">
+          <option value="SELF_ONLY" selected>SELF_ONLY — private</option>
+        </select>
+
+        <fieldset>
+          <legend>Interaction controls</legend>
+          <div class="row">
+            <label><input id="disableComment" type="checkbox" name="disable_comment" /> Disable comments</label>
+            <label><input id="disableDuet" type="checkbox" name="disable_duet" /> Disable duet</label>
+            <label><input id="disableStitch" type="checkbox" name="disable_stitch" /> Disable stitch</label>
+          </div>
+        </fieldset>
+
+        <button id="directButton" type="button">Direct Post to TikTok</button>
+        <button id="draftButton" class="secondary" type="button">Upload to TikTok Draft</button>
+      </form>
+
+      <progress id="progress" max="100" value="0" hidden></progress>
+      <h3>Result</h3>
+      <pre id="result">No upload yet.</pre>
+      <h3>Processing status</h3>
+      <pre id="status">No publish_id yet.</pre>
     </section>
   </main>
+
   <script>
+    const WORKER_BASE = 'https://lenadelapi-tiktok-oauth.delapilena.workers.dev';
     const params = new URLSearchParams(window.location.search);
     const title = document.getElementById('title');
     const message = document.getElementById('message');
-    const detail = document.getElementById('detail');
+    const account = document.getElementById('account');
+    const posting = document.getElementById('posting');
+    const form = document.getElementById('postForm');
+    const privacy = document.getElementById('privacy');
+    const progress = document.getElementById('progress');
+    const result = document.getElementById('result');
+    const statusBox = document.getElementById('status');
+    const directButton = document.getElementById('directButton');
+    const draftButton = document.getElementById('draftButton');
+    const disableComment = document.getElementById('disableComment');
+    const disableDuet = document.getElementById('disableDuet');
+    const disableStitch = document.getElementById('disableStitch');
+
     const safe = (value) => (value || '').replace(/[^\w .,:@/-]/g, '').slice(0, 180);
 
     if (params.has('code')) {
-      title.textContent = 'TikTok callback misconfigured';
-      title.className = 'error';
-      message.textContent = 'GitHub Pages cannot exchange OAuth codes. Register the backend callback URL in the TikTok Developer Portal and start login again.';
-      detail.textContent = 'No OAuth code or token was stored by this static page.';
-    } else if (params.get('status') === 'success') {
-      title.textContent = 'TikTok connected';
-      title.className = 'ok';
-      message.textContent = 'The backend completed TikTok Login Kit authorization and stored tokens server-side.';
-      const openId = safe(params.get('open_id'));
-      detail.innerHTML = openId ? `Connected TikTok account: <code>${openId}</code>` : '';
+      showError('TikTok callback misconfigured', 'GitHub Pages cannot exchange OAuth codes. Register the backend callback URL in the TikTok Developer Portal and start login again.');
+    } else if (params.get('status') === 'error') {
+      showError('TikTok login did not complete', `Reason: ${safe(params.get('error') || 'unknown_error')}`);
     } else {
-      title.textContent = 'TikTok login did not complete';
+      initialize();
+    }
+
+    async function initialize() {
+      try {
+        const session = await workerJson('/auth/tiktok/session', { method: 'GET' });
+        title.textContent = 'TikTok connected';
+        title.className = 'ok';
+        message.textContent = 'The backend completed TikTok Login Kit authorization and stored tokens server-side.';
+        account.innerHTML = `Connected TikTok account ID: <code>${safe(session.session.open_id)}</code>`;
+        posting.style.display = 'block';
+        await loadCreatorInfo();
+      } catch (error) {
+        showError('TikTok connection unavailable', error.message || 'Please reconnect TikTok.');
+      }
+    }
+
+    async function loadCreatorInfo() {
+      const response = await workerJson('/api/tiktok/creator-info', { method: 'POST' });
+      if (!response.ok) throw new Error(response.error || 'Creator info failed');
+      const creator = response.creator || {};
+      account.innerHTML += `<br>Creator: <code>@${safe(creator.creator_username || 'unknown')}</code> ${safe(creator.creator_nickname || '')}`;
+      renderPrivacyOptions(creator.privacy_level_options || ['SELF_ONLY']);
+      disableComment.checked = Boolean(creator.comment_disabled);
+      disableDuet.checked = Boolean(creator.duet_disabled);
+      disableStitch.checked = Boolean(creator.stitch_disabled);
+      disableComment.disabled = Boolean(creator.comment_disabled);
+      disableDuet.disabled = Boolean(creator.duet_disabled);
+      disableStitch.disabled = Boolean(creator.stitch_disabled);
+    }
+
+    function renderPrivacyOptions(options) {
+      privacy.innerHTML = '';
+      const ordered = options.includes('SELF_ONLY') ? ['SELF_ONLY', ...options.filter((item) => item !== 'SELF_ONLY')] : options;
+      for (const option of ordered) {
+        const node = document.createElement('option');
+        node.value = option;
+        node.textContent = option === 'SELF_ONLY' ? 'SELF_ONLY — private' : option;
+        privacy.appendChild(node);
+      }
+      privacy.value = options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0];
+    }
+
+    directButton.addEventListener('click', () => submitVideo('/api/tiktok/publish/direct'));
+    draftButton.addEventListener('click', () => submitVideo('/api/tiktok/upload/draft'));
+
+    async function submitVideo(path) {
+      const file = document.getElementById('video').files[0];
+      if (!file) {
+        result.textContent = 'Select an MP4 or MOV file first.';
+        return;
+      }
+      setBusy(true);
+      progress.hidden = false;
+      progress.value = 12;
+      statusBox.textContent = 'Waiting for TikTok publish_id…';
+      try {
+        const body = new FormData(form);
+        body.set('disable_comment', String(disableComment.checked));
+        body.set('disable_duet', String(disableDuet.checked));
+        body.set('disable_stitch', String(disableStitch.checked));
+        const response = await workerJson(path, { method: 'POST', body });
+        progress.value = 70;
+        result.textContent = JSON.stringify({
+          ok: response.ok,
+          mode: response.mode,
+          publish_id: response.publish_id,
+          upload_id: response.upload_id,
+          upload: response.upload,
+          caption_note: response.caption_note || undefined,
+          tiktok: response.tiktok,
+        }, null, 2);
+        if (response.publish_id) {
+          await pollStatus(response.publish_id);
+        } else {
+          statusBox.textContent = 'No publish_id returned.';
+        }
+        progress.value = 100;
+      } catch (error) {
+        result.textContent = `Failed: ${error.message}`;
+        statusBox.textContent = 'No final status available.';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function pollStatus(publishId) {
+      for (let attempt = 1; attempt <= 10; attempt += 1) {
+        const response = await workerJson('/api/tiktok/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publish_id: publishId }),
+        });
+        statusBox.textContent = JSON.stringify({ attempt, ...response }, null, 2);
+        const terminal = ['PUBLISH_COMPLETE', 'SEND_TO_USER_INBOX', 'FAILED'].includes(response.status);
+        if (terminal) return;
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+
+    async function workerJson(path, options) {
+      const response = await fetch(`${WORKER_BASE}${path}`, { credentials: 'include', ...options });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
+      return payload;
+    }
+
+    function setBusy(busy) {
+      directButton.disabled = busy;
+      draftButton.disabled = busy;
+    }
+
+    function showError(heading, text) {
+      title.textContent = heading;
       title.className = 'error';
-      message.textContent = 'The backend rejected or could not complete the TikTok login.';
-      const error = safe(params.get('error') || 'unknown_error');
-      const description = safe(params.get('error_description') || params.get('message') || '');
-      detail.innerHTML = `Reason: <code>${error}</code>${description ? ` — ${description}` : ''}`;
+      message.textContent = text;
+      account.textContent = '';
+      posting.style.display = 'none';
     }
   </script>
 </body>

@@ -31,6 +31,13 @@ class FakeKV {
   }
 }
 
+function parseSetCookies(response) {
+  if (typeof response.headers.getSetCookie === 'function') {
+    return response.headers.getSetCookie();
+  }
+  return response.headers.get('set-cookie').split(/,(?=__Host-)/);
+}
+
 function baseEnv(overrides = {}) {
   return {
     TIKTOK_CLIENT_KEY: 'test-client-key',
@@ -161,6 +168,7 @@ test('successful callback stores tokens server-side and redacts public output', 
     env,
     {
       now: () => Date.parse('2026-07-29T00:00:00Z'),
+      cryptoImpl: fixedCrypto(),
       fetcher: async (url, options) => {
         providerBody = String(options.body);
         return new Response(JSON.stringify({
@@ -183,17 +191,274 @@ test('successful callback stores tokens server-side and redacts public output', 
   assert.doesNotMatch(location, /access-token-secret|refresh-token-secret|oauth-code-secret/);
   assert.match(location, /status=success/);
   assert.match(location, /open_id=open-id-123/);
+  assert.match(parseSetCookies(response).join('\n'), /__Host-lena_tiktok_session=.*HttpOnly; Secure; SameSite=None/);
 
   const stored = await env.TIKTOK_TOKEN_KV.get('tiktok:user:open-id-123', 'json');
   assert.equal(stored.access_token, 'access-token-secret');
   assert.equal(stored.refresh_token, 'refresh-token-secret');
   assert.equal(stored.expires_at, '2026-07-30T00:00:00.000Z');
+  assert.equal(env.TIKTOK_TOKEN_KV.keys().some((key) => key.startsWith('tiktok:session:')), true);
   assert.equal(await env.OAUTH_STATE_KV.get('tiktok:oauth:state:state-2'), null);
 
   assert.deepEqual(
     redactTikTokPayload({ access_token: 'a', refresh_token: 'r', nested: { client_secret: 's', ok: true } }),
     { access_token: '[REDACTED]', refresh_token: '[REDACTED]', nested: { client_secret: '[REDACTED]', ok: true } },
   );
+});
+
+test('session route returns connected account without exposing tokens', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({
+    open_id: 'open-id-123',
+    created_at: '2026-07-29T00:00:00.000Z',
+  }));
+
+  const response = await handleRequest(
+    new Request('https://auth.example.test/auth/tiktok/session', {
+      headers: {
+        Cookie: `${internalsForTests.SESSION_COOKIE}=session-123`,
+        Origin: 'https://delapilena-max.github.io',
+      },
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+  const payload = await response.json();
+  assert.deepEqual(payload, {
+    ok: true,
+    session: { connected: true, open_id: 'open-id-123' },
+  });
+});
+
+test('creator-info uses server-side token and redacts browser response', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({ open_id: 'open-id-123' }));
+  await env.TIKTOK_TOKEN_KV.put('tiktok:user:open-id-123', JSON.stringify({
+    open_id: 'open-id-123',
+    access_token: 'access-token-secret',
+    refresh_token: 'refresh-token-secret',
+    expires_at: '2026-07-30T00:00:00.000Z',
+  }));
+  let providerAuthorization = '';
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/creator-info', {
+      method: 'POST',
+      headers: {
+        Cookie: `${internalsForTests.SESSION_COOKIE}=session-123`,
+        Origin: 'https://delapilena-max.github.io',
+      },
+    }),
+    env,
+    {
+      now: () => Date.parse('2026-07-29T00:00:00Z'),
+      fetcher: async (url, options) => {
+        assert.equal(url, internalsForTests.TIKTOK_CREATOR_INFO_URL);
+        providerAuthorization = options.headers.Authorization;
+        return new Response(JSON.stringify({
+          data: {
+            creator_username: 'lena_test',
+            creator_nickname: 'Lena Test',
+            privacy_level_options: ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'],
+            comment_disabled: false,
+            duet_disabled: true,
+            stitch_disabled: false,
+            max_video_post_duration_sec: 300,
+          },
+          error: { code: 'ok', message: '', log_id: 'log-1' },
+        }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(providerAuthorization, 'Bearer access-token-secret');
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.ok, true);
+  assert.equal(payload.creator.creator_username, 'lena_test');
+  assert.doesNotMatch(JSON.stringify(payload), /access-token-secret|refresh-token-secret/);
+});
+
+test('direct post initializes private FILE_UPLOAD, uploads bytes, and returns publish status ids', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({ open_id: 'open-id-123' }));
+  await env.TIKTOK_TOKEN_KV.put('tiktok:user:open-id-123', JSON.stringify({
+    open_id: 'open-id-123',
+    access_token: 'access-token-secret',
+    refresh_token: 'refresh-token-secret',
+    expires_at: '2026-07-30T00:00:00.000Z',
+  }));
+  const form = new FormData();
+  form.set('video', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'video/mp4' }), 'review.mp4');
+  form.set('caption', 'Private demo caption');
+  form.set('privacy_level', 'SELF_ONLY');
+  form.set('disable_comment', 'true');
+  form.set('disable_duet', 'false');
+  form.set('disable_stitch', 'true');
+  let initBody;
+  let uploadHeaders;
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/publish/direct', {
+      method: 'POST',
+      headers: {
+        Cookie: `${internalsForTests.SESSION_COOKIE}=session-123`,
+        Origin: 'https://delapilena-max.github.io',
+      },
+      body: form,
+    }),
+    env,
+    {
+      now: () => Date.parse('2026-07-29T00:00:00Z'),
+      fetcher: async (url, options) => {
+        if (url === internalsForTests.TIKTOK_CREATOR_INFO_URL) {
+          return new Response(JSON.stringify({
+            data: {
+              creator_username: 'lena_test',
+              privacy_level_options: ['SELF_ONLY'],
+              comment_disabled: false,
+              duet_disabled: false,
+              stitch_disabled: false,
+            },
+            error: { code: 'ok', message: '', log_id: 'log-creator' },
+          }), { status: 200 });
+        }
+        if (url === internalsForTests.TIKTOK_DIRECT_POST_INIT_URL) {
+          initBody = JSON.parse(options.body);
+          return new Response(JSON.stringify({
+            data: {
+              publish_id: 'v_pub_file~v2-1.123',
+              upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=upload-123&upload_token=secret-upload-token',
+            },
+            error: { code: 'ok', message: '', log_id: 'log-init' },
+          }), { status: 200 });
+        }
+        if (String(url).startsWith('https://open-upload.tiktokapis.com/video/')) {
+          uploadHeaders = options.headers;
+          return new Response('', { status: 200, statusText: 'OK' });
+        }
+        throw new Error(`unexpected url ${url}`);
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(initBody.post_info.privacy_level, 'SELF_ONLY');
+  assert.equal(initBody.post_info.title, 'Private demo caption');
+  assert.equal(initBody.post_info.disable_comment, true);
+  assert.equal(initBody.post_info.disable_stitch, true);
+  assert.equal(initBody.post_info.is_aigc, true);
+  assert.equal(initBody.source_info.source, 'FILE_UPLOAD');
+  assert.equal(initBody.source_info.video_size, 4);
+  assert.equal(initBody.source_info.total_chunk_count, 1);
+  assert.equal(uploadHeaders['Content-Range'], 'bytes 0-3/4');
+  const payload = await response.json();
+  assert.equal(payload.ok, true);
+  assert.equal(payload.publish_id, 'v_pub_file~v2-1.123');
+  assert.equal(payload.upload_id, 'upload-123');
+  assert.doesNotMatch(JSON.stringify(payload), /secret-upload-token|access-token-secret|refresh-token-secret/);
+});
+
+test('draft upload uses video.upload inbox endpoint and returns caption note', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({ open_id: 'open-id-123' }));
+  await env.TIKTOK_TOKEN_KV.put('tiktok:user:open-id-123', JSON.stringify({
+    open_id: 'open-id-123',
+    access_token: 'access-token-secret',
+    refresh_token: 'refresh-token-secret',
+    expires_at: '2026-07-30T00:00:00.000Z',
+  }));
+  const form = new FormData();
+  form.set('video', new Blob([new Uint8Array([1, 2])], { type: 'video/quicktime' }), 'draft.mov');
+  form.set('caption', 'Draft caption');
+  let initBody;
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/upload/draft', {
+      method: 'POST',
+      headers: { Cookie: `${internalsForTests.SESSION_COOKIE}=session-123` },
+      body: form,
+    }),
+    env,
+    {
+      now: () => Date.parse('2026-07-29T00:00:00Z'),
+      fetcher: async (url, options) => {
+        if (url === internalsForTests.TIKTOK_DRAFT_UPLOAD_INIT_URL) {
+          initBody = JSON.parse(options.body);
+          return new Response(JSON.stringify({
+            data: {
+              publish_id: 'v_inbox_file~v2.123',
+              upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=draft-upload-123&upload_token=secret',
+            },
+            error: { code: 'ok', message: '', log_id: 'log-draft' },
+          }), { status: 200 });
+        }
+        if (String(url).startsWith('https://open-upload.tiktokapis.com/video/')) {
+          return new Response('', { status: 200 });
+        }
+        throw new Error(`unexpected url ${url}`);
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(initBody.source_info.source, 'FILE_UPLOAD');
+  const payload = await response.json();
+  assert.equal(payload.mode, 'draft_upload');
+  assert.equal(payload.publish_id, 'v_inbox_file~v2.123');
+  assert.match(payload.caption_note, /does not accept a caption/);
+});
+
+test('status endpoint polls TikTok with publish_id and no token exposure', async () => {
+  const env = baseEnv();
+  await env.TIKTOK_TOKEN_KV.put('tiktok:session:session-123', JSON.stringify({ open_id: 'open-id-123' }));
+  await env.TIKTOK_TOKEN_KV.put('tiktok:user:open-id-123', JSON.stringify({
+    open_id: 'open-id-123',
+    access_token: 'access-token-secret',
+    refresh_token: 'refresh-token-secret',
+    expires_at: '2026-07-30T00:00:00.000Z',
+  }));
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/status', {
+      method: 'POST',
+      headers: {
+        Cookie: `${internalsForTests.SESSION_COOKIE}=session-123`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ publish_id: 'v_pub_file~v2-1.123' }),
+    }),
+    env,
+    {
+      now: () => Date.parse('2026-07-29T00:00:00Z'),
+      fetcher: async (url, options) => {
+        assert.equal(url, internalsForTests.TIKTOK_POST_STATUS_URL);
+        assert.equal(JSON.parse(options.body).publish_id, 'v_pub_file~v2-1.123');
+        return new Response(JSON.stringify({
+          data: { status: 'PUBLISH_COMPLETE', uploaded_bytes: 4 },
+          error: { code: 'ok', message: '', log_id: 'log-status' },
+        }), { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.status, 'PUBLISH_COMPLETE');
+  assert.doesNotMatch(JSON.stringify(payload), /access-token-secret|refresh-token-secret/);
+});
+
+test('posting endpoints reject missing session before TikTok API calls', async () => {
+  const env = baseEnv();
+  let fetchCalls = 0;
+  const response = await handleRequest(
+    new Request('https://auth.example.test/api/tiktok/creator-info', { method: 'POST' }),
+    env,
+    { fetcher: async () => { fetchCalls += 1; throw new Error('must not call TikTok'); } },
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal(fetchCalls, 0);
+  const payload = await response.json();
+  assert.equal(payload.error, 'not_connected');
 });
 
 test('missing configuration fails without exposing secrets', async () => {

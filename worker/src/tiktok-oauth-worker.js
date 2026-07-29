@@ -1,16 +1,26 @@
 const TIKTOK_AUTHORIZATION_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 const TIKTOK_TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
+const TIKTOK_CREATOR_INFO_URL = 'https://open.tiktokapis.com/v2/post/publish/creator_info/query/';
+const TIKTOK_DIRECT_POST_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/video/init/';
+const TIKTOK_DRAFT_UPLOAD_INIT_URL = 'https://open.tiktokapis.com/v2/post/publish/inbox/video/init/';
+const TIKTOK_POST_STATUS_URL = 'https://open.tiktokapis.com/v2/post/publish/status/fetch/';
 const REQUIRED_SCOPES = ['user.info.basic', 'video.upload', 'video.publish'];
 const STATE_TTL_SECONDS = 600;
+const SESSION_TTL_SECONDS = 86400;
 const STATE_COOKIE = '__Host-lena_tiktok_oauth_state';
+const SESSION_COOKIE = '__Host-lena_tiktok_session';
 const STATE_KEY_PREFIX = 'tiktok:oauth:state:';
 const TOKEN_KEY_PREFIX = 'tiktok:user:';
+const SESSION_KEY_PREFIX = 'tiktok:session:';
+const PAGES_ORIGIN = 'https://delapilena-max.github.io';
+const PUBLIC_SITE_ORIGIN = 'https://delapilena-max.github.io';
 const SENSITIVE_FIELDS = new Set([
   'access_token',
   'refresh_token',
   'client_secret',
   'code',
   'authorization',
+  'upload_url',
 ]);
 
 class PublicOAuthError extends Error {
@@ -44,16 +54,31 @@ export async function handleRequest(request, env, runtime = {}) {
 
   try {
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: noStoreHeaders() });
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
     if (request.method === 'GET' && url.pathname === '/auth/tiktok/start') {
       return await startTikTokLogin(env, { now, cryptoImpl });
     }
     if (request.method === 'GET' && url.pathname === '/auth/tiktok/callback') {
-      return await completeTikTokLogin(request, env, { fetcher, now });
+      return await completeTikTokLogin(request, env, { fetcher, now, cryptoImpl });
     }
     if (request.method === 'POST' && url.pathname === '/auth/tiktok/refresh') {
       return await refreshTikTokToken(request, env, { fetcher, now });
+    }
+    if (request.method === 'GET' && url.pathname === '/auth/tiktok/session') {
+      return await getTikTokSession(request, env);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/tiktok/creator-info') {
+      return await getCreatorInfo(request, env, { fetcher, now });
+    }
+    if (request.method === 'POST' && url.pathname === '/api/tiktok/publish/direct') {
+      return await publishDirectPost(request, env, { fetcher, now });
+    }
+    if (request.method === 'POST' && url.pathname === '/api/tiktok/upload/draft') {
+      return await uploadDraft(request, env, { fetcher, now });
+    }
+    if (request.method === 'POST' && url.pathname === '/api/tiktok/status') {
+      return await fetchPostStatus(request, env, { fetcher, now });
     }
     return jsonResponse({ ok: false, error: 'not_found' }, 404);
   } catch (error) {
@@ -146,12 +171,21 @@ export async function completeTikTokLogin(request, env, runtime = {}) {
   const tokenRecord = buildStoredTokenRecord(tokenPayload, runtime.now || (() => Date.now()));
   await env.TIKTOK_TOKEN_KV.put(tokenKey(tokenRecord.open_id), JSON.stringify(tokenRecord));
   await env.OAUTH_STATE_KV.delete(stateKey(state));
+  const sessionId = generateState(runtime.cryptoImpl || globalThis.crypto);
+  await env.TIKTOK_TOKEN_KV.put(
+    sessionKey(sessionId),
+    JSON.stringify({
+      open_id: tokenRecord.open_id,
+      created_at: new Date((runtime.now || (() => Date.now()))()).toISOString(),
+    }),
+    { expirationTtl: SESSION_TTL_SECONDS },
+  );
 
   return redirectToPublic(env.PUBLIC_SUCCESS_REDIRECT, {
     status: 'success',
     open_id: tokenRecord.open_id,
     scope: tokenRecord.scope,
-  }, expireStateCookie());
+  }, [expireStateCookie(), sessionCookie(sessionId)]);
 }
 
 export async function refreshTikTokToken(request, env, runtime = {}) {
@@ -193,6 +227,109 @@ export async function refreshTikTokToken(request, env, runtime = {}) {
   return jsonResponse({ ok: true, token: publicTokenSummary(tokenRecord) }, 200);
 }
 
+export async function getTikTokSession(request, env) {
+  const session = await requirePostingSession(request, env);
+  return jsonResponse({ ok: true, session: { connected: true, open_id: session.open_id } }, 200, request);
+}
+
+export async function getCreatorInfo(request, env, runtime = {}) {
+  const { tokenRecord } = await loadPostingToken(request, env, runtime);
+  const payload = await callTikTokJson(
+    TIKTOK_CREATOR_INFO_URL,
+    tokenRecord.access_token,
+    {},
+    runtime.fetcher || globalThis.fetch,
+  );
+  return jsonResponse({ ok: isTikTokOk(payload), creator: payload.data || null, tiktok: redactTikTokPayload(payload) }, 200, request);
+}
+
+export async function publishDirectPost(request, env, runtime = {}) {
+  const { tokenRecord } = await loadPostingToken(request, env, runtime);
+  const form = await readVideoForm(request);
+  const creatorPayload = await callTikTokJson(
+    TIKTOK_CREATOR_INFO_URL,
+    tokenRecord.access_token,
+    {},
+    runtime.fetcher || globalThis.fetch,
+  );
+  if (!isTikTokOk(creatorPayload)) {
+    return jsonResponse({ ok: false, error: 'creator_info_failed', tiktok: creatorPayload }, 502, request);
+  }
+  const creator = creatorPayload.data || {};
+  const privacyLevel = normalizePrivacyLevel(form.privacyLevel, creator.privacy_level_options || []);
+  const initPayload = await callTikTokJson(
+    TIKTOK_DIRECT_POST_INIT_URL,
+    tokenRecord.access_token,
+    {
+      post_info: {
+        title: form.caption,
+        privacy_level: privacyLevel,
+        disable_duet: form.disableDuet || Boolean(creator.duet_disabled),
+        disable_comment: form.disableComment || Boolean(creator.comment_disabled),
+        disable_stitch: form.disableStitch || Boolean(creator.stitch_disabled),
+        brand_content_toggle: false,
+        brand_organic_toggle: false,
+        is_aigc: true,
+      },
+      source_info: sourceInfoForFile(form.file),
+    },
+    runtime.fetcher || globalThis.fetch,
+  );
+  const uploadResult = await uploadFileIfNeeded(initPayload, form.file, runtime.fetcher || globalThis.fetch);
+  return jsonResponse({
+    ok: isTikTokOk(initPayload) && uploadResult.ok,
+    mode: 'direct_post',
+    publish_id: initPayload.data?.publish_id || null,
+    upload_id: extractUploadId(initPayload.data?.upload_url || ''),
+    creator,
+    tiktok: redactTikTokPayload(initPayload),
+    upload: uploadResult.public,
+  }, isTikTokOk(initPayload) && uploadResult.ok ? 200 : 502, request);
+}
+
+export async function uploadDraft(request, env, runtime = {}) {
+  const { tokenRecord } = await loadPostingToken(request, env, runtime);
+  const form = await readVideoForm(request);
+  const initPayload = await callTikTokJson(
+    TIKTOK_DRAFT_UPLOAD_INIT_URL,
+    tokenRecord.access_token,
+    { source_info: sourceInfoForFile(form.file) },
+    runtime.fetcher || globalThis.fetch,
+  );
+  const uploadResult = await uploadFileIfNeeded(initPayload, form.file, runtime.fetcher || globalThis.fetch);
+  return jsonResponse({
+    ok: isTikTokOk(initPayload) && uploadResult.ok,
+    mode: 'draft_upload',
+    publish_id: initPayload.data?.publish_id || null,
+    upload_id: extractUploadId(initPayload.data?.upload_url || ''),
+    caption_note: form.caption ? 'TikTok draft upload does not accept a caption in the init API; caption is entered in TikTok when completing the draft.' : '',
+    tiktok: redactTikTokPayload(initPayload),
+    upload: uploadResult.public,
+  }, isTikTokOk(initPayload) && uploadResult.ok ? 200 : 502, request);
+}
+
+export async function fetchPostStatus(request, env, runtime = {}) {
+  const { tokenRecord } = await loadPostingToken(request, env, runtime);
+  const body = await readJson(request);
+  const publishId = String(body.publish_id || '').trim();
+  if (!publishId) {
+    return jsonResponse({ ok: false, error: 'missing_publish_id' }, 400, request);
+  }
+  const payload = await callTikTokJson(
+    TIKTOK_POST_STATUS_URL,
+    tokenRecord.access_token,
+    { publish_id: publishId },
+    runtime.fetcher || globalThis.fetch,
+  );
+  return jsonResponse({
+    ok: isTikTokOk(payload),
+    publish_id: publishId,
+    status: payload.data?.status || null,
+    data: payload.data || null,
+    tiktok: redactTikTokPayload(payload),
+  }, isTikTokOk(payload) ? 200 : 502, request);
+}
+
 async function exchangeCodeForToken(code, env, fetcher) {
   const form = new URLSearchParams({
     client_key: env.TIKTOK_CLIENT_KEY,
@@ -212,6 +349,167 @@ async function refreshToken(refreshTokenValue, env, fetcher) {
     refresh_token: refreshTokenValue,
   });
   return sendTokenRequest(form, fetcher);
+}
+
+async function loadPostingToken(request, env, runtime = {}) {
+  requireConfig(env, ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_TOKEN_KV']);
+  const session = await requirePostingSession(request, env);
+  const tokenRecord = await env.TIKTOK_TOKEN_KV.get(tokenKey(session.open_id), 'json');
+  if (!tokenRecord || !tokenRecord.access_token) {
+    throw new PublicOAuthError('token_not_found', 'TikTok token was not found for the connected account.', 401);
+  }
+  if (tokenNeedsRefresh(tokenRecord, runtime.now || (() => Date.now()))) {
+    if (!tokenRecord.refresh_token) {
+      throw new PublicOAuthError('token_expired', 'TikTok token is expired and no refresh token is available.', 401);
+    }
+    const refreshedPayload = await refreshToken(tokenRecord.refresh_token, env, runtime.fetcher || globalThis.fetch);
+    const refreshedRecord = buildStoredTokenRecord(
+      { ...refreshedPayload, open_id: refreshedPayload.open_id || tokenRecord.open_id },
+      runtime.now || (() => Date.now()),
+    );
+    await env.TIKTOK_TOKEN_KV.put(tokenKey(refreshedRecord.open_id), JSON.stringify(refreshedRecord));
+    return { session, tokenRecord: refreshedRecord };
+  }
+  return { session, tokenRecord };
+}
+
+async function requirePostingSession(request, env) {
+  requireConfig(env, ['TIKTOK_TOKEN_KV']);
+  const sessionId = parseCookies(request.headers.get('Cookie') || '')[SESSION_COOKIE] || '';
+  if (!sessionId) {
+    throw new PublicOAuthError('not_connected', 'TikTok account is not connected in this browser session.', 401);
+  }
+  const session = await env.TIKTOK_TOKEN_KV.get(sessionKey(sessionId), 'json');
+  if (!session || !session.open_id) {
+    throw new PublicOAuthError('session_expired', 'TikTok connection session expired. Please log in again.', 401);
+  }
+  return session;
+}
+
+function tokenNeedsRefresh(record, now) {
+  if (!record.expires_at) return false;
+  return Date.parse(record.expires_at) - now() < 60000;
+}
+
+async function callTikTokJson(url, accessToken, body, fetcher) {
+  const response = await fetcher(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+    },
+    body: JSON.stringify(body),
+  });
+  const rawText = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(rawText || '{}');
+  } catch {
+    throw new PublicOAuthError('malformed_tiktok_response', 'TikTok response was not valid JSON.', 502);
+  }
+  if (!response.ok && !payload.error) {
+    payload.error = { code: `http_${response.status}`, message: 'TikTok request failed.' };
+  }
+  return payload;
+}
+
+async function readJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    throw new PublicOAuthError('malformed_json', 'Request JSON was malformed.', 400);
+  }
+}
+
+async function readVideoForm(request) {
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    throw new PublicOAuthError('malformed_form', 'Upload form was malformed.', 400);
+  }
+  const file = formData.get('video');
+  if (!isFileLike(file) || file.size <= 0) {
+    throw new PublicOAuthError('missing_video', 'Select an MP4 or MOV video file.', 400);
+  }
+  if (!['video/mp4', 'video/quicktime'].includes(file.type)) {
+    throw new PublicOAuthError('unsupported_video_type', 'Only MP4 and MOV files are accepted for this review demo.', 400);
+  }
+  return {
+    file,
+    caption: String(formData.get('caption') || '').slice(0, 2200),
+    privacyLevel: String(formData.get('privacy_level') || 'SELF_ONLY'),
+    disableComment: formData.get('disable_comment') === 'true',
+    disableDuet: formData.get('disable_duet') === 'true',
+    disableStitch: formData.get('disable_stitch') === 'true',
+  };
+}
+
+function isFileLike(value) {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && typeof value.size === 'number'
+    && typeof value.type === 'string'
+    && typeof value.arrayBuffer === 'function',
+  );
+}
+
+function normalizePrivacyLevel(requested, options) {
+  const available = Array.isArray(options) ? options : [];
+  if (available.includes(requested)) return requested;
+  if (available.includes('SELF_ONLY')) return 'SELF_ONLY';
+  throw new PublicOAuthError('privacy_level_unavailable', 'SELF_ONLY/private posting is not available for this TikTok account.', 400);
+}
+
+function sourceInfoForFile(file) {
+  return {
+    source: 'FILE_UPLOAD',
+    video_size: file.size,
+    chunk_size: file.size,
+    total_chunk_count: 1,
+  };
+}
+
+async function uploadFileIfNeeded(initPayload, file, fetcher) {
+  if (!isTikTokOk(initPayload)) {
+    return { ok: false, public: { skipped: true, reason: 'init_failed' } };
+  }
+  const uploadUrl = initPayload.data?.upload_url || '';
+  if (!uploadUrl) {
+    return { ok: true, public: { skipped: true, transfer: 'PULL_FROM_URL_or_no_upload_url' } };
+  }
+  const bytes = await file.arrayBuffer();
+  const uploadResponse = await fetcher(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+      'Content-Length': String(file.size),
+      'Content-Range': `bytes 0-${file.size - 1}/${file.size}`,
+    },
+    body: bytes,
+  });
+  return {
+    ok: uploadResponse.ok,
+    public: {
+      status: uploadResponse.status,
+      status_text: uploadResponse.statusText,
+      uploaded_bytes: uploadResponse.ok ? file.size : 0,
+    },
+  };
+}
+
+function isTikTokOk(payload) {
+  return payload?.error?.code === 'ok';
+}
+
+function extractUploadId(uploadUrl) {
+  if (!uploadUrl) return null;
+  try {
+    return new URL(uploadUrl).searchParams.get('upload_id');
+  } catch {
+    return null;
+  }
 }
 
 async function sendTokenRequest(form, fetcher) {
@@ -331,6 +629,10 @@ function tokenKey(openId) {
   return `${TOKEN_KEY_PREFIX}${openId}`;
 }
 
+function sessionKey(session) {
+  return `${SESSION_KEY_PREFIX}${session}`;
+}
+
 function sanitizeForUrl(value) {
   return String(value || '').replace(/[^\w .,:@/-]/g, '').slice(0, 180);
 }
@@ -342,12 +644,15 @@ function redirectToPublic(target, params, cookieHeader) {
       destination.searchParams.set(key, value);
     }
   }
-  const headers = {
+  const headers = new Headers({
     ...noStoreHeaders(),
     Location: destination.toString(),
-  };
+  });
   if (cookieHeader) {
-    headers['Set-Cookie'] = cookieHeader;
+    const cookies = Array.isArray(cookieHeader) ? cookieHeader : [cookieHeader];
+    for (const cookie of cookies) {
+      headers.append('Set-Cookie', cookie);
+    }
   }
   return new Response(null, { status: 303, headers });
 }
@@ -356,14 +661,31 @@ function expireStateCookie() {
   return `${STATE_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 
-function jsonResponse(payload, status) {
+function sessionCookie(sessionId) {
+  return `${SESSION_COOKIE}=${sessionId}; Max-Age=${SESSION_TTL_SECONDS}; Path=/; HttpOnly; Secure; SameSite=None`;
+}
+
+function jsonResponse(payload, status, request = null) {
   return new Response(JSON.stringify(redactTikTokPayload(payload)), {
     status,
     headers: {
-      ...noStoreHeaders(),
+      ...(request ? corsHeaders(request) : noStoreHeaders()),
       'Content-Type': 'application/json; charset=utf-8',
     },
   });
+}
+
+function corsHeaders(request) {
+  const origin = request?.headers?.get('Origin') || '';
+  const allowOrigin = origin === PAGES_ORIGIN || origin === PUBLIC_SITE_ORIGIN ? origin : PAGES_ORIGIN;
+  return {
+    ...noStoreHeaders(),
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  };
 }
 
 function noStoreHeaders() {
@@ -377,5 +699,10 @@ export const internalsForTests = {
   REQUIRED_SCOPES,
   TIKTOK_AUTHORIZATION_URL,
   TIKTOK_TOKEN_URL,
+  TIKTOK_CREATOR_INFO_URL,
+  TIKTOK_DIRECT_POST_INIT_URL,
+  TIKTOK_DRAFT_UPLOAD_INIT_URL,
+  TIKTOK_POST_STATUS_URL,
   STATE_COOKIE,
+  SESSION_COOKIE,
 };
