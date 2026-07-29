@@ -63,7 +63,7 @@ The redirect URI must be absolute HTTPS, static, and contain no query string or
 fragment.
 
 ## Contact
-For privacy or legal inquiries: privacy@lenadelapi.example
+For privacy or legal inquiries: delapilena@gmail.com
 
 
 
