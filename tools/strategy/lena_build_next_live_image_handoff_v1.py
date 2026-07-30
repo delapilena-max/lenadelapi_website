@@ -140,10 +140,16 @@ def load_selected_candidate_report(date_str: str) -> tuple[Path, dict]:
 
 
 def load_reconciled_selected_candidate_report(date_str: str, reconciliation_artifact_path: str) -> tuple[Path, dict]:
-    _reconciliation_path, reconciliation_report, _reconciliation_sha256 = reconciliation_contract.load_reconciliation_report(
-        reconciliation_artifact_path,
-        date_str=date_str,
-    )
+    try:
+        _reconciliation_path, reconciliation_report, _reconciliation_sha256 = reconciliation_contract.load_reconciliation_report(
+            reconciliation_artifact_path,
+            date_str=date_str,
+        )
+    except FileNotFoundError as exc:
+        raise HandoffBuildError(
+            "[ABORT] missing_selected_candidate: "
+            f"selected candidate artifact from reconciliation does not exist: {exc.filename}"
+        ) from exc
     source_artifacts = reconciliation_report.get("source_artifacts", {})
     selected_source = source_artifacts.get("selected_candidate", {}) if isinstance(source_artifacts, dict) else {}
     selected_path_value = str(selected_source.get("source_artifact_path", "")).strip() if isinstance(selected_source, dict) else ""

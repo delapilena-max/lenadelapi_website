@@ -136,8 +136,9 @@ def test_proof_mode_prompt_includes_hpe_presence_profile() -> None:
 
     packet = packet_builder.build_packet(copy.deepcopy(recipe), copy.deepcopy(hook), "highest score", "2026-07-14")
 
+    assert packet["production_proof_mode"] is True
     assert "[Subject Presence]:" in packet["compact_provider_prompt_preview"]
-    assert "Camera-aware, self-possessed, quietly sensual;" in packet["compact_provider_prompt_preview"]
+    assert packet_builder.HPE_SUBJECT_PRESENCE_COMPACT in packet["compact_provider_prompt_preview"]
 
 
 def test_non_proof_mode_prompt_excludes_subject_presence_section() -> None:

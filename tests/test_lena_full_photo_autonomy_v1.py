@@ -332,7 +332,13 @@ def test_callable_retry_executor_validates_before_claim_and_provider(
     monkeypatch.setattr(
         executor,
         "_validate_retry_approval_artifact",
-        lambda handoff, approval: order.append("approval") or {"retry_facts": {"custom_reference_id": "soul-current", "date": "2026-07-21", "slot_id": "slot-retry01"}},
+        lambda handoff, approval: order.append("approval") or {
+            "retry_facts": {
+                "custom_reference_id": executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+                "date": "2026-07-21",
+                "slot_id": "slot-retry01",
+            }
+        },
     )
     monkeypatch.setattr(executor, "_create_retry_generation_claim", lambda result: order.append("claim") or {"claim_path": claim, "claim_repo_path": "claim.json"})
     monkeypatch.setattr(executor, "manifest_path", lambda day, slot: manifest)
@@ -346,7 +352,7 @@ def test_callable_retry_executor_validates_before_claim_and_provider(
 
     def provider(day, slot, source, soul_id):
         order.append("provider")
-        assert soul_id == "soul-current"
+        assert soul_id == executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID
         return {
             "saved_image_path": str(image),
             "provider_submission_may_have_occurred": True,
@@ -426,9 +432,10 @@ def test_retry_approval_is_issued_from_consumed_standing_authority_and_remains_c
         "executor": "higgsfield_cli",
         "model": "text2image_soul_v2",
         "aspect_ratio": "9:16",
-        "custom_reference_id": "soul-current",
+        "custom_reference_id": executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         "soul_name": "Lena",
         "soul_type": "soul_2",
+        "generation_reference": executor.soul_cinema_contract.load_generation_reference_binding(),
     }
     record = retry_approval.build_standing_autonomy_retry_generation_approval_record(retry_facts, auth_result)
     approval_path = tmp_path / "pipeline" / "retry-approval.json"
@@ -470,7 +477,14 @@ def test_typed_retry_qa_ingestion_rebinds_retry_slot_prompt_and_original_candida
     monkeypatch.setattr(photo_qa.typed_retry_handoff, "validate_retry_handoff_artifact", lambda path: typed)
     monkeypatch.setattr(photo_qa.pose_provenance, "validate_pose_provenance", lambda value: value)
     monkeypatch.setattr(photo_qa, "_resolve_pose_repo_path", lambda value, label: candidate_path)
-    monkeypatch.setattr(photo_qa, "_validate_selected_decision", lambda path: ({"authority_commit": "a" * 40}, source_candidate))
+    monkeypatch.setattr(
+        photo_qa,
+        "_validate_selected_decision",
+        lambda path, *, freshness_mode=photo_qa.handoff.FRESHNESS_MODE_CURRENT: (
+            {"authority_commit": "a" * 40},
+            source_candidate,
+        ),
+    )
 
     decision, candidate, kind, binding = photo_qa._resolve_generation_binding_context(decision_path)
     assert kind == "typed_retry_handoff"
