@@ -758,7 +758,13 @@ def test_provider_action_and_manifest_pose_disagreement_fail_closed() -> None:
         },
     }
     with pytest.raises(executor.HandoffArtifactError) as manifest_error:
-        executor.build_manifest("2026-07-21", "fixture-photo", source, "fixture-soul", None)
+        executor.build_manifest(
+            "2026-07-21",
+            "fixture-photo",
+            source,
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+            None,
+        )
     assert manifest_error.value.code == "manifest_pose_provenance_mismatch"
 
 
