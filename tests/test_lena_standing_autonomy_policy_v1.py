@@ -223,7 +223,7 @@ def test_authorization_bound_photo_qa_context_allows_historical_expired_authoriz
     monkeypatch.setattr(
         photo_qa.approval,
         "inspect_handoff_artifact",
-        lambda _path, **_kwargs: {
+        lambda _path, *, selected_candidate_freshness_mode=None: {
             "report": handoff_report,
             "selected_candidate_path": str(Path(bundle["candidate_path"]).resolve()),
         },
@@ -231,7 +231,10 @@ def test_authorization_bound_photo_qa_context_allows_historical_expired_authoriz
     monkeypatch.setattr(
         photo_qa,
         "_validate_selected_decision",
-        lambda _path, **_kwargs: ({"as_of_date": handoff_report["date"]}, dict(bundle["candidate"])),
+        lambda _path, *, freshness_mode=photo_qa.handoff.FRESHNESS_MODE_CURRENT: (
+            {"as_of_date": handoff_report["date"]},
+            dict(bundle["candidate"]),
+        ),
     )
 
     decision, candidate, decision_kind, binding_context = photo_qa._resolve_generation_binding_context(

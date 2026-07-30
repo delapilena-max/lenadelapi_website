@@ -92,10 +92,10 @@ def main() -> int:
     if policy:
         autonomous_enabled = policy.get("autonomous_enabled")
         autonomous_enabled_by_default = policy.get("autonomous_enabled_by_default")
-        report["autonomous_enabled"] = autonomous_enabled
-        report["autonomous_enabled_by_default"] = autonomous_enabled_by_default
+        report["autonomous_enabled"] = autonomous_enabled if isinstance(autonomous_enabled, bool) else None
+        report["autonomous_enabled_by_default"] = autonomous_enabled_by_default if isinstance(autonomous_enabled_by_default, bool) else None
         report["autonomous_policy_state"] = str(policy.get("autonomous_policy_state") or "")
-        report["activation_required"] = autonomous_enabled is False
+        report["activation_required"] = (autonomous_enabled is False) if isinstance(autonomous_enabled, bool) else None
         check(report, policy.get("policy_id") == "lena_approved_queue_auto_publisher_policy_v2_8", "policy_checks", "policy id matches")
         check(report, policy.get("policy_version") == "v2.8.0", "policy_checks", "policy version matches")
         check(report, policy.get("autonomous_mode") == "scheduled_autonomous", "policy_checks", "policy names separate autonomous mode")

@@ -73,11 +73,21 @@ def test_multiline_prompt_and_trailing_flags_survive_the_subprocess_boundary(tmp
     assert received[received.index("--quality") + 1] == "2k"
 
 
-def test_launcher_never_resolves_to_a_batch_shim() -> None:
+def test_launcher_never_resolves_to_a_batch_shim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A .CMD/.BAT launcher corrupts argv and must never be returned."""
+    direct_exe = tmp_path / "higgsfield.exe"
+    direct_exe.write_bytes(b"MZ")
+    monkeypatch.setattr(
+        executor.shutil,
+        "which",
+        lambda name: str(direct_exe) if name == executor.HIGGSFIELD_CLI_BINARY else None,
+    )
+
     launcher = executor.resolve_provider_launcher()
 
-    assert launcher, "launcher must not be empty"
+    assert launcher == [str(direct_exe)]
     assert Path(launcher[0]).suffix.lower() not in {".cmd", ".bat"}
 
 
@@ -98,6 +108,19 @@ def test_launcher_fails_closed_when_only_an_unusable_shim_exists(
         executor.resolve_provider_launcher()
 
     assert excinfo.value.stage == "provider_launcher_unsafe"
+    assert excinfo.value.subprocess_start_attempted is False
+    assert excinfo.value.provider_submission_may_have_occurred is False
+
+
+def test_launcher_fails_closed_when_cli_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(executor.shutil, "which", lambda name: None)
+
+    with pytest.raises(executor.ProviderCallError) as excinfo:
+        executor.resolve_provider_launcher()
+
+    assert excinfo.value.stage == "subprocess_start_failure"
     assert excinfo.value.subprocess_start_attempted is False
     assert excinfo.value.provider_submission_may_have_occurred is False
 

@@ -947,10 +947,12 @@ def _production_dual_binding_fixture(
         "manifest_path": manifest_path,
         "evidence_path": evidence_path,
         "image_path": image_path,
+        "reference_manifest_path": reference_manifest_path,
         "reference_authority_path": reference_authority_path,
         "reference_authority_sha": _sha(reference_authority_path),
         "reference_image_path": reference_image_path,
         "reference_image_sha": _sha(reference_image_path),
+        "current_generated_custom_reference_id": str(auth["custom_reference_id"]),
         "provider_lane": provider_binding["provider_lane"],
         "provider_prompt_sha256": provider_binding["provider_prompt_sha256"],
         "date": date_str,
@@ -1070,6 +1072,13 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
     )
     assert result["qa_inputs"].get("decision_kind") == "authorization_bound_handoff", result
     assert result["provider_called"] is False
+    reference_manifest = json.loads(Path(bundle["reference_manifest_path"]).read_text(encoding="utf-8"))
+    generated_manifest = json.loads(Path(bundle["manifest_path"]).read_text(encoding="utf-8"))
+    assert reference_manifest["custom_reference_id"] == disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID
+    assert reference_manifest["soul_id"] == disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID
+    assert reference_manifest["custom_reference_id"] != bundle["current_generated_custom_reference_id"]
+    assert generated_manifest["custom_reference_id"] == bundle["current_generated_custom_reference_id"]
+    assert generated_manifest["soul_id"] == bundle["current_generated_custom_reference_id"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_lane"] == bundle["provider_lane"]
     assert result["generation_provenance"]["provider_job_id"] == "job-123"
