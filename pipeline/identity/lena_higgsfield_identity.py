@@ -41,6 +41,7 @@ EXPECTED_SOUL_STATUS = "completed"
 EXPECTED_SOUL_NAME = "Lena"
 EXPECTED_SOUL_TYPE = "soul_2"
 EXPECTED_JOB_TYPE = soul_cinema_contract.MODEL
+CURRENT_LENA_SOUL_ID = soul_cinema_contract.CUSTOM_REFERENCE_ID
 HISTORICAL_JOB_TYPES = frozenset({"text2image_soul_v2"})
 APPROVED_JOB_TYPES = frozenset({EXPECTED_JOB_TYPE, *HISTORICAL_JOB_TYPES})
 # These are real, provider-confirmed Lena Soul ids -- not interchangeable
@@ -78,7 +79,7 @@ SCHEMA_VERSION = "1"
 REQUIRED_EVIDENCE_FIELDS = (
     "schema_version", "verified_at_utc", "provider", "date", "slot_id",
     "provider_job_id", "provider_job_status", "job_type",
-    "custom_reference_id", "soul_name", "soul_type", "prompt_sha256",
+    "custom_reference_id", "soul_id", "soul_name", "soul_type", "prompt_sha256",
     "width", "height", "local_image_path", "local_image_sha256",
     "verification_result", "checks_passed",
 )
@@ -305,6 +306,7 @@ def verify_higgsfield_identity(
         "provider_job_status": job_status,
         "job_type": job_type,
         "custom_reference_id": provider_custom_reference_id,
+        "soul_id": provider_custom_reference_id,
         "soul_name": soul_name,
         "soul_type": soul_type,
         "soul_status": soul_status,
@@ -339,6 +341,7 @@ def build_identity_verification_evidence(date_str: str, verified: Dict[str, Any]
         "provider_job_status": verified["provider_job_status"],
         "job_type": verified["job_type"],
         "custom_reference_id": verified["custom_reference_id"],
+        "soul_id": verified["soul_id"],
         "soul_name": verified["soul_name"],
         "soul_type": verified["soul_type"],
         "prompt_sha256": verified["prompt_sha256"],
@@ -381,6 +384,7 @@ def verify_and_record_higgsfield_identity(
     provider_job_id = manifest.get("provider_job_id")
     job_type = manifest.get("job_type")
     custom_reference_id = manifest.get("custom_reference_id")
+    soul_id = manifest.get("soul_id")
     prompt_sha256 = manifest.get("prompt_sha256")
     saved_image_path_raw = manifest.get("saved_image_path")
 
@@ -388,6 +392,7 @@ def verify_and_record_higgsfield_identity(
         ("provider_job_id", provider_job_id),
         ("job_type", job_type),
         ("custom_reference_id", custom_reference_id),
+        ("soul_id", soul_id),
         ("prompt_sha256", prompt_sha256),
         ("saved_image_path", saved_image_path_raw),
     ):
@@ -395,6 +400,10 @@ def verify_and_record_higgsfield_identity(
             raise HiggsfieldIdentityVerificationError(
                 f"manifest {manifest_path} is missing '{field_name}' -- refusing to fabricate a value."
             )
+    if str(soul_id) != str(custom_reference_id):
+        raise HiggsfieldIdentityVerificationError(
+            f"manifest {manifest_path} soul_id {soul_id!r} does not match custom_reference_id {custom_reference_id!r}"
+        )
 
     verified = verify_higgsfield_identity(
         slot_id=slot_id,
@@ -490,6 +499,8 @@ def validate_local_identity_evidence(
             f"identity_verification.json custom_reference_id {evidence.get('custom_reference_id')!r} "
             f"is not one of the approved Lena reference ids {sorted(APPROVED_CUSTOM_REFERENCE_IDS)!r}"
         )
+    if evidence.get("soul_id") != evidence.get("custom_reference_id"):
+        reasons.append("identity_verification.json soul_id does not match custom_reference_id")
 
     if evidence.get("soul_name") != EXPECTED_SOUL_NAME:
         reasons.append(
@@ -522,6 +533,12 @@ def validate_local_identity_evidence(
         reasons.append(
             f"identity_verification.json custom_reference_id does not match this queue item's own "
             f"metadata.custom_reference_id {meta_custom_reference_id!r}"
+        )
+    meta_soul_id = meta.get("soul_id")
+    if meta_soul_id and evidence.get("soul_id") != meta_soul_id:
+        reasons.append(
+            f"identity_verification.json soul_id does not match this queue item's own "
+            f"metadata.soul_id {meta_soul_id!r}"
         )
 
     meta_image_prompt = meta.get("image_prompt")

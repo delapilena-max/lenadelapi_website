@@ -164,9 +164,15 @@ def build_local_identity_evidence(
     _require(job_type == identity.EXPECTED_JOB_TYPE, "manifest_job_type_mismatch", "manifest job_type does not match the approved Higgsfield job type")
     custom_reference_id = _required_string(manifest, "custom_reference_id")
     _require(
-        custom_reference_id in identity.APPROVED_CUSTOM_REFERENCE_IDS,
-        "identity_custom_reference_id_invalid",
-        "manifest custom_reference_id is not an approved Lena reference id",
+        custom_reference_id == identity.CURRENT_LENA_SOUL_ID,
+        "identity_current_soul_id_invalid",
+        "manifest custom_reference_id is not the current Lena Soul ID",
+    )
+    soul_id = _required_string(manifest, "soul_id")
+    _require(
+        soul_id == custom_reference_id,
+        "manifest_soul_id_mismatch",
+        "manifest soul_id must match custom_reference_id",
     )
     soul_name = _required_string(manifest, "cli_soul_name")
     _require(soul_name == identity.EXPECTED_SOUL_NAME, "manifest_cli_soul_name_mismatch", "manifest cli_soul_name must be exactly 'Lena'")
@@ -211,6 +217,7 @@ def build_local_identity_evidence(
         "provider_job_status": provider_status,
         "job_type": job_type,
         "custom_reference_id": custom_reference_id,
+        "soul_id": soul_id,
         "soul_name": soul_name,
         "soul_type": soul_type,
         "prompt_sha256": prompt_sha256,
@@ -272,6 +279,10 @@ def build_local_identity_evidence(
         raise LenaIdentityEvidenceError("identity_evidence_validation_failed", "identity evidence slot_id mismatch")
     if observed.get("custom_reference_id") not in identity.APPROVED_CUSTOM_REFERENCE_IDS:
         raise LenaIdentityEvidenceError("identity_evidence_validation_failed", "identity evidence custom_reference_id is not approved")
+    if observed.get("custom_reference_id") != identity.CURRENT_LENA_SOUL_ID:
+        raise LenaIdentityEvidenceError("identity_evidence_validation_failed", "identity evidence custom_reference_id is not the current Lena Soul ID")
+    if observed.get("soul_id") != observed.get("custom_reference_id"):
+        raise LenaIdentityEvidenceError("identity_evidence_validation_failed", "identity evidence soul_id must match custom_reference_id")
     if observed.get("local_image_sha256") != image_sha256:
         raise LenaIdentityEvidenceError("identity_evidence_validation_failed", "identity evidence image SHA-256 mismatch")
     return evidence_path, evidence, written

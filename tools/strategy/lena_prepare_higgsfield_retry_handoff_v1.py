@@ -522,11 +522,13 @@ def build_retry_handoff(
         "model": approval_contract.MODEL,
         "aspect_ratio": approval_contract.ASPECT_RATIO,
         "custom_reference_id": custom_reference_id,
+        "soul_id": custom_reference_id,
         "generation_reference": generation_reference,
         "soul_name": soul_name,
         "soul_type": soul_type,
         "retry_soul_binding": retry_soul_binding,
         "historical_custom_reference_id": handoff_facts["custom_reference_id"],
+        "historical_soul_id": str(handoff_facts.get("soul_id") or handoff_facts["custom_reference_id"]),
         "retry_constraints": retry_constraints,
         "prompt_mutation": prompt_mutation,
         "retry_prompt_text": retry_prompt,
@@ -662,10 +664,12 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
             "retry Soul id must match the verified Lena Soul 2.0 id",
         )
         _require(artifact.get("custom_reference_id") == soul.get("id"), "custom_reference_id_mismatch", "retry handoff custom_reference_id must match retry Soul id")
+        _require(artifact.get("soul_id") == soul.get("id"), "soul_id_mismatch", "retry handoff soul_id must match retry Soul id")
         _require(artifact.get("soul_name") == soul.get("name"), "soul_name_mismatch", "retry handoff soul_name must match retry Soul binding")
         _require(artifact.get("soul_type") == soul.get("type"), "soul_type_mismatch", "retry handoff soul_type must match retry Soul binding")
     else:
         _require(artifact.get("custom_reference_id") == handoff_facts["custom_reference_id"], "custom_reference_id_mismatch", "background retry handoff must preserve the source reference id")
+        _require(artifact.get("soul_id") == str(handoff_facts.get("soul_id") or handoff_facts["custom_reference_id"]), "soul_id_mismatch", "background retry handoff must preserve the source soul id")
     _require(
         artifact.get("custom_reference_id") == soul_cinema_contract.CUSTOM_REFERENCE_ID,
         "custom_reference_id_mismatch",
@@ -675,6 +679,11 @@ def validate_retry_handoff_artifact(path: Path) -> dict[str, Any]:
         artifact.get("historical_custom_reference_id") == handoff_facts["custom_reference_id"],
         "historical_reference_mismatch",
         "retry handoff historical_custom_reference_id must preserve the source handoff reference",
+    )
+    _require(
+        artifact.get("historical_soul_id") == str(handoff_facts.get("soul_id") or handoff_facts["custom_reference_id"]),
+        "historical_soul_id_mismatch",
+        "retry handoff historical_soul_id must preserve the source handoff soul id",
     )
     _require(artifact.get("provider") == approval_contract.APPROVAL_PROVIDER, "provider_mismatch", "retry handoff provider is invalid")
     _require(artifact.get("executor") == approval_contract.APPROVAL_EXECUTOR, "executor_mismatch", "retry handoff executor is invalid")

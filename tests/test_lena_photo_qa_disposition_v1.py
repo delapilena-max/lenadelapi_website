@@ -260,7 +260,8 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "wardrobe_outfit_name": "fixture outfit",
         "wardrobe_silhouette_class": "fitted_dress",
         "effective_wardrobe_silhouette_class": "fitted_dress",
-        "custom_reference_id": next(iter(identity.APPROVED_CUSTOM_REFERENCE_IDS)),
+        "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+        "soul_id": identity.CURRENT_LENA_SOUL_ID,
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
         "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
         "provider_job_id": provider_job_id,
@@ -283,6 +284,7 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "provider_job_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
         "custom_reference_id": manifest["custom_reference_id"],
+        "soul_id": manifest["soul_id"],
         "soul_name": identity.EXPECTED_SOUL_NAME,
         "soul_type": identity.EXPECTED_SOUL_TYPE,
         "prompt_sha256": prompt_sha,
@@ -751,7 +753,8 @@ def _production_dual_binding_fixture(
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "provider_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
-        "custom_reference_id": str(auth["custom_reference_id"]),
+        "custom_reference_id": disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID,
+        "soul_id": disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID,
     }
     reference_manifest_bytes = json.dumps(reference_manifest, indent=2, ensure_ascii=True).encode("utf-8")
     reference_manifest_sha = hashlib.sha256(reference_manifest_bytes).hexdigest()
@@ -904,6 +907,7 @@ def _production_dual_binding_fixture(
         "wardrobe_silhouette_class": "jeans_based",
         "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
         "custom_reference_id": str(auth["custom_reference_id"]),
+        "soul_id": str(auth["custom_reference_id"]),
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
         "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
         "provider_job_id": "job-123",
@@ -925,6 +929,7 @@ def _production_dual_binding_fixture(
         "provider_job_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
         "custom_reference_id": str(auth["custom_reference_id"]),
+        "soul_id": str(auth["custom_reference_id"]),
         "soul_name": identity.EXPECTED_SOUL_NAME,
         "soul_type": identity.EXPECTED_SOUL_TYPE,
         "prompt_sha256": candidate_body["prompt_sha256"],
@@ -2000,6 +2005,7 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         "provider": "higgsfield", "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "provider_status": "completed", "job_type": "text2image_soul_v2",
         "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+        "soul_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
     }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     manifest_sha = _sha(manifest_path)
@@ -2089,6 +2095,7 @@ def test_real_visual_reference_authority_bundle_rejects_stale_or_forged_commit(t
                 "provider_status": "completed",
                 "job_type": "text2image_soul_v2",
                 "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+                "soul_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
             }
         ),
         encoding="utf-8",

@@ -58,7 +58,11 @@ EXPRESSION_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_expression_gaze_b
 WARDROBE_CATALOG_PATH = ROOT / "pipeline/prompt_banks/lena/lena_wardrobe_catalog_v1.json"
 RECIPE_BANK_PATH = ROOT / "pipeline/prompt_banks/lena/lena_high_caliber_prompt_recipe_bank_v1.json"
 PROMPT_BRAIN_PATH = ROOT / "pipeline/prompting/lena_prompt_brain.py"
-CURRENT_LENA_SOUL_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
+# Historical reference-authority binding only. This is the Soul ID recorded
+# in the committed July 9, 2026 reference manifest used for visual identity
+# continuity checks; it is not the current live Soul used for new provider
+# submissions.
+REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID = "90a293d7-f3af-4377-8751-3304a27b6f31"
 LENA_REFERENCE_MANIFEST_PATH = (
     "pipeline/higgsfield_debug/2026-07-09/prompt_isolation_tests/"
     "readypack0709-pack004-08-wardrobe-test-c/result_manifest.json"
@@ -377,7 +381,7 @@ def _validate_reference_metadata(authority: dict[str, Any], authority_commit: st
         "provider": "higgsfield",
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "job_type": "text2image_soul_v2",
-        "custom_reference_id": CURRENT_LENA_SOUL_ID,
+        "custom_reference_id": REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID,
         "authority_scope": "identity_continuity_not_style",
     }
     if any(item.get(key) != value for key, value in required.items()):
@@ -839,7 +843,7 @@ def _validate_manifest(
     if manifest.get("provider_status") != "completed":
         raise BoundaryError("provenance_mismatch", "manifest provider_status must be completed")
     required_text = (
-        "job_type", "custom_reference_id", "cli_soul_name", "cli_soul_type", "provider_job_id",
+        "job_type", "custom_reference_id", "soul_id", "cli_soul_name", "cli_soul_type", "provider_job_id",
         "pose_body_language_id", "pose_body_language_label", "pose_text", "expression_gaze_id", "expression_gaze_label",
         "expression_text", "wardrobe_outfit_id", "wardrobe_outfit_name",
         "wardrobe_silhouette_class", "effective_wardrobe_silhouette_class", "image_format_detected",
@@ -847,6 +851,8 @@ def _validate_manifest(
     for key in required_text:
         if not isinstance(manifest.get(key), str) or not manifest[key].strip():
             raise BoundaryError("provenance_mismatch", f"manifest is missing required generation provenance: {key}")
+    if manifest.get("soul_id") != manifest.get("custom_reference_id"):
+        raise BoundaryError("provenance_mismatch", "manifest soul_id must exactly match custom_reference_id")
     _validate_manifest_pose_contract(
         manifest,
         decision,
@@ -1102,6 +1108,7 @@ def _validate_identity_evidence(
     meta = {
         "provider_job_id": manifest.get("provider_job_id"),
         "custom_reference_id": manifest.get("custom_reference_id"),
+        "soul_id": manifest.get("soul_id"),
         "image_prompt": manifest.get("image_prompt"),
     }
     reasons = identity.validate_local_identity_evidence(
@@ -1115,6 +1122,7 @@ def _validate_identity_evidence(
         "provider_job_id": manifest["provider_job_id"],
         "job_type": manifest["job_type"],
         "custom_reference_id": manifest["custom_reference_id"],
+        "soul_id": manifest["soul_id"],
         "prompt_sha256": candidate["prompt_sha256"],
         "local_image_sha256": image["sha256"],
     }
@@ -1668,6 +1676,7 @@ def evaluate_photo_qa_disposition(
                 "provider_job_id": manifest["provider_job_id"],
                 "provider_status": manifest["provider_status"],
                 "custom_reference_id": manifest["custom_reference_id"],
+                "soul_id": manifest["soul_id"],
                 "soul_name": manifest["cli_soul_name"],
                 "soul_type": manifest["cli_soul_type"],
                 "provider_execution_binding": provider_binding,

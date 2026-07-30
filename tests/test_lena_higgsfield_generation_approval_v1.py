@@ -1110,7 +1110,7 @@ def test_validate_rejects_custom_reference_id_mismatch(tmp_path: Path, monkeypat
 
     with pytest.raises(HiggsfieldGenerationApprovalError) as excinfo:
         validate_generation_approval_artifact(approval_path)
-    assert excinfo.value.code == "approval_custom_reference_id_mismatch"
+    assert excinfo.value.code == "approval_soul_id_mismatch"
 
 
 def test_validate_rejects_generation_reference_substitution(

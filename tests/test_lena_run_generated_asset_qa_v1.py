@@ -109,6 +109,12 @@ def _build_fixture(
         "generation_execution_receipt_path": approval.repo_relative_path(receipt_path),
         "provider_job_id": "job-123",
         "image_format_detected": ".png",
+        "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+        "soul_id": identity.CURRENT_LENA_SOUL_ID,
+        "job_type": identity.EXPECTED_JOB_TYPE,
+        "cli_soul_name": identity.EXPECTED_SOUL_NAME,
+        "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
+        "prompt_sha256": PROMPT_SHA,
     }
     _write_json(manifest_path, manifest)
     manifest_sha256 = _sha(manifest_path)
@@ -230,7 +236,8 @@ def _build_fixture(
             "provider_job_id": "job-123",
             "provider_job_status": "completed",
             "job_type": identity.EXPECTED_JOB_TYPE,
-            "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+            "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+            "soul_id": identity.CURRENT_LENA_SOUL_ID,
             "soul_name": identity.EXPECTED_SOUL_NAME,
             "soul_type": identity.EXPECTED_SOUL_TYPE,
             "prompt_sha256": PROMPT_SHA,
