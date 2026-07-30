@@ -290,7 +290,11 @@ def _patch_git_commit(
     monkeypatch.setattr(autopublish.subprocess, "check_output", fake_check_output)
 
 
-def test_validator_accepts_disabled_contract_and_scheduler_wrappers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validator_accepts_disabled_contract_and_scheduler_wrappers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     _patch_tree(monkeypatch, tmp_path)
     _policy(tmp_path, enabled=False, authority_commit="a" * 40)
     _manifest(tmp_path)
@@ -329,6 +333,10 @@ def test_validator_accepts_disabled_contract_and_scheduler_wrappers(tmp_path: Pa
     report = json.loads((tmp_path / "pipeline" / "influencer_nodes" / "lena" / "approved_queue_auto_publisher_policy_v2_8.json").read_text(encoding="utf-8"))
     assert report["autonomous_enabled"] is False
     assert validator.main() == 0
+    validator_report = json.loads(capsys.readouterr().out)
+    assert validator_report["ok"] is True
+    assert validator_report["autonomous_enabled"] is False
+    assert validator_report["activation_required"] is True
 
 
 def test_checked_in_scheduler_wrappers_are_scheduler_safe() -> None:

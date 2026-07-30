@@ -751,7 +751,7 @@ def _production_dual_binding_fixture(
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "provider_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
-        "custom_reference_id": str(auth["custom_reference_id"]),
+        "custom_reference_id": disposition.CURRENT_LENA_SOUL_ID,
     }
     reference_manifest_bytes = json.dumps(reference_manifest, indent=2, ensure_ascii=True).encode("utf-8")
     reference_manifest_sha = hashlib.sha256(reference_manifest_bytes).hexdigest()

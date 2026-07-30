@@ -30,7 +30,20 @@ def _isolate_hand_built_candidate_contracts(request, monkeypatch: pytest.MonkeyP
     if request.node.name.startswith("test_production_selector_"):
         return
 
-    def validate_fixture_issuance(artifact: dict, *, root: Path | None = None) -> dict:
+    def validate_fixture_issuance(
+        artifact: dict,
+        *,
+        root: Path | None = None,
+        freshness_mode: str = selected_candidate.FRESHNESS_MODE_CURRENT,
+    ) -> dict:
+        if freshness_mode not in {
+            selected_candidate.FRESHNESS_MODE_CURRENT,
+            selected_candidate.FRESHNESS_MODE_STORED_SNAPSHOT,
+        }:
+            raise selected_candidate.ConsumerError(
+                "freshness_mode_invalid",
+                f"unsupported selected-candidate freshness mode: {freshness_mode}",
+            )
         candidate = selected_candidate._validate_shape(artifact)
         stored_core, recomputed = selected_candidate._validate_fingerprint(artifact)
         selected_candidate._validate_authority(artifact, root=root)
@@ -534,7 +547,7 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
             expected_pose_provenance=binding,
             expected_expression_provenance=expression_binding,
         )
-    assert executor_exc.value.code == "stale_decision"
+    assert executor_exc.value.code == "handoff_pose_provenance_mismatch"
 
     recommendation = {
         "learning_status": "current",
@@ -565,7 +578,11 @@ def test_production_selector_rejects_resealed_alternate_valid_pose(
     monkeypatch.setattr(handoff_builder, "load_report", lambda *args, **kwargs: recommendation)
     monkeypatch.setattr(handoff_builder, "load_learning_report", lambda *args, **kwargs: (root / "learning.json", learning))
     monkeypatch.setattr(handoff_builder, "load_queue_report", lambda *args, **kwargs: (root / "queue.json", queue))
-    monkeypatch.setattr(handoff_builder, "load_selected_candidate_report", lambda *args, **kwargs: (candidate_path, tampered))
+    monkeypatch.setattr(
+        handoff_builder,
+        "load_reconciled_selected_candidate_report",
+        lambda *args, **kwargs: (candidate_path, tampered),
+    )
     monkeypatch.setattr(handoff_builder, "content_packet_path", lambda *args, **kwargs: packet_path)
     monkeypatch.setattr(handoff_builder, "load_content_packet_report", lambda *args, **kwargs: bound_packet)
     monkeypatch.setattr(
@@ -758,7 +775,13 @@ def test_provider_action_and_manifest_pose_disagreement_fail_closed() -> None:
         },
     }
     with pytest.raises(executor.HandoffArtifactError) as manifest_error:
-        executor.build_manifest("2026-07-21", "fixture-photo", source, "fixture-soul", None)
+        executor.build_manifest(
+            "2026-07-21",
+            "fixture-photo",
+            source,
+            executor.DEFAULT_LENA_CUSTOM_REFERENCE_ID,
+            None,
+        )
     assert manifest_error.value.code == "manifest_pose_provenance_mismatch"
 
 

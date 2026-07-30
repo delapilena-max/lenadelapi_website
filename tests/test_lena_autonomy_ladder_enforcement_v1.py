@@ -9,6 +9,7 @@ import pytest
 
 from pipeline.influencer_nodes.lena import autonomy_ladder
 from pipeline import higgsfield_lena_api_executor as executor
+from pipeline.identity import lena_higgsfield_soul_cinema_contract_v1 as soul_cinema_contract
 from tools import lena_build_approved_publish_queue_v2_8 as publish_queue
 from tools import lena_higgsfield_generation_approval_v1 as approval
 from tools import lena_higgsfield_retry_generation_approval_v1 as retry_approval
@@ -53,11 +54,12 @@ def _fake_retry_facts() -> dict:
         "executor": "Higgsfield CLI repo adapter",
         "model": "text2image_soul_v2",
         "aspect_ratio": "9:16",
-        "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+        "custom_reference_id": soul_cinema_contract.CUSTOM_REFERENCE_ID,
         "soul_name": "Lena",
         "soul_type": "Soul 2.0",
         "retry_handoff_fingerprint_sha256": "1" * 64,
         "expression_provenance_fingerprint_sha256": "2" * 64,
+        "generation_reference": soul_cinema_contract.load_generation_reference_binding(),
     }
 
 

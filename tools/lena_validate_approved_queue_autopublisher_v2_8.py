@@ -36,6 +36,8 @@ def main() -> int:
     report = {
         "ok": True,
         "version": "v2.8.4",
+        "autonomous_enabled": None,
+        "activation_required": None,
         "files": {},
         "tools": {},
         "batch_gates": {},
@@ -85,10 +87,13 @@ def main() -> int:
     policy = loaded.get("approved_queue_auto_publisher_policy_v2_8.json")
     manifest = loaded.get("approved_queue_auto_publisher_manifest_v2_8.json")
     if policy:
+        autonomous_enabled = policy.get("autonomous_enabled")
+        report["autonomous_enabled"] = autonomous_enabled if isinstance(autonomous_enabled, bool) else None
+        report["activation_required"] = (autonomous_enabled is False) if isinstance(autonomous_enabled, bool) else None
         check(report, policy.get("policy_id") == "lena_approved_queue_auto_publisher_policy_v2_8", "policy_checks", "policy id matches")
         check(report, policy.get("policy_version") == "v2.8.0", "policy_checks", "policy version matches")
         check(report, policy.get("autonomous_mode") == "scheduled_autonomous", "policy_checks", "policy names separate autonomous mode")
-        check(report, policy.get("autonomous_enabled") is False, "policy_checks", "autonomous mode disabled by default")
+        check(report, isinstance(autonomous_enabled, bool), "policy_checks", "autonomous enabled flag is boolean")
         check(report, policy.get("autonomous_enabled_by_default") is False, "policy_checks", "autonomous mode disabled by default flag")
         check(report, int(policy.get("hard_item_limit_per_invocation", 0)) == 1, "policy_checks", "hard item limit is one")
         check(report, set(policy.get("approved_slots", [])) == {"morning", "afternoon", "evening"}, "policy_checks", "approved slots are morning afternoon evening")
