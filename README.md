@@ -1,6 +1,6 @@
-﻿# lenadelapi-website
+﻿# lenadelapi_website
 
-This repository hosts the public Terms of Service and Privacy Policy pages for **lenadelapi_uploader**, the web/desktop integration used to create, preview, and publish ai_lady content to TikTok via OAuth and the Content Posting API.
+This repository hosts the public Terms of Service and Privacy Policy pages for **lenadelapi_website**, the web/desktop integration used to create, preview, and publish ai_lady content to TikTok via OAuth and the Content Posting API.
 
 ## Purpose
 These static pages are provided to satisfy app review requirements on the TikTok Developer Portal and to give users a clear, public record of our terms and privacy practices.
