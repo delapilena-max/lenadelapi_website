@@ -2028,14 +2028,12 @@ def test_valid_handoff_and_approval_live_creates_claim_receipt_and_manifest(
     assert "receipt written" in stdout
 
 
-def test_provider_stdout_parser_accepts_higgsfield_cli_empty_prefix_stream() -> None:
+def test_provider_stdout_parser_rejects_multiple_json_values_in_one_stream() -> None:
     stdout = '{} {"result_url":"https://x.y/a"}    '
     assert len(stdout) == 37
     with pytest.raises(json.JSONDecodeError) as exc_info:
-        json.loads(stdout)
+        executor._parse_provider_json_stdout(stdout)
     assert exc_info.value.pos == 3
-
-    assert executor._parse_provider_json_stdout(stdout) == {"result_url": "https://x.y/a"}
 
 
 def test_provider_argv_attaches_verified_lena_soul_and_sends_no_image_reference() -> None:

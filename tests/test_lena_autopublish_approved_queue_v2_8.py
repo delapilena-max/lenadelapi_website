@@ -333,10 +333,104 @@ def test_validator_accepts_disabled_contract_and_scheduler_wrappers(
     report = json.loads((tmp_path / "pipeline" / "influencer_nodes" / "lena" / "approved_queue_auto_publisher_policy_v2_8.json").read_text(encoding="utf-8"))
     assert report["autonomous_enabled"] is False
     assert validator.main() == 0
-    validator_report = json.loads(capsys.readouterr().out)
-    assert validator_report["ok"] is True
-    assert validator_report["autonomous_enabled"] is False
-    assert validator_report["activation_required"] is True
+    result = json.loads(capsys.readouterr().out)
+    assert result["ok"] is True
+    assert result["autonomous_enabled"] is False
+    assert result["activation_required"] is True
+    assert result["separate_activation_validator"] == "tools/lena_autopublish_go_live_readiness_v1.py"
+
+
+def test_validator_accepts_enabled_structural_contract_without_treating_it_as_invalid(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    _policy(tmp_path, enabled=True)
+    _manifest(tmp_path)
+    for tool in validator.TOOLS:
+        tool_path = tmp_path / tool
+        tool_path.parent.mkdir(parents=True, exist_ok=True)
+        tool_path.write_text("print('ok')\n", encoding="utf-8")
+    for name, slot in [("RUN_LENA_PUBLISH_MORNING_SLOT.bat", "morning"), ("RUN_LENA_PUBLISH_AFTERNOON_SLOT.bat", "afternoon"), ("RUN_LENA_PUBLISH_EVENING_SLOT.bat", "evening")]:
+        (tmp_path / name).write_text(
+            "\n".join(
+                [
+                    "@echo off",
+                    "setlocal",
+                    'set "ROOT=%LENA_AUTOPUBLISH_PRODUCTION_ROOT%"',
+                    'if not defined ROOT set "ROOT=%CONTENT_BOT_ROOT%"',
+                    'if not defined ROOT (',
+                    '  echo Missing production root environment variable: LENA_AUTOPUBLISH_PRODUCTION_ROOT or CONTENT_BOT_ROOT',
+                    "  exit /b 1",
+                    ")",
+                    'set "PYTHON_EXE=%LENA_AUTOPUBLISH_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE set "PYTHON_EXE=%CONTENT_BOT_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE (',
+                    '  echo Missing Python interpreter environment variable: LENA_AUTOPUBLISH_PYTHON_EXE or CONTENT_BOT_PYTHON_EXE',
+                    "  exit /b 1",
+                    ")",
+                    'cd /d "%ROOT%"',
+                    f'"%PYTHON_EXE%" ".\\tools\\lena_autopublish_approved_queue_v2_8.py" --scheduled-autonomous --slot-keyword {slot} --limit 1',
+                    "endlocal",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    assert validator.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["ok"] is True
+    assert result["autonomous_enabled"] is True
+    assert result["autonomous_enabled_by_default"] is False
+    assert result["autonomous_policy_state"] == "enabled"
+    assert result["activation_required"] is False
+
+
+def test_validator_rejects_mismatched_autonomous_policy_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True)
+    payload = json.loads(policy_path.read_text(encoding="utf-8"))
+    payload["autonomous_policy_state"] = "disabled_by_default"
+    policy_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _manifest(tmp_path)
+    for tool in validator.TOOLS:
+        tool_path = tmp_path / tool
+        tool_path.parent.mkdir(parents=True, exist_ok=True)
+        tool_path.write_text("print('ok')\n", encoding="utf-8")
+    for name, slot in [("RUN_LENA_PUBLISH_MORNING_SLOT.bat", "morning"), ("RUN_LENA_PUBLISH_AFTERNOON_SLOT.bat", "afternoon"), ("RUN_LENA_PUBLISH_EVENING_SLOT.bat", "evening")]:
+        (tmp_path / name).write_text(
+            "\n".join(
+                [
+                    "@echo off",
+                    "setlocal",
+                    'set "ROOT=%LENA_AUTOPUBLISH_PRODUCTION_ROOT%"',
+                    'if not defined ROOT set "ROOT=%CONTENT_BOT_ROOT%"',
+                    'if not defined ROOT (',
+                    '  echo Missing production root environment variable: LENA_AUTOPUBLISH_PRODUCTION_ROOT or CONTENT_BOT_ROOT',
+                    "  exit /b 1",
+                    ")",
+                    'set "PYTHON_EXE=%LENA_AUTOPUBLISH_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE set "PYTHON_EXE=%CONTENT_BOT_PYTHON_EXE%"',
+                    'if not defined PYTHON_EXE (',
+                    '  echo Missing Python interpreter environment variable: LENA_AUTOPUBLISH_PYTHON_EXE or CONTENT_BOT_PYTHON_EXE',
+                    "  exit /b 1",
+                    ")",
+                    'cd /d "%ROOT%"',
+                    f'"%PYTHON_EXE%" ".\\tools\\lena_autopublish_approved_queue_v2_8.py" --scheduled-autonomous --slot-keyword {slot} --limit 1',
+                    "endlocal",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    assert validator.main() == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["ok"] is False
+    mismatch = next(item for item in result["policy_checks"] if item["check"] == "autonomous policy state matches enabled flag")
+    assert mismatch["ok"] is False
 
 
 def test_checked_in_scheduler_wrappers_are_scheduler_safe() -> None:

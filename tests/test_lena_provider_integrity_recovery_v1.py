@@ -20,7 +20,7 @@ SLOT = "lenagate202607176924dc10-pack000-00-photo"
 JOB = "97cc0b2f-5360-45db-943b-a7a146ca3590"
 ORIGINAL_AUTH_SHA = "a" * 64
 SEEDED_IDENTITY_UTC = "2001-01-01T00:00:00+00:00"
-CUSTOM_REFERENCE_ID = sorted(identity.APPROVED_CUSTOM_REFERENCE_IDS)[-1]
+CUSTOM_REFERENCE_ID = identity.CURRENT_LENA_SOUL_ID
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -59,15 +59,15 @@ def _build_recovery_bundle(
     policy_path = tmp_path / "pipeline" / "config" / "lena_standing_autonomy_policy_v1.json"
     _write_image(image_path)
     _write_json(candidate_path, {"candidate_id": "candidate-1", "slot_id": SLOT})
-    _write_json(handoff_path, {"report_type": "lena_next_live_image_handoff", "schema_version": "v1", "date": DATE, "selected_slot_id": SLOT, "selected_candidate": {"candidate_id": "candidate-1"}, "prompt_sha256": "b" * 64, "custom_reference_id": CUSTOM_REFERENCE_ID})
+    _write_json(handoff_path, {"report_type": "lena_next_live_image_handoff", "schema_version": "v1", "date": DATE, "selected_slot_id": SLOT, "selected_candidate": {"candidate_id": "candidate-1"}, "prompt_sha256": "b" * 64, "custom_reference_id": CUSTOM_REFERENCE_ID, "soul_id": CUSTOM_REFERENCE_ID})
     _write_json(policy_path, {"report_type": "policy"})
     authorization = {
-        "report_type": "lena_standing_autonomy_cycle_authorization", "schema_version": "v1", "authorization_mode": "standing_autonomy_policy", "authorization_issuer": "lena_autonomy_controller", "single_use": True, "consumed": True, "authorization_consumed": True, "consumed_at_utc": "2026-07-19T04:21:14Z", "cycle_authorization_sha256": ORIGINAL_AUTH_SHA, "date": DATE, "slot_id": SLOT, "candidate_id": "candidate-1", "candidate_artifact_path": str(candidate_path), "candidate_artifact_sha256": _sha(candidate_path), "generation_handoff_artifact_path": str(handoff_path), "generation_handoff_artifact_sha256": _sha(handoff_path), "expected_output_directory": str(image_path.parent), "expected_output_stem": image_path.stem, "allowed_output_extensions": [".png", ".jpg", ".webp", ".bin"], "provider_call_cap_per_cycle": 1, "publish_action_cap_per_cycle": 1, "retry_cap_per_cycle": 0, "policy_artifact_path": str(policy_path), "policy_artifact_sha256": _sha(policy_path), "platform": "Instagram Feed", "caption": "caption", "custom_reference_id": CUSTOM_REFERENCE_ID, "cycle_id": "cycle-1",
+        "report_type": "lena_standing_autonomy_cycle_authorization", "schema_version": "v1", "authorization_mode": "standing_autonomy_policy", "authorization_issuer": "lena_autonomy_controller", "single_use": True, "consumed": True, "authorization_consumed": True, "consumed_at_utc": "2026-07-19T04:21:14Z", "cycle_authorization_sha256": ORIGINAL_AUTH_SHA, "date": DATE, "slot_id": SLOT, "candidate_id": "candidate-1", "candidate_artifact_path": str(candidate_path), "candidate_artifact_sha256": _sha(candidate_path), "generation_handoff_artifact_path": str(handoff_path), "generation_handoff_artifact_sha256": _sha(handoff_path), "expected_output_directory": str(image_path.parent), "expected_output_stem": image_path.stem, "allowed_output_extensions": [".png", ".jpg", ".webp", ".bin"], "provider_call_cap_per_cycle": 1, "publish_action_cap_per_cycle": 1, "retry_cap_per_cycle": 0, "policy_artifact_path": str(policy_path), "policy_artifact_sha256": _sha(policy_path), "platform": "Instagram Feed", "caption": "caption", "custom_reference_id": CUSTOM_REFERENCE_ID, "soul_id": CUSTOM_REFERENCE_ID, "cycle_id": "cycle-1",
     }
     _write_json(auth_path, authorization)
-    claim = {"report_type": "lena_higgsfield_generation_claim", "schema_version": "v1", "approval_artifact_sha256": ORIGINAL_AUTH_SHA, "authorized_attempts": 1, "consumed_attempt_number": 1, "date": DATE, "slot_id": SLOT}
+    claim = {"report_type": "lena_higgsfield_generation_claim", "schema_version": "v1", "approval_artifact_sha256": ORIGINAL_AUTH_SHA, "authorized_attempts": 1, "consumed_attempt_number": 1, "date": DATE, "slot_id": SLOT, "custom_reference_id": CUSTOM_REFERENCE_ID, "soul_id": CUSTOM_REFERENCE_ID}
     _write_json(claim_path, claim)
-    manifest = {"provider": "higgsfield", "date": DATE, "slot_id": SLOT, "provider_job_id": JOB, "provider_status": "completed", "job_type": "text2image_soul_v2", "live_attempt_count": 1, "retry_count": 0, "prompt_sha256": "b" * 64, "saved_image_path": str(image_path), "saved_image_sha256": _sha(image_path), "image_format_detected": ".png", "custom_reference_id": CUSTOM_REFERENCE_ID, "cli_soul_name": "Lena", "cli_soul_type": "soul_2"}
+    manifest = {"provider": "higgsfield", "date": DATE, "slot_id": SLOT, "provider_job_id": JOB, "provider_status": "completed", "job_type": "text2image_soul_v2", "live_attempt_count": 1, "retry_count": 0, "prompt_sha256": "b" * 64, "saved_image_path": str(image_path), "saved_image_sha256": _sha(image_path), "image_format_detected": ".png", "custom_reference_id": CUSTOM_REFERENCE_ID, "soul_id": CUSTOM_REFERENCE_ID, "cli_soul_name": "Lena", "cli_soul_type": "soul_2"}
     _write_json(manifest_path, manifest)
     receipt = {"report_type": "lena_higgsfield_generation_execution_receipt", "schema_version": "v1", "outcome": "success", "provider_submission_may_have_occurred": True, "claim_artifact_sha256": _sha(claim_path), "provider_job_id": JOB, "output_path": str(image_path), "actual_manifest_path": (Path("pipeline/higgsfield_debug") / DATE / SLOT / "result_manifest.json").as_posix()}
     _write_json(receipt_path, receipt)

@@ -166,6 +166,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
     handoff = {
         "date": date,
         "selected_slot_id": slot,
+        "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+        "soul_id": identity.CURRENT_LENA_SOUL_ID,
         "pose_provenance": pose_binding,
         "pose_bound_content_packet_sha256": packet_digest,
         "expression_provenance": expression_binding,
@@ -252,7 +254,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
         "provider_job_id": provider_job_id,
         "provider_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
-        "custom_reference_id": next(iter(identity.APPROVED_CUSTOM_REFERENCE_IDS)),
+        "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+        "soul_id": identity.CURRENT_LENA_SOUL_ID,
         "saved_image_path": str(image.resolve()),
         "pose_body_language_id": candidate["pose_body_language_id"],
         "pose_body_language_label": candidate["pose"],
@@ -430,7 +433,8 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "date": date,
             "slot_id": slot,
             "prompt_sha256": source_prompt_sha,
-            "custom_reference_id": next(iter(identity.APPROVED_CUSTOM_REFERENCE_IDS)),
+            "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+            "soul_id": identity.CURRENT_LENA_SOUL_ID,
         },
     )
     monkeypatch.setattr(
@@ -519,6 +523,7 @@ def build_retry_lineage(tmp_path: Path, monkeypatch) -> dict:
             "provider_job_status": "completed",
             "job_type": identity.EXPECTED_JOB_TYPE,
             "custom_reference_id": manifest["custom_reference_id"],
+            "soul_id": manifest["soul_id"],
             "soul_name": identity.EXPECTED_SOUL_NAME,
             "soul_type": identity.EXPECTED_SOUL_TYPE,
             "prompt_sha256": retry_decision["retry_prompt_sha256"],
