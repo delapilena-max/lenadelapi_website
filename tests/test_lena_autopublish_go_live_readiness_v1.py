@@ -228,6 +228,74 @@ def _write_policy_manifest(root: Path, *, authority_commit: str, autonomous_enab
     return policy_path, manifest_path
 
 
+def _scheduler_definition(production_root: Path, python_exe: Path | str = Path("python.exe")) -> dict:
+    return {
+        "ok": True,
+        "blockers": [],
+        "register_script_path": str(production_root / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1"),
+        "plan": {
+            "task_count": 1,
+            "task_name": readiness.CANONICAL_TASK_NAME,
+            "disabled_by_default": True,
+            "action": {
+                "execute": "powershell.exe",
+                "arguments": f'-NoProfile -ExecutionPolicy Bypass -File "{production_root / "tools" / "lena_autonomy_scheduler_driver_run_v1.ps1"}" -RepoRoot "{production_root}" -PythonExe "{python_exe}"',
+                "working_directory": str(production_root),
+            },
+            "trigger": {
+                "type": "poll_every_minute",
+                "repetition_interval": "PT1M",
+                "repetition_duration_element": "omitted",
+                "schedule_slots": ["morning", "afternoon", "evening"],
+            },
+        },
+    }
+
+
+def _legacy_task_row(name: str) -> dict:
+    return {
+        "task_name": name,
+        "present": True,
+        "enabled": False,
+        "state": "Disabled",
+        "repetition_interval": "",
+        "repetition_duration": "",
+        "stop_at_duration_end": False,
+        "actions": [
+            {
+                "execute": "cmd.exe",
+                "arguments": "legacy",
+                "working_directory": r"C:\projects\ai\lenadelapi_website_autopublish_fix",
+            }
+        ],
+    }
+
+
+def _canonical_task_row(
+    production_root: Path,
+    *,
+    enabled: bool = False,
+    arguments: str | None = None,
+    working_directory: str | None = None,
+) -> dict:
+    return {
+        "task_name": readiness.CANONICAL_TASK_NAME,
+        "present": True,
+        "enabled": enabled,
+        "state": "Ready" if enabled else "Disabled",
+        "repetition_interval": "PT1M",
+        "repetition_duration": "",
+        "stop_at_duration_end": True,
+        "actions": [
+            {
+                "execute": "powershell.exe",
+                "arguments": arguments or f'-NoProfile -ExecutionPolicy Bypass -File "{production_root / "tools" / "lena_autonomy_scheduler_driver_run_v1.ps1"}" -RepoRoot "{production_root}" -PythonExe "python.exe"',
+                "working_directory": working_directory or str(production_root),
+            }
+        ],
+    }
+
+
 def test_publish_common_config_status_reads_explicit_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     production_root = tmp_path / "production"
     shared_secret_path = _write_env_tree(production_root)
@@ -425,38 +493,21 @@ def test_readiness_report_never_emits_raw_secret_values(
     monkeypatch.setattr(
         readiness,
         "_canonical_scheduler_definition",
-        lambda production_root, python_exe: {
-            "ok": True,
-            "blockers": [],
-            "register_script_path": str(production_root / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1"),
-            "plan": {
-                "task_count": 1,
-                "task_name": readiness.CANONICAL_TASK_NAME,
-                "disabled_by_default": True,
-                "action": {
-                    "execute": "powershell.exe",
-                    "arguments": f'-NoProfile -ExecutionPolicy Bypass -File "{production_root / "tools" / "lena_autonomy_scheduler_driver_run_v1.ps1"}" -RepoRoot "{production_root}" -PythonExe "{Path("python.exe")}"',
-                    "working_directory": str(production_root),
-                },
-                "trigger": {
-                    "type": "poll_every_minute",
-                    "schedule_slots": ["morning", "afternoon", "evening"],
-                },
-            },
-        },
+        lambda production_root, python_exe: _scheduler_definition(production_root, Path("python.exe")),
     )
     monkeypatch.setattr(
         readiness,
         "_registered_task_deployment_status",
         lambda production_root, scheduler_definition: {
             "query_ok": True,
-            "deployment_state": "canonical_driver_missing",
+            "deployment_state": "stale_legacy_tasks_present",
             "activation_required": True,
+            "continuous_autonomy_active": False,
             "tasks": [],
             "canonical_task_present": False,
             "canonical_task_enabled": False,
             "canonical_task_matches_plan": False,
-            "legacy_tasks_present": [],
+            "legacy_tasks_present": list(readiness.LEGACY_TASK_NAMES),
             "stale_deployment_detected": False,
             "blockers": [],
         },
@@ -559,38 +610,21 @@ def test_go_live_readiness_reports_ready_from_explicit_production_root(
     monkeypatch.setattr(
         readiness,
         "_canonical_scheduler_definition",
-        lambda production_root, python_exe: {
-            "ok": True,
-            "blockers": [],
-            "register_script_path": str(production_root / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1"),
-            "plan": {
-                "task_count": 1,
-                "task_name": readiness.CANONICAL_TASK_NAME,
-                "disabled_by_default": True,
-                "action": {
-                    "execute": "powershell.exe",
-                    "arguments": f'-NoProfile -ExecutionPolicy Bypass -File "{production_root / "tools" / "lena_autonomy_scheduler_driver_run_v1.ps1"}" -RepoRoot "{production_root}" -PythonExe "{python_exe}"',
-                    "working_directory": str(production_root),
-                },
-                "trigger": {
-                    "type": "poll_every_minute",
-                    "schedule_slots": ["morning", "afternoon", "evening"],
-                },
-            },
-        },
+        lambda production_root, python_exe: _scheduler_definition(production_root, python_exe),
     )
     monkeypatch.setattr(
         readiness,
         "_registered_task_deployment_status",
         lambda production_root, scheduler_definition: {
             "query_ok": True,
-            "deployment_state": "canonical_driver_missing",
+            "deployment_state": "stale_legacy_tasks_present",
             "activation_required": True,
+            "continuous_autonomy_active": False,
             "tasks": [],
             "canonical_task_present": False,
             "canonical_task_enabled": False,
             "canonical_task_matches_plan": False,
-            "legacy_tasks_present": [],
+            "legacy_tasks_present": list(readiness.LEGACY_TASK_NAMES),
             "stale_deployment_detected": False,
             "blockers": [],
         },
@@ -606,9 +640,10 @@ def test_go_live_readiness_reports_ready_from_explicit_production_root(
     assert report["manifest"]["blockers"] == []
     assert report["blockers"] == []
     assert report["scheduler_definition_readiness"]["ok"] is True
-    assert report["registered_task_deployment_status"]["deployment_state"] == "canonical_driver_missing"
+    assert report["registered_task_deployment_status"]["deployment_state"] == "stale_legacy_tasks_present"
     assert report["activation_state"]["autonomous_enabled"] is True
     assert report["activation_state"]["activation_required"] is True
+    assert report["activation_state"]["continuous_autonomy_active"] is False
     assert report["safe_validation_commands"][0].startswith('"python.exe" -m tools.lena_autopublish_go_live_readiness_v1')
     assert report["safe_validation_commands"][0].endswith("--validate-only")
     assert report["safe_validation_commands"][1].startswith("powershell.exe -NoProfile -ExecutionPolicy Bypass -File")
@@ -663,38 +698,21 @@ def test_build_report_accepts_clean_branch_ahead_of_origin_main(
     monkeypatch.setattr(
         readiness,
         "_canonical_scheduler_definition",
-        lambda production_root, python_exe: {
-            "ok": True,
-            "blockers": [],
-            "register_script_path": str(production_root / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1"),
-            "plan": {
-                "task_count": 1,
-                "task_name": readiness.CANONICAL_TASK_NAME,
-                "disabled_by_default": True,
-                "action": {
-                    "execute": "powershell.exe",
-                    "arguments": f'-NoProfile -ExecutionPolicy Bypass -File "{production_root / "tools" / "lena_autonomy_scheduler_driver_run_v1.ps1"}" -RepoRoot "{production_root}" -PythonExe "{python_exe}"',
-                    "working_directory": str(production_root),
-                },
-                "trigger": {
-                    "type": "poll_every_minute",
-                    "schedule_slots": ["morning", "afternoon", "evening"],
-                },
-            },
-        },
+        lambda production_root, python_exe: _scheduler_definition(production_root, python_exe),
     )
     monkeypatch.setattr(
         readiness,
         "_registered_task_deployment_status",
         lambda production_root, scheduler_definition: {
             "query_ok": True,
-            "deployment_state": "canonical_driver_missing",
+            "deployment_state": "stale_legacy_tasks_present",
             "activation_required": True,
+            "continuous_autonomy_active": False,
             "tasks": [],
             "canonical_task_present": False,
             "canonical_task_enabled": False,
             "canonical_task_matches_plan": False,
-            "legacy_tasks_present": [],
+            "legacy_tasks_present": list(readiness.LEGACY_TASK_NAMES),
             "stale_deployment_detected": False,
             "blockers": [],
         },
@@ -709,21 +727,291 @@ def test_build_report_accepts_clean_branch_ahead_of_origin_main(
     assert report["environment_contract"]["secret_source_path"] == str(shared_secret_path)
 
 
+def test_build_report_marks_disabled_canonical_driver_ready_for_bounded_photo_proof(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    production_root = tmp_path / "production"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    production_root.mkdir(parents=True, exist_ok=True)
+    shared_secret_path = _write_env_tree(production_root)
+    _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
+
+    monkeypatch.setattr(readiness, "ROOT", repo_root)
+    monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
+    monkeypatch.setattr(
+        readiness,
+        "_git_state",
+        lambda root: {
+            "branch": "codex/lena-bounded-photo-proof-readiness-v1",
+            "head": "b" * 40,
+            "origin_main": "a" * 40,
+            "clean": True,
+            "status_lines": [],
+            "head_matches_origin_main": False,
+            "origin_main_ancestor_of_head": True,
+            "head_ancestor_of_origin_main": False,
+        },
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_probe_python_interpreter",
+        lambda python_exe, production_root: {
+            "ok": True,
+            "reason": "",
+            "python_exe": str(python_exe),
+            "returncode": 0,
+            "stdout_tail": [],
+            "stderr_tail": [],
+            "parsed": {"ok": True, "executable": str(python_exe), "module": "tools.publishers.lena_meta_publish_common_v2_9"},
+        },
+    )
+    monkeypatch.setattr(readiness, "_git_is_ancestor", lambda root, ancestor_commit, descendant_commit: True)
+    monkeypatch.setattr(
+        readiness,
+        "_canonical_scheduler_definition",
+        lambda production_root, python_exe: _scheduler_definition(production_root, python_exe),
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_registered_task_deployment_status",
+        lambda production_root, scheduler_definition: {
+            "query_ok": True,
+            "deployment_state": "canonical_driver_disabled",
+            "activation_required": True,
+            "continuous_autonomy_active": False,
+            "tasks": [],
+            "canonical_task_present": True,
+            "canonical_task_enabled": False,
+            "canonical_task_matches_plan": True,
+            "legacy_tasks_present": [],
+            "stale_deployment_detected": False,
+            "serialization_deviation": {
+                "classification": "non_blocking_serialization_deviation",
+                "repetition_interval": "PT1M",
+                "repetition_duration_element": "omitted",
+                "stop_at_duration_end": True,
+            },
+            "blockers": [],
+        },
+    )
+
+    report = readiness._build_report(production_root, Path("python.exe"), "cli", "cli", "2026-07-31")
+
+    assert report["overall_result"] == "ready_for_bounded_photo_autonomy_proof"
+    assert report["activation_state"]["activation_required"] is True
+    assert report["activation_state"]["continuous_autonomy_active"] is False
+    assert report["activation_state"]["bounded_photo_proof_executed"] is False
+    assert report["provider_calls_performed"] == 0
+    assert report["publish_calls_performed"] == 0
+    assert report["queue_mutations_performed"] == 0
+    assert report["task_mutations_performed"] == 0
+    assert report["task_starts_performed"] == 0
+    assert report["task_enables_performed"] == 0
+    assert report["anthropic_calls_performed"] == 0
+    assert report["video_actions_performed"] == 0
+
+
+def test_build_report_blocks_when_no_governed_scheduler_state_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    production_root = tmp_path / "production"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    production_root.mkdir(parents=True, exist_ok=True)
+    shared_secret_path = _write_env_tree(production_root)
+    _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
+
+    monkeypatch.setattr(readiness, "ROOT", repo_root)
+    monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
+    monkeypatch.setattr(
+        readiness,
+        "_git_state",
+        lambda root: {
+            "branch": "codex/lena-bounded-photo-proof-readiness-v1",
+            "head": "a" * 40,
+            "origin_main": "a" * 40,
+            "clean": True,
+            "status_lines": [],
+            "head_matches_origin_main": True,
+            "origin_main_ancestor_of_head": True,
+            "head_ancestor_of_origin_main": True,
+        },
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_probe_python_interpreter",
+        lambda python_exe, production_root: {
+            "ok": True,
+            "reason": "",
+            "python_exe": str(python_exe),
+            "returncode": 0,
+            "stdout_tail": [],
+            "stderr_tail": [],
+            "parsed": {"ok": True, "executable": str(python_exe), "module": "tools.publishers.lena_meta_publish_common_v2_9"},
+        },
+    )
+    monkeypatch.setattr(readiness, "_git_is_ancestor", lambda root, ancestor_commit, descendant_commit: True)
+    monkeypatch.setattr(
+        readiness,
+        "_canonical_scheduler_definition",
+        lambda production_root, python_exe: _scheduler_definition(production_root, python_exe),
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_registered_task_deployment_status",
+        lambda production_root, scheduler_definition: {
+            "query_ok": True,
+            "deployment_state": "canonical_driver_missing",
+            "activation_required": True,
+            "continuous_autonomy_active": False,
+            "tasks": [],
+            "canonical_task_present": False,
+            "canonical_task_enabled": False,
+            "canonical_task_matches_plan": False,
+            "legacy_tasks_present": [],
+            "stale_deployment_detected": False,
+            "blockers": [{"code": "scheduler_governed_tasks_missing", "detail": "canonical task is absent and no governed legacy tasks remain registered"}],
+        },
+    )
+
+    report = readiness._build_report(production_root, Path("python.exe"), "cli", "cli", "2026-07-31")
+
+    assert report["overall_result"] == "blocked"
+    assert any(blocker["code"] == "scheduler_governed_tasks_missing" for blocker in report["blockers"])
+
+
+def test_registered_task_status_records_non_blocking_serialization_deviation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    scheduler_definition = _scheduler_definition(production_root)
+    payload = [_canonical_task_row(production_root)]
+
+    def fake_run(*args, **kwargs):
+        return type("Proc", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+    status = readiness._registered_task_deployment_status(production_root, scheduler_definition)
+
+    assert status["deployment_state"] == "canonical_driver_disabled"
+    assert status["canonical_task_matches_plan"] is True
+    assert status["continuous_autonomy_active"] is False
+    assert status["serialization_deviation"] == {
+        "classification": "non_blocking_serialization_deviation",
+        "repetition_interval": "PT1M",
+        "repetition_duration_element": "omitted",
+        "stop_at_duration_end": True,
+        "detail": "StopAtDurationEnd is inert when the repetition duration element is omitted.",
+    }
+    assert status["blockers"] == []
+
+
+def test_registered_task_status_blocks_mixed_canonical_and_legacy_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    scheduler_definition = _scheduler_definition(production_root)
+    payload = [_canonical_task_row(production_root), _legacy_task_row(readiness.LEGACY_TASK_NAMES[0])]
+
+    def fake_run(*args, **kwargs):
+        return type("Proc", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+    status = readiness._registered_task_deployment_status(production_root, scheduler_definition)
+
+    assert status["deployment_state"] == "stale_legacy_tasks_present"
+    assert any(blocker["code"] == "scheduler_mixed_canonical_and_legacy_state" for blocker in status["blockers"])
+
+
+def test_registered_task_status_blocks_when_canonical_and_legacy_are_both_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    scheduler_definition = _scheduler_definition(production_root)
+    payload: list[dict] = []
+
+    def fake_run(*args, **kwargs):
+        return type("Proc", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+    status = readiness._registered_task_deployment_status(production_root, scheduler_definition)
+
+    assert status["deployment_state"] == "canonical_driver_missing"
+    assert any(blocker["code"] == "scheduler_governed_tasks_missing" for blocker in status["blockers"])
+
+
+def test_registered_task_status_blocks_launcher_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    scheduler_definition = _scheduler_definition(production_root)
+    payload = [_canonical_task_row(production_root, arguments='-NoProfile -ExecutionPolicy Bypass -File "C:\\wrong.ps1" -RepoRoot "C:\\wrong" -PythonExe "python.exe"')]
+
+    def fake_run(*args, **kwargs):
+        return type("Proc", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+    status = readiness._registered_task_deployment_status(production_root, scheduler_definition)
+
+    assert status["deployment_state"] == "canonical_driver_mismatch"
+    assert any(blocker["code"] == "scheduler_canonical_task_mismatch" for blocker in status["blockers"])
+
+
+def test_registered_task_status_blocks_working_directory_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    scheduler_definition = _scheduler_definition(production_root)
+    payload = [_canonical_task_row(production_root, working_directory=r"C:\wrong\root")]
+
+    def fake_run(*args, **kwargs):
+        return type("Proc", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
+
+    monkeypatch.setattr(readiness.subprocess, "run", fake_run)
+
+    status = readiness._registered_task_deployment_status(production_root, scheduler_definition)
+
+    assert status["deployment_state"] == "canonical_driver_mismatch"
+    assert any(blocker["code"] == "scheduler_canonical_task_mismatch" for blocker in status["blockers"])
+
+
 def test_save_report_is_conflict_safe(tmp_path: Path) -> None:
     production_root = tmp_path / "production"
     report = {
-        "overall_result": "ready_for_disabled_scheduler_replacement",
+        "overall_result": "ready_for_bounded_photo_autonomy_proof",
         "production_root": str(production_root),
         "python_exe": "python.exe",
         "git": {"head": "a" * 40, "origin_main": "a" * 40, "clean": True},
         "structural_validity": {"ok": True},
-        "activation_state": {"activation_required": True},
+        "activation_state": {"activation_required": True, "continuous_autonomy_active": False},
         "registered_task_deployment_status": {
-            "deployment_state": "canonical_driver_missing",
-            "canonical_task_present": False,
-            "canonical_task_matches_plan": False,
+            "deployment_state": "canonical_driver_disabled",
+            "canonical_task_present": True,
+            "canonical_task_matches_plan": True,
             "canonical_task_enabled": False,
             "legacy_tasks_present": [],
+            "serialization_deviation": {"classification": "non_blocking_serialization_deviation"},
         },
         "operator_checklist": [],
         "safe_validation_commands": [],
@@ -731,6 +1019,10 @@ def test_save_report_is_conflict_safe(tmp_path: Path) -> None:
         "blockers": [],
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
+        "queue_mutations_performed": 0,
+        "task_mutations_performed": 0,
+        "anthropic_calls_performed": 0,
+        "video_actions_performed": 0,
     }
 
     json_path, md_path = readiness.save_report(report, production_root, "2026-07-19", "20260719T010203Z")
@@ -749,18 +1041,19 @@ def test_main_validate_only_emits_json_and_writes_no_artifacts(
     production_root = tmp_path / "production"
     production_root.mkdir(parents=True, exist_ok=True)
     report = {
-        "overall_result": "ready_for_disabled_scheduler_replacement",
+        "overall_result": "ready_for_bounded_photo_autonomy_proof",
         "production_root": str(production_root),
         "python_exe": "python.exe",
         "git": {"head": "a" * 40, "origin_main": "a" * 40, "clean": True},
         "structural_validity": {"ok": True},
-        "activation_state": {"activation_required": True},
+        "activation_state": {"activation_required": True, "continuous_autonomy_active": False},
         "registered_task_deployment_status": {
-            "deployment_state": "canonical_driver_missing",
-            "canonical_task_present": False,
-            "canonical_task_matches_plan": False,
+            "deployment_state": "canonical_driver_disabled",
+            "canonical_task_present": True,
+            "canonical_task_matches_plan": True,
             "canonical_task_enabled": False,
             "legacy_tasks_present": [],
+            "serialization_deviation": {"classification": "non_blocking_serialization_deviation"},
         },
         "operator_checklist": [],
         "safe_validation_commands": [],
@@ -768,6 +1061,10 @@ def test_main_validate_only_emits_json_and_writes_no_artifacts(
         "blockers": [],
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
+        "queue_mutations_performed": 0,
+        "task_mutations_performed": 0,
+        "anthropic_calls_performed": 0,
+        "video_actions_performed": 0,
     }
     monkeypatch.setattr(readiness, "_build_report", lambda *args, **kwargs: report)
 
@@ -785,5 +1082,5 @@ def test_main_validate_only_emits_json_and_writes_no_artifacts(
 
     assert exit_code == 0
     emitted = json.loads(capsys.readouterr().out)
-    assert emitted["overall_result"] == "ready_for_disabled_scheduler_replacement"
+    assert emitted["overall_result"] == "ready_for_bounded_photo_autonomy_proof"
     assert not (production_root / "pipeline" / "publishing" / "lena" / "go_live_readiness").exists()

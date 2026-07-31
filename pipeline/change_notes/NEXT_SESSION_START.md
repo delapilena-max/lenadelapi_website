@@ -158,3 +158,116 @@ G. What must not be done
 - Do not copy, print, or rewrite any secret from `C:\projects\ai\content_bot\.env`.
 - Do not modify Task Scheduler in this step.
 - Do not publish, generate media, create queues, invoke Anthropic, or touch video in this step.
+
+## Addendum (Codex, 2026-07-31) - canonical disabled scheduler deployed; bounded one-photo proof staged
+
+A. What changed
+
+- Verified the live scheduler migration outcome in the canonical deployment checkout after the elevated governed `-Apply`.
+- Confirmed `Lena Autonomy Scheduler Driver` is installed, disabled, bound to the canonical launcher and working directory, and the four obsolete Lena tasks are retired.
+- Re-verified the preserved migration evidence outside Git: migration receipt, rollback instructions, canonical post-export, and all four legacy XML backups with matching recorded hashes.
+- Re-ran read-only publisher/scheduler readiness from `C:\projects\ai\content_bot_photo_production_main_v1` and confirmed publisher configuration, environment visibility, credential visibility, media-host readiness, canonical secret-source binding, and canonical disabled-task deployment state.
+- Prepared the bounded one-photo autonomy proof package in this status record only. No proof was executed.
+
+B. Files changed
+
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validations run
+
+- Read-only `Get-ScheduledTask` / `Export-ScheduledTask` verification for:
+  - `Lena Autonomy Scheduler Driver`
+  - `Lena Daily Orchestrator`
+  - `Lena Publish Morning Slot`
+  - `Lena Publish Afternoon Slot`
+  - `Lena Publish Evening Slot`
+- `C:\Python314\python.exe -m tools.lena_autopublish_go_live_readiness_v1 --production-root C:\projects\ai\content_bot_photo_production_main_v1 --python-exe C:\Python314\python.exe --validate-only`
+- Re-read preserved evidence under:
+  - `C:\Users\Nicolas\AppData\Local\Temp\lena_scheduler_apply_20260731\apply_live_20260731_124953`
+
+D. Decisions made
+
+- Treat `StopAtDurationEnd=true` together with an omitted repetition `Duration` element as `non_blocking_serialization_deviation`; do not reinstall or mutate the task solely for that inert serialized field.
+- Treat the scheduler deployment as successful and disabled-by-default, with rollback evidence preserved.
+- Keep continuous autonomy inactive. The next gate is one bounded photo proof only, with Phase A generation/local evaluation and Phase B live publication requiring separate explicit Nicolas authorizations.
+- Use the deterministic controlled photo route:
+  - strategy prep dry-run
+  - controlled selected-candidate artifact
+  - generation reconciliation artifact
+  - next-live-image handoff artifact
+  - single-use Higgsfield generation approval artifact
+  - one live executor run
+  - local deterministic QA
+  - privacy-clean derivative
+  - publish packet
+  - one approved queue row
+  - one manual live publish invocation
+
+E. Blockers / parked branches
+
+- Live readiness facts are green, but the current readiness script still reports the older top-level classification:
+  - actual `overall_result`: `ready_for_disabled_scheduler_replacement`
+  - expected operational classification now that the canonical disabled task is deployed: `ready_for_bounded_photo_autonomy_proof`
+- This is now a source-classification mismatch, not an environment, credential, scheduler-installation, or task-state blocker.
+- The canonical scheduler must remain disabled. No recurring autonomy proof is authorized.
+
+F. Next approved step
+
+1. If Nicolas explicitly authorizes Phase A, run the bounded one-photo generation route only:
+   - `C:\Python314\python.exe tools\strategy\lena_run_strategy_autonomy_prep_v1.py --date <UTC_DATE> --recipes hcr_012 --controlled-photo-autonomy`
+   - `C:\Python314\python.exe tools\lena_record_higgsfield_generation_approval_v1.py --handoff-artifact <handoff_json> --operator-id nicolas --confirm "<required confirmation phrase>"`
+   - `C:\Python314\python.exe pipeline\higgsfield_lena_api_executor.py --handoff-artifact <handoff_json> --approval-artifact <generation_approval_json> --live`
+  - `C:\Python314\python.exe -m tools.lena_photo_qa_disposition_v1 --decision-artifact <handoff_json> --manifest <result_manifest_json> --image <generated_image_path> --expected-image-sha256 <generated_image_sha256> --identity-evidence <identity_verification_json> --identity-reference-authority-artifact C:\projects\ai\content_bot_photo_production_main_v1\pipeline\identity\lena_visual_reference_authority_v1.json --identity-reference-authority-sha256 080ea6edafb02aa73f412e9d60e2315019f3a905f17f8ef84d900150a037041c --identity-reference C:\projects\ai\content_bot_photo_production_main_v1\pipeline\higgsfield_library\lena\2026-07-09\prompt_isolation_tests\readypack0709-pack004-08-wardrobe-test-c_seed.png::7649a7ab360832390eac0e5f06ed7bb4f21d941f31e57201ef6721c00a313ffb --qa-mode autonomous_local --write-artifact`
+   - Stop after local QA, privacy-clean derivative creation, and human review of the generated image plus caption.
+2. Only after separate explicit Nicolas approval of the specific generated photo and caption, run Phase B:
+   - `C:\Python314\python.exe tools\lena_build_publish_packet_v1.py --date <UTC_DATE>`
+   - `C:\Python314\python.exe tools\lena_build_approved_publish_queue_v2_8.py --date <UTC_DATE> --platforms "Instagram Feed"`
+   - `C:\Python314\python.exe tools\lena_autopublish_approved_queue_v2_8.py --date <UTC_DATE> --platforms "Instagram Feed" --live --i-understand-this-can-publish --limit 1`
+
+Bounded one-photo proof package
+
+- Route: `tools/strategy/lena_run_strategy_autonomy_prep_v1.py --controlled-photo-autonomy` forces `--recipes hcr_012`, selects one controlled candidate, builds one reconciliation artifact, then builds one `lena_next_live_image_handoff` artifact.
+- Soul binding: the live executor enforces the current Lena Soul `79119c27-64fc-47f8-9ff3-c174d12932aa`; provider submission fails closed unless `--soul-id` is present and exactly matches the verified Lena Soul binding.
+- HPE / prompt provenance: the handoff must bind the selected candidate SHA, prompt SHA, candidate-selection binding, provider-execution binding, and binding-linkage authority blocks. Phase A uses the canonical executor only through `--handoff-artifact ... --approval-artifact ... --live`.
+- Wardrobe / scene authority: the controlled policy binds recipe `hcr_012`, wardrobe `wc_p050`, and the committed identity reference authority at `pipeline/identity/lena_visual_reference_authority_v1.json`.
+- Provider / model route: Higgsfield only, model `text2image_soul_v2`, through `pipeline/higgsfield_lena_api_executor.py`; no video provider, no Anthropic requirement.
+- Maximum paid cost: `3 provider_credits` daily ceiling from `pipeline/config/lena_standing_autonomy_policy_v1.json`; this package still caps generation count at exactly `1`.
+- Generation count limit: `1`; no second candidate, no batch, no retry, no fallback.
+- Framing: aspect ratio `9:16`; output extensions limited to the approved still-image set; platform-safe feed-photo composition only.
+- Local deterministic QA gates: provenance binding, identity verification, Lena photo QA disposition, no-provider/no-publish QA package, and privacy-clean derivative preparation.
+- Identity / Soul lineage checks: handoff, approval artifact, executor provider-command binding, manifest, and local identity evidence must all bind the same Soul/reference/prompt/candidate lineage.
+- Clean derivative / metadata scrubbing: required before any Phase B queue construction for the controlled photo route; clean export must bind source SHA and lineage in its report.
+- Caption path: the content packet `caption_draft` is the deterministic caption seed; any Phase B live publication remains separately review-gated against the exact generated image.
+- Target platform: `Instagram Feed`
+- Queue construction: build accepted publish packet, then one queue row only, then one manual live publish invocation with explicit flags.
+- Publish authorization boundary: Phase A approval does not authorize queue creation or publication. Phase B requires separate explicit Nicolas approval of the specific photo and exact caption.
+- Stop conditions:
+  - any provenance / Soul / prompt / SHA mismatch
+  - any QA non-accept result
+  - any duplicate-content rejection
+  - any missing clean-export binding
+  - any missing sidecar or caption/photo approval mismatch
+  - any attempt to exceed one generation, one queue row, or one publish action
+- Rollback / reconciliation:
+  - Phase A stop leaves no queue or publish mutation
+  - Phase B queue/publish stays bounded to one row and one platform with receipt-based duplicate prevention
+  - preserved scheduler rollback instructions remain at `C:\Users\Nicolas\AppData\Local\Temp\lena_scheduler_apply_20260731\apply_live_20260731_124953\migration_output\scheduler_task_migration_20260731_125425\rollback_instructions.json`
+- Evidence / receipt roots:
+  - scheduler migration evidence: `C:\Users\Nicolas\AppData\Local\Temp\lena_scheduler_apply_20260731\apply_live_20260731_124953`
+  - handoff: `pipeline/strategy/lena/next_actions/<UTC_DATE>/`
+  - generation approval / claim / receipt: `pipeline/approvals/lena/generation/<UTC_DATE>/`
+  - generated source image: `pipeline/higgsfield_library/lena/<UTC_DATE>/`
+  - provider manifest / debug evidence: `pipeline/higgsfield_debug/<UTC_DATE>/<slot_id>/`
+  - QA artifacts: `pipeline/asset_review/lena/<UTC_DATE>/`
+  - publish packets: `pipeline/publish_packets/lena/<UTC_DATE>/`
+  - approved queue / claims / receipts: `pipeline/publishing/lena/approved_queue/<UTC_DATE>/`, `pipeline/publishing/lena/approved_queue_claims/<UTC_DATE>/`, `pipeline/publishing/lena/approved_queue_receipts/<UTC_DATE>/`
+
+G. What must not be done
+
+- Do not enable or start `Lena Autonomy Scheduler Driver`.
+- Do not reinstall, mutate, or roll back the successful scheduler migration to chase the inert `StopAtDurationEnd` serialization field.
+- Do not treat the current disabled scheduler deployment as active continuous autonomy.
+- Do not run any paid generation without explicit Nicolas authorization for Phase A.
+- Do not create a queue row or publish anything under Phase A authority.
+- Do not publish anything under queue-construction authority alone; Phase B requires separate explicit approval of the exact photo and caption.
+- Do not call Anthropic, touch video, invoke TikTok, or use any non-Higgsfield generation provider in this proof lane.

@@ -659,6 +659,9 @@ foreach ($name in $names) {
     present = $true
     enabled = [bool]$task.Settings.Enabled
     state = [string]$task.State
+    repetition_interval = if (@($task.Triggers).Count -gt 0 -and $null -ne @($task.Triggers)[0].Repetition) { [string]@($task.Triggers)[0].Repetition.Interval } else { '' }
+    repetition_duration = if (@($task.Triggers).Count -gt 0 -and $null -ne @($task.Triggers)[0].Repetition) { [string]@($task.Triggers)[0].Repetition.Duration } else { '' }
+    stop_at_duration_end = if (@($task.Triggers).Count -gt 0 -and $null -ne @($task.Triggers)[0].Repetition) { [bool]@($task.Triggers)[0].Repetition.StopAtDurationEnd } else { $false }
     actions = $actions
   }
 }
@@ -710,17 +713,23 @@ $rows | ConvertTo-Json -Depth 6 -Compress
         for item in tasks
         if isinstance(item, dict)
     }
+    blockers: list[dict[str, str]] = []
     canonical = task_map.get(CANONICAL_TASK_NAME, {})
     canonical_present = bool(canonical.get("present"))
     canonical_enabled = bool(canonical.get("enabled")) if canonical_present else False
     legacy_tasks_present = [name for name in LEGACY_TASK_NAMES if task_map.get(name, {}).get("present")]
     plan = scheduler_definition.get("plan", {}) if isinstance(scheduler_definition, dict) else {}
     plan_action = plan.get("action", {}) if isinstance(plan, dict) else {}
+    plan_trigger = plan.get("trigger", {}) if isinstance(plan, dict) else {}
     expected_execute = str(plan_action.get("execute") or "").lower()
     expected_working_directory = str(plan_action.get("working_directory") or "")
+    expected_interval = str(plan_trigger.get("repetition_interval") or "")
+    expected_duration_element = str(plan_trigger.get("repetition_duration_element") or "")
     expected_wrapper_token = "lena_autonomy_scheduler_driver_run_v1.ps1"
     expected_repo_arg = f'-RepoRoot "{production_root}"'
-    canonical_matches_plan = False
+    canonical_action_matches = False
+    canonical_trigger_matches = False
+    serialization_deviation: dict[str, Any] | None = None
     if canonical_present:
         for action in canonical.get("actions", []):
             if not isinstance(action, dict):
@@ -734,8 +743,72 @@ $rows | ConvertTo-Json -Depth 6 -Compress
                 and expected_wrapper_token in arguments
                 and expected_repo_arg in arguments
             ):
-                canonical_matches_plan = True
+                canonical_action_matches = True
                 break
+        observed_interval = str(canonical.get("repetition_interval") or "")
+        observed_duration = str(canonical.get("repetition_duration") or "")
+        observed_stop_at_duration_end = bool(canonical.get("stop_at_duration_end"))
+        canonical_trigger_matches = (
+            observed_interval == expected_interval
+            and (
+                (expected_duration_element == "omitted" and not observed_duration)
+                or (expected_duration_element != "omitted")
+            )
+        )
+        if (
+            canonical_trigger_matches
+            and expected_duration_element == "omitted"
+            and not observed_duration
+            and observed_stop_at_duration_end
+        ):
+            serialization_deviation = {
+                "classification": "non_blocking_serialization_deviation",
+                "repetition_interval": observed_interval,
+                "repetition_duration_element": "omitted",
+                "stop_at_duration_end": True,
+                "detail": "StopAtDurationEnd is inert when the repetition duration element is omitted.",
+            }
+    else:
+        observed_interval = ""
+        observed_duration = ""
+        observed_stop_at_duration_end = False
+    canonical_matches_plan = canonical_action_matches and canonical_trigger_matches
+
+    if canonical_present and legacy_tasks_present:
+        blockers.append(
+            {
+                "code": "scheduler_mixed_canonical_and_legacy_state",
+                "detail": "canonical task is present while governed legacy tasks are still registered",
+            }
+        )
+    if legacy_tasks_present:
+        if set(legacy_tasks_present) != set(LEGACY_TASK_NAMES):
+            blockers.append(
+                {
+                    "code": "scheduler_legacy_task_set_incomplete",
+                    "detail": "governed legacy task set must contain exactly the four expected disabled tasks before replacement",
+                }
+            )
+        invalid_legacy = [
+            name
+            for name in legacy_tasks_present
+            if bool(task_map.get(name, {}).get("enabled"))
+            or str(task_map.get(name, {}).get("state") or "").strip().lower() != "disabled"
+        ]
+        if invalid_legacy:
+            blockers.append(
+                {
+                    "code": "scheduler_legacy_task_state_invalid",
+                    "detail": "governed legacy tasks must all remain disabled before replacement: " + ", ".join(invalid_legacy),
+                }
+            )
+    if not canonical_present and not legacy_tasks_present:
+        blockers.append(
+            {
+                "code": "scheduler_governed_tasks_missing",
+                "detail": "canonical task is absent and no governed legacy tasks remain registered",
+            }
+        )
 
     if legacy_tasks_present:
         deployment_state = "stale_legacy_tasks_present"
@@ -748,18 +821,33 @@ $rows | ConvertTo-Json -Depth 6 -Compress
     else:
         deployment_state = "canonical_driver_missing"
 
+    if canonical_present and not canonical_matches_plan:
+        blockers.append(
+            {
+                "code": "scheduler_canonical_task_mismatch",
+                "detail": "canonical task launcher, working directory, or repetition contract does not match the registration plan",
+            }
+        )
+
     activation_required = deployment_state != "canonical_driver_enabled"
     return {
         "query_ok": True,
         "deployment_state": deployment_state,
         "activation_required": activation_required,
+        "continuous_autonomy_active": deployment_state == "canonical_driver_enabled",
         "tasks": tasks,
         "canonical_task_present": canonical_present,
         "canonical_task_enabled": canonical_enabled,
         "canonical_task_matches_plan": canonical_matches_plan,
+        "canonical_action_matches_plan": canonical_action_matches,
+        "canonical_trigger_matches_plan": canonical_trigger_matches,
+        "canonical_trigger_interval": observed_interval or None,
+        "canonical_trigger_duration": observed_duration or None,
+        "canonical_stop_at_duration_end": observed_stop_at_duration_end if canonical_present else None,
+        "serialization_deviation": serialization_deviation,
         "legacy_tasks_present": legacy_tasks_present,
         "stale_deployment_detected": bool(legacy_tasks_present) or deployment_state == "canonical_driver_mismatch",
-        "blockers": [],
+        "blockers": blockers,
         "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
         "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
     }
@@ -826,6 +914,18 @@ def _operator_checklist(report: dict[str, Any]) -> list[dict[str, Any]]:
             "enablement_commands": report["later_enablement_commands"],
         },
     ]
+
+
+def _overall_result_for(report_blockers: list[dict[str, Any]], activation_required: bool, deployment_state: str) -> str:
+    if report_blockers:
+        return "blocked"
+    if deployment_state == "canonical_driver_disabled" and activation_required:
+        return "ready_for_bounded_photo_autonomy_proof"
+    if not activation_required:
+        return "active_deployment_present"
+    if deployment_state == "stale_legacy_tasks_present":
+        return "ready_for_disabled_scheduler_replacement"
+    return "blocked"
 
 
 def _build_report(
@@ -1005,13 +1105,14 @@ def _build_report(
         "autonomous_policy_state": policy.get("autonomous_policy_state"),
         "activation_required": activation_required,
         "active_deployment_present": not activation_required,
+        "continuous_autonomy_active": bool(registered_task_deployment_status.get("continuous_autonomy_active", False)),
+        "bounded_photo_proof_executed": False,
     }
-    if blockers:
-        overall_result = "blocked"
-    elif not activation_required:
-        overall_result = "active_deployment_present"
-    else:
-        overall_result = "ready_for_disabled_scheduler_replacement"
+    overall_result = _overall_result_for(
+        blockers,
+        activation_required,
+        str(registered_task_deployment_status.get("deployment_state") or ""),
+    )
     report = {
         "report_type": "lena_autopublish_go_live_readiness",
         "schema_version": "v1",
@@ -1047,6 +1148,12 @@ def _build_report(
         ),
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
+        "queue_mutations_performed": 0,
+        "task_mutations_performed": 0,
+        "task_starts_performed": 0,
+        "task_enables_performed": 0,
+        "anthropic_calls_performed": 0,
+        "video_actions_performed": 0,
         "blockers": blockers,
         "overall_result": overall_result,
     }
@@ -1112,6 +1219,9 @@ def _render_markdown(report: dict[str, Any]) -> str:
     lines.append(f"- Canonical task present: `{deployment.get('canonical_task_present', False)}`")
     lines.append(f"- Canonical task matches plan: `{deployment.get('canonical_task_matches_plan', False)}`")
     lines.append(f"- Canonical task enabled: `{deployment.get('canonical_task_enabled', False)}`")
+    lines.append(f"- Continuous autonomy active: `{report['activation_state'].get('continuous_autonomy_active', False)}`")
+    if deployment.get("serialization_deviation"):
+        lines.append(f"- Serialization deviation: `{deployment['serialization_deviation']['classification']}`")
     if deployment.get("legacy_tasks_present"):
         for task_name in deployment["legacy_tasks_present"]:
             lines.append(f"- Stale legacy task present: `{task_name}`")
@@ -1129,7 +1239,17 @@ def _render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- `{blocker['code']}`: {blocker['detail']}")
     else:
         lines.append("- none")
-    lines.extend(["", f"Provider calls: `{report['provider_calls_performed']}`", f"Publish calls: `{report['publish_calls_performed']}`"])
+    lines.extend(
+        [
+            "",
+            f"Provider calls: `{report['provider_calls_performed']}`",
+            f"Publish calls: `{report['publish_calls_performed']}`",
+            f"Queue mutations: `{report['queue_mutations_performed']}`",
+            f"Task mutations: `{report['task_mutations_performed']}`",
+            f"Anthropic calls: `{report['anthropic_calls_performed']}`",
+            f"Video actions: `{report['video_actions_performed']}`",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -1169,6 +1289,12 @@ def main(argv: list[str] | None = None) -> int:
         "blockers": report["blockers"],
         "provider_calls_performed": 0,
         "publish_calls_performed": 0,
+        "queue_mutations_performed": 0,
+        "task_mutations_performed": 0,
+        "task_starts_performed": 0,
+        "task_enables_performed": 0,
+        "anthropic_calls_performed": 0,
+        "video_actions_performed": 0,
     }
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     return 0 if summary["ok"] else 1
