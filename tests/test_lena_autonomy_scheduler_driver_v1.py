@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import timedelta
 from pathlib import Path
+
+import pytest
 
 import tools.lena_autonomy_daily_schedule_v1 as schedule_mod
 import tools.lena_autonomy_scheduler_driver_v1 as driver
@@ -204,3 +207,15 @@ def test_full_offline_path_schedule_to_receipt(tmp_path: Path) -> None:
 
     assert generation_calls == ["morning"]
     assert publish_calls == ["morning"]
+
+
+def test_historical_wrapper_bootstrap_repo_root_argument_failed_driver_parse() -> None:
+    original_argv = sys.argv[:]
+    try:
+        sys.argv = ["-", r"C:\projects\ai\content_bot_photo_production_main_v1"]
+        with pytest.raises(SystemExit) as excinfo:
+            driver.main()
+    finally:
+        sys.argv = original_argv
+
+    assert excinfo.value.code == 2

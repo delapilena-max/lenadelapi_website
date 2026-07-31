@@ -392,3 +392,67 @@ G. What must not be done
 - Do not allow `.py`, `.ps1`, config-like JSON, dotenv/secret-like files, or escape paths under runtime roots to bypass `repository_dirty`.
 - Do not enable or start `Lena Autonomy Scheduler Driver`.
 - Do not publish, generate media, invoke Meta/Higgsfield/Anthropic, or touch video in this fix step.
+
+## Addendum (Codex, 2026-07-31) - canonical scheduler automatic poll failure fixed
+
+A. What changed
+
+- Diagnosed the real automatic-poll failure for `Lena Autonomy Scheduler Driver` from the preserved July 31 scheduler log and exact task action.
+- The scheduled wrapper was invoking `C:\Python314\python.exe - <RepoRoot>`, then running `tools.lena_autonomy_scheduler_driver_v1` under `runpy` without clearing that bootstrap argument.
+- On every automatic poll, the Python driver reached `argparse` with the stray positional repository-root argument still present and failed immediately with:
+  - `usage: - [-h] [--inspect-only] [--now NOW]`
+  - `error: unrecognized arguments: C:\projects\ai\content_bot_photo_production_main_v1`
+- The fix is narrow: the wrapper now preserves the canonical secret-source bootstrap but resets `sys.argv` to the driver module name before entering `runpy`, so scheduled polls no longer inherit the wrapper bootstrap argument as a fake CLI operand.
+- This failure occurred after Python started but before any slot decision, generation, queue, publish, Anthropic, scheduler mutation, or video action was reached.
+
+B. Files changed
+
+- `tools/lena_autonomy_scheduler_driver_run_v1.ps1`
+- `tests/test_lena_autonomy_scheduler_driver_v1.py`
+- `tests/test_lena_scheduler_registration_source_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validations run
+
+- Preserved failure evidence outside Git:
+  - `C:\Users\Nicolas\AppData\Local\Temp\lena_scheduler_failure_20260731_181428`
+- Exact task action repro from the canonical working directory:
+  - wrapper exit code `1`
+  - deepest reproduced failure:
+    - file: `tools/lena_autonomy_scheduler_driver_v1.py`
+    - stage: CLI parse
+    - error: unrecognized repository-root positional argument
+- `C:\Python314\python.exe -B -m pytest -p no:cacheprovider tests/test_lena_autonomy_scheduler_driver_v1.py tests/test_lena_scheduler_registration_source_v1.py tests/test_lena_autopublish_go_live_readiness_v1.py tests/test_lena_autopublish_approved_queue_v2_8.py tests/test_lena_autopublish_approved_queue_v2_8_new.py tests/test_lena_run_autonomous_publish_cycle_v1.py tests/test_lena_build_publish_packet_v1.py tests/test_lena_build_generation_reconciliation_v1.py tests/test_lena_record_generation_reconciliation_decision_v1.py tests/test_lena_reconciliation_integration_v1.py tests/test_lena_standing_autonomy_policy_v1.py tests/test_lena_instagram_media_host_custom_domain_v1.py tests/test_lena_photo_qa_disposition_v1.py -q`
+- Result: `315 passed, 1 skipped`
+- `C:\Python314\python.exe -m py_compile tools\lena_autonomy_scheduler_driver_v1.py tools\lena_autopublish_go_live_readiness_v1.py tools\lena_autopublish_approved_queue_v2_8.py tools\lena_build_publish_packet_v1.py tools\lena_run_autonomous_publish_cycle_v1.py tools\lena_validate_approved_queue_autopublisher_v2_8.py tools\lena_standing_autonomy_policy_v1.py tools\strategy\lena_build_generation_reconciliation_v1.py tools\strategy\lena_record_generation_reconciliation_decision_v1.py tools\strategy\lena_reconciliation_contract_v1.py tools\publishers\lena_meta_publish_common_v2_9.py tests\test_lena_autonomy_scheduler_driver_v1.py tests\test_lena_scheduler_registration_source_v1.py tests\test_lena_autopublish_go_live_readiness_v1.py tests\test_lena_autopublish_approved_queue_v2_8.py tests\test_lena_autopublish_approved_queue_v2_8_new.py tests\test_lena_run_autonomous_publish_cycle_v1.py tests\test_lena_build_publish_packet_v1.py tests\test_lena_build_generation_reconciliation_v1.py tests\test_lena_record_generation_reconciliation_decision_v1.py tests\test_lena_reconciliation_integration_v1.py tests\test_lena_standing_autonomy_policy_v1.py tests\test_lena_instagram_media_host_custom_domain_v1.py tests\test_lena_photo_qa_disposition_v1.py`
+- PowerShell parser checks passed for:
+  - `tools/lena_autonomy_scheduler_driver_run_v1.ps1`
+  - `tools/register_lena_autonomy_scheduler_task_v1.ps1`
+
+D. Decisions made
+
+- Treat the proven scheduler failure as a wrapper-to-driver argv hygiene defect, not as a slot-policy, readiness, queue, provider, or runtime-evidence failure.
+- Keep the central secret source unchanged at `C:\projects\ai\content_bot\.env`.
+- Keep the canonical task definition, trigger, principal, working directory, media host, duplicate prevention, automatic receipts, HPE, autonomous-local QA, Soul binding, and photo-only scope unchanged.
+- Do not broaden this fix into a scheduler redesign or alternate orchestrator audit.
+
+E. Blockers / parked branches
+
+- The automatic poll failure itself is fixed in source and covered by regression tests.
+- Remaining live activation steps require elevated local Administrator PowerShell to enable the Windows scheduled task; this Codex session must not mutate Task Scheduler directly.
+- The preserved July 31 governed runtime evidence remains authoritative and untouched.
+
+F. Next approved step
+
+1. Commit only the scheduler wrapper fix, direct tests, and this status-note update.
+2. Push a focused PR into `main`, wait for CI, and merge with a merge commit if green.
+3. Fast-forward the deployment checkout to the merged `main`.
+4. Hand off the exact elevated enable/verification commands for the operator to run locally, then inspect the resulting automatic polls.
+
+G. What must not be done
+
+- Do not rerun Phase A.
+- Do not generate another proof photo or republish queue `q_488721d95be927`.
+- Do not touch the video lane.
+- Do not call Anthropic.
+- Do not reset or clean away governed runtime evidence.
