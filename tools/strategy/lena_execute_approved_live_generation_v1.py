@@ -189,6 +189,7 @@ def load_execution_context(
         "handoff_artifact": Path(handoff_artifact),
         "approval_artifact": Path(approval_artifact),
         "custom_reference_id": str(handoff_facts["custom_reference_id"]),
+        "soul_id": str(handoff_facts.get("soul_id") or handoff_facts["custom_reference_id"]),
     }
 
 

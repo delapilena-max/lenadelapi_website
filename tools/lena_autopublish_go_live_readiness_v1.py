@@ -11,9 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from tools.publishers import lena_meta_publish_common_v2_9 as publish_common
 
-ROOT = Path(__file__).resolve().parents[1]
 REPORT_ROOT = ROOT / "pipeline" / "publishing" / "lena" / "go_live_readiness"
 POLICY_PATH = (
     ROOT / "pipeline" / "influencer_nodes" / "lena"

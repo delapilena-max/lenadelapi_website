@@ -198,6 +198,10 @@ class ProviderCallError(Exception):
         provider_stderr_escaped: str | None = None,
         provider_stdout_length: int | None = None,
         provider_stderr_length: int | None = None,
+        provider_returncode: int | None = None,
+        parsed_runtime_type: str | None = None,
+        provider_output_normalization_method: str | None = None,
+        normalized_job: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(message)
         self.stage = stage
@@ -211,6 +215,10 @@ class ProviderCallError(Exception):
         self.provider_stderr_escaped = provider_stderr_escaped
         self.provider_stdout_length = provider_stdout_length
         self.provider_stderr_length = provider_stderr_length
+        self.provider_returncode = provider_returncode
+        self.parsed_runtime_type = parsed_runtime_type
+        self.provider_output_normalization_method = provider_output_normalization_method
+        self.normalized_job = normalized_job
 
 
 class HandoffArtifactError(Exception):
@@ -821,7 +829,8 @@ def execute_approved_handoff_live_generation(
     slot_id = str(context["slot_id"])
     source = context["source"]
     resolved_custom_reference_id = custom_reference_id or str(context["custom_reference_id"])
-    _require_current_lena_soul_reference_id(resolved_custom_reference_id)
+    resolved_soul_id = str(context.get("soul_id") or resolved_custom_reference_id)
+    _resolve_provider_soul_binding(resolved_custom_reference_id, resolved_soul_id)
     manifest_repo_path = context["manifest_path"]
 
     claim_info = _create_generation_claim(approval_result)
@@ -1026,7 +1035,8 @@ def execute_approved_retry_live_generation(
     approval_result = _validate_retry_approval_artifact(retry_handoff_path, retry_approval_path)
     retry_facts = approval_result["retry_facts"]
     custom_reference_id = str(retry_facts["custom_reference_id"])
-    _require_current_lena_soul_reference_id(custom_reference_id)
+    soul_id = str(retry_facts.get("soul_id") or custom_reference_id)
+    _resolve_provider_soul_binding(custom_reference_id, soul_id)
     claim_info = _create_retry_generation_claim(approval_result)
     claim_path = Path(claim_info["claim_path"])
     manifest_path_obj = manifest_path(date_str, slot_id)
@@ -1579,13 +1589,31 @@ def _load_handoff_report(handoff_path: Path) -> dict[str, Any]:
 # --- Provider argv construction ---------------------------------------------
 
 def _require_current_lena_soul_reference_id(custom_reference_id: str) -> None:
-    if custom_reference_id != DEFAULT_LENA_CUSTOM_REFERENCE_ID:
+    if str(custom_reference_id or "").strip() != DEFAULT_LENA_CUSTOM_REFERENCE_ID:
         raise ProviderCallError(
             "Lena Soul 2.0 custom_reference_id is missing or not the current provider-confirmed Lena Soul ID",
             stage="soul_reference_binding_invalid",
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
         )
+
+
+def _resolve_provider_soul_binding(
+    custom_reference_id: str,
+    soul_id: str | None = None,
+) -> tuple[str, str]:
+    resolved_custom_reference_id = str(custom_reference_id or "").strip()
+    resolved_soul_id = str(soul_id or resolved_custom_reference_id).strip()
+    _require_current_lena_soul_reference_id(resolved_custom_reference_id)
+    _require_current_lena_soul_reference_id(resolved_soul_id)
+    if resolved_custom_reference_id != resolved_soul_id:
+        raise ProviderCallError(
+            "Lena Soul 2.0 soul_id must exactly match custom_reference_id",
+            stage="soul_reference_binding_invalid",
+            subprocess_start_attempted=False,
+            provider_submission_may_have_occurred=False,
+        )
+    return resolved_custom_reference_id, resolved_soul_id
 
 
 def _require_provider_job_bound_lena_soul(parsed: Any, expected_custom_reference_id: str) -> None:
@@ -1708,6 +1736,7 @@ def _require_prompt_survives_argv_boundary(resolved_argv: list[str], approved_pr
 def build_provider_argv(
     prompt: str,
     custom_reference_id: str,
+    soul_id: str | dict[str, Any] | None = None,
     generation_reference: dict[str, Any] | None = None,
 ) -> list[str]:
     """Constructed as a list, never shell-concatenated text. subprocess is
@@ -1719,7 +1748,13 @@ def build_provider_argv(
     .json) were produced from Soul + prompt only, and forcing an extra image
     reference overrode the Soul's identity. generation_reference is retained
     only as the recorded identity anchor of provenance, never transmitted."""
-    _require_current_lena_soul_reference_id(custom_reference_id)
+    if isinstance(soul_id, dict) and generation_reference is None:
+        generation_reference = soul_id
+        soul_id = None
+    _, resolved_soul_id = _resolve_provider_soul_binding(
+        custom_reference_id,
+        soul_id=soul_id,
+    )
     # --prompt is placed LAST as a defence-in-depth safeguard so that any
     # future argv-mangling layer can only ever damage the prompt itself,
     # never silently swallow the Soul/aspect/quality flags behind it. This
@@ -1730,7 +1765,7 @@ def build_provider_argv(
         "create",
         HIGGSFIELD_IMAGE_JOB_TYPE,
         "--soul-id",
-        custom_reference_id,
+        resolved_soul_id,
         "--aspect_ratio",
         HIGGSFIELD_ASPECT_RATIO,
         "--quality",
@@ -1806,6 +1841,22 @@ def _canonical_result_urls(obj: Any) -> list[str]:
     return deduped
 
 
+def _parsed_runtime_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "list"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    return type(value).__name__
+
+
 def _find_first_str_field(obj: Any, keys: tuple[str, ...]) -> Optional[str]:
     """Best-effort, shallow-then-nested lookup for a job id/status style
     field. Not schema-confirmed (same caveat as _collect_result_urls) --
@@ -1832,23 +1883,55 @@ def _parse_provider_json_stdout(stdout: str) -> Any:
     raw = stdout or ""
     decoder = json.JSONDecoder()
     index = 0
-    parsed_values: list[Any] = []
-    while True:
-        while index < len(raw) and raw[index].isspace():
-            index += 1
-        if index >= len(raw):
-            break
-        if raw[index] not in "{[":
-            if parsed_values:
-                break
-            return json.loads(raw)
-        parsed, index = decoder.raw_decode(raw, index)
-        parsed_values.append(parsed)
-        if _canonical_result_urls(parsed):
-            return parsed
-    if parsed_values:
-        return parsed_values[-1]
-    return json.loads(raw)
+    while index < len(raw) and raw[index].isspace():
+        index += 1
+    parsed, end_index = decoder.raw_decode(raw, index)
+    while end_index < len(raw) and raw[end_index].isspace():
+        end_index += 1
+    if end_index != len(raw):
+        raise json.JSONDecodeError("extra data", raw, end_index)
+    return parsed
+
+
+def _normalize_direct_provider_job_payload(parsed: Any) -> tuple[str, dict[str, Any], str]:
+    parsed_type = _parsed_runtime_type(parsed)
+    if isinstance(parsed, dict):
+        return "direct_object", parsed, parsed_type
+    if isinstance(parsed, list):
+        if not parsed:
+            raise ProviderCallError(
+                "Provider response JSON list was empty; expected exactly one Higgsfield job object.",
+                stage="provider_output_invalid",
+                subprocess_start_attempted=True,
+                provider_submission_may_have_occurred=True,
+                parsed_runtime_type=parsed_type,
+            )
+        if len(parsed) != 1:
+            raise ProviderCallError(
+                f"Provider response JSON list contained {len(parsed)} items; expected exactly one Higgsfield job object.",
+                stage="provider_output_invalid",
+                subprocess_start_attempted=True,
+                provider_submission_may_have_occurred=True,
+                parsed_runtime_type=parsed_type,
+            )
+        candidate = parsed[0]
+        if not isinstance(candidate, dict):
+            raise ProviderCallError(
+                "Provider response JSON list contained a non-object item; expected exactly one Higgsfield job object.",
+                stage="provider_output_invalid",
+                subprocess_start_attempted=True,
+                provider_submission_may_have_occurred=True,
+                parsed_runtime_type=parsed_type,
+                provider_output_normalization_method="singleton_list_object",
+            )
+        return "singleton_list_object", candidate, parsed_type
+    raise ProviderCallError(
+        f"Provider response JSON runtime type {parsed_type!r} is invalid; expected a job object or a singleton list containing one job object.",
+        stage="provider_output_invalid",
+        subprocess_start_attempted=True,
+        provider_submission_may_have_occurred=True,
+        parsed_runtime_type=parsed_type,
+    )
 
 
 def _bare_provider_job_id(stdout: str) -> str | None:
@@ -2086,7 +2169,10 @@ def _bind_provider_command_to_job(
     generation_reference: dict[str, Any],
     submitted_prompt: dict[str, Any],
 ) -> dict[str, Any]:
-    _require_current_lena_soul_reference_id(custom_reference_id)
+    resolved_custom_reference_id, resolved_soul_id = _resolve_provider_soul_binding(
+        custom_reference_id,
+        custom_reference_id,
+    )
     if not job_id:
         raise ProviderCallError(
             "provider response did not include a Higgsfield job UUID to bind to the submitted prompt and Soul command",
@@ -2098,7 +2184,7 @@ def _bind_provider_command_to_job(
     if (
         "--soul-id" not in resolved_argv
         or resolved_argv[resolved_argv.index("--soul-id") + 1]
-        != custom_reference_id
+        != resolved_soul_id
     ):
         raise ProviderCallError(
             "constructed provider command is missing the verified Lena Soul --soul-id binding",
@@ -2133,7 +2219,8 @@ def _bind_provider_command_to_job(
         "job_type": HIGGSFIELD_IMAGE_JOB_TYPE,
         "provider_job_id": job_id,
         "provider_status": status,
-        "custom_reference_id": custom_reference_id,
+        "custom_reference_id": resolved_custom_reference_id,
+        "soul_id": resolved_soul_id,
         "soul_id_flag": "--soul-id",
         "soul_id_binding_verified_before_subprocess": True,
         "generation_reference": reference_binding,
@@ -2164,6 +2251,10 @@ def build_manifest(
     receipt_repo_path: str | None = None,
     saved_image_sha256: str | None = None,
 ) -> dict:
+    resolved_custom_reference_id, resolved_soul_id = _resolve_provider_soul_binding(
+        custom_reference_id,
+        custom_reference_id,
+    )
     image = source["image"]
     prompt = image["image_prompt"]
     prompt_bytes = prompt.encode("utf-8")
@@ -2253,7 +2344,8 @@ def build_manifest(
         "source_slot_prefix": source["slot_prefix"],
         "source_pack_count": source["pack_count"],
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "custom_reference_id": custom_reference_id,
+        "custom_reference_id": resolved_custom_reference_id,
+        "soul_id": resolved_soul_id,
         "cli_soul_name": CONFIRMED_LENA_SOUL_NAME,
         "cli_soul_type": CONFIRMED_LENA_CLI_SOUL_TYPE,
         "aspect_ratio": HIGGSFIELD_ASPECT_RATIO,
@@ -2458,6 +2550,10 @@ def _load_retry_decision_source(retry_decision_artifact: Path) -> tuple[str, str
 def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str) -> dict:
     image = source["image"]
     prompt = image["image_prompt"]
+    resolved_custom_reference_id, resolved_soul_id = _resolve_provider_soul_binding(
+        custom_reference_id,
+        custom_reference_id,
+    )
     try:
         generation_reference = soul_cinema_contract.validate_generation_reference_binding(
             image.get("generation_reference")
@@ -2469,7 +2565,12 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             subprocess_start_attempted=False,
             provider_submission_may_have_occurred=False,
         ) from exc
-    argv = build_provider_argv(prompt, custom_reference_id, generation_reference)
+    argv = build_provider_argv(
+        prompt,
+        resolved_custom_reference_id,
+        soul_id=resolved_soul_id,
+        generation_reference=generation_reference,
+    )
     submitted_prompt = _persist_and_validate_submitted_prompt(date_str, slot_id, image, prompt)
 
     # HARD GATE: no prompt reaches Higgsfield without satisfying the one
@@ -2521,14 +2622,16 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         )
 
     stdout = result.stdout or ""
+    stderr = result.stderr or ""
     stdout_job_id = _bare_provider_job_id(stdout)
+    normalization_method: str | None = None
+    normalized_job: dict[str, Any] | None = None
     if stdout_job_id:
         parsed = _lookup_provider_job_record(resolved_binary, stdout_job_id)
     else:
         try:
             parsed = _parse_provider_json_stdout(stdout)
         except json.JSONDecodeError as exc:
-            stderr = result.stderr or ""
             raise ProviderCallError(
                 f"Failed to parse --json output as JSON: {exc}. "
                 f"stdout length was {len(stdout)} chars."
@@ -2540,12 +2643,48 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
                 provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
                 provider_stdout_length=len(stdout),
                 provider_stderr_length=len(stderr),
+                provider_returncode=result.returncode,
             ) from exc
+        normalization_method, normalized_job, _ = _normalize_direct_provider_job_payload(parsed)
+        parsed = normalized_job
 
+    parsed_runtime_type = _parsed_runtime_type(parsed)
     job_id = _find_first_str_field(parsed, ("job_id", "id"))
     status = _find_first_str_field(parsed, ("status",))
     result_urls = _canonical_result_urls(parsed)
-    _require_provider_job_bound_lena_soul(parsed, custom_reference_id)
+    _require_provider_job_bound_lena_soul(parsed, resolved_custom_reference_id)
+    if not job_id:
+        raise ProviderCallError(
+            "Provider response did not include a Higgsfield job UUID.",
+            stage="provider_job_id_missing",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_status=status,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+            provider_returncode=result.returncode,
+            parsed_runtime_type=parsed_runtime_type,
+            provider_output_normalization_method=normalization_method,
+            normalized_job=normalized_job,
+        )
+    if not status:
+        raise ProviderCallError(
+            "Provider response did not include a job status.",
+            stage="provider_status_missing",
+            subprocess_start_attempted=True,
+            provider_submission_may_have_occurred=True,
+            provider_job_id=job_id,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+            provider_returncode=result.returncode,
+            parsed_runtime_type=parsed_runtime_type,
+            provider_output_normalization_method=normalization_method,
+            normalized_job=normalized_job,
+        )
     provider_command_binding = _bind_provider_command_to_job(
         date_str,
         slot_id,
@@ -2553,7 +2692,7 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         status=status,
         resolved_argv=resolved_argv,
         prompt=prompt,
-        custom_reference_id=custom_reference_id,
+        custom_reference_id=resolved_custom_reference_id,
         generation_reference=generation_reference,
         submitted_prompt=submitted_prompt,
     )
@@ -2570,6 +2709,14 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             provider_submission_may_have_occurred=True,
             provider_job_id=job_id,
             provider_status=status,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+            provider_returncode=result.returncode,
+            parsed_runtime_type=parsed_runtime_type,
+            provider_output_normalization_method=normalization_method,
+            normalized_job=normalized_job,
         )
     if len(result_urls) > 1:
         raise ProviderCallError(
@@ -2583,6 +2730,14 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
             provider_submission_may_have_occurred=True,
             provider_job_id=job_id,
             provider_status=status,
+            provider_stdout_escaped=_escape_provider_diagnostic_text(stdout),
+            provider_stderr_escaped=_escape_provider_diagnostic_text(stderr),
+            provider_stdout_length=len(stdout),
+            provider_stderr_length=len(stderr),
+            provider_returncode=result.returncode,
+            parsed_runtime_type=parsed_runtime_type,
+            provider_output_normalization_method=normalization_method,
+            normalized_job=normalized_job,
         )
 
     result_url = result_urls[0]
@@ -2610,6 +2765,11 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
         "result_urls": result_urls,
         "saved_image_path": str(final_path),
         "image_format_detected": extension,
+        "custom_reference_id": resolved_custom_reference_id,
+        "soul_id": resolved_soul_id,
+        "provider_output_runtime_type": parsed_runtime_type,
+        "provider_output_normalization_method": normalization_method,
+        "normalized_provider_job": normalized_job,
         **submitted_prompt,
         "provider_command_binding_path": provider_command_binding["provider_command_binding_path"],
         "provider_command_binding_sha256": _sha256_file(
@@ -2625,14 +2785,19 @@ def run_live(date_str: str, slot_id: str, source: dict, custom_reference_id: str
 def print_dry_run_report(date_str: str, slot_id: str, source: dict, custom_reference_id: str, validation: dict) -> None:
     image = source["image"]
     prompt = image["image_prompt"]
-    argv = build_provider_argv(prompt, custom_reference_id)
+    resolved_custom_reference_id, resolved_soul_id = _resolve_provider_soul_binding(
+        custom_reference_id,
+        custom_reference_id,
+    )
+    argv = build_provider_argv(prompt, resolved_custom_reference_id)
 
     print("=== Higgsfield Lena executor -- DRY RUN (no provider/network call) ===\n")
     print(f"date                    : {date_str}")
     print(f"slot_id                 : {slot_id}")
     print(f"source resolver         : {source['resolver']} (slot_prefix={source['slot_prefix']!r}, pack_count={source['pack_count']})")
     print(f"job_type                : {HIGGSFIELD_IMAGE_JOB_TYPE}")
-    print(f"custom_reference_id     : {custom_reference_id}")
+    print(f"custom_reference_id     : {resolved_custom_reference_id}")
+    print(f"soul_id                 : {resolved_soul_id}")
     print(f"cli soul identity       : name={CONFIRMED_LENA_SOUL_NAME!r} type={CONFIRMED_LENA_SOUL_TYPE!r}")
     print(f"aspect_ratio            : {HIGGSFIELD_ASPECT_RATIO}")
     print(f"quality                 : {HIGGSFIELD_QUALITY}")
@@ -2684,6 +2849,11 @@ def main() -> int:
         default=DEFAULT_LENA_CUSTOM_REFERENCE_ID,
         help="Higgsfield Soul custom_reference_id (default: Lena's confirmed Soul ID)",
     )
+    parser.add_argument(
+        "--soul-id", dest="soul_id",
+        default=None,
+        help="Optional explicit Higgsfield soul_id. If supplied, it must exactly match --custom-reference-id.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument(
@@ -2697,6 +2867,14 @@ def main() -> int:
         print("[ABORT] --dry-run and --live are mutually exclusive.")
         return 1
     live = bool(args.live)
+    try:
+        args.custom_reference_id, args.soul_id = _resolve_provider_soul_binding(
+            args.custom_reference_id,
+            args.soul_id,
+        )
+    except ProviderCallError as exc:
+        print(f"[ABORT] {exc.stage}: {exc}")
+        return 1
 
     expected_prompt_path = Path(args.expected_prompt_file) if args.expected_prompt_file else None
 
@@ -2800,6 +2978,7 @@ def main() -> int:
             "handoff_artifact": args.handoff_artifact,
             "approval_artifact": args.approval_artifact,
             "custom_reference_id": args.custom_reference_id,
+            "soul_id": args.soul_id,
         }
         try:
             execution_result = execute_approved_handoff_live_generation(

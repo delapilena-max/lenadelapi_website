@@ -260,7 +260,8 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "wardrobe_outfit_name": "fixture outfit",
         "wardrobe_silhouette_class": "fitted_dress",
         "effective_wardrobe_silhouette_class": "fitted_dress",
-        "custom_reference_id": next(iter(identity.APPROVED_CUSTOM_REFERENCE_IDS)),
+        "custom_reference_id": identity.CURRENT_LENA_SOUL_ID,
+        "soul_id": identity.CURRENT_LENA_SOUL_ID,
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
         "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
         "provider_job_id": provider_job_id,
@@ -283,6 +284,7 @@ def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
         "provider_job_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
         "custom_reference_id": manifest["custom_reference_id"],
+        "soul_id": manifest["soul_id"],
         "soul_name": identity.EXPECTED_SOUL_NAME,
         "soul_type": identity.EXPECTED_SOUL_TYPE,
         "prompt_sha256": prompt_sha,
@@ -751,7 +753,8 @@ def _production_dual_binding_fixture(
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "provider_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
-        "custom_reference_id": str(auth["custom_reference_id"]),
+        "custom_reference_id": disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID,
+        "soul_id": disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID,
     }
     reference_manifest_bytes = json.dumps(reference_manifest, indent=2, ensure_ascii=True).encode("utf-8")
     reference_manifest_sha = hashlib.sha256(reference_manifest_bytes).hexdigest()
@@ -904,6 +907,7 @@ def _production_dual_binding_fixture(
         "wardrobe_silhouette_class": "jeans_based",
         "effective_wardrobe_silhouette_class": "fitted_top_and_jeans",
         "custom_reference_id": str(auth["custom_reference_id"]),
+        "soul_id": str(auth["custom_reference_id"]),
         "cli_soul_name": identity.EXPECTED_SOUL_NAME,
         "cli_soul_type": identity.EXPECTED_SOUL_TYPE,
         "provider_job_id": "job-123",
@@ -925,6 +929,7 @@ def _production_dual_binding_fixture(
         "provider_job_status": "completed",
         "job_type": identity.EXPECTED_JOB_TYPE,
         "custom_reference_id": str(auth["custom_reference_id"]),
+        "soul_id": str(auth["custom_reference_id"]),
         "soul_name": identity.EXPECTED_SOUL_NAME,
         "soul_type": identity.EXPECTED_SOUL_TYPE,
         "prompt_sha256": candidate_body["prompt_sha256"],
@@ -942,10 +947,12 @@ def _production_dual_binding_fixture(
         "manifest_path": manifest_path,
         "evidence_path": evidence_path,
         "image_path": image_path,
+        "reference_manifest_path": reference_manifest_path,
         "reference_authority_path": reference_authority_path,
         "reference_authority_sha": _sha(reference_authority_path),
         "reference_image_path": reference_image_path,
         "reference_image_sha": _sha(reference_image_path),
+        "current_generated_custom_reference_id": str(auth["custom_reference_id"]),
         "provider_lane": provider_binding["provider_lane"],
         "provider_prompt_sha256": provider_binding["provider_prompt_sha256"],
         "date": date_str,
@@ -1065,6 +1072,13 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
     )
     assert result["qa_inputs"].get("decision_kind") == "authorization_bound_handoff", result
     assert result["provider_called"] is False
+    reference_manifest = json.loads(Path(bundle["reference_manifest_path"]).read_text(encoding="utf-8"))
+    generated_manifest = json.loads(Path(bundle["manifest_path"]).read_text(encoding="utf-8"))
+    assert reference_manifest["custom_reference_id"] == disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID
+    assert reference_manifest["soul_id"] == disposition.REFERENCE_AUTHORITY_CUSTOM_REFERENCE_ID
+    assert reference_manifest["custom_reference_id"] != bundle["current_generated_custom_reference_id"]
+    assert generated_manifest["custom_reference_id"] == bundle["current_generated_custom_reference_id"]
+    assert generated_manifest["soul_id"] == bundle["current_generated_custom_reference_id"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_lane"] == bundle["provider_lane"]
     assert result["generation_provenance"]["provider_job_id"] == "job-123"
@@ -1427,6 +1441,122 @@ def test_default_makes_no_provider_call_and_does_not_accept(harness) -> None:
     assert result["side_effects_performed"] == []
 
 
+def test_autonomous_local_performs_zero_anthropic_calls(harness) -> None:
+    calls = []
+    harness["monkeypatch"].setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request))
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert calls == []
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["qa_inputs"]["qa_mode"] == disposition.QA_MODE_AUTONOMOUS_LOCAL
+    assert result["visual_judgment_source"]["authoritative_mode"] is True
+
+
+def test_missing_anthropic_credentials_do_not_block_autonomous_local(harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "anthropic", None)
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reason_codes"] == []
+
+
+def test_anthropic_outage_does_not_block_autonomous_local(harness) -> None:
+    harness["monkeypatch"].setattr(
+        disposition,
+        "call_anthropic_visual_review",
+        lambda request: (_ for _ in ()).throw(RuntimeError("synthetic outage")),
+    )
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reason_codes"] == []
+
+
+def test_optional_external_diagnostic_is_disabled_by_default(harness) -> None:
+    calls = []
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_authorized=True,
+        reviewer=lambda request: calls.append(request),
+    )
+    assert calls == []
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["external_visual_diagnostic_disabled"]
+
+
+def test_optional_external_diagnostic_requires_explicit_authorization(harness) -> None:
+    calls = []
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_enabled=True,
+        external_visual_diagnostic_provider="anthropic",
+        external_visual_diagnostic_model="exact-test-model",
+        external_visual_diagnostic_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        external_visual_diagnostic_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        reviewer=lambda request: calls.append(request),
+    )
+    assert calls == []
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["external_visual_diagnostic_unauthorized"]
+
+
+def test_optional_external_diagnostic_is_non_authoritative(harness) -> None:
+    calls = []
+
+    def reviewer(request):
+        calls.append(request)
+        return _all_pass()
+
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_enabled=True,
+        external_visual_diagnostic_authorized=True,
+        external_visual_diagnostic_provider="anthropic",
+        external_visual_diagnostic_model="exact-test-model",
+        external_visual_diagnostic_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        external_visual_diagnostic_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        reviewer=reviewer,
+    )
+    assert len(calls) == 1
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is True
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["qa_inputs"]["qa_mode"] == disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC
+    assert result["visual_judgment_source"]["authoritative_mode"] is False
+    assert result["visual_judgment_source"]["external_visual_diagnostic"]["non_authoritative"] is True
+    assert result["exact_next_allowed_action"] == "existing_downstream_governed_publish_gates_only"
+
+
+def test_supervised_human_review_mode_does_not_call_anthropic_automatically(harness) -> None:
+    calls = []
+    harness["monkeypatch"].setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request))
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_SUPERVISED_HUMAN_REVIEW)
+    assert calls == []
+    assert result["disposition"] == "blocked"
+    assert result["reason_codes"] == ["human_visual_review_required"]
+    assert result["provider_called"] is False
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["exact_next_allowed_action"] == "human_visual_review_required"
+
+
+def test_invalid_qa_mode_fails_closed(harness) -> None:
+    result = _evaluate(harness, None, qa_mode="invalid_mode")
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["invalid_qa_mode"]
+    assert result["provider_called"] is False
+
+
 def test_exactly_one_mocked_bound_visual_call_no_retry_or_fallback(harness) -> None:
     preflight = _evaluate(harness, _all_pass())
     reference_set_sha = preflight["identity_reference_provenance"]["reference_set_sha256"]
@@ -1763,7 +1893,10 @@ def test_reference_parser_requires_explicit_hash_binding(tmp_path) -> None:
 
 def test_cli_help_exposes_only_explicit_review_and_write_gates() -> None:
     options = disposition._parser().format_help()
+    assert "--qa-mode" in options
     assert "--live-visual-review" in options
+    assert "--external-visual-diagnostic-enabled" in options
+    assert "--external-visual-diagnostic-authorized" in options
     assert "--write-artifact" in options
     assert "--identity-reference-authority-artifact" in options
     assert "--identity-reference-authority-sha256" in options
@@ -2000,6 +2133,7 @@ def test_real_reference_authority_rejects_uncommitted_and_wrong_sets(tmp_path, m
         "provider": "higgsfield", "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "provider_status": "completed", "job_type": "text2image_soul_v2",
         "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+        "soul_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
     }
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     manifest_sha = _sha(manifest_path)
@@ -2089,6 +2223,7 @@ def test_real_visual_reference_authority_bundle_rejects_stale_or_forged_commit(t
                 "provider_status": "completed",
                 "job_type": "text2image_soul_v2",
                 "custom_reference_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
+                "soul_id": "90a293d7-f3af-4377-8751-3304a27b6f31",
             }
         ),
         encoding="utf-8",

@@ -140,10 +140,16 @@ def load_selected_candidate_report(date_str: str) -> tuple[Path, dict]:
 
 
 def load_reconciled_selected_candidate_report(date_str: str, reconciliation_artifact_path: str) -> tuple[Path, dict]:
-    _reconciliation_path, reconciliation_report, _reconciliation_sha256 = reconciliation_contract.load_reconciliation_report(
-        reconciliation_artifact_path,
-        date_str=date_str,
-    )
+    try:
+        _reconciliation_path, reconciliation_report, _reconciliation_sha256 = reconciliation_contract.load_reconciliation_report(
+            reconciliation_artifact_path,
+            date_str=date_str,
+        )
+    except FileNotFoundError as exc:
+        raise HandoffBuildError(
+            "[ABORT] missing_selected_candidate: "
+            f"selected candidate artifact from reconciliation does not exist: {exc.filename}"
+        ) from exc
     source_artifacts = reconciliation_report.get("source_artifacts", {})
     selected_source = source_artifacts.get("selected_candidate", {}) if isinstance(source_artifacts, dict) else {}
     selected_path_value = str(selected_source.get("source_artifact_path", "")).strip() if isinstance(selected_source, dict) else ""
@@ -839,6 +845,7 @@ def build_handoff(
             "model": MODEL,
             "aspect_ratio": ASPECT_RATIO,
             "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
+            "soul_id": DEFAULT_CUSTOM_REFERENCE_ID,
             "negative_prompt_enabled": NEGATIVE_PROMPT_ENABLED,
             "quality": soul_cinema_contract.QUALITY,
             "generation_reference": generation_reference,
@@ -846,6 +853,7 @@ def build_handoff(
                 "name": SOUL_NAME,
                 "type": SOUL_TYPE,
                 "custom_reference_id": DEFAULT_CUSTOM_REFERENCE_ID,
+                "soul_id": DEFAULT_CUSTOM_REFERENCE_ID,
                 "identity_is_prompt_instruction": False,
             },
             "selected_prompt_input_artifact_path": repo_relative_path(packet_path),
