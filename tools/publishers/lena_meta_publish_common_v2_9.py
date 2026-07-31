@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, mimetypes, os, shutil, sys, time, uuid, urllib.parse, urllib.request, urllib.error
+import hashlib, importlib, json, mimetypes, os, shutil, sys, time, uuid, urllib.parse, urllib.request, urllib.error
 from datetime import datetime
 from pathlib import Path
 
@@ -29,7 +29,21 @@ GOVERNED_PUBLISHER_SECRET_ENV_KEYS = (
     "R2_ACCESS_KEY_ID",
     "R2_SECRET_ACCESS_KEY",
 )
+R2_SECRET_ENV_KEYS = (
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+)
+R2_NONSECRET_CONFIG_KEYS = (
+    "r2_account_id",
+    "r2_bucket_name",
+    "r2_public_base_url",
+)
 LOCAL_MEDIA_PUBLIC_DIR_REL = Path("pipeline") / "publishing" / "lena" / "media_public"
+TEST_OR_PLACEHOLDER_PUBLIC_HOSTS = {"example.invalid"}
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
+WEBP_RIFF_MAGIC = b"RIFF"
+WEBP_WEBP_MAGIC = b"WEBP"
 
 
 def _resolve_root(root: Path | None = None) -> Path:
@@ -62,6 +76,13 @@ class MetaConnectorError(Exception):
 
 class ConfigContractError(MetaConnectorError):
     pass
+
+class MediaHostVerificationError(MetaConnectorError):
+    pass
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def redact(s: str) -> str:
     if not s:
@@ -99,6 +120,57 @@ def _is_placeholder(value: object) -> bool:
             "PLACEHOLDER",
         )
     )
+
+
+def _public_host_kind(url: str) -> str:
+    host = urllib.parse.urlparse(str(url or "")).hostname or ""
+    host = host.lower()
+    if host in TEST_OR_PLACEHOLDER_PUBLIC_HOSTS:
+        return "test_or_placeholder_host"
+    if host.endswith(".r2.dev"):
+        return "cloudflare_r2_development_host"
+    if host:
+        return "custom_or_external_https_host"
+    return "missing_or_invalid_host"
+
+
+def classify_public_media_base_url(cfg: dict) -> dict:
+    raw = str(cfg.get("media_public_base_url") or cfg.get("r2_public_base_url") or "").strip()
+    kind = _public_host_kind(raw)
+    return {
+        "url": raw,
+        "host_kind": kind,
+        "production_ready": bool(raw.lower().startswith("https://")) and kind == "custom_or_external_https_host",
+        "requires_custom_domain": kind == "cloudflare_r2_development_host",
+        "test_or_placeholder_host": kind == "test_or_placeholder_host",
+    }
+
+
+def _public_media_env_override_allowed(existing: str, env_value: str) -> bool:
+    existing = str(existing or "").strip()
+    env_value = str(env_value or "").strip()
+    existing_is_blank_or_placeholder = (
+        not existing
+        or _is_placeholder(existing)
+        or _public_host_kind(existing) == "test_or_placeholder_host"
+    )
+    if existing_is_blank_or_placeholder:
+        return True
+    return _public_host_kind(env_value) == "custom_or_external_https_host"
+
+
+def _expected_content_type(path: Path) -> str:
+    return mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+
+
+def _matches_magic(body: bytes, expected_content_type: str) -> bool:
+    if expected_content_type == "image/png":
+        return body.startswith(PNG_MAGIC)
+    if expected_content_type == "image/jpeg":
+        return body.startswith(JPEG_MAGIC)
+    if expected_content_type == "image/webp":
+        return len(body) >= 12 and body.startswith(WEBP_RIFF_MAGIC) and body[8:12] == WEBP_WEBP_MAGIC
+    return bool(body)
 
 def _default_media_public_local_dir(root: Path | None = None) -> str:
     return str(_resolve_root(root) / LOCAL_MEDIA_PUBLIC_DIR_REL)
@@ -217,9 +289,18 @@ def _apply_effective_config(
             continue
         if not resolved.get(key) or _is_placeholder(resolved.get(key)):
             resolved[key] = value
+    for env_key, config_key in ENV_VAR_TO_CONFIG_KEY.items():
+        env_value = process_env.get(env_key)
+        if not env_value:
+            continue
+        if config_key == "media_public_base_url" and not _public_media_env_override_allowed(resolved.get(config_key, ""), env_value):
+            continue
+        resolved[config_key] = env_value
     if not resolved.get("media_public_local_dir") or _is_placeholder(resolved.get("media_public_local_dir")):
         resolved["media_public_local_dir"] = _default_media_public_local_dir(root)
         resolved["_media_public_local_dir_source"] = "runtime_default"
+    if not resolved.get("r2_public_base_url") or _is_placeholder(resolved.get("r2_public_base_url")):
+        resolved["r2_public_base_url"] = str(resolved.get("media_public_base_url") or "").strip()
     if not resolved.get("page_access_token") and resolved.get("instagram_access_token"):
         resolved["page_access_token"] = resolved["instagram_access_token"]
         resolved["_page_access_token_alias"] = "instagram_access_token"
@@ -230,23 +311,88 @@ def _load_env_for_r2(root: Path | None = None) -> None:
     populate_process_env_from_canonical_secret_source(root)
 
 
-def _r2_is_configured(root: Path | None = None) -> bool:
+def _r2_secret_presence(root: Path | None = None) -> dict[str, bool]:
     _load_env_for_r2(root)
-    return all(os.environ.get(k) for k in (
-        "R2_ACCOUNT_ID", "R2_BUCKET_NAME",
-        "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_PUBLIC_BASE_URL",
-    ))
+    return {key: bool(os.environ.get(key)) for key in R2_SECRET_ENV_KEYS}
 
 
-def _try_r2_upload(src: Path, key: str) -> dict | None:
+def _r2_uploader_status() -> dict:
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        importlib.import_module("pipeline.media_host.r2_uploader")
+        return {"available": True, "detail": ""}
+    except Exception as exc:
+        return {"available": False, "detail": str(exc)}
+
+
+def resolve_media_host_route(cfg: dict, root: Path | None = None) -> dict:
+    base_root = _resolve_root(root)
+    host = classify_public_media_base_url(cfg)
+    uploader = _r2_uploader_status()
+    secret_presence = _r2_secret_presence(base_root)
+    r2_public_base_url = str(cfg.get("r2_public_base_url") or cfg.get("media_public_base_url") or "").strip().rstrip("/")
+    media_public_base_url = str(cfg.get("media_public_base_url") or "").strip().rstrip("/")
+    nonsecret_values = {
+        "r2_account_id": str(cfg.get("r2_account_id") or "").strip(),
+        "r2_bucket_name": str(cfg.get("r2_bucket_name") or "").strip(),
+        "r2_public_base_url": r2_public_base_url,
+    }
+    missing_nonsecret_keys = [key for key, value in nonsecret_values.items() if not value or _is_placeholder(value)]
+    missing_secret_keys = [key for key, present in secret_presence.items() if not present]
+    public_base_matches = bool(media_public_base_url) and media_public_base_url == r2_public_base_url
+
+    reason = ""
+    ok = False
+    if not host["url"]:
+        reason = "media_public_base_url_not_configured"
+    elif host["requires_custom_domain"]:
+        reason = "r2_production_custom_domain_required"
+    elif not host["production_ready"]:
+        reason = "public_media_base_url_not_production_ready"
+    elif missing_nonsecret_keys:
+        reason = "r2_nonsecret_config_incomplete"
+    elif not public_base_matches:
+        reason = "r2_public_base_url_mismatch"
+    elif missing_secret_keys:
+        reason = "r2_missing_required_secret_keys"
+    elif not uploader["available"]:
+        reason = "r2_uploader_unavailable"
+    else:
+        ok = True
+
+    return {
+        "ok": ok,
+        "route": "r2" if ok else "not_ready",
+        "reason": reason,
+        "host": host,
+        "uploader_available": uploader["available"],
+        "uploader_detail": uploader["detail"],
+        "missing_nonsecret_keys": missing_nonsecret_keys,
+        "missing_secret_keys": missing_secret_keys,
+        "r2_account_id": nonsecret_values["r2_account_id"],
+        "r2_bucket_name": nonsecret_values["r2_bucket_name"],
+        "r2_public_base_url": r2_public_base_url,
+        "media_public_base_url": media_public_base_url,
+        "public_base_matches": public_base_matches,
+    }
+
+
+def _r2_is_configured(root: Path | None = None) -> bool:
+    cfg = load_config(root)
+    return resolve_media_host_route(cfg, root).get("ok", False)
+
+
+def _try_r2_upload(src: Path, key: str, cfg: dict, root: Path | None = None) -> dict | None:
     """Upload src to R2 at key; return r2_uploader result or None on any error."""
-    if not _r2_is_configured():
+    route = resolve_media_host_route(cfg, root)
+    if not route["ok"]:
         return None
     try:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
         from pipeline.media_host.r2_uploader import upload_file_to_r2  # type: ignore
-        return upload_file_to_r2(src, key)
+        return upload_file_to_r2(src, key, root=_resolve_root(root))
     except Exception:
         return None
 
@@ -317,10 +463,22 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
         placeholder = _is_placeholder(val)
         return {"ok": bool(val) and not placeholder, "value": redact(val) if secret else val}
 
-    try:
-        r2_ok = _r2_is_configured(base_root) if secret_source_ok else False
-    except ConfigContractError:
-        r2_ok = False
+    media_host_route = resolve_media_host_route(cfg, base_root) if secret_source_ok and env_map_ok else {
+        "ok": False,
+        "route": "not_ready",
+        "reason": "publisher_contract_unavailable",
+        "host": classify_public_media_base_url(cfg),
+        "uploader_available": False,
+        "uploader_detail": "",
+        "missing_nonsecret_keys": list(R2_NONSECRET_CONFIG_KEYS),
+        "missing_secret_keys": list(R2_SECRET_ENV_KEYS),
+        "r2_account_id": str(cfg.get("r2_account_id") or ""),
+        "r2_bucket_name": str(cfg.get("r2_bucket_name") or ""),
+        "r2_public_base_url": str(cfg.get("r2_public_base_url") or cfg.get("media_public_base_url") or ""),
+        "media_public_base_url": str(cfg.get("media_public_base_url") or ""),
+        "public_base_matches": False,
+    }
+    r2_ok = media_host_route["ok"]
     mode     = _auth_mode(cfg)
     checks = {
         "instagram_access_token": check("instagram_access_token", True),
@@ -354,8 +512,23 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
             "detail": secret_source_error,
         },
     }
+    checks["media_public_base_url"]["ok"] = media_host_route["ok"]
+    checks["r2_uploader_available"] = {
+        "ok": bool(media_host_route["uploader_available"]),
+        "detail": media_host_route["uploader_detail"],
+    }
+    checks["media_host_route"] = {
+        "ok": media_host_route["ok"],
+        "route": media_host_route["route"],
+        "reason": media_host_route["reason"],
+        "host_kind": media_host_route["host"]["host_kind"],
+        "production_ready_host": media_host_route["host"]["production_ready"],
+        "missing_nonsecret_keys": media_host_route["missing_nonsecret_keys"],
+        "missing_secret_keys": media_host_route["missing_secret_keys"],
+        "public_base_matches": media_host_route["public_base_matches"],
+    }
 
-    media_host_ok = checks["media_public_base_url"]["ok"] or r2_ok
+    media_host_ok = r2_ok
     instagram_ready = checks["instagram_business_account_id"]["ok"] and (checks["instagram_access_token"]["ok"] or checks["page_access_token"]["ok"]) and media_host_ok
     facebook_ready = checks["facebook_page_id"]["ok"] and checks["page_access_token"]["ok"] and media_host_ok
 
@@ -380,12 +553,86 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
             "graph_base_url":  graph_base(cfg),
             "instagram_ready": instagram_ready,
             "facebook_ready":  facebook_ready,
-            "media_host_ready": (checks["media_public_base_url"]["ok"] and checks["media_public_local_dir"]["ok"]) or r2_ok,
-            "media_host_method": "r2" if r2_ok else ("local_server" if checks["media_public_base_url"]["ok"] else "not_configured"),
+            "media_host_ready": media_host_ok,
+            "media_host_method": media_host_route["route"] if media_host_route["ok"] else "not_ready",
         },
         "api_test": api_result
     }
 
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect rejected", headers, fp)
+
+
+def verify_hosted_media_before_container(
+    media_url: str,
+    *,
+    expected_sha256: str,
+    expected_content_type: str,
+    expected_content_length: int,
+    max_download_seconds: float = 20.0,
+) -> dict:
+    parsed = urllib.parse.urlparse(str(media_url or ""))
+    if parsed.scheme.lower() != "https":
+        raise MediaHostVerificationError("hosted_media_url_must_be_https")
+    if _public_host_kind(media_url) == "cloudflare_r2_development_host":
+        raise MediaHostVerificationError("r2_production_custom_domain_required")
+
+    req = urllib.request.Request(
+        media_url,
+        headers={"User-Agent": "LenaPublisher/2.9.1 media-host-verifier"},
+        method="GET",
+    )
+    opener = urllib.request.build_opener(NoRedirectHandler)
+    started = time.time()
+    try:
+        with opener.open(req, timeout=max_download_seconds) as resp:
+            status = getattr(resp, "status", resp.getcode())
+            final_url = resp.geturl()
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            body = resp.read()
+    except urllib.error.HTTPError as exc:
+        raise MediaHostVerificationError(f"hosted_media_http_error:{exc.code}") from exc
+    except Exception as exc:
+        raise MediaHostVerificationError(f"hosted_media_fetch_failed:{exc}") from exc
+
+    elapsed = time.time() - started
+    if status != 200:
+        raise MediaHostVerificationError(f"hosted_media_status_not_200:{status}")
+    if final_url != media_url:
+        raise MediaHostVerificationError("hosted_media_redirect_not_allowed")
+    if elapsed > max_download_seconds:
+        raise MediaHostVerificationError("hosted_media_download_too_slow")
+
+    content_type = str(headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if content_type != expected_content_type:
+        raise MediaHostVerificationError(f"hosted_media_content_type_invalid:{content_type}")
+    content_length_raw = str(headers.get("content-length") or "").strip()
+    if not content_length_raw:
+        raise MediaHostVerificationError("hosted_media_content_length_missing_or_zero")
+    try:
+        content_length = int(content_length_raw)
+    except ValueError as exc:
+        raise MediaHostVerificationError("hosted_media_content_length_invalid") from exc
+    if content_length <= 0 or content_length != expected_content_length or content_length != len(body):
+        raise MediaHostVerificationError("hosted_media_content_length_mismatch")
+    if not _matches_magic(body, expected_content_type):
+        raise MediaHostVerificationError("hosted_media_magic_bytes_invalid")
+    actual_sha = hashlib.sha256(body).hexdigest()
+    if actual_sha != expected_sha256:
+        raise MediaHostVerificationError("hosted_media_sha256_mismatch")
+    return {
+        "ok": True,
+        "media_url": media_url,
+        "status": status,
+        "final_url": final_url,
+        "content_type": content_type,
+        "content_length": content_length,
+        "sha256": actual_sha,
+        "download_seconds": elapsed,
+        "host_kind": _public_host_kind(media_url),
+    }
 
 
 def preflight_token(cfg: dict, platform: str = "") -> dict:
@@ -437,9 +684,9 @@ def validate_config_for(platform: str, media_type: str, root: Path | None = None
             return {"ok": False, "reason": "missing_page_access_token", "status": status}
     else:
         return {"ok": False, "reason": "unsupported_meta_platform", "status": status}
-    if not cfg.get("media_public_base_url") or _is_placeholder(cfg.get("media_public_base_url")):
-        if not _r2_is_configured(root):
-            return {"ok": False, "reason": "missing_public_media_base_url_and_r2_not_configured", "status": status}
+    media_host_route = resolve_media_host_route(cfg, root)
+    if not media_host_route["ok"]:
+        return {"ok": False, "reason": media_host_route["reason"] or "media_host_not_ready", "status": status, "media_host_route": media_host_route}
     return {"ok": True, "config": cfg}
 
 def _auth_mode(cfg: dict) -> str:
@@ -580,26 +827,57 @@ def ensure_public_media(asset_path: str, queue_id: str, platform: str, cfg: dict
     src = Path(asset_path)
     if not src.exists():
         return {"ok": False, "reason": "asset_file_missing", "asset_path": asset_path}
+    route = resolve_media_host_route(cfg, ROOT)
+    if not route["ok"]:
+        return {
+            "ok": False,
+            "reason": route["reason"] or "media_host_not_ready",
+            "host": route["host"],
+            "missing_nonsecret_keys": route["missing_nonsecret_keys"],
+            "missing_secret_keys": route["missing_secret_keys"],
+        }
     date_part = datetime.now().strftime("%Y-%m-%d")
     safe_platform = "".join(c if c.isalnum() else "_" for c in platform)
     dest_name = f"{queue_id}_{safe_platform}{src.suffix.lower()}"
+    object_key = f"lena/{date_part}/{dest_name}"
+    expected_sha256 = sha256_file(src)
+    expected_content_type = _expected_content_type(src)
+    expected_content_length = src.stat().st_size
 
-    # R2 path: upload to R2 and return the permanent public URL.
-    r2 = _try_r2_upload(src, f"lena/{date_part}/{dest_name}")
+    r2 = _try_r2_upload(src, object_key, cfg, ROOT)
     if r2 and r2.get("ok"):
-        return {"ok": True, "local_path": str(src), "media_url": r2["public_url"], "upload_method": "r2"}
+        try:
+            verification = verify_hosted_media_before_container(
+                r2["public_url"],
+                expected_sha256=expected_sha256,
+                expected_content_type=expected_content_type,
+                expected_content_length=expected_content_length,
+            )
+        except MediaHostVerificationError as exc:
+            return {
+                "ok": False,
+                "reason": "pre_container_media_verification_failed",
+                "detail": str(exc),
+                "media_url": r2["public_url"],
+                "upload_method": "r2",
+                "r2_key": r2.get("key", object_key),
+            }
+        return {
+            "ok": True,
+            "local_path": str(src),
+            "media_url": r2["public_url"],
+            "upload_method": "r2",
+            "r2_key": r2.get("key", object_key),
+            "expected_sha256": expected_sha256,
+            "pre_container_media_verification": verification,
+        }
 
-    # Local-server fallback: copy to media_public dir and build URL from base.
-    base_url = str(cfg.get("media_public_base_url") or "").rstrip("/")
-    local_dir = Path(str(cfg.get("media_public_local_dir") or ROOT / "pipeline" / "publishing" / "lena" / "media_public"))
-    if not base_url or "YOUR_PUBLIC_MEDIA_HOST" in base_url:
-        return {"ok": False, "reason": "media_public_base_url_not_configured"}
-    dest_dir = local_dir / date_part
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / dest_name
-    shutil.copy2(src, dest)
-    media_url = f"{base_url}/{date_part}/{urllib.parse.quote(dest_name)}"
-    return {"ok": True, "local_path": str(dest), "media_url": media_url, "upload_method": "local_server"}
+    return {
+        "ok": False,
+        "reason": "r2_upload_failed",
+        "upload_method": "r2",
+        "r2_key": object_key,
+    }
 
 def wait_for_container(creation_id: str, cfg: dict, platform: str = "", timeout_seconds: int = 900) -> dict:
     start = time.time()

@@ -272,6 +272,12 @@ def _required_runtime_env_keys(config_status: dict[str, Any], effective_cfg: dic
         required.add("META_PAGE_ACCESS_TOKEN")
     if not page_token and not instagram_token and auth_mode == "instagram_login":
         required.add("META_INSTAGRAM_ACCESS_TOKEN")
+    try:
+        media_host_route = publish_common.resolve_media_host_route(effective_cfg, ROOT)
+    except publish_common.ConfigContractError:
+        media_host_route = {"host": {"production_ready": bool(effective_cfg.get("media_public_base_url"))}}
+    if media_host_route["host"]["production_ready"]:
+        required.update({"R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"})
     return required
 
 

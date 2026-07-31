@@ -590,6 +590,7 @@ def issue_cycle_authorization(
     auth_root: Path | None = None,
     report_root: Path | None = None,
     schedule_slot: str | None = None,
+    allow_existing_outputs: bool = False,
 ) -> dict[str, Any]:
     policy_result = validate_policy_artifact(policy_artifact)
     # 2026-07-24 (3x/day expansion): controlled photo autonomy now
@@ -693,7 +694,11 @@ def issue_cycle_authorization(
     expected_output_stem = str(scope["expected_output_stem"])
     allowed_output_extensions = [str(item) for item in scope["allowed_output_extensions"]]
     for output_path in _authorized_output_paths(expected_output_directory, expected_output_stem, allowed_output_extensions):
-        _require(not output_path.exists(), "expected_output_conflict", f"authorized output path already exists: {output_path}")
+        _require(
+            allow_existing_outputs or not output_path.exists(),
+            "expected_output_conflict",
+            f"authorized output path already exists: {output_path}",
+        )
     report_root = report_root or REPORT_ROOT
     usage_before = collect_daily_usage(report_root, day)
     _require(usage_before["cycle_count"] < int(policy_result["artifact"]["maximum_cycles_per_day"]), "daily_cycle_cap_reached", "daily cycle cap reached")
