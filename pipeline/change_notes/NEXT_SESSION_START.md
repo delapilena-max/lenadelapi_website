@@ -331,3 +331,64 @@ G. What must not be done
 - Do not modify queue runtime artifacts, receipts, media, or dispatch evidence as source.
 - Do not enable or start `Lena Autonomy Scheduler Driver`.
 - Do not publish, generate media, invoke Anthropic, or touch video in this fix step.
+
+## Addendum (Codex, 2026-07-31) - governed runtime evidence no longer self-blocks readiness
+
+A. What changed
+
+- Narrowed the readiness `repository_dirty` gate so it no longer blocks on the exact governed July 31 runtime evidence written by the approved photo lane.
+- Readiness now excludes only validated runtime artifacts under the approved Lena photo roots for analytics, bounded-live authorization, publish packets, approved queue rows, approved queue receipts, dispatch outbox payloads, and dispatch reports.
+- The exclusion is fail-closed: tracked source changes still block, unexpected untracked files still block, fake source/config/secret-like files under those roots still block, and traversal or resolved-path escape does not qualify for exclusion.
+- Read-only readiness now reports the excluded runtime paths, count, and approved roots separately so the deployment can remain physically evidence-bearing without appearing operationally unsafe.
+
+B. Files changed
+
+- `tools/lena_autopublish_go_live_readiness_v1.py`
+- `tests/test_lena_autopublish_go_live_readiness_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validations run
+
+- `C:\Python314\python.exe -B -m pytest -p no:cacheprovider tests/test_lena_autopublish_go_live_readiness_v1.py tests/test_lena_autopublish_approved_queue_v2_8.py tests/test_lena_autopublish_approved_queue_v2_8_new.py tests/test_lena_run_autonomous_publish_cycle_v1.py tests/test_lena_build_generation_reconciliation_v1.py tests/test_lena_record_generation_reconciliation_decision_v1.py tests/test_lena_reconciliation_integration_v1.py tests/test_lena_autonomy_scheduler_driver_v1.py tests/test_lena_scheduler_registration_source_v1.py tests/test_lena_build_publish_packet_v1.py tests/test_lena_standing_autonomy_policy_v1.py tests/test_lena_instagram_media_host_custom_domain_v1.py -q`
+- Result: `158 passed`
+- Focused readiness file result: `33 passed`
+- `C:\Python314\python.exe -m py_compile tools\lena_autopublish_go_live_readiness_v1.py tools\lena_autopublish_approved_queue_v2_8.py tools\lena_build_publish_packet_v1.py tools\lena_run_autonomous_publish_cycle_v1.py tools\lena_validate_approved_queue_autopublisher_v2_8.py tools\lena_standing_autonomy_policy_v1.py tools\strategy\lena_build_generation_reconciliation_v1.py tools\strategy\lena_record_generation_reconciliation_decision_v1.py tools\strategy\lena_reconciliation_contract_v1.py tools\publishers\lena_meta_publish_common_v2_9.py tests\test_lena_autopublish_go_live_readiness_v1.py tests\test_lena_autopublish_approved_queue_v2_8.py tests\test_lena_autopublish_approved_queue_v2_8_new.py tests\test_lena_run_autonomous_publish_cycle_v1.py tests\test_lena_build_publish_packet_v1.py tests\test_lena_build_generation_reconciliation_v1.py tests\test_lena_record_generation_reconciliation_decision_v1.py tests\test_lena_reconciliation_integration_v1.py tests\test_lena_standing_autonomy_policy_v1.py tests\test_lena_instagram_media_host_custom_domain_v1.py tests\test_lena_autonomy_scheduler_driver_v1.py tests\test_lena_scheduler_registration_source_v1.py`
+- `C:\Python314\python.exe tools\lena_validate_approved_queue_autopublisher_v2_8.py`
+- `git diff --check`
+- Real read-only post-publication dry run:
+  - `C:\Python314\python.exe tools\lena_autopublish_approved_queue_v2_8.py --date 2026-07-31 --platforms "Instagram Feed" --dry-run`
+  - Result: `processed=0`, `publish_calls_performed=0`, `queue_mutated=false`
+
+D. Decisions made
+
+- Treat governed runtime evidence as operationally expected, not as implicit source dirt, but only when each path matches an exact approved runtime root plus artifact-shape contract.
+- Keep the approved runtime exclusion roots exact:
+  - `pipeline/analytics/`
+  - `pipeline/approvals/lena/bounded_live_cycles/`
+  - `pipeline/publish_packets/`
+  - `pipeline/publishing/lena/approved_queue/`
+  - `pipeline/publishing/lena/approved_queue_receipts/`
+  - `pipeline/publishing/lena/dispatch_outbox/`
+  - `pipeline/publishing/lena/dispatch_reports/`
+- Preserve the July 31 queue row, receipt, dispatch payload/report, approval evidence, and analytics files as immutable runtime evidence; do not delete them to make readiness pass.
+- Keep the canonical scheduler disabled and continuous autonomy inactive.
+
+E. Blockers / parked branches
+
+- During implementation, read-only readiness still truthfully reported `repository_dirty` while these tracked source/test edits were uncommitted.
+- After commit, the only expected remaining gate is the existing pre-activation state with the canonical scheduler still disabled; no provider, publisher, queue, or task mutation blocker remains in this fix lane.
+
+F. Next approved step
+
+1. Commit only this readiness/runtime-output correction, its focused tests, and this status-note update.
+2. Re-run read-only readiness from the committed checkout to confirm the preserved July 31 governed runtime evidence no longer blocks readiness.
+3. Push the fix on a new branch, open a PR into `main`, and wait for CI.
+4. Do not enable the scheduler in this step.
+
+G. What must not be done
+
+- Do not delete or rewrite the July 31 governed runtime evidence to fake a clean repository.
+- Do not broaden the exclusion to the entire `pipeline/` tree or to arbitrary untracked files.
+- Do not allow `.py`, `.ps1`, config-like JSON, dotenv/secret-like files, or escape paths under runtime roots to bypass `repository_dirty`.
+- Do not enable or start `Lena Autonomy Scheduler Driver`.
+- Do not publish, generate media, invoke Meta/Higgsfield/Anthropic, or touch video in this fix step.
