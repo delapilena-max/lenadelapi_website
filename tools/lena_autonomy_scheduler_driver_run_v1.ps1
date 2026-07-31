@@ -62,6 +62,9 @@ if str(repo_root) not in sys.path:
 from tools.publishers import lena_meta_publish_common_v2_9 as publish_common
 
 publish_common.populate_process_env_from_canonical_secret_source(repo_root)
+# Drop the wrapper's repo-root bootstrap argument before the driver
+# module enters argparse under runpy.
+sys.argv = ["tools.lena_autonomy_scheduler_driver_v1"]
 runpy.run_module("tools.lena_autonomy_scheduler_driver_v1", run_name="__main__")
 '@
     $output = $bootstrap | & $PythonExe - $RepoRoot 2>&1
