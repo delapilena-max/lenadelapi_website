@@ -1441,6 +1441,122 @@ def test_default_makes_no_provider_call_and_does_not_accept(harness) -> None:
     assert result["side_effects_performed"] == []
 
 
+def test_autonomous_local_performs_zero_anthropic_calls(harness) -> None:
+    calls = []
+    harness["monkeypatch"].setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request))
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert calls == []
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["qa_inputs"]["qa_mode"] == disposition.QA_MODE_AUTONOMOUS_LOCAL
+    assert result["visual_judgment_source"]["authoritative_mode"] is True
+
+
+def test_missing_anthropic_credentials_do_not_block_autonomous_local(harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "anthropic", None)
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reason_codes"] == []
+
+
+def test_anthropic_outage_does_not_block_autonomous_local(harness) -> None:
+    harness["monkeypatch"].setattr(
+        disposition,
+        "call_anthropic_visual_review",
+        lambda request: (_ for _ in ()).throw(RuntimeError("synthetic outage")),
+    )
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_AUTONOMOUS_LOCAL)
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is False
+    assert result["reason_codes"] == []
+
+
+def test_optional_external_diagnostic_is_disabled_by_default(harness) -> None:
+    calls = []
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_authorized=True,
+        reviewer=lambda request: calls.append(request),
+    )
+    assert calls == []
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["external_visual_diagnostic_disabled"]
+
+
+def test_optional_external_diagnostic_requires_explicit_authorization(harness) -> None:
+    calls = []
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_enabled=True,
+        external_visual_diagnostic_provider="anthropic",
+        external_visual_diagnostic_model="exact-test-model",
+        external_visual_diagnostic_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        external_visual_diagnostic_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        reviewer=lambda request: calls.append(request),
+    )
+    assert calls == []
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["external_visual_diagnostic_unauthorized"]
+
+
+def test_optional_external_diagnostic_is_non_authoritative(harness) -> None:
+    calls = []
+
+    def reviewer(request):
+        calls.append(request)
+        return _all_pass()
+
+    result = _evaluate(
+        harness,
+        None,
+        qa_mode=disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        external_visual_diagnostic_enabled=True,
+        external_visual_diagnostic_authorized=True,
+        external_visual_diagnostic_provider="anthropic",
+        external_visual_diagnostic_model="exact-test-model",
+        external_visual_diagnostic_authority_artifact=harness["tmp_path"] / "model_authority.json",
+        external_visual_diagnostic_authority_sha256="2" * 64,
+        expected_decision_fingerprint=harness["decision"]["decision_fingerprint_sha256"],
+        expected_reference_set_sha256=harness["reference_set_sha"],
+        reviewer=reviewer,
+    )
+    assert len(calls) == 1
+    assert result["disposition"] == "accept"
+    assert result["provider_called"] is True
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["qa_inputs"]["qa_mode"] == disposition.QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC
+    assert result["visual_judgment_source"]["authoritative_mode"] is False
+    assert result["visual_judgment_source"]["external_visual_diagnostic"]["non_authoritative"] is True
+    assert result["exact_next_allowed_action"] == "existing_downstream_governed_publish_gates_only"
+
+
+def test_supervised_human_review_mode_does_not_call_anthropic_automatically(harness) -> None:
+    calls = []
+    harness["monkeypatch"].setattr(disposition, "call_anthropic_visual_review", lambda request: calls.append(request))
+    result = _evaluate(harness, None, qa_mode=disposition.QA_MODE_SUPERVISED_HUMAN_REVIEW)
+    assert calls == []
+    assert result["disposition"] == "blocked"
+    assert result["reason_codes"] == ["human_visual_review_required"]
+    assert result["provider_called"] is False
+    assert result["reviewer_type"] == "local_validation_only"
+    assert result["exact_next_allowed_action"] == "human_visual_review_required"
+
+
+def test_invalid_qa_mode_fails_closed(harness) -> None:
+    result = _evaluate(harness, None, qa_mode="invalid_mode")
+    assert result["disposition"] == "hard_stop"
+    assert result["reason_codes"] == ["invalid_qa_mode"]
+    assert result["provider_called"] is False
+
+
 def test_exactly_one_mocked_bound_visual_call_no_retry_or_fallback(harness) -> None:
     preflight = _evaluate(harness, _all_pass())
     reference_set_sha = preflight["identity_reference_provenance"]["reference_set_sha256"]
@@ -1777,7 +1893,10 @@ def test_reference_parser_requires_explicit_hash_binding(tmp_path) -> None:
 
 def test_cli_help_exposes_only_explicit_review_and_write_gates() -> None:
     options = disposition._parser().format_help()
+    assert "--qa-mode" in options
     assert "--live-visual-review" in options
+    assert "--external-visual-diagnostic-enabled" in options
+    assert "--external-visual-diagnostic-authorized" in options
     assert "--write-artifact" in options
     assert "--identity-reference-authority-artifact" in options
     assert "--identity-reference-authority-sha256" in options
