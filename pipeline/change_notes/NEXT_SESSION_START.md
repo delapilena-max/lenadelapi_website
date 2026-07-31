@@ -271,3 +271,63 @@ G. What must not be done
 - Do not create a queue row or publish anything under Phase A authority.
 - Do not publish anything under queue-construction authority alone; Phase B requires separate explicit approval of the exact photo and caption.
 - Do not call Anthropic, touch video, invoke TikTok, or use any non-Higgsfield generation provider in this proof lane.
+
+## Addendum (Codex, 2026-07-31) - automatic governed receipt after confirmed Lena manual publish
+
+A. What changed
+
+- Finished the narrow manual-publish receipt fix in the canonical deployment checkout.
+- `tools/lena_autopublish_approved_queue_v2_8.py` now routes confirmed manual publish success through the same governed receipt path already used by scheduled autonomous mode.
+- Manual success now writes the governed receipt before final queue-row completion.
+- Existing matching receipts are recovered idempotently; conflicting receipts fail closed before any connector invocation.
+- If receipt writing fails after a confirmed remote success, the row is preserved as remotely posted with local reconciliation required, and a later local-only rerun rebuilds the missing receipt from the preserved dispatch report without republishing.
+- The existing successful Instagram publication, queue row, dispatch report, and reconciled receipt were re-verified and not modified or retried.
+
+B. Files changed
+
+- `tools/lena_autopublish_approved_queue_v2_8.py`
+- `tests/test_lena_autopublish_approved_queue_v2_8.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validations run
+
+- `C:\Python314\python.exe -B -m pytest -p no:cacheprovider tests/test_lena_autopublish_approved_queue_v2_8.py tests/test_lena_autopublish_approved_queue_v2_8_new.py tests/test_lena_run_autonomous_publish_cycle_v1.py tests/test_lena_build_publish_packet_v1.py tests/test_lena_build_generation_reconciliation_v1.py tests/test_lena_record_generation_reconciliation_decision_v1.py tests/test_lena_reconciliation_integration_v1.py tests/test_lena_standing_autonomy_policy_v1.py tests/test_lena_instagram_media_host_custom_domain_v1.py tests/test_lena_autopublish_go_live_readiness_v1.py tests/test_lena_autonomy_scheduler_driver_v1.py tests/test_lena_scheduler_registration_source_v1.py -q`
+- Result: `146 passed`
+- Focused receipt file result: `21 passed`
+- `C:\Python314\python.exe -m py_compile tools\lena_autopublish_approved_queue_v2_8.py tools\lena_build_publish_packet_v1.py tools\lena_autopublish_go_live_readiness_v1.py tools\lena_run_autonomous_publish_cycle_v1.py tools\lena_validate_approved_queue_autopublisher_v2_8.py tools\lena_standing_autonomy_policy_v1.py tools\strategy\lena_build_generation_reconciliation_v1.py tools\strategy\lena_record_generation_reconciliation_decision_v1.py tools\strategy\lena_reconciliation_contract_v1.py tools\publishers\lena_meta_publish_common_v2_9.py tests\test_lena_autopublish_approved_queue_v2_8.py tests\test_lena_autopublish_approved_queue_v2_8_new.py tests\test_lena_run_autonomous_publish_cycle_v1.py tests\test_lena_build_publish_packet_v1.py tests\test_lena_build_generation_reconciliation_v1.py tests\test_lena_record_generation_reconciliation_decision_v1.py tests\test_lena_reconciliation_integration_v1.py tests\test_lena_standing_autonomy_policy_v1.py tests\test_lena_instagram_media_host_custom_domain_v1.py tests\test_lena_autopublish_go_live_readiness_v1.py tests\test_lena_autonomy_scheduler_driver_v1.py tests\test_lena_scheduler_registration_source_v1.py`
+- `C:\Python314\python.exe tools\lena_validate_approved_queue_autopublisher_v2_8.py`
+- Real read-only dry run after the existing July 31 publication:
+  - `C:\Python314\python.exe tools\lena_autopublish_approved_queue_v2_8.py --date 2026-07-31 --platforms "Instagram Feed" --dry-run`
+  - Result: `processed=0`, `publish_calls_performed=0`, `queue_mutated=false`
+- Read-only readiness:
+  - `C:\Python314\python.exe -m tools.lena_autopublish_go_live_readiness_v1 --production-root C:\projects\ai\content_bot_photo_production_main_v1 --python-exe C:\Python314\python.exe --validate-only`
+  - Result: read-only only; `provider_calls_performed=0`, `publish_calls_performed=0`, `anthropic_calls_performed=0`
+- `git diff --check`
+
+D. Decisions made
+
+- Keep the governed receipt schema unchanged; the defect was in manual-mode control flow, not in the receipt artifact contract.
+- Treat the preserved dispatch report as the only allowed local reconciliation source when a confirmed publish succeeded but receipt writing failed.
+- Preserve duplicate-publication prevention by treating `publish_state=posted` plus `failure_reason=receipt_reconciliation_required` as remotely published, never as publish retry authority.
+- Keep the existing successful July 31 Instagram publication and all of its runtime artifacts immutable.
+- Keep the canonical scheduler disabled. Continuous autonomy remains inactive.
+
+E. Blockers / parked branches
+
+- The narrow source fix is ready locally, but merge is still pending.
+- Read-only readiness still reports `repository_dirty` until this fix is committed and pushed.
+- Continuous autonomy is still not authorized; scheduler enablement remains a separate explicit gate after this fix is merged.
+
+F. Next approved step
+
+1. Commit only the receipt-fix source, focused tests, and this status-note update.
+2. Push the fix on a new branch and open a PR into `main`.
+3. Wait for terminal CI.
+4. Only after merge and separate explicit authorization may any scheduler enablement or further bounded autonomy proof proceed.
+
+G. What must not be done
+
+- Do not republish or otherwise touch the existing July 31 Instagram publication.
+- Do not modify queue runtime artifacts, receipts, media, or dispatch evidence as source.
+- Do not enable or start `Lena Autonomy Scheduler Driver`.
+- Do not publish, generate media, invoke Anthropic, or touch video in this fix step.
