@@ -943,6 +943,7 @@ def _production_dual_binding_fixture(
     }
     _write_json(evidence_path, evidence)
     return {
+        "handoff_path": handoff_path,
         "auth_path": auth_path,
         "manifest_path": manifest_path,
         "evidence_path": evidence_path,
@@ -1054,6 +1055,62 @@ def test_authorization_bound_manifest_uses_provider_binding(harness, tmp_path: P
     assert result["prompt_sha256"] == provider_prompt_sha
 
 
+def test_authorization_bound_identity_evidence_uses_provider_prompt_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    bundle = _production_dual_binding_fixture(tmp_path, monkeypatch, request)
+    decision, candidate, decision_kind, binding_context = disposition._resolve_generation_binding_context(
+        Path(bundle["handoff_path"])
+    )
+    assert decision_kind == "authorization_bound_handoff"
+    provider_binding = binding_context["provider_execution_binding"]
+    image = disposition._inspect_image(Path(bundle["image_path"]), generated=True)
+    manifest = disposition._validate_manifest(
+        Path(bundle["manifest_path"]),
+        decision,
+        candidate,
+        image,
+        decision_kind,
+        provider_binding=provider_binding,
+    )
+
+    evidence = disposition._validate_identity_evidence(
+        Path(bundle["evidence_path"]),
+        decision,
+        candidate,
+        manifest,
+        image,
+        provider_binding=provider_binding,
+    )
+
+    assert evidence["prompt_sha256"] == bundle["provider_prompt_sha256"]
+
+
+def test_committed_json_authority_accepts_crlf_local_sha_when_bytes_are_equivalent(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(disposition, "ROOT", tmp_path)
+    authority_path = tmp_path / "authority.json"
+    committed_bytes = (
+        b'{\n'
+        b'  "schema_version": "schema_v1",\n'
+        b'  "influencer_id": "lena",\n'
+        b'  "authority_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n'
+        b'}\n'
+    )
+    authority_path.write_bytes(committed_bytes.replace(b"\n", b"\r\n"))
+    monkeypatch.setattr(disposition, "_git_show_bytes", lambda commit, path: committed_bytes)
+
+    authority = disposition._committed_json_authority(
+        authority_path,
+        _sha(authority_path),
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "schema_v1",
+    )
+
+    assert authority["schema_version"] == "schema_v1"
+
+
 def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1081,6 +1138,30 @@ def test_consumed_authorization_with_valid_dual_binding_reaches_qa_path(
     assert generated_manifest["soul_id"] == bundle["current_generated_custom_reference_id"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_prompt_sha256"] == bundle["provider_prompt_sha256"]
     assert result["generation_provenance"]["provider_execution_binding"]["provider_lane"] == bundle["provider_lane"]
+    assert result["generation_provenance"]["provider_job_id"] == "job-123"
+    assert result["generation_provenance"]["manifest_path"] == str(Path(bundle["manifest_path"]).resolve())
+    assert result["identity_reference_provenance"]["references"][0]["path"] == str(Path(bundle["reference_image_path"]).resolve())
+    assert result["reason_codes"] == ["visual_review_unavailable"]
+
+
+def test_plain_handoff_with_valid_dual_binding_reaches_qa_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> None:
+    bundle = _production_dual_binding_fixture(tmp_path, monkeypatch, request)
+    result = disposition.evaluate_photo_qa_disposition(
+        decision_path=Path(bundle["handoff_path"]),
+        manifest_path=Path(bundle["manifest_path"]),
+        image_path=Path(bundle["image_path"]),
+        identity_evidence_path=Path(bundle["evidence_path"]),
+        reference_specs=[(Path(bundle["reference_image_path"]), str(bundle["reference_image_sha"]))],
+        reference_authority_artifact=Path(bundle["reference_authority_path"]),
+        reference_authority_sha256=str(bundle["reference_authority_sha"]),
+        expected_image_sha256=_sha(Path(bundle["image_path"])),
+    )
+    assert result["qa_inputs"].get("decision_kind") == "authorization_bound_handoff", result
+    assert result["provider_called"] is False
     assert result["generation_provenance"]["provider_job_id"] == "job-123"
     assert result["generation_provenance"]["manifest_path"] == str(Path(bundle["manifest_path"]).resolve())
     assert result["identity_reference_provenance"]["references"][0]["path"] == str(Path(bundle["reference_image_path"]).resolve())

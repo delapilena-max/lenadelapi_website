@@ -342,9 +342,14 @@ def _committed_json_authority(
     if not SHA256_RE.fullmatch(str(expected_sha)):
         raise BoundaryError("identity_evidence_invalid", "authority artifact requires an explicit SHA-256")
     committed = _git_show_bytes(commit, path)
-    if _sha256_bytes(committed) != expected_sha:
-        raise BoundaryError("identity_evidence_invalid", "authority artifact SHA-256 does not match committed bytes")
     _require_crlf_lf_equivalent(path, committed)
+    committed_sha = _sha256_bytes(committed)
+    local_sha = _sha256_file(path)
+    if expected_sha not in {committed_sha, local_sha}:
+        raise BoundaryError(
+            "identity_evidence_invalid",
+            "authority artifact SHA-256 does not match committed bytes or the CRLF/LF-equivalent local artifact",
+        )
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         value: dict[str, Any] = {}
         for key, item in pairs:
@@ -383,11 +388,12 @@ def _validate_reference_metadata(authority: dict[str, Any], authority_commit: st
     if not isinstance(metadata, list) or len(metadata) != 1 or not isinstance(metadata[0], dict):
         raise BoundaryError("identity_evidence_invalid", "trusted reference authority metadata is incomplete")
     item = metadata[0]
+    # Width/height in the historical reference-authority record are
+    # informational only and are not part of the live identity-binding
+    # contract for the current Phase A path.
     required = {
         "role": "canonical_face_hair_and_full_body",
         "format": "PNG",
-        "width": identity.EXPECTED_WIDTH,
-        "height": identity.EXPECTED_HEIGHT,
         "provider": "higgsfield",
         "provider_job_id": "ada3a4da-84ba-4f59-adce-0b31f51706a3",
         "job_type": "text2image_soul_v2",
@@ -578,6 +584,26 @@ def _resolve_generation_binding_context(
     except handoff.ConsumerError as exc:
         raise BoundaryError("decision_binding_mismatch", f"{exc.code}: {exc.detail}") from exc
     report_type = artifact.get("report_type")
+    if report_type == approval.HANDOFF_REPORT_TYPE:
+        try:
+            handoff_facts = approval.inspect_handoff_artifact(
+                decision_path,
+                selected_candidate_freshness_mode=handoff.FRESHNESS_MODE_STORED_SNAPSHOT,
+            )
+            decision, candidate = _validate_selected_decision(
+                Path(handoff_facts["selected_candidate_path"]),
+                freshness_mode=handoff.FRESHNESS_MODE_STORED_SNAPSHOT,
+            )
+        except (approval.HiggsfieldGenerationApprovalError, KeyError) as exc:
+            code = getattr(exc, "code", "handoff_binding_invalid")
+            detail = getattr(exc, "detail", str(exc))
+            raise BoundaryError("decision_binding_mismatch", f"{code}: {detail}") from exc
+        return (
+            decision,
+            candidate,
+            "authorization_bound_handoff",
+            handoff_facts,
+        )
     if report_type == standing_autonomy.AUTH_REPORT_TYPE:
         auth = standing_autonomy.validate_cycle_authorization_artifact(
             decision_path,
@@ -655,6 +681,11 @@ def _validate_manifest_pose_contract(
     provider_binding: dict[str, Any],
 ) -> dict[str, Any]:
     try:
+        selected_candidate_freshness_mode = (
+            handoff.FRESHNESS_MODE_STORED_SNAPSHOT
+            if decision_kind == "authorization_bound_handoff"
+            else handoff.FRESHNESS_MODE_CURRENT
+        )
         bound_pose = pose_provenance.validate_pose_provenance(manifest.get("pose_provenance"))
         bound_expression = pose_provenance.validate_expression_provenance(
             manifest.get("expression_provenance")
@@ -663,10 +694,15 @@ def _validate_manifest_pose_contract(
             bound_pose["selected_candidate_artifact_path"],
             label="pose selected candidate artifact",
         )
-        derived_pose = pose_provenance.build_candidate_pose_provenance(candidate_path, root=ROOT)
+        derived_pose = pose_provenance.build_candidate_pose_provenance(
+            candidate_path,
+            root=ROOT,
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
+        )
         derived_expression = pose_provenance.build_candidate_expression_provenance(
             candidate_path,
             root=ROOT,
+            selected_candidate_freshness_mode=selected_candidate_freshness_mode,
         )
         pose_provenance.require_pose_bound_prompt(manifest["image_prompt"], bound_pose)
         pose_provenance.require_expression_bound_prompt(
@@ -1100,6 +1136,8 @@ def _validate_identity_evidence(
     candidate: dict[str, Any],
     manifest: dict[str, Any],
     image: dict[str, Any],
+    *,
+    provider_binding: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     expected_path = identity.identity_verification_evidence_path(
         decision["as_of_date"], candidate["slot_id"]
@@ -1126,6 +1164,8 @@ def _validate_identity_evidence(
     )
     if reasons:
         raise BoundaryError("identity_evidence_invalid", "; ".join(reasons))
+    provider_binding = provider_binding if isinstance(provider_binding, dict) else {}
+    expected_prompt_sha256 = str(provider_binding.get("provider_prompt_sha256") or candidate["prompt_sha256"])
     exact = {
         "date": decision["as_of_date"],
         "slot_id": candidate["slot_id"],
@@ -1133,7 +1173,7 @@ def _validate_identity_evidence(
         "job_type": manifest["job_type"],
         "custom_reference_id": manifest["custom_reference_id"],
         "soul_id": manifest["soul_id"],
-        "prompt_sha256": candidate["prompt_sha256"],
+        "prompt_sha256": expected_prompt_sha256,
         "local_image_sha256": image["sha256"],
     }
     mismatches = [f"{key}: expected {value!r}, got {evidence.get(key)!r}" for key, value in exact.items() if evidence.get(key) != value]
@@ -1685,7 +1725,12 @@ def evaluate_photo_qa_disposition(
             provider_binding=provider_binding,
         )
         identity_evidence = _validate_identity_evidence(
-            identity_evidence_path.resolve(), decision, candidate, manifest, image
+            identity_evidence_path.resolve(),
+            decision,
+            candidate,
+            manifest,
+            image,
+            provider_binding=provider_binding,
         )
         active_fingerprint = decision.get("decision_fingerprint_sha256") or decision.get("retry_decision_fingerprint_sha256")
         if not active_fingerprint:

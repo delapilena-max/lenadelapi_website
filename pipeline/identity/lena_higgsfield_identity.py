@@ -67,12 +67,11 @@ APPROVED_CUSTOM_REFERENCE_IDS = {
     "e45ec580-a6db-4063-a9b2-f9163856daae",  # historical Lena Soul id (2026-07-20 - 2026-07-23; did not visually match Lena, retired same-day)
     "79119c27-64fc-47f8-9ff3-c174d12932aa",  # current live Lena Soul id (retrained 2026-07-23)
 }
-# The one real, approved Higgsfield photo resolution proven so far -- see
-# tools/lena_build_publish_packet_v1.py's resolve_packet_inputs_higgsfield(),
-# which measures this from the real saved image rather than trusting a
-# manifest field. Not claimed to be the only resolution Higgsfield could
-# ever produce -- just the one this pipeline has actually verified.
-EXPECTED_WIDTH = 2048
+# The approved still-photo proof lane currently runs 9:16 at Higgsfield
+# quality "2k". The real returned Lena photo on 2026-07-31 resolved to
+# 1152x2048, and downstream identity/QA verification must validate against
+# the measured provider output rather than a stale square assumption.
+EXPECTED_WIDTH = 1152
 EXPECTED_HEIGHT = 2048
 
 SCHEMA_VERSION = "1"
