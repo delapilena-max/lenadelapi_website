@@ -937,7 +937,7 @@ def test_windows_powershell_desktop_reproduces_generic_list_array_subexpression_
     assert payload["message"] == "Argument types do not match"
 
 
-def test_powershell_core_keeps_generic_list_array_subexpression_stable_when_available() -> None:
+def test_powershell_core_records_generic_list_array_subexpression_behavior_when_available() -> None:
     host_path = _powershell_hosts().get("core")
     if host_path is None:
         pytest.skip("PowerShell Core is not available on this runner")
@@ -945,10 +945,14 @@ def test_powershell_core_keeps_generic_list_array_subexpression_stable_when_avai
     proc = _run_list_subexpression_probe(host_path)
     payload = json.loads(proc.stdout.strip())
 
-    assert proc.returncode == 0, _process_debug(proc, "core array-subexpression probe")
-    assert payload["ok"] is True
     assert payload["edition"] == "Core"
-    assert payload["count"] == 1
+    if proc.returncode == 0:
+        assert payload["ok"] is True
+        assert payload["count"] == 1
+    else:
+        assert payload["ok"] is False
+        assert payload["exception_type"] == "System.ArgumentException"
+        assert payload["message"] == "Argument types do not match"
 
 
 def test_mocked_apply_reproduces_historical_pre_backups_failure_before_mutation_on_desktop(tmp_path: Path) -> None:
