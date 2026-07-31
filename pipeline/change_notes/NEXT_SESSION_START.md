@@ -456,3 +456,61 @@ G. What must not be done
 - Do not touch the video lane.
 - Do not call Anthropic.
 - Do not reset or clean away governed runtime evidence.
+
+## Addendum (Codex, 2026-07-31) - scheduler runtime log no longer self-blocks activation readiness
+
+A. What changed
+
+- Verified on merged `main` that the preserved July 31 governed queue, receipt, dispatch, approval, packet, and analytics evidence was already excluded correctly by readiness.
+- Found one exact remaining activation-path blocker: the canonical scheduler wrapper writes `logs/scheduler/lena_autonomy_scheduler_<YYYY-MM-DD>.log`, and readiness was still treating that exact runtime log family as unexpected untracked source dirt.
+- Narrowed the readiness runtime-path classifier so only canonical scheduler log filenames under `logs/scheduler/` are treated as governed runtime evidence.
+- The exclusion remains fail-closed: arbitrary files under `logs/`, source/config/secret-like files, and any path outside the exact scheduler log root still block `repository_dirty`.
+
+B. Files changed
+
+- `tools/lena_autopublish_go_live_readiness_v1.py`
+- `tests/test_lena_autopublish_go_live_readiness_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validations run
+
+- `C:\Python314\python.exe -B -m pytest -p no:cacheprovider tests/test_lena_autopublish_go_live_readiness_v1.py tests/test_lena_autonomy_scheduler_driver_v1.py tests/test_lena_scheduler_registration_source_v1.py tests/test_lena_autopublish_approved_queue_v2_8.py tests/test_lena_autopublish_approved_queue_v2_8_new.py tests/test_lena_run_autonomous_publish_cycle_v1.py tests/test_lena_build_publish_packet_v1.py tests/test_lena_build_generation_reconciliation_v1.py tests/test_lena_record_generation_reconciliation_decision_v1.py tests/test_lena_reconciliation_integration_v1.py tests/test_lena_standing_autonomy_policy_v1.py tests/test_lena_instagram_media_host_custom_domain_v1.py tests/test_lena_photo_qa_disposition_v1.py -q`
+- Result: `316 passed, 1 skipped`
+- `C:\Python314\python.exe -m py_compile tools\lena_autopublish_go_live_readiness_v1.py tests\test_lena_autopublish_go_live_readiness_v1.py tools\lena_autonomy_scheduler_driver_v1.py tools\lena_autopublish_approved_queue_v2_8.py tools\lena_build_publish_packet_v1.py tools\lena_run_autonomous_publish_cycle_v1.py tools\lena_validate_approved_queue_autopublisher_v2_8.py tools\lena_standing_autonomy_policy_v1.py tools\strategy\lena_build_generation_reconciliation_v1.py tools\strategy\lena_record_generation_reconciliation_decision_v1.py tools\strategy\lena_reconciliation_contract_v1.py tools\publishers\lena_meta_publish_common_v2_9.py tests\test_lena_autonomy_scheduler_driver_v1.py tests\test_lena_scheduler_registration_source_v1.py tests\test_lena_autopublish_approved_queue_v2_8.py tests\test_lena_autopublish_approved_queue_v2_8_new.py tests\test_lena_run_autonomous_publish_cycle_v1.py tests\test_lena_build_publish_packet_v1.py tests\test_lena_build_generation_reconciliation_v1.py tests\test_lena_record_generation_reconciliation_decision_v1.py tests\test_lena_reconciliation_integration_v1.py tests\test_lena_standing_autonomy_policy_v1.py tests\test_lena_instagram_media_host_custom_domain_v1.py tests\test_lena_photo_qa_disposition_v1.py`
+- `C:\Python314\python.exe tools\lena_validate_approved_queue_autopublisher_v2_8.py`
+- `git diff --check`
+- Real read-only checks from the canonical deployment checkout:
+  - `C:\Python314\python.exe -m tools.lena_autopublish_go_live_readiness_v1 --production-root C:\projects\ai\content_bot_photo_production_main_v1 --python-exe C:\Python314\python.exe --validate-only`
+  - `C:\Python314\python.exe tools\lena_autopublish_approved_queue_v2_8.py --date 2026-07-31 --platforms "Instagram Feed" --dry-run`
+- Observed result before committing this source fix:
+  - scheduler log path excluded correctly
+  - zero unexpected untracked paths remained
+  - the only reported blocker was the tracked source/test edit itself, as intended
+  - dry run stayed `processed=0`, `publish_calls_performed=0`, `queue_mutated=false`
+
+D. Decisions made
+
+- Treat the scheduler wrapper's daily log as governed runtime evidence because the canonical task itself writes it on every automatic poll and its presence should not make the deployment appear unsafe.
+- Keep the exclusion exact to the canonical file contract:
+  - root: `logs/scheduler/`
+  - filename pattern: `lena_autonomy_scheduler_<YYYY-MM-DD>.log`
+- Do not broaden the exclusion to arbitrary `logs/` content.
+
+E. Blockers / parked branches
+
+- Before commit, read-only readiness still truthfully reports `repository_dirty` because this source/test change is tracked and uncommitted.
+- After commit and merge, the remaining operational gate is expected to be local Administrator enablement of the already-registered canonical task; Codex must not mutate Task Scheduler directly.
+
+F. Next approved step
+
+1. Commit only this narrow readiness classifier correction, its focused tests, and this status-note update.
+2. Push a focused PR into `main`, wait for CI, and merge with a merge commit if green.
+3. Re-run read-only readiness from the clean merged checkout.
+4. Hand off the exact elevated enable/verification commands for the operator to run locally.
+
+G. What must not be done
+
+- Do not exclude arbitrary `logs/` content from readiness.
+- Do not delete or rewrite the preserved July 31 runtime evidence.
+- Do not enable or start `Lena Autonomy Scheduler Driver` from Codex.
+- Do not generate, publish, invoke Anthropic, or touch video in this fix step.

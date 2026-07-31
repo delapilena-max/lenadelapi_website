@@ -218,8 +218,13 @@ def _dispatch_report_match(parts: tuple[str, ...]) -> bool:
     return len(parts) == 2 and DATE_SEGMENT_RE.fullmatch(parts[0]) and bool(re.fullmatch(r"approved_queue_autopublish_report_[A-Za-z0-9._-]+\.json", parts[1]))
 
 
+def _scheduler_log_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 1 and bool(re.fullmatch(r"lena_autonomy_scheduler_\d{4}-\d{2}-\d{2}\.log", parts[0]))
+
+
 def _governed_runtime_specs() -> tuple[dict[str, Any], ...]:
     return (
+        {"root": _runtime_root("logs/scheduler"), "matcher": _scheduler_log_match},
         {"root": _runtime_root("pipeline/analytics"), "matcher": _analytics_runtime_match},
         {"root": _runtime_root("pipeline/approvals/lena/bounded_live_cycles"), "matcher": _bounded_live_cycle_match},
         {"root": _runtime_root("pipeline/publish_packets"), "matcher": _publish_packets_match},
