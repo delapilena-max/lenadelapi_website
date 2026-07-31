@@ -550,6 +550,17 @@ def inspect_handoff_artifact(
     )
     custom_reference_id = str(soul.get("custom_reference_id") or "").strip()
     require(custom_reference_id, "handoff_custom_reference_id_missing", "handoff custom_reference_id is missing")
+    soul_id = str(
+        soul.get("soul_id")
+        or structured.get("soul_id")
+        or custom_reference_id
+    ).strip()
+    require(soul_id, "handoff_soul_id_missing", "handoff soul_id is missing")
+    require(
+        soul_id == custom_reference_id,
+        "handoff_soul_id_mismatch",
+        "handoff soul_id must exactly match custom_reference_id",
+    )
     require(
         soul.get("identity_is_prompt_instruction") is False,
         "handoff_soul_identity_mode_invalid",
@@ -767,6 +778,7 @@ def inspect_handoff_artifact(
         "slot_id": slot_id,
         "prompt_sha256": prompt_sha,
         "custom_reference_id": custom_reference_id,
+        "soul_id": soul_id,
         "generation_reference": generation_reference,
         "soul_name": soul.get("name"),
         "soul_type": soul.get("type"),
@@ -812,6 +824,7 @@ def _reinspect_authoritative_handoff_facts(handoff_facts: Any) -> dict[str, Any]
         "slot_id",
         "prompt_sha256",
         "custom_reference_id",
+        "soul_id",
         "generation_reference",
         "selected_candidate_path",
         "selected_candidate_sha256",
@@ -1104,6 +1117,7 @@ def build_generation_approval_record(
         "soul_name": handoff_facts["soul_name"],
         "soul_type": handoff_facts["soul_type"],
         "custom_reference_id": handoff_facts["custom_reference_id"],
+        "soul_id": handoff_facts["soul_id"],
         "generation_reference": handoff_facts["generation_reference"],
         "confirmation_statement": confirmation,
         "reconciliation": handoff_facts.get("reconciliation"),
@@ -1220,6 +1234,13 @@ def validate_generation_approval_artifact(
     )
     custom_reference_id = str(approval.get("custom_reference_id") or "").strip()
     require(custom_reference_id, "approval_custom_reference_id_missing", "approval custom_reference_id is missing")
+    soul_id = str(approval.get("soul_id") or "").strip()
+    require(soul_id, "approval_soul_id_missing", "approval soul_id is missing")
+    require(
+        soul_id == custom_reference_id,
+        "approval_soul_id_mismatch",
+        "approval soul_id must exactly match custom_reference_id",
+    )
     try:
         generation_reference = soul_cinema_contract.validate_generation_reference_binding(
             approval.get("generation_reference")
@@ -1328,6 +1349,11 @@ def validate_generation_approval_artifact(
         custom_reference_id == handoff_facts["custom_reference_id"],
         "approval_custom_reference_id_mismatch",
         "approval custom_reference_id does not match the bound handoff Soul reference",
+    )
+    require(
+        soul_id == handoff_facts["soul_id"],
+        "approval_soul_id_binding_mismatch",
+        "approval soul_id does not match the bound handoff Soul reference",
     )
     require(
         generation_reference == handoff_facts["generation_reference"],
@@ -1481,6 +1507,7 @@ def build_generation_claim_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "soul_id": approval["soul_id"],
         "generation_reference": approval["generation_reference"],
         "authorized_attempts": 1,
         "consumed_attempt_number": 1,
@@ -1560,6 +1587,7 @@ def build_generation_execution_receipt_record(
         "soul_name": approval["soul_name"],
         "soul_type": approval["soul_type"],
         "custom_reference_id": approval["custom_reference_id"],
+        "soul_id": approval["soul_id"],
         "generation_reference": approval["generation_reference"],
         "upload_authorized": False,
         "queue_promotion_authorized": False,
@@ -1666,6 +1694,7 @@ def validate_lineage_record_authority(
         "soul_name",
         "soul_type",
         "custom_reference_id",
+        "soul_id",
         "generation_reference",
     ):
         require(
@@ -1827,6 +1856,7 @@ def validate_generation_execution_receipt_lineage(
         "soul_name",
         "soul_type",
         "custom_reference_id",
+        "soul_id",
         "generation_reference",
         *AUTHORITY_BLOCK_KEYS,
     ):

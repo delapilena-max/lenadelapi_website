@@ -481,20 +481,31 @@ def _controlled_visual_qa_kwargs(
     _require(configured_reference == reference_authority_path.resolve(), "controlled_reference_authority_mismatch", "controlled visual QA reference authority differs from the canonical authority")
     reference_authority = _read_json_object(reference_authority_path, code="reference_authority_missing_or_invalid", label="reference authority artifact")
     reference_set_sha = str(reference_authority.get("reference_set_sha256") or "")
-    model_authority_path = (ROOT / str(controlled.get("visual_model_authority_path") or "")).resolve()
-    _ensure_path_within_root(model_authority_path, ROOT, code="visual_model_authority_escape", label="visual model authority", must_exist=True)
     decision_fingerprint = str(decision_fingerprint or candidate_artifact.get("decision_fingerprint_sha256") or "")
     _require(len(decision_fingerprint) == 64, "controlled_candidate_fingerprint_missing", "controlled visual QA requires the selected candidate decision fingerprint")
     _require(len(reference_set_sha) == 64, "controlled_reference_set_sha_missing", "controlled visual QA requires the canonical reference-set SHA")
-    return {
-        "live_visual_review": True,
-        "visual_provider": str(controlled["visual_provider"]),
-        "visual_model": str(controlled["visual_model"]),
-        "visual_model_authority_artifact": model_authority_path,
-        "visual_model_authority_sha256": _sha256_file(model_authority_path),
+    qa_kwargs = {
+        "qa_mode": str(controlled.get("qa_mode") or photo_qa.QA_MODE_AUTONOMOUS_LOCAL),
         "expected_decision_fingerprint": decision_fingerprint,
         "expected_reference_set_sha256": reference_set_sha,
     }
+    diagnostic = controlled.get("external_visual_diagnostic")
+    if isinstance(diagnostic, dict):
+        authority_path = (ROOT / str(diagnostic.get("visual_model_authority_path") or "")).resolve()
+        _ensure_path_within_root(authority_path, ROOT, code="visual_model_authority_escape", label="visual model authority", must_exist=True)
+        qa_kwargs.update(
+            {
+                "external_visual_diagnostic_enabled": bool(diagnostic.get("enabled", False)),
+                "external_visual_diagnostic_provider": str(diagnostic.get("provider") or ""),
+                "external_visual_diagnostic_model": str(diagnostic.get("model") or ""),
+                "external_visual_diagnostic_authority_artifact": authority_path,
+                "external_visual_diagnostic_authority_sha256": _sha256_file(authority_path),
+                "external_visual_diagnostic_authorized": bool(
+                    diagnostic.get("enabled", False) and diagnostic.get("explicit_authorization_required") is not True
+                ),
+            }
+        )
+    return qa_kwargs
 
 
 def _issue_controlled_retry_approval(auth: dict[str, Any], retry_handoff_path: Path) -> dict[str, Any]:

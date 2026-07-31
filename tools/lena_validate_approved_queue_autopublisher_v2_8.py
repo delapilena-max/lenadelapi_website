@@ -35,11 +35,16 @@ def check(report: dict, ok: bool, section: str, label: str, detail: str = "") ->
 def main() -> int:
     report = {
         "ok": True,
-        "version": "v2.8.4",
+        "version": "v2.8.5",
         "files": {},
         "tools": {},
         "batch_gates": {},
         "policy_checks": [],
+        "autonomous_enabled": None,
+        "autonomous_enabled_by_default": None,
+        "autonomous_policy_state": "",
+        "activation_required": None,
+        "separate_activation_validator": "tools/lena_autopublish_go_live_readiness_v1.py",
     }
 
     loaded: dict[str, dict] = {}
@@ -85,11 +90,26 @@ def main() -> int:
     policy = loaded.get("approved_queue_auto_publisher_policy_v2_8.json")
     manifest = loaded.get("approved_queue_auto_publisher_manifest_v2_8.json")
     if policy:
+        autonomous_enabled = policy.get("autonomous_enabled")
+        autonomous_enabled_by_default = policy.get("autonomous_enabled_by_default")
+        report["autonomous_enabled"] = autonomous_enabled if isinstance(autonomous_enabled, bool) else None
+        report["autonomous_enabled_by_default"] = autonomous_enabled_by_default if isinstance(autonomous_enabled_by_default, bool) else None
+        report["autonomous_policy_state"] = str(policy.get("autonomous_policy_state") or "")
+        report["activation_required"] = (autonomous_enabled is False) if isinstance(autonomous_enabled, bool) else None
         check(report, policy.get("policy_id") == "lena_approved_queue_auto_publisher_policy_v2_8", "policy_checks", "policy id matches")
         check(report, policy.get("policy_version") == "v2.8.0", "policy_checks", "policy version matches")
         check(report, policy.get("autonomous_mode") == "scheduled_autonomous", "policy_checks", "policy names separate autonomous mode")
-        check(report, policy.get("autonomous_enabled") is False, "policy_checks", "autonomous mode disabled by default")
-        check(report, policy.get("autonomous_enabled_by_default") is False, "policy_checks", "autonomous mode disabled by default flag")
+        check(report, isinstance(autonomous_enabled, bool), "policy_checks", "autonomous enabled flag is boolean")
+        if isinstance(autonomous_enabled, bool):
+            expected_policy_state = "enabled" if autonomous_enabled else "disabled_by_default"
+            check(
+                report,
+                report["autonomous_policy_state"] == expected_policy_state,
+                "policy_checks",
+                "autonomous policy state matches enabled flag",
+                detail=f"expected={expected_policy_state} actual={report['autonomous_policy_state']}",
+            )
+        check(report, autonomous_enabled_by_default is False, "policy_checks", "autonomous mode disabled by default flag")
         check(report, int(policy.get("hard_item_limit_per_invocation", 0)) == 1, "policy_checks", "hard item limit is one")
         check(report, set(policy.get("approved_slots", [])) == {"morning", "afternoon", "evening"}, "policy_checks", "approved slots are morning afternoon evening")
         check(report, policy.get("manual_live_mode_unchanged") is True, "policy_checks", "manual live mode unchanged")
