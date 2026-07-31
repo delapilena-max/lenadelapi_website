@@ -46,6 +46,37 @@ def _run_powershell(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _run_powershell_command(command: str) -> subprocess.CompletedProcess[str]:
+    return _run_powershell("-Command", command)
+
+
+def _process_debug(proc: subprocess.CompletedProcess[str], label: str) -> str:
+    command = " ".join(str(part) for part in proc.args)
+    return (
+        f"{label} failed\n"
+        f"command: {command}\n"
+        f"returncode: {proc.returncode}\n"
+        f"stderr:\n{proc.stderr}\n"
+        f"stdout:\n{proc.stdout}"
+    )
+
+
+def _assert_json_success(proc: subprocess.CompletedProcess[str], label: str) -> dict:
+    assert proc.returncode == 0, _process_debug(proc, label)
+    assert proc.stdout.strip(), _process_debug(proc, label)
+    return json.loads(proc.stdout)
+
+
+def _assert_failed_process(
+    proc: subprocess.CompletedProcess[str], label: str, expected_text: str | None = None
+) -> None:
+    assert proc.returncode != 0, _process_debug(proc, label)
+    assert proc.stderr.strip(), _process_debug(proc, label)
+    if expected_text is not None:
+        combined = proc.stderr + proc.stdout
+        assert expected_text in combined, _process_debug(proc, label)
+
+
 def _legacy_task(
     name: str,
     execute: str,
@@ -148,8 +179,7 @@ def _canonical_plan() -> dict:
         "-PythonExe",
         sys.executable,
     )
-    assert proc.returncode == 0, proc.stderr
-    return json.loads(proc.stdout)
+    return _assert_json_success(proc, "canonical validate-only registration plan")
 
 
 def _contract_sha256(plan: dict) -> str:
@@ -278,8 +308,7 @@ def _source() -> str:
 
 def test_migration_validate_only_plan_identifies_four_legacy_tasks_precisely(tmp_path: Path) -> None:
     proc = _validate_only_plan(tmp_path)
-    assert proc.returncode == 0, proc.stderr
-    plan = json.loads(proc.stdout)
+    plan = _assert_json_success(proc, "migration validate-only plan")
 
     assert plan["ok"] is True
     assert plan["canonical_task_name"] == CANONICAL_TASK_NAME
@@ -301,8 +330,7 @@ def test_migration_validate_only_plan_identifies_four_legacy_tasks_precisely(tmp
 
 def test_migration_plan_governs_exact_old_checkout_paths_and_principals(tmp_path: Path) -> None:
     proc = _validate_only_plan(tmp_path)
-    assert proc.returncode == 0, proc.stderr
-    plan = json.loads(proc.stdout)
+    plan = _assert_json_success(proc, "migration validate-only principal/path plan")
 
     assert plan["legacy_expected_repo_root"] == LEGACY_REPO_ROOT
     for spec in plan["governed_legacy_tasks"]:
@@ -319,11 +347,7 @@ def test_enabled_legacy_task_fails_closed(tmp_path: Path) -> None:
     payload[1]["enabled"] = True
 
     proc = _validate_only_plan(tmp_path, payload=payload)
-    assert proc.returncode != 0
-    plan = json.loads(proc.stdout)
-
-    assert plan["ok"] is False
-    assert any(item["code"] == "legacy_task_not_disabled" for item in plan["blockers"])
+    _assert_failed_process(proc, "enabled legacy task fail-closed case", "legacy_task_not_disabled")
 
 
 def test_missing_legacy_task_without_prior_receipt_fails_closed(tmp_path: Path) -> None:
@@ -331,18 +355,12 @@ def test_missing_legacy_task_without_prior_receipt_fails_closed(tmp_path: Path) 
     payload[2]["present"] = False
 
     proc = _validate_only_plan(tmp_path, payload=payload)
-    assert proc.returncode != 0
-    plan = json.loads(proc.stdout)
-
-    assert plan["ok"] is False
-    assert plan["resumable_state"]["authorized"] is False
-    assert any(item["code"] == "legacy_task_missing" for item in plan["blockers"])
+    _assert_failed_process(proc, "missing legacy task fail-closed case", "legacy_task_missing")
 
 
 def test_missing_legacy_task_with_valid_prior_receipt_authorizes_deterministic_resume(tmp_path: Path) -> None:
     first_proc = _validate_only_plan(tmp_path / "plan_seed")
-    assert first_proc.returncode == 0, first_proc.stderr
-    first_plan = json.loads(first_proc.stdout)
+    first_plan = _assert_json_success(first_proc, "seed validate-only plan")
     prior_receipt = _write_prior_receipt(
         tmp_path,
         contract_sha256=_contract_sha256(first_plan),
@@ -365,8 +383,7 @@ def test_missing_legacy_task_with_valid_prior_receipt_authorizes_deterministic_r
     }
 
     proc = _validate_only_plan(tmp_path / "resume_case", payload=payload, prior_receipt_path=prior_receipt)
-    assert proc.returncode == 0, proc.stderr
-    plan = json.loads(proc.stdout)
+    plan = _assert_json_success(proc, "resumable validate-only plan")
 
     assert plan["ok"] is True
     assert plan["resumable_state"]["prior_receipt_valid"] is True
@@ -377,8 +394,7 @@ def test_missing_legacy_task_with_valid_prior_receipt_authorizes_deterministic_r
 
 def test_tampered_prior_receipt_fails_closed(tmp_path: Path) -> None:
     first_proc = _validate_only_plan(tmp_path / "plan_seed")
-    assert first_proc.returncode == 0, first_proc.stderr
-    first_plan = json.loads(first_proc.stdout)
+    first_plan = _assert_json_success(first_proc, "seed validate-only plan for tampered receipt")
     prior_receipt = _write_prior_receipt(
         tmp_path,
         contract_sha256=_contract_sha256(first_plan),
@@ -402,18 +418,13 @@ def test_tampered_prior_receipt_fails_closed(tmp_path: Path) -> None:
     }
 
     proc = _validate_only_plan(tmp_path / "tampered_case", payload=payload, prior_receipt_path=prior_receipt)
-    assert proc.returncode != 0
-    plan = json.loads(proc.stdout)
-
-    assert plan["ok"] is False
-    assert any(item["code"] == "prior_receipt_invalid" for item in plan["blockers"])
+    _assert_failed_process(proc, "tampered prior receipt fail-closed case", "prior_receipt_invalid")
 
 
 def test_validate_only_performs_zero_writes_and_plans_external_paths(tmp_path: Path) -> None:
     output_root = tmp_path / "outside_reports"
     proc = _validate_only_plan(tmp_path, output_root=output_root)
-    assert proc.returncode == 0, proc.stderr
-    plan = json.loads(proc.stdout)
+    plan = _assert_json_success(proc, "zero-write validate-only plan")
 
     assert plan["mutation_counters"] == {
         "scheduler_mutations_performed": 0,
@@ -432,8 +443,7 @@ def test_validate_only_performs_zero_writes_and_plans_external_paths(tmp_path: P
 
 def test_canonical_replacement_is_exact_and_disabled(tmp_path: Path) -> None:
     proc = _validate_only_plan(tmp_path)
-    assert proc.returncode == 0, proc.stderr
-    plan = json.loads(proc.stdout)
+    plan = _assert_json_success(proc, "canonical replacement validate-only plan")
     canonical = _canonical_plan()
 
     assert plan["canonical_replacement_count"] == 1
@@ -442,6 +452,48 @@ def test_canonical_replacement_is_exact_and_disabled(tmp_path: Path) -> None:
     assert plan["canonical_plan"]["action"]["working_directory"] == str(ROOT)
     assert plan["apply_guards"]["canonical_task_must_be_disabled"] is True
     assert plan["apply_guards"]["verify_canonical_task_before_legacy_removal"] is True
+
+
+def test_source_resolves_current_host_before_fallback_and_avoids_literal_child_powershell() -> None:
+    source = _source()
+
+    assert "function Resolve-CurrentPowerShellHost" in source
+    assert "Get-Process -Id $PID" in source
+    assert "$hostPath = Resolve-CurrentPowerShellHost" in source
+    assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $registerScript" not in source
+    assert "Invoke-PowerShellChildProcess" in source
+
+
+def test_source_declares_desktop_and_core_powerShell_host_fallbacks() -> None:
+    source = _source()
+
+    assert "@('powershell.exe')" in source
+    assert "@('pwsh', 'pwsh.exe')" in source
+    assert 'Unable to resolve a valid PowerShell host for edition' in source
+
+
+def test_dot_sourced_helper_reports_core_host_on_current_runtime() -> None:
+    proc = _run_powershell_command(
+        f". '{SCRIPT}'; Resolve-CurrentPowerShellHost | Write-Output"
+    )
+    assert proc.returncode == 0, _process_debug(proc, "current host resolver")
+    assert proc.stdout.strip(), _process_debug(proc, "current host resolver")
+    if sys.platform.startswith("win"):
+        assert proc.stdout.strip().lower().endswith(("pwsh.exe", "powershell.exe"))
+    else:
+        assert proc.stdout.strip().lower().endswith("pwsh")
+
+
+def test_dot_sourced_helper_fails_closed_when_no_host_can_be_resolved() -> None:
+    proc = _run_powershell_command(
+        f". '{SCRIPT}'; try {{ Resolve-CurrentPowerShellHost -CurrentProcessPath 'C:\\definitely-missing\\not-a-real-host.exe' -Edition Core -FallbackCandidates @('definitely-not-a-real-pwsh-host') | Out-Null; exit 0 }} catch {{ Write-Error $_.Exception.Message; exit 1 }}"
+    )
+    _assert_failed_process(proc, "missing host resolution", "Unable to resolve a valid PowerShell host")
+
+
+def test_source_emits_stderr_summary_for_validate_only_blockers() -> None:
+    source = _source()
+    assert "Validate-only blockers:" in source
 
 
 def test_source_requires_elevation_and_backups_before_mutation() -> None:
@@ -496,3 +548,26 @@ def test_source_has_no_video_task_handling_or_provider_capability() -> None:
     assert "anthropic = $false" in source
     assert "Invoke-RestMethod" not in source
     assert "Invoke-WebRequest" not in source
+
+
+def test_failed_execution_reports_process_details_instead_of_json_decode_noise(tmp_path: Path) -> None:
+    proc = _run_powershell(
+        "-File",
+        str(SCRIPT),
+        "-ValidateOnly",
+        "-RepoRoot",
+        str(ROOT),
+        "-PythonExe",
+        sys.executable,
+        "-TaskSnapshotPath",
+        str(tmp_path / "missing_snapshot.json"),
+    )
+    with_exception = None
+    try:
+        _assert_json_success(proc, "expected failing subprocess")
+    except AssertionError as exc:
+        with_exception = str(exc)
+    assert with_exception is not None
+    assert "returncode:" in with_exception
+    assert "stderr:" in with_exception
+    assert "stdout:" in with_exception

@@ -171,13 +171,112 @@ function Resolve-OutputRoot {
     throw 'Unable to resolve an output root outside the repository.'
 }
 
+function Resolve-PowerShellHostCandidate {
+    param([string]$Candidate)
+    if (-not $Candidate) {
+        return $null
+    }
+    if ([IO.Path]::IsPathRooted($Candidate)) {
+        if (Test-Path -LiteralPath $Candidate -PathType Leaf) {
+            return [IO.Path]::GetFullPath($Candidate)
+        }
+        return $null
+    }
+    $command = Get-Command -Name $Candidate -CommandType Application -ErrorAction SilentlyContinue
+    if ($null -eq $command -or -not $command.Source) {
+        return $null
+    }
+    return [string]$command.Source
+}
+
+function Resolve-CurrentPowerShellHost {
+    param(
+        [string]$CurrentProcessPath = '',
+        [string]$Edition = '',
+        [string[]]$FallbackCandidates = @()
+    )
+    if (-not $CurrentProcessPath) {
+        try {
+            $process = Get-Process -Id $PID -ErrorAction Stop
+            if ($process.Path) {
+                $CurrentProcessPath = [string]$process.Path
+            }
+        }
+        catch {
+            $CurrentProcessPath = ''
+        }
+    }
+    $resolvedCurrent = Resolve-PowerShellHostCandidate -Candidate $CurrentProcessPath
+    if ($resolvedCurrent) {
+        return $resolvedCurrent
+    }
+    if (-not $Edition) {
+        $Edition = [string]$PSVersionTable.PSEdition
+    }
+    $candidates = @()
+    if (@($FallbackCandidates).Count -gt 0) {
+        $candidates = @($FallbackCandidates)
+    }
+    elseif ($Edition -eq 'Desktop') {
+        $candidates = @('powershell.exe')
+    }
+    else {
+        $candidates = @('pwsh', 'pwsh.exe')
+    }
+    foreach ($candidate in $candidates) {
+        $resolved = Resolve-PowerShellHostCandidate -Candidate $candidate
+        if ($resolved) {
+            return $resolved
+        }
+    }
+    $candidateText = if ($candidates.Count -gt 0) { $candidates -join ', ' } else { '<none>' }
+    throw "Unable to resolve a valid PowerShell host for edition '$Edition'. CurrentProcessPath='$CurrentProcessPath'; candidates=$candidateText"
+}
+
+function Invoke-PowerShellChildProcess {
+    param(
+        [string]$HostPath,
+        [string]$WorkingDirectory,
+        [string]$FilePath,
+        [string[]]$Arguments = @()
+    )
+    $stdoutPath = [IO.Path]::GetTempFileName()
+    $stderrPath = [IO.Path]::GetTempFileName()
+    try {
+        Push-Location -LiteralPath $WorkingDirectory
+        try {
+            & $HostPath -NoProfile -ExecutionPolicy Bypass -File $FilePath @Arguments 1> $stdoutPath 2> $stderrPath
+            $exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+        }
+        finally {
+            Pop-Location
+        }
+        return [ordered]@{
+            host_path = $HostPath
+            exit_code = $exitCode
+            stdout = [IO.File]::ReadAllText($stdoutPath)
+            stderr = [IO.File]::ReadAllText($stderrPath)
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-CanonicalPlan {
     $registerScript = Join-Path $RepoRoot 'tools\register_lena_autonomy_scheduler_task_v1.ps1'
     if (-not (Test-Path -LiteralPath $registerScript -PathType Leaf)) {
         throw "Canonical registration script not found: $registerScript"
     }
-    $json = powershell.exe -NoProfile -ExecutionPolicy Bypass -File $registerScript -ValidateOnly -RepoRoot $RepoRoot -PythonExe $PythonExe
-    return $json | ConvertFrom-Json
+    $hostPath = Resolve-CurrentPowerShellHost
+    $result = Invoke-PowerShellChildProcess -HostPath $hostPath -WorkingDirectory $RepoRoot -FilePath $registerScript -Arguments @('-ValidateOnly', '-RepoRoot', $RepoRoot, '-PythonExe', $PythonExe)
+    if ($result.exit_code -ne 0) {
+        throw ("Canonical registration plan generation failed via '{0}' with exit code {1}. stderr: {2} stdout: {3}" -f $result.host_path, $result.exit_code, $result.stderr.Trim(), $result.stdout.Trim())
+    }
+    if (-not $result.stdout.Trim()) {
+        throw ("Canonical registration plan generation returned no stdout via '{0}'." -f $result.host_path)
+    }
+    return $result.stdout | ConvertFrom-Json
 }
 
 function Get-TaskField {
@@ -731,8 +830,21 @@ function Build-Plan {
     return $plan
 }
 
+if ($MyInvocation.InvocationName -eq '.') {
+    return
+}
+
 $plan = Build-Plan
 if ($ValidateOnly) {
+    if (-not $plan.ok) {
+        [Console]::Error.WriteLine(
+            'Validate-only blockers: ' + (
+                @($plan.blockers | ForEach-Object {
+                    '{0}: {1}' -f $_.code, $_.detail
+                }) -join '; '
+            )
+        )
+    }
     $plan | ConvertTo-Json -Depth 10
     exit $(if ($plan.ok) { 0 } else { 1 })
 }
