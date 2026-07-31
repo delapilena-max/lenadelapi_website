@@ -10,7 +10,7 @@ import subprocess
 import sys
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +54,7 @@ REQUIRED_PUBLISH_ENV_KEYS = (
     "R2_ACCESS_KEY_ID",
     "R2_SECRET_ACCESS_KEY",
 )
+DATE_SEGMENT_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 CANONICAL_TASK_NAME = "Lena Autonomy Scheduler Driver"
 LEGACY_TASK_NAMES = (
@@ -175,8 +176,146 @@ def _git_command(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
 
 
+def _runtime_root(path: str) -> PurePosixPath:
+    return PurePosixPath(path)
+
+
+def _analytics_runtime_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 1 and parts[0] in {
+        "lena_manual_post_log_v2_7.csv",
+        "lena_post_metrics_v1_6_1.csv",
+    }
+
+
+def _bounded_live_cycle_match(parts: tuple[str, ...]) -> bool:
+    if len(parts) != 2 or not DATE_SEGMENT_RE.fullmatch(parts[0]):
+        return False
+    return bool(
+        re.fullmatch(
+            rf"lena_bounded_live_cycle_authorization_{re.escape(parts[0])}_[A-Za-z0-9._-]+\.json",
+            parts[1],
+        )
+    )
+
+
+def _publish_packets_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 3 and parts[0] == "lena" and DATE_SEGMENT_RE.fullmatch(parts[1]) and parts[2] == "lena_publish_packets_v2_4.json"
+
+
+def _approved_queue_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 2 and DATE_SEGMENT_RE.fullmatch(parts[0]) and parts[1] == "lena_approved_publish_queue_v2_8.csv"
+
+
+def _approved_queue_receipt_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 3 and DATE_SEGMENT_RE.fullmatch(parts[0]) and bool(re.fullmatch(r"[A-Za-z0-9._-]+", parts[1])) and bool(re.fullmatch(r"q_[A-Za-z0-9._-]+_publish_receipt\.json", parts[2]))
+
+
+def _dispatch_outbox_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 2 and DATE_SEGMENT_RE.fullmatch(parts[0]) and bool(re.fullmatch(r"q_[A-Za-z0-9._-]+_payload\.json", parts[1]))
+
+
+def _dispatch_report_match(parts: tuple[str, ...]) -> bool:
+    return len(parts) == 2 and DATE_SEGMENT_RE.fullmatch(parts[0]) and bool(re.fullmatch(r"approved_queue_autopublish_report_[A-Za-z0-9._-]+\.json", parts[1]))
+
+
+def _governed_runtime_specs() -> tuple[dict[str, Any], ...]:
+    return (
+        {"root": _runtime_root("pipeline/analytics"), "matcher": _analytics_runtime_match},
+        {"root": _runtime_root("pipeline/approvals/lena/bounded_live_cycles"), "matcher": _bounded_live_cycle_match},
+        {"root": _runtime_root("pipeline/publish_packets"), "matcher": _publish_packets_match},
+        {"root": _runtime_root("pipeline/publishing/lena/approved_queue"), "matcher": _approved_queue_match},
+        {"root": _runtime_root("pipeline/publishing/lena/approved_queue_receipts"), "matcher": _approved_queue_receipt_match},
+        {"root": _runtime_root("pipeline/publishing/lena/dispatch_outbox"), "matcher": _dispatch_outbox_match},
+        {"root": _runtime_root("pipeline/publishing/lena/dispatch_reports"), "matcher": _dispatch_report_match},
+    )
+
+
+def _resolve_repo_relative_path(root: Path, relative_path: str) -> Path:
+    return (root / relative_path).resolve()
+
+
+def _classify_governed_runtime_path(root: Path, relative_path: str) -> dict[str, str] | None:
+    normalized = relative_path.replace("\\", "/").strip()
+    if not normalized:
+        return None
+    if normalized.startswith("/"):
+        return None
+    try:
+        repo_relative = PurePosixPath(normalized)
+    except Exception:
+        return None
+    parts = repo_relative.parts
+    if not parts or any(part in {"", ".", ".."} for part in parts):
+        return None
+
+    resolved_repo_root = root.resolve()
+    try:
+        resolved_candidate = _resolve_repo_relative_path(root, normalized)
+        resolved_candidate.relative_to(resolved_repo_root)
+    except Exception:
+        return None
+
+    for spec in _governed_runtime_specs():
+        spec_root = spec["root"]
+        try:
+            relative_within_root = repo_relative.relative_to(spec_root)
+        except ValueError:
+            continue
+        try:
+            resolved_candidate.relative_to((root / spec_root).resolve())
+        except Exception:
+            return None
+        artifact_parts = relative_within_root.parts
+        if spec["matcher"](artifact_parts):
+            return {
+                "path": repo_relative.as_posix(),
+                "approved_root": spec_root.as_posix(),
+            }
+        return None
+    return None
+
+
+def _classify_git_status(root: Path, status_lines: list[str]) -> dict[str, Any]:
+    tracked_status_lines: list[str] = []
+    untracked_status_lines: list[str] = []
+    excluded_runtime_paths: list[dict[str, str]] = []
+    unexpected_untracked_paths: list[dict[str, str]] = []
+
+    for raw_line in status_lines:
+        line = raw_line.rstrip()
+        if not line:
+            continue
+        if line.startswith("?? "):
+            untracked_status_lines.append(line)
+            relative_path = line[3:].strip()
+            classification = _classify_governed_runtime_path(root, relative_path)
+            if classification is not None:
+                excluded_runtime_paths.append(classification)
+                continue
+            unexpected_untracked_paths.append({"path": relative_path.replace("\\", "/")})
+            continue
+        tracked_status_lines.append(line)
+
+    excluded_runtime_roots = sorted({entry["approved_root"] for entry in excluded_runtime_paths})
+    repository_dirty = bool(tracked_status_lines or unexpected_untracked_paths)
+    return {
+        "physically_clean": not bool(status_lines),
+        "clean": not repository_dirty,
+        "repository_dirty": repository_dirty,
+        "tracked_status_lines": tracked_status_lines,
+        "untracked_status_lines": untracked_status_lines,
+        "excluded_governed_runtime_paths": excluded_runtime_paths,
+        "excluded_governed_runtime_path_count": len(excluded_runtime_paths),
+        "excluded_governed_runtime_roots": excluded_runtime_roots,
+        "unexpected_untracked_paths": unexpected_untracked_paths,
+        "unexpected_untracked_path_count": len(unexpected_untracked_paths),
+    }
+
+
 def _git_state(root: Path) -> dict[str, Any]:
-    status = _git_command(root, "status", "--short")
+    status = _git_command(root, "status", "--short", "--untracked-files=all")
+    status_lines = [line for line in status.splitlines() if line.strip()]
+    status_summary = _classify_git_status(root, status_lines)
     head = _git_command(root, "rev-parse", "HEAD")
     branch = _git_command(root, "branch", "--show-current")
     origin_main = _git_command(root, "rev-parse", "origin/main")
@@ -186,8 +325,17 @@ def _git_state(root: Path) -> dict[str, Any]:
         "branch": branch,
         "head": head,
         "origin_main": origin_main,
-        "clean": not bool(status.strip()),
-        "status_lines": [line for line in status.splitlines() if line.strip()],
+        "clean": status_summary["clean"],
+        "physically_clean": status_summary["physically_clean"],
+        "repository_dirty": status_summary["repository_dirty"],
+        "status_lines": status_lines,
+        "tracked_status_lines": status_summary["tracked_status_lines"],
+        "untracked_status_lines": status_summary["untracked_status_lines"],
+        "excluded_governed_runtime_paths": status_summary["excluded_governed_runtime_paths"],
+        "excluded_governed_runtime_path_count": status_summary["excluded_governed_runtime_path_count"],
+        "excluded_governed_runtime_roots": status_summary["excluded_governed_runtime_roots"],
+        "unexpected_untracked_paths": status_summary["unexpected_untracked_paths"],
+        "unexpected_untracked_path_count": status_summary["unexpected_untracked_path_count"],
         "head_matches_origin_main": head == origin_main,
         "origin_main_ancestor_of_head": origin_main_ancestor_of_head,
         "head_ancestor_of_origin_main": head_ancestor_of_origin_main,
@@ -956,8 +1104,13 @@ def _build_report(
     later_enablement_commands = _later_enablement_commands(production_root, python_exe)
 
     blockers: list[dict[str, Any]] = []
-    if not git_state["clean"]:
-        blockers.append({"code": "repository_dirty", "detail": "production repository has uncommitted changes"})
+    governed_runtime_exclusions = {
+        "count": int(git_state.get("excluded_governed_runtime_path_count", 0)),
+        "roots": list(git_state.get("excluded_governed_runtime_roots", [])),
+        "paths": list(git_state.get("excluded_governed_runtime_paths", [])),
+    }
+    if git_state.get("repository_dirty", not git_state["clean"]):
+        blockers.append({"code": "repository_dirty", "detail": "production repository has tracked changes or unexpected untracked files"})
     head_contains_origin_main = bool(
         git_state.get("origin_main_ancestor_of_head", git_state["head_matches_origin_main"])
     )
@@ -1129,6 +1282,7 @@ def _build_report(
         "python_exe": str(python_exe),
         "python_exe_source": python_source,
         "git": git_state,
+        "governed_runtime_exclusions": governed_runtime_exclusions,
         "python_probe": python_probe,
         "publisher_config": _sanitize_config_status(config_status),
         "publisher_config_ready": publisher_config_ready,
@@ -1188,7 +1342,8 @@ def _render_markdown(report: dict[str, Any]) -> str:
         f"- Python: `{report['python_exe']}`",
         f"- Git HEAD: `{report['git']['head']}`",
         f"- Origin main: `{report['git']['origin_main']}`",
-        f"- Clean worktree: `{report['git']['clean']}`",
+        f"- Git status empty: `{report['git'].get('physically_clean', report['git']['clean'])}`",
+        f"- Readiness-clean worktree: `{report['git']['clean']}`",
         f"- Structural validity: `{report['structural_validity']['ok']}`",
         f"- Activation required: `{report['activation_state']['activation_required']}`",
         "",
@@ -1213,6 +1368,25 @@ def _render_markdown(report: dict[str, Any]) -> str:
     )
     for command in report["safe_validation_commands"]:
         lines.append(f"- `{command}`")
+    lines.extend(
+        [
+            "",
+            "## Governed Runtime Exclusions",
+            "",
+        ]
+    )
+    exclusions = report.get("governed_runtime_exclusions", {})
+    lines.append(f"- Excluded runtime path count: `{exclusions.get('count', 0)}`")
+    if exclusions.get("roots"):
+        for root in exclusions["roots"]:
+            lines.append(f"- Approved runtime root: `{root}`")
+    else:
+        lines.append("- Approved runtime root: none")
+    if exclusions.get("paths"):
+        for path_entry in exclusions["paths"]:
+            lines.append(f"- Excluded runtime path: `{path_entry['path']}`")
+    else:
+        lines.append("- Excluded runtime path: none")
     lines.extend(
         [
             "",

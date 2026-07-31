@@ -571,6 +571,131 @@ def test_resolve_python_exe_missing_executable_fails_closed_in_probe(tmp_path: P
     assert probe["reason"] == "python_executable_missing"
 
 
+def test_classify_git_status_excludes_expected_governed_runtime_outputs(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    summary = readiness._classify_git_status(
+        production_root,
+        [
+            "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
+            "?? pipeline/analytics/lena_post_metrics_v1_6_1.csv",
+            "?? pipeline/approvals/lena/bounded_live_cycles/2026-07-31/lena_bounded_live_cycle_authorization_2026-07-31_lenagate20260731dd3acbe5-pack000-00-photo.json",
+            "?? pipeline/publish_packets/lena/2026-07-31/lena_publish_packets_v2_4.json",
+            "?? pipeline/publishing/lena/approved_queue/2026-07-31/lena_approved_publish_queue_v2_8.csv",
+            "?? pipeline/publishing/lena/approved_queue_receipts/2026-07-31/lenagate20260731dd3acbe5-pack000-00-photo/q_488721d95be927_Instagram_Feed_publish_receipt.json",
+            "?? pipeline/publishing/lena/dispatch_outbox/2026-07-31/q_488721d95be927_Instagram_Feed_payload.json",
+            "?? pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
+        ],
+    )
+
+    assert summary["physically_clean"] is False
+    assert summary["clean"] is True
+    assert summary["repository_dirty"] is False
+    assert summary["tracked_status_lines"] == []
+    assert summary["unexpected_untracked_paths"] == []
+    assert summary["excluded_governed_runtime_path_count"] == 8
+    assert summary["excluded_governed_runtime_roots"] == [
+        "pipeline/analytics",
+        "pipeline/approvals/lena/bounded_live_cycles",
+        "pipeline/publish_packets",
+        "pipeline/publishing/lena/approved_queue",
+        "pipeline/publishing/lena/approved_queue_receipts",
+        "pipeline/publishing/lena/dispatch_outbox",
+        "pipeline/publishing/lena/dispatch_reports",
+    ]
+
+
+def test_classify_git_status_tracked_source_change_still_blocks(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    summary = readiness._classify_git_status(
+        production_root,
+        [
+            " M tools/lena_autopublish_go_live_readiness_v1.py",
+            "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
+        ],
+    )
+
+    assert summary["clean"] is False
+    assert summary["repository_dirty"] is True
+    assert summary["tracked_status_lines"] == [" M tools/lena_autopublish_go_live_readiness_v1.py"]
+    assert summary["excluded_governed_runtime_path_count"] == 1
+    assert summary["unexpected_untracked_paths"] == []
+
+
+def test_classify_git_status_unexpected_untracked_file_still_blocks(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    summary = readiness._classify_git_status(
+        production_root,
+        [
+            "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
+            "?? notes/unexpected.txt",
+        ],
+    )
+
+    assert summary["clean"] is False
+    assert summary["repository_dirty"] is True
+    assert summary["excluded_governed_runtime_path_count"] == 1
+    assert summary["unexpected_untracked_paths"] == [{"path": "notes/unexpected.txt"}]
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "pipeline/analytics/helper.py",
+        "pipeline/publishing/lena/dispatch_reports/2026-07-31/runtime_fix.ps1",
+        "pipeline/publish_packets/lena/2026-07-31/meta_publisher_config_v2_9.local.json",
+        "pipeline/publishing/lena/approved_queue/2026-07-31/.env",
+    ],
+)
+def test_classify_governed_runtime_path_rejects_source_config_and_secret_like_files(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    assert readiness._classify_governed_runtime_path(production_root, relative_path) is None
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "pipeline/analytics/../secret.env",
+        "/pipeline/analytics/lena_manual_post_log_v2_7.csv",
+        "pipeline/autonomy/lena/bounded_live_cycles/2026-07-31/lena_bounded_live_cycle_authorization_2026-07-31_slot.json",
+    ],
+)
+def test_classify_governed_runtime_path_rejects_path_escape_or_unapproved_roots(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    assert readiness._classify_governed_runtime_path(production_root, relative_path) is None
+
+
+def test_classify_governed_runtime_path_rejects_symlink_escape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    escaped = tmp_path / "outside" / "q_488721d95be927_Instagram_Feed_payload.json"
+
+    monkeypatch.setattr(readiness, "_resolve_repo_relative_path", lambda root, relative_path: escaped.resolve())
+
+    assert (
+        readiness._classify_governed_runtime_path(
+            production_root,
+            "pipeline/publishing/lena/dispatch_outbox/2026-07-31/q_488721d95be927_Instagram_Feed_payload.json",
+        )
+        is None
+    )
+
+
 def test_go_live_readiness_reports_ready_from_explicit_production_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -818,6 +943,124 @@ def test_build_report_marks_disabled_canonical_driver_ready_for_bounded_photo_pr
     assert report["task_enables_performed"] == 0
     assert report["anthropic_calls_performed"] == 0
     assert report["video_actions_performed"] == 0
+
+
+def test_build_report_reports_governed_runtime_exclusions_transparently(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    production_root = tmp_path / "production"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    production_root.mkdir(parents=True, exist_ok=True)
+    shared_secret_path = _write_env_tree(production_root)
+    _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
+
+    monkeypatch.setattr(readiness, "ROOT", repo_root)
+    monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
+    monkeypatch.setattr(
+        readiness,
+        "_git_state",
+        lambda root: {
+            "branch": "",
+            "head": "b" * 40,
+            "origin_main": "a" * 40,
+            "clean": True,
+            "physically_clean": False,
+            "repository_dirty": False,
+            "status_lines": [
+                "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
+                "?? pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
+            ],
+            "tracked_status_lines": [],
+            "untracked_status_lines": [
+                "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
+                "?? pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
+            ],
+            "excluded_governed_runtime_paths": [
+                {
+                    "path": "pipeline/analytics/lena_manual_post_log_v2_7.csv",
+                    "approved_root": "pipeline/analytics",
+                },
+                {
+                    "path": "pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
+                    "approved_root": "pipeline/publishing/lena/dispatch_reports",
+                },
+            ],
+            "excluded_governed_runtime_path_count": 2,
+            "excluded_governed_runtime_roots": [
+                "pipeline/analytics",
+                "pipeline/publishing/lena/dispatch_reports",
+            ],
+            "unexpected_untracked_paths": [],
+            "unexpected_untracked_path_count": 0,
+            "head_matches_origin_main": False,
+            "origin_main_ancestor_of_head": True,
+            "head_ancestor_of_origin_main": False,
+        },
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_probe_python_interpreter",
+        lambda python_exe, production_root: {
+            "ok": True,
+            "reason": "",
+            "python_exe": str(python_exe),
+            "returncode": 0,
+            "stdout_tail": [],
+            "stderr_tail": [],
+            "parsed": {"ok": True, "executable": str(python_exe), "module": "tools.publishers.lena_meta_publish_common_v2_9"},
+        },
+    )
+    monkeypatch.setattr(readiness, "_git_is_ancestor", lambda root, ancestor_commit, descendant_commit: True)
+    monkeypatch.setattr(
+        readiness,
+        "_canonical_scheduler_definition",
+        lambda production_root, python_exe: _scheduler_definition(production_root, python_exe),
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_registered_task_deployment_status",
+        lambda production_root, scheduler_definition: {
+            "query_ok": True,
+            "deployment_state": "canonical_driver_disabled",
+            "activation_required": True,
+            "continuous_autonomy_active": False,
+            "tasks": [],
+            "canonical_task_present": True,
+            "canonical_task_enabled": False,
+            "canonical_task_matches_plan": True,
+            "legacy_tasks_present": [],
+            "stale_deployment_detected": False,
+            "blockers": [],
+        },
+    )
+
+    report = readiness._build_report(production_root, Path("python.exe"), "cli", "cli", "2026-07-31")
+
+    assert report["overall_result"] == "ready_for_bounded_photo_autonomy_proof"
+    assert report["governed_runtime_exclusions"] == {
+        "count": 2,
+        "roots": [
+            "pipeline/analytics",
+            "pipeline/publishing/lena/dispatch_reports",
+        ],
+        "paths": [
+            {
+                "path": "pipeline/analytics/lena_manual_post_log_v2_7.csv",
+                "approved_root": "pipeline/analytics",
+            },
+            {
+                "path": "pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
+                "approved_root": "pipeline/publishing/lena/dispatch_reports",
+            },
+        ],
+    }
+    assert report["git"]["physically_clean"] is False
+    assert report["git"]["clean"] is True
+    assert report["blockers"] == []
 
 
 def test_build_report_blocks_when_no_governed_scheduler_state_exists(
