@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -187,13 +188,48 @@ def test_publish_common_config_status_reads_explicit_root(tmp_path: Path, monkey
     assert status["readiness"]["media_host_ready"] is True
 
 
-def test_resolve_python_exe_uses_path_lookup_for_bare_cli_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(readiness.shutil, "which", lambda value: r"C:\Python314\python.exe" if value == "python.exe" else None)
+def test_resolve_python_exe_uses_path_lookup_for_bare_cli_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_python = tmp_path / "bin" / "python.exe"
+    fake_python.parent.mkdir(parents=True, exist_ok=True)
+    fake_python.write_text("", encoding="utf-8")
+    monkeypatch.setattr(readiness.shutil, "which", lambda value: str(fake_python) if value == "python.exe" else None)
 
     python_exe, source = readiness._resolve_python_exe("python.exe")
 
     assert source == "cli"
-    assert python_exe == Path(r"C:\Python314\python.exe")
+    assert python_exe == fake_python.resolve()
+
+
+def test_resolve_python_exe_preserves_explicit_relative_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_python = tmp_path / "runtime" / "python.exe"
+    fake_python.parent.mkdir(parents=True, exist_ok=True)
+    fake_python.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    python_exe, source = readiness._resolve_python_exe(os.path.join("runtime", "python.exe"))
+
+    assert source == "cli"
+    assert python_exe == fake_python.resolve()
+
+
+def test_resolve_python_exe_preserves_explicit_windows_absolute_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(readiness.shutil, "which", lambda value: None)
+
+    python_exe, source = readiness._resolve_python_exe(r"C:\Python314\python.exe")
+
+    assert source == "cli"
+    assert str(python_exe) == r"C:\Python314\python.exe"
+
+
+def test_resolve_python_exe_missing_executable_fails_closed_in_probe(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    python_exe, source = readiness._resolve_python_exe("missing-python-executable")
+    probe = readiness._probe_python_interpreter(python_exe, production_root)
+
+    assert source == "cli"
+    assert probe["ok"] is False
+    assert probe["reason"] == "python_executable_missing"
 
 
 def test_go_live_readiness_reports_ready_from_explicit_production_root(

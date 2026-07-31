@@ -4,6 +4,7 @@ import argparse
 import json
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -46,6 +47,7 @@ PYTHON_EXE_ENV_KEYS = (
     "CONTENT_BOT_PYTHON_EXE",
     "PYTHON_EXE",
 )
+WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
 REQUIRED_PUBLISH_ENV_KEYS = (
     "META_PAGE_ACCESS_TOKEN",
     "META_INSTAGRAM_ACCESS_TOKEN",
@@ -149,13 +151,23 @@ def _resolve_production_root(raw: str | None = None) -> Path:
 
 
 def _resolve_python_exe(raw: str | None = None) -> tuple[Path, str]:
+    def is_windows_absolute(value: str) -> bool:
+        return bool(WINDOWS_ABSOLUTE_PATH_RE.match(value))
+
     def resolve_candidate(value: str) -> Path:
-        candidate = Path(value).expanduser()
-        if candidate.is_absolute() or any(sep in value for sep in ("\\", "/")):
+        expanded = os.path.expanduser(value)
+        if is_windows_absolute(expanded):
+            return Path(expanded)
+        candidate = Path(expanded)
+        if candidate.is_absolute():
             return candidate.resolve()
         which = shutil.which(value)
         if which:
+            if is_windows_absolute(which):
+                return Path(which)
             return Path(which).resolve()
+        if any(sep in expanded for sep in ("\\", "/")):
+            return candidate.resolve()
         return candidate.resolve()
 
     if raw:
