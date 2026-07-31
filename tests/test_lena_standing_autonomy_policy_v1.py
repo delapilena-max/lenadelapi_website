@@ -147,6 +147,31 @@ def test_default_validation_accepts_current_authorization_timing(
     assert result["artifact"]["slot_id"]
 
 
+def test_issue_cycle_authorization_can_optionally_allow_existing_output_for_post_generation_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch)
+    auth_path = Path(bundle["auth_path"])
+    auth_path.unlink()
+    image_path = Path(bundle["image_path"])
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"already-generated-phase-a-output")
+
+    result = standing_autonomy.issue_cycle_authorization(
+        Path(bundle["policy_path"]),
+        Path(bundle["handoff_path"]),
+        allow_existing_outputs=True,
+    )
+
+    assert Path(result["path"]).is_file()
+    issued = json.loads(Path(result["path"]).read_text(encoding="utf-8"))
+    assert issued["publish_authorized"] is True
+    assert issued["expected_output_stem"] == image_path.stem
+
+
 def test_historical_mode_accepts_expired_unconsumed_authorization_context(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

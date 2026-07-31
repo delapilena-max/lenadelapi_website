@@ -5,11 +5,15 @@
   "instagram_business_account_id": "17841409711154047",
   "facebook_page_id": "1267219163131062",
   "ig_share_reels_to_feed": true,
-  "media_public_base_url": "https://pub-ee462a06dda9471ca44720da4c8597b5.r2.dev",
+  "media_public_base_url": "https://media.nicnodes.us",
+  "r2_account_id": "c0e8fe2666397392158302767db14a7b",
+  "r2_bucket_name": "nicnodes-media",
+  "r2_public_base_url": "https://media.nicnodes.us",
   "dry_run": false,
   "notes": [
     "auth_mode: facebook_login uses META_PAGE_ACCESS_TOKEN via graph.facebook.com.",
     "Tokens and secrets live only in the canonical machine-local publisher secret file C:/projects/ai/content_bot/.env.",
-    "R2 env vars provide the primary media host for Meta publishing."
+    "R2 access credentials live only in the canonical machine-local publisher secret file; non-secret R2 route values are tracked here.",
+    "Meta publishing uses the governed nicnodes-media bucket and the production custom domain https://media.nicnodes.us."
   ]
 }
