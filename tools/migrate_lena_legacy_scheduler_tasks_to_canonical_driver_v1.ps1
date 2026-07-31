@@ -417,6 +417,24 @@ function Get-ContractHash {
     return Get-Sha256Hex -Text (ConvertTo-CanonicalJson -Value $ContractDescriptor)
 }
 
+function ConvertTo-StableArray {
+    param([object]$Value)
+    if ($null -eq $Value) {
+        return @()
+    }
+    if ($Value -is [Array]) {
+        return $Value
+    }
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+        $items = New-Object System.Collections.Generic.List[object]
+        foreach ($item in $Value) {
+            $items.Add($item)
+        }
+        return $items.ToArray()
+    }
+    return @($Value)
+}
+
 function Get-ReceiptProofMaterial {
     param([object]$Receipt)
     return [ordered]@{
@@ -426,21 +444,68 @@ function Get-ReceiptProofMaterial {
         contract_sha256 = [string](Get-TaskField $Receipt 'contract_sha256')
         repo_root = [string](Get-TaskField $Receipt 'repo_root')
         python_exe = [string](Get-TaskField $Receipt 'python_exe')
-        pre_backups = @(Get-TaskField $Receipt 'pre_backups')
+        pre_backups = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'pre_backups')
         canonical_pre = Get-TaskField $Receipt 'canonical_pre'
         canonical_post = Get-TaskField $Receipt 'canonical_post'
-        legacy_tasks_removed = @(Get-TaskField $Receipt 'legacy_tasks_removed')
-        changes = @(Get-TaskField $Receipt 'changes')
+        legacy_tasks_removed = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'legacy_tasks_removed')
+        changes = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'changes')
         rollback = Get-TaskField $Receipt 'rollback'
-        post_state = @(Get-TaskField $Receipt 'post_state')
+        post_state = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'post_state')
     }
 }
 
 function Add-ReceiptProof {
-    param([hashtable]$Receipt)
+    param([System.Collections.IDictionary]$Receipt)
     $material = Get-ReceiptProofMaterial -Receipt $Receipt
-    $Receipt.proof_sha256 = Get-Sha256Hex -Text (ConvertTo-CanonicalJson -Value $material)
+    $Receipt['proof_sha256'] = Get-Sha256Hex -Text (ConvertTo-CanonicalJson -Value $material)
     return $Receipt
+}
+
+function Get-InnerExceptionDetails {
+    param([Exception]$Exception)
+    $details = New-Object System.Collections.Generic.List[object]
+    $current = $Exception.InnerException
+    while ($null -ne $current) {
+        $details.Add([ordered]@{
+            exception_type = $current.GetType().FullName
+            message = [string]$current.Message
+        })
+        $current = $current.InnerException
+    }
+    return ConvertTo-StableArray -Value $details
+}
+
+function New-StructuredFailureReport {
+    param(
+        [System.Management.Automation.ErrorRecord]$ErrorRecord,
+        [string]$StageIdentifier,
+        [System.Collections.IDictionary]$MutationCounters
+    )
+    $invocation = $ErrorRecord.InvocationInfo
+    return [ordered]@{
+        report_type = 'lena_scheduler_legacy_to_canonical_driver_failure'
+        schema_version = 'v1'
+        stage_identifier = $StageIdentifier
+        generated_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        exception_type = $ErrorRecord.Exception.GetType().FullName
+        message = [string]$ErrorRecord.Exception.Message
+        fully_qualified_error_id = [string]$ErrorRecord.FullyQualifiedErrorId
+        category_info = [string]$ErrorRecord.CategoryInfo
+        script_name = [string]$invocation.ScriptName
+        script_line_number = $invocation.ScriptLineNumber
+        offset_in_line = $invocation.OffsetInLine
+        line = [string]$invocation.Line
+        position_message = [string]$invocation.PositionMessage
+        script_stack_trace = [string]$ErrorRecord.ScriptStackTrace
+        inner_exceptions = @(Get-InnerExceptionDetails -Exception $ErrorRecord.Exception)
+        mutation_counters = [ordered]@{
+            scheduler_mutations_performed = [int](Get-TaskField $MutationCounters 'scheduler_mutations_performed')
+            task_start_operations_performed = [int](Get-TaskField $MutationCounters 'task_start_operations_performed')
+            task_enable_operations_performed = [int](Get-TaskField $MutationCounters 'task_enable_operations_performed')
+            backup_writes_performed = [int](Get-TaskField $MutationCounters 'backup_writes_performed')
+            receipt_writes_performed = [int](Get-TaskField $MutationCounters 'receipt_writes_performed')
+        }
+    }
 }
 
 function Get-ValidatedPriorReceipt {
@@ -555,7 +620,7 @@ function Invoke-Rollback {
         report_type = 'lena_scheduler_legacy_to_canonical_driver_rollback_receipt'
         schema_version = 'v1'
         rolled_back_at_utc = (Get-Date).ToUniversalTime().ToString('o')
-        restored_tasks = @($restoreLog)
+        restored_tasks = ConvertTo-StableArray -Value $restoreLog
     }
     $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $RollbackReceiptPath -Encoding utf8
 }
@@ -863,88 +928,125 @@ if (-not $plan.ok) {
 }
 
 $resolvedOutputRoot = Resolve-OutputRoot
-if (Test-IsPathWithinRoot -Path $resolvedOutputRoot -Root $RepoRoot) {
-    Write-Error "OutputRoot must remain outside the repository: $resolvedOutputRoot"
-    exit 1
+$currentStage = 'preflight'
+$applyMutationCounters = [ordered]@{
+    scheduler_mutations_performed = 0
+    task_start_operations_performed = 0
+    task_enable_operations_performed = 0
+    backup_writes_performed = 0
+    receipt_writes_performed = 0
 }
-[IO.Directory]::CreateDirectory($resolvedOutputRoot) | Out-Null
-$runRoot = Join-Path $resolvedOutputRoot ("scheduler_task_migration_{0}" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
-[IO.Directory]::CreateDirectory($runRoot) | Out-Null
-
-$preBackups = New-Object System.Collections.Generic.List[object]
-$canonicalExistingBefore = ($plan.canonical_task_state.present -eq $true)
-foreach ($spec in $LegacySpecs) {
-    $stateRecord = @($plan.legacy_tasks | Where-Object { $_.task_name -eq $spec.task_name })[0]
-    if ($stateRecord.present) {
-        $preBackups.Add((Export-TaskXmlToPath -TaskName $spec.task_name -Path (Join-Path $runRoot ("pre_{0}.xml" -f ($spec.task_name -replace '[^A-Za-z0-9]+', '_')))))
+$receipt = $null
+$receiptPath = ''
+$rollbackPath = ''
+try {
+    if (Test-IsPathWithinRoot -Path $resolvedOutputRoot -Root $RepoRoot) {
+        throw "OutputRoot must remain outside the repository: $resolvedOutputRoot"
     }
-    elseif ($plan.resumable_state.authorized) {
-        $receipt = Get-ValidatedPriorReceipt -Path $PriorReceiptPath -ContractHash $plan.contract_sha256
-        $existingBackup = @((Get-TaskField $receipt 'pre_backups') | Where-Object { [string](Get-TaskField $_ 'task_name') -eq $spec.task_name })[0]
-        $preBackups.Add([ordered]@{
-            task_name = [string](Get-TaskField $existingBackup 'task_name')
-            xml_path = [string](Get-TaskField $existingBackup 'xml_path')
-            xml_sha256 = [string](Get-TaskField $existingBackup 'xml_sha256')
-        })
-    }
-}
+    $currentStage = 'backup-root preparation'
+    [IO.Directory]::CreateDirectory($resolvedOutputRoot) | Out-Null
+    $runRoot = Join-Path $resolvedOutputRoot ("scheduler_task_migration_{0}" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
+    [IO.Directory]::CreateDirectory($runRoot) | Out-Null
 
-$canonicalExisting = Get-ScheduledTask -TaskName $CanonicalTaskName -ErrorAction SilentlyContinue
-if ($null -ne $canonicalExisting) {
-    $preBackups.Add((Export-TaskXmlToPath -TaskName $CanonicalTaskName -Path (Join-Path $runRoot ("pre_{0}.xml" -f ($CanonicalTaskName -replace '[^A-Za-z0-9]+', '_')))))
-}
-
-$receipt = [ordered]@{
-    report_type = 'lena_scheduler_legacy_to_canonical_driver_migration_receipt'
-    schema_version = 'v1'
-    stage = 'pre_mutation_backups_complete'
-    contract_sha256 = $plan.contract_sha256
-    repo_root = $RepoRoot
-    python_exe = $PythonExe
-    applied_at_utc = (Get-Date).ToUniversalTime().ToString('o')
-    pre_state = @($plan.legacy_snapshot)
-    pre_backups = @($preBackups)
-    canonical_pre = @($preBackups | Where-Object { $_.task_name -eq $CanonicalTaskName })
-    canonical_post = $null
-    legacy_tasks_removed = @()
-    changes = @()
-    post_state = @()
-    rollback = [ordered]@{
-        legacy_xml_paths = @($preBackups | Where-Object { $_.task_name -ne $CanonicalTaskName } | ForEach-Object { $_.xml_path })
-        canonical_pre_xml_paths = @($preBackups | Where-Object { $_.task_name -eq $CanonicalTaskName } | ForEach-Object { $_.xml_path })
-        canonical_post_xml_path = Join-Path $runRoot ("post_{0}.xml" -f ($CanonicalTaskName -replace '[^A-Za-z0-9]+', '_'))
-        restore_legacy_disabled_commands = @($LegacySpecs | ForEach-Object { "Register-ScheduledTask -TaskName `"$($_.task_name)`" -Xml (Get-Content -Raw `"$((Join-Path $runRoot ("pre_{0}.xml" -f ($_.task_name -replace '[^A-Za-z0-9]+', '_'))))`") -Force; Disable-ScheduledTask -TaskName `"$($_.task_name)`"" })
-        restore_canonical_pre_or_remove = 'If a canonical pre-backup exists, restore it disabled. Otherwise remove the canonical task to restore prior absence.'
+    $preBackups = New-Object System.Collections.Generic.List[object]
+    $canonicalExistingBefore = ($plan.canonical_task_state.present -eq $true)
+    $currentStage = 'legacy-state verification'
+    foreach ($spec in $LegacySpecs) {
+        $stateRecord = @($plan.legacy_tasks | Where-Object { $_.task_name -eq $spec.task_name })[0]
+        if ($stateRecord.present) {
+            $currentStage = 'XML export'
+            $preBackups.Add((Export-TaskXmlToPath -TaskName $spec.task_name -Path (Join-Path $runRoot ("pre_{0}.xml" -f ($spec.task_name -replace '[^A-Za-z0-9]+', '_')))))
+            $applyMutationCounters.backup_writes_performed++
+            $currentStage = 'legacy-state verification'
+        }
+        elseif ($plan.resumable_state.authorized) {
+            $receipt = Get-ValidatedPriorReceipt -Path $PriorReceiptPath -ContractHash $plan.contract_sha256
+            $existingBackup = @((Get-TaskField $receipt 'pre_backups') | Where-Object { [string](Get-TaskField $_ 'task_name') -eq $spec.task_name })[0]
+            $preBackups.Add([ordered]@{
+                task_name = [string](Get-TaskField $existingBackup 'task_name')
+                xml_path = [string](Get-TaskField $existingBackup 'xml_path')
+                xml_sha256 = [string](Get-TaskField $existingBackup 'xml_sha256')
+            })
+        }
     }
+
+    $canonicalExisting = Get-ScheduledTask -TaskName $CanonicalTaskName -ErrorAction SilentlyContinue
+    if ($null -ne $canonicalExisting) {
+        $currentStage = 'XML export'
+        $preBackups.Add((Export-TaskXmlToPath -TaskName $CanonicalTaskName -Path (Join-Path $runRoot ("pre_{0}.xml" -f ($CanonicalTaskName -replace '[^A-Za-z0-9]+', '_')))))
+        $applyMutationCounters.backup_writes_performed++
+        $currentStage = 'legacy-state verification'
+    }
+
+    $currentStage = 'backup hashing'
+    $preBackupArray = ConvertTo-StableArray -Value $preBackups
+    $currentStage = 'receipt writing'
+    $receipt = [ordered]@{
+        report_type = 'lena_scheduler_legacy_to_canonical_driver_migration_receipt'
+        schema_version = 'v1'
+        stage = 'pre_mutation_backups_complete'
+        contract_sha256 = $plan.contract_sha256
+        repo_root = $RepoRoot
+        python_exe = $PythonExe
+        applied_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        pre_state = @($plan.legacy_snapshot)
+        pre_backups = $preBackupArray
+        canonical_pre = @($preBackupArray | Where-Object { $_.task_name -eq $CanonicalTaskName })
+        canonical_post = $null
+        legacy_tasks_removed = @()
+        changes = @()
+        post_state = @()
+        rollback = [ordered]@{
+            legacy_xml_paths = @($preBackupArray | Where-Object { $_.task_name -ne $CanonicalTaskName } | ForEach-Object { $_.xml_path })
+            canonical_pre_xml_paths = @($preBackupArray | Where-Object { $_.task_name -eq $CanonicalTaskName } | ForEach-Object { $_.xml_path })
+            canonical_post_xml_path = Join-Path $runRoot ("post_{0}.xml" -f ($CanonicalTaskName -replace '[^A-Za-z0-9]+', '_'))
+            restore_legacy_disabled_commands = @($LegacySpecs | ForEach-Object { "Register-ScheduledTask -TaskName `"$($_.task_name)`" -Xml (Get-Content -Raw `"$((Join-Path $runRoot ("pre_{0}.xml" -f ($_.task_name -replace '[^A-Za-z0-9]+', '_'))))`") -Force; Disable-ScheduledTask -TaskName `"$($_.task_name)`"" })
+            restore_canonical_pre_or_remove = 'If a canonical pre-backup exists, restore it disabled. Otherwise remove the canonical task to restore prior absence.'
+        }
+    }
+    Add-ReceiptProof -Receipt $receipt | Out-Null
+    $receiptPath = Join-Path $runRoot 'migration_receipt.json'
+    $rollbackPath = Join-Path $runRoot 'rollback_receipt.json'
+    $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+    $applyMutationCounters.receipt_writes_performed++
 }
-Add-ReceiptProof -Receipt $receipt | Out-Null
-$receiptPath = Join-Path $runRoot 'migration_receipt.json'
-$rollbackPath = Join-Path $runRoot 'rollback_receipt.json'
-$receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+catch {
+    $failureReport = New-StructuredFailureReport -ErrorRecord $_ -StageIdentifier $currentStage -MutationCounters $applyMutationCounters
+    [Console]::Error.WriteLine((ConvertTo-CanonicalJson -Value $failureReport))
+    throw
+}
 
 try {
+    $currentStage = 'canonical-plan resolution'
     $canonicalPlan = $plan.canonical_plan
     $canonicalAlreadyReady = $plan.canonical_task_state.present -and (-not $plan.canonical_task_state.enabled) -and $plan.canonical_task_state.actions_match
     if (-not $canonicalAlreadyReady) {
+        $currentStage = 'canonical registration'
         $action = New-CanonicalAction -CanonicalPlan $canonicalPlan
         $trigger = New-CanonicalTrigger
         $principal = New-CanonicalPrincipal
         $settings = New-CanonicalSettings
 
         Register-ScheduledTask -TaskName $CanonicalTaskName -Description 'Polls every minute and lets the Lena autonomy scheduler driver decide whether a photo generation or publish transition is due.' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+        $applyMutationCounters.scheduler_mutations_performed++
         Disable-ScheduledTask -TaskName $CanonicalTaskName | Out-Null
         $receipt.stage = 'canonical_registered_disabled'
         $receipt.changes = @($receipt.changes) + @('Registered or updated canonical task', 'Forced canonical task disabled')
+        $currentStage = 'receipt writing'
         Add-ReceiptProof -Receipt $receipt | Out-Null
         $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+        $applyMutationCounters.receipt_writes_performed++
     }
     else {
         $receipt.stage = 'canonical_registered_disabled'
         $receipt.changes = @($receipt.changes) + @('Resumed from prior receipt with canonical task already present and disabled')
+        $currentStage = 'receipt writing'
         Add-ReceiptProof -Receipt $receipt | Out-Null
         $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+        $applyMutationCounters.receipt_writes_performed++
     }
 
+    $currentStage = 'canonical verification'
     $canonicalVerify = Get-ScheduledTask -TaskName $CanonicalTaskName -ErrorAction Stop
     if ([bool]$canonicalVerify.Settings.Enabled) {
         throw 'Canonical task verification failed: task is not disabled.'
@@ -963,21 +1065,30 @@ try {
             }) -Actions $canonicalActions)) {
         throw 'Canonical task verification failed: action mismatch after registration.'
     }
+    $currentStage = 'XML export'
     $canonicalPost = Export-TaskXmlToPath -TaskName $CanonicalTaskName -Path (Join-Path $runRoot ("post_{0}.xml" -f ($CanonicalTaskName -replace '[^A-Za-z0-9]+', '_')))
+    $applyMutationCounters.backup_writes_performed++
     $receipt.canonical_post = $canonicalPost
     $receipt.rollback.canonical_post_xml_path = $canonicalPost.xml_path
     $receipt.stage = 'legacy_retirement_started'
     $receipt.changes = @($receipt.changes) + @('Verified canonical task disabled before legacy retirement')
+    $currentStage = 'receipt writing'
     Add-ReceiptProof -Receipt $receipt | Out-Null
     $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+    $applyMutationCounters.receipt_writes_performed++
 
+    $currentStage = 'legacy retirement'
     foreach ($spec in $LegacySpecs) {
         $task = Get-ScheduledTask -TaskName $spec.task_name -ErrorAction SilentlyContinue
         if ($null -ne $task) {
             Unregister-ScheduledTask -TaskName $spec.task_name -Confirm:$false
+            $applyMutationCounters.scheduler_mutations_performed++
             $receipt.legacy_tasks_removed = @($receipt.legacy_tasks_removed) + @($spec.task_name)
+            $currentStage = 'receipt writing'
             Add-ReceiptProof -Receipt $receipt | Out-Null
             $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+            $applyMutationCounters.receipt_writes_performed++
+            $currentStage = 'legacy retirement'
         }
     }
 
@@ -985,15 +1096,31 @@ try {
     $receipt.changes = @($receipt.changes) + @('Retired only the four governed disabled legacy tasks')
     $postNames = @($LegacySpecs | ForEach-Object { $_.task_name }) + @($CanonicalTaskName)
     $receipt.post_state = @(Get-LiveTaskSnapshot -TaskNames $postNames)
+    $currentStage = 'receipt writing'
     Add-ReceiptProof -Receipt $receipt | Out-Null
     $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+    $applyMutationCounters.receipt_writes_performed++
 
     $receipt | ConvertTo-Json -Depth 10
 }
 catch {
-    $receipt.changes = @($receipt.changes) + @("Failure: $($_.Exception.Message)")
-    Add-ReceiptProof -Receipt $receipt | Out-Null
-    $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
-    Invoke-Rollback -PreBackups @($preBackups) -CanonicalTaskName $CanonicalTaskName -RollbackReceiptPath $rollbackPath -CanonicalExistedBefore $canonicalExistingBefore
+    $failureReport = New-StructuredFailureReport -ErrorRecord $_ -StageIdentifier $currentStage -MutationCounters $applyMutationCounters
+    if ($null -ne $receipt) {
+        $receipt.changes = @($receipt.changes) + @("Failure: $($_.Exception.Message)")
+        $receipt.failure = $failureReport
+    }
+    if ($null -ne $receipt -and $receiptPath) {
+        try {
+            $currentStage = 'receipt writing'
+            Add-ReceiptProof -Receipt $receipt | Out-Null
+            $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8
+            $applyMutationCounters.receipt_writes_performed++
+        }
+        catch {
+        }
+    }
+    [Console]::Error.WriteLine((ConvertTo-CanonicalJson -Value $failureReport))
+    $currentStage = 'rollback preparation'
+    Invoke-Rollback -PreBackups (ConvertTo-StableArray -Value $preBackups) -CanonicalTaskName $CanonicalTaskName -RollbackReceiptPath $rollbackPath -CanonicalExistedBefore $canonicalExistingBefore
     throw
 }

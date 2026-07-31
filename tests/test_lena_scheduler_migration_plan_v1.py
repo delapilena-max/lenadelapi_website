@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +16,7 @@ SCRIPT = ROOT / "tools" / "migrate_lena_legacy_scheduler_tasks_to_canonical_driv
 REGISTER_SCRIPT = ROOT / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1"
 CANONICAL_TASK_NAME = "Lena Autonomy Scheduler Driver"
 LEGACY_REPO_ROOT = r"C:\projects\ai\lenadelapi_website_autopublish_fix"
+SECRET_SENTINEL = "TEST_META_PAGE_ACCESS_TOKEN_SHOULD_NOT_APPEAR"
 LEGACY_TASKS = [
     "Lena Daily Orchestrator",
     "Lena Publish Morning Slot",
@@ -24,6 +28,7 @@ LEGACY_PRINCIPAL = {
     "logon_type": "Interactive",
     "run_level": "Limited",
 }
+PYTHON_EXE = str(Path(r"C:\Python314\python.exe") if Path(r"C:\Python314\python.exe").exists() else Path(sys.executable))
 
 
 def _powershell_runtime() -> str | None:
@@ -36,8 +41,12 @@ def _run_powershell(*args: str) -> subprocess.CompletedProcess[str]:
     runtime = _powershell_runtime()
     if not runtime:
         raise RuntimeError("No compatible PowerShell runtime is available")
+    return _run_powershell_host(runtime, *args)
+
+
+def _run_powershell_host(host_path: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [runtime, "-NoProfile", "-ExecutionPolicy", "Bypass", *args],
+        [host_path, "-NoProfile", "-ExecutionPolicy", "Bypass", *args],
         cwd=str(ROOT),
         text=True,
         capture_output=True,
@@ -158,7 +167,7 @@ def _validate_only_plan(
         "-RepoRoot",
         str(ROOT),
         "-PythonExe",
-        sys.executable,
+        PYTHON_EXE,
         "-TaskSnapshotPath",
         str(snapshot_path),
         "-OutputRoot",
@@ -177,7 +186,7 @@ def _canonical_plan() -> dict:
         "-RepoRoot",
         str(ROOT),
         "-PythonExe",
-        sys.executable,
+        PYTHON_EXE,
     )
     return _assert_json_success(proc, "canonical validate-only registration plan")
 
@@ -282,7 +291,7 @@ def _write_prior_receipt(
         "stage": stage,
         "contract_sha256": "0" * 64 if tamper_contract_hash else contract_sha256,
         "repo_root": str(ROOT),
-        "python_exe": sys.executable,
+        "python_exe": PYTHON_EXE,
         "pre_backups": pre_backups,
         "canonical_pre": canonical_pre,
         "canonical_post": canonical_post,
@@ -304,6 +313,465 @@ def _write_prior_receipt(
 
 def _source() -> str:
     return SCRIPT.read_text(encoding="utf-8")
+
+
+def _powershell_hosts() -> dict[str, str]:
+    hosts: dict[str, str] = {}
+    desktop = shutil.which("powershell.exe")
+    if desktop:
+        hosts["desktop"] = desktop
+    core = shutil.which("pwsh") or shutil.which("pwsh.exe")
+    if core:
+        hosts["core"] = core
+    return hosts
+
+
+def _powershell_single_quote(text: str) -> str:
+    return text.replace("'", "''")
+
+
+def _extract_json_lines(text: str) -> list[dict]:
+    payloads: list[dict] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("{") or not stripped.endswith("}"):
+            continue
+        try:
+            payloads.append(json.loads(stripped))
+        except json.JSONDecodeError:
+            continue
+    return payloads
+
+
+def _replace_test_is_administrator(source: str) -> str:
+    updated, count = re.subn(
+        (
+            r"function Test-IsAdministrator \{\r?\n"
+            r"    \$identity = \[Security\.Principal\.WindowsIdentity\]::GetCurrent\(\)\r?\n"
+            r"    \$principal = \[Security\.Principal\.WindowsPrincipal\]::new\(\$identity\)\r?\n"
+            r"    return \$principal\.IsInRole\(\[Security\.Principal\.WindowsBuiltInRole\]::Administrator\)\r?\n"
+            r"\}"
+        ),
+        "function Test-IsAdministrator {\n    return $true\n}",
+        source,
+        count=1,
+    )
+    assert count == 1
+    return updated
+
+
+def _run_list_subexpression_probe(host_path: str) -> subprocess.CompletedProcess[str]:
+    command = """
+$ErrorActionPreference = 'Stop'
+try {
+    $preBackups = New-Object System.Collections.Generic.List[object]
+    $preBackups.Add([ordered]@{ task_name = 'A'; xml_path = 'x'; xml_sha256 = 'x' }) | Out-Null
+    [pscustomobject]@{
+        ok = $true
+        count = @($preBackups).Count
+        edition = [string]$PSVersionTable.PSEdition
+        version = [string]$PSVersionTable.PSVersion
+    } | ConvertTo-Json -Compress
+}
+catch {
+    [pscustomobject]@{
+        ok = $false
+        exception_type = $_.Exception.GetType().FullName
+        message = [string]$_.Exception.Message
+        edition = [string]$PSVersionTable.PSEdition
+        version = [string]$PSVersionTable.PSVersion
+    } | ConvertTo-Json -Compress
+    exit 1
+}
+"""
+    return _run_powershell_host(host_path, "-Command", command)
+
+
+def _run_mocked_apply(
+    tmp_path: Path,
+    *,
+    source_text: str | None = None,
+    failure_mode: str = "",
+    host_path: str | None = None,
+) -> tuple[subprocess.CompletedProcess[str], dict, Path]:
+    source_text = _source() if source_text is None else source_text
+    source_text = _replace_test_is_administrator(source_text)
+
+    snapshot_path = _write_snapshot(tmp_path / "mock_snapshot.json", _snapshot_payload())
+    output_root = tmp_path / "mock_apply_output"
+    summary_path = tmp_path / "mock_summary.json"
+    source_copy = tmp_path / "mocked_apply_source.ps1"
+    source_copy.write_text(source_text, encoding="utf-8")
+    wrapper_path = tmp_path / "run_mocked_apply.ps1"
+    wrapper_path.write_text(
+        f"""
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$env:META_PAGE_ACCESS_TOKEN = '{SECRET_SENTINEL}'
+$global:MockTaskStore = @{{}}
+$global:MockOperationLog = New-Object System.Collections.Generic.List[object]
+$global:FailureMode = '{_powershell_single_quote(failure_mode)}'
+
+function Add-MockOperation {{
+    param(
+        [string]$Operation,
+        [string]$TaskName = '',
+        [object]$Details = $null
+    )
+    $entry = [ordered]@{{
+        operation = $Operation
+        task_name = $TaskName
+        details = $Details
+    }}
+    $global:MockOperationLog.Add($entry) | Out-Null
+}}
+
+function New-MockTaskFromParts {{
+    param(
+        [string]$TaskName,
+        [bool]$Enabled,
+        [string]$State,
+        [object[]]$Actions,
+        [object]$Principal,
+        [object]$Settings
+    )
+    return [pscustomobject]@{{
+        TaskName = $TaskName
+        State = $State
+        Actions = $Actions
+        Principal = $Principal
+        Settings = $Settings
+    }}
+}}
+
+function Get-MockPropertyValue {{
+    param(
+        [object]$Item,
+        [string]$Name,
+        [object]$Default = $null
+    )
+    $property = $Item.PSObject.Properties[$Name]
+    if ($null -eq $property) {{
+        return $Default
+    }}
+    return $property.Value
+}}
+
+function New-MockTaskFromSnapshot {{
+    param([object]$Item)
+    $actions = @()
+    foreach ($action in @(Get-MockPropertyValue -Item $Item -Name 'actions' -Default @())) {{
+        $actions += [pscustomobject]@{{
+            Execute = [string](Get-MockPropertyValue -Item $action -Name 'execute' -Default '')
+            Arguments = [string](Get-MockPropertyValue -Item $action -Name 'arguments' -Default '')
+            WorkingDirectory = [string](Get-MockPropertyValue -Item $action -Name 'working_directory' -Default '')
+        }}
+    }}
+    $principal = [pscustomobject]@{{
+        UserId = [string](Get-MockPropertyValue -Item $Item -Name 'user_id' -Default '')
+        LogonType = [string](Get-MockPropertyValue -Item $Item -Name 'logon_type' -Default '')
+        RunLevel = [string](Get-MockPropertyValue -Item $Item -Name 'run_level' -Default '')
+    }}
+    $settings = [pscustomobject]@{{
+        Enabled = [bool](Get-MockPropertyValue -Item $Item -Name 'enabled' -Default $false)
+    }}
+    return New-MockTaskFromParts -TaskName ([string](Get-MockPropertyValue -Item $Item -Name 'task_name' -Default '')) -Enabled ([bool](Get-MockPropertyValue -Item $Item -Name 'enabled' -Default $false)) -State ([string](Get-MockPropertyValue -Item $Item -Name 'state' -Default '')) -Actions $actions -Principal $principal -Settings $settings
+}}
+
+function Initialize-MockTaskStore {{
+    param([string]$SnapshotPath)
+    foreach ($item in (Get-Content -LiteralPath $SnapshotPath -Raw | ConvertFrom-Json)) {{
+        if ([bool](Get-MockPropertyValue -Item $item -Name 'present' -Default $false)) {{
+            $global:MockTaskStore[[string]$item.task_name] = New-MockTaskFromSnapshot -Item $item
+        }}
+    }}
+}}
+
+function Get-StringTypeName {{
+    param([object]$Value)
+    if ($null -eq $Value) {{
+        return '<null>'
+    }}
+    return $Value.GetType().FullName
+}}
+
+function ConvertTo-MockActionArray {{
+    param([object]$Value)
+    if ($null -eq $Value) {{
+        return @()
+    }}
+    if ($Value -is [Array]) {{
+        return @($Value)
+    }}
+    return @($Value)
+}}
+
+function ConvertTo-MockStableArray {{
+    param([object]$Value)
+    if ($null -eq $Value) {{
+        return @()
+    }}
+    if ($Value -is [Array]) {{
+        return $Value
+    }}
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {{
+        $items = New-Object System.Collections.Generic.List[object]
+        foreach ($item in $Value) {{
+            $items.Add($item) | Out-Null
+        }}
+        return $items.ToArray()
+    }}
+    return @($Value)
+}}
+
+function ConvertTo-MockTaskSummary {{
+    param([object]$Task)
+    return [ordered]@{{
+        task_name = [string]$Task.TaskName
+        enabled = [bool]$Task.Settings.Enabled
+        state = [string]$Task.State
+        actions = @($Task.Actions | ForEach-Object {{
+            [ordered]@{{
+                execute = [string]$_.Execute
+                arguments = [string]$_.Arguments
+                working_directory = [string]$_.WorkingDirectory
+            }}
+        }})
+        principal = [ordered]@{{
+            user_id = [string]$Task.Principal.UserId
+            logon_type = [string]$Task.Principal.LogonType
+            run_level = [string]$Task.Principal.RunLevel
+        }}
+    }}
+}}
+
+function New-ScheduledTaskAction {{
+    [CmdletBinding()]
+    param(
+        [string]$Execute,
+        [string]$Argument,
+        [string]$WorkingDirectory
+    )
+    return [pscustomobject]@{{
+        Execute = $Execute
+        Arguments = $Argument
+        WorkingDirectory = $WorkingDirectory
+    }}
+}}
+
+function New-ScheduledTaskTrigger {{
+    [CmdletBinding()]
+    param(
+        [switch]$Once,
+        [datetime]$At,
+        [timespan]$RepetitionInterval,
+        [timespan]$RepetitionDuration
+    )
+    return [pscustomobject]@{{
+        Once = [bool]$Once
+        At = $At
+        RepetitionInterval = $RepetitionInterval
+        RepetitionDuration = $RepetitionDuration
+    }}
+}}
+
+function New-ScheduledTaskPrincipal {{
+    [CmdletBinding()]
+    param(
+        [string]$UserId,
+        [string]$LogonType,
+        [string]$RunLevel
+    )
+    return [pscustomobject]@{{
+        UserId = $UserId
+        LogonType = $LogonType
+        RunLevel = $RunLevel
+    }}
+}}
+
+function New-ScheduledTaskSettingsSet {{
+    [CmdletBinding()]
+    param(
+        [switch]$AllowStartIfOnBatteries,
+        [switch]$DontStopIfGoingOnBatteries,
+        [switch]$StartWhenAvailable,
+        [string]$MultipleInstances,
+        [int]$RestartCount,
+        [timespan]$RestartInterval,
+        [timespan]$ExecutionTimeLimit,
+        [switch]$WakeToRun
+    )
+    return [pscustomobject]@{{
+        AllowStartIfOnBatteries = [bool]$AllowStartIfOnBatteries
+        DontStopIfGoingOnBatteries = [bool]$DontStopIfGoingOnBatteries
+        StartWhenAvailable = [bool]$StartWhenAvailable
+        MultipleInstances = $MultipleInstances
+        RestartCount = $RestartCount
+        RestartInterval = $RestartInterval
+        ExecutionTimeLimit = $ExecutionTimeLimit
+        WakeToRun = [bool]$WakeToRun
+        Enabled = $true
+    }}
+}}
+
+function Get-ScheduledTask {{
+    [CmdletBinding()]
+    param([string]$TaskName)
+    Add-MockOperation -Operation 'Get-ScheduledTask' -TaskName $TaskName -Details ([ordered]@{{
+        task_name_type = Get-StringTypeName -Value $TaskName
+        error_action = [string]$ErrorActionPreference
+    }})
+    if ([string]::IsNullOrEmpty($TaskName)) {{
+        return @($global:MockTaskStore.Values)
+    }}
+    if ($global:MockTaskStore.ContainsKey($TaskName)) {{
+        return $global:MockTaskStore[$TaskName]
+    }}
+    if ($ErrorActionPreference -eq 'Stop') {{
+        throw "Mock task missing: $TaskName"
+    }}
+    return $null
+}}
+
+function Export-ScheduledTask {{
+    [CmdletBinding()]
+    param([string]$TaskName)
+    Add-MockOperation -Operation 'Export-ScheduledTask' -TaskName $TaskName -Details ([ordered]@{{
+        task_name_type = Get-StringTypeName -Value $TaskName
+    }})
+    if (-not $global:MockTaskStore.ContainsKey($TaskName)) {{
+        throw "Mock export missing task: $TaskName"
+    }}
+    $task = $global:MockTaskStore[$TaskName]
+    $action = @($task.Actions)[0]
+    return "<Task><RegistrationInfo><URI>$TaskName</URI></RegistrationInfo><Principals><Principal><UserId>$($task.Principal.UserId)</UserId><LogonType>$($task.Principal.LogonType)</LogonType><RunLevel>$($task.Principal.RunLevel)</RunLevel></Principal></Principals><Actions><Exec><Command>$($action.Execute)</Command><Arguments>$($action.Arguments)</Arguments><WorkingDirectory>$($action.WorkingDirectory)</WorkingDirectory></Exec></Actions></Task>"
+}}
+
+function Get-ScheduledTaskInfo {{
+    [CmdletBinding()]
+    param([string]$TaskName)
+    Add-MockOperation -Operation 'Get-ScheduledTaskInfo' -TaskName $TaskName
+    if (-not $global:MockTaskStore.ContainsKey($TaskName)) {{
+        if ($ErrorActionPreference -eq 'Stop') {{
+            throw "Mock task info missing: $TaskName"
+        }}
+        return $null
+    }}
+    $now = Get-Date '2026-07-31T10:30:00Z'
+    return [pscustomobject]@{{
+        LastRunTime = $now.AddMinutes(-1)
+        LastTaskResult = 0
+        NextRunTime = $now.AddMinutes(1)
+    }}
+}}
+
+function Register-ScheduledTask {{
+    [CmdletBinding()]
+    param(
+        [string]$TaskName,
+        [string]$Description,
+        [object]$Action,
+        [object]$Trigger,
+        [object]$Principal,
+        [object]$Settings,
+        [string]$Xml,
+        [switch]$Force
+    )
+    Add-MockOperation -Operation 'Register-ScheduledTask' -TaskName $TaskName -Details ([ordered]@{{
+        xml_mode = $PSBoundParameters.ContainsKey('Xml')
+        action_type = Get-StringTypeName -Value $Action
+        trigger_type = Get-StringTypeName -Value $Trigger
+        principal_type = Get-StringTypeName -Value $Principal
+        settings_type = Get-StringTypeName -Value $Settings
+    }})
+    if ($global:FailureMode -eq 'throw_on_register' -and -not $PSBoundParameters.ContainsKey('Xml') -and $TaskName -eq '{CANONICAL_TASK_NAME}') {{
+        $inner = [System.InvalidOperationException]::new('mock inner failure')
+        throw [System.Exception]::new('mock canonical registration failure', $inner)
+    }}
+    if ($PSBoundParameters.ContainsKey('Xml')) {{
+        [xml]$xmlDoc = $Xml
+        $actionObject = [pscustomobject]@{{
+            Execute = [string]$xmlDoc.Task.Actions.Exec.Command
+            Arguments = [string]$xmlDoc.Task.Actions.Exec.Arguments
+            WorkingDirectory = [string]$xmlDoc.Task.Actions.Exec.WorkingDirectory
+        }}
+        $principalObject = [pscustomobject]@{{
+            UserId = [string]$xmlDoc.Task.Principals.Principal.UserId
+            LogonType = [string]$xmlDoc.Task.Principals.Principal.LogonType
+            RunLevel = [string]$xmlDoc.Task.Principals.Principal.RunLevel
+        }}
+        $settingsObject = [pscustomobject]@{{ Enabled = $false }}
+        $task = New-MockTaskFromParts -TaskName $TaskName -Enabled $false -State 'Disabled' -Actions @($actionObject) -Principal $principalObject -Settings $settingsObject
+        $global:MockTaskStore[$TaskName] = $task
+        return $task
+    }}
+    $actions = ConvertTo-MockActionArray -Value $Action
+    $task = New-MockTaskFromParts -TaskName $TaskName -Enabled ([bool]$Settings.Enabled) -State 'Disabled' -Actions $actions -Principal $Principal -Settings $Settings
+    $task.Settings.Enabled = [bool]$Settings.Enabled
+    $global:MockTaskStore[$TaskName] = $task
+    return $task
+}}
+
+function Disable-ScheduledTask {{
+    [CmdletBinding()]
+    param([string]$TaskName)
+    Add-MockOperation -Operation 'Disable-ScheduledTask' -TaskName $TaskName
+    if (-not $global:MockTaskStore.ContainsKey($TaskName)) {{
+        throw "Mock disable missing task: $TaskName"
+    }}
+    $task = $global:MockTaskStore[$TaskName]
+    $task.Settings.Enabled = $false
+    $task.State = 'Disabled'
+    return $task
+}}
+
+function Unregister-ScheduledTask {{
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
+    param([string]$TaskName)
+    Add-MockOperation -Operation 'Unregister-ScheduledTask' -TaskName $TaskName
+    if ($global:MockTaskStore.ContainsKey($TaskName)) {{
+        $global:MockTaskStore.Remove($TaskName) | Out-Null
+    }}
+}}
+
+Initialize-MockTaskStore -SnapshotPath '{_powershell_single_quote(str(snapshot_path))}'
+$exitCode = 0
+$caughtMessage = ''
+$caughtType = ''
+try {{
+    & '{_powershell_single_quote(str(source_copy))}' -Apply -RepoRoot '{_powershell_single_quote(str(ROOT))}' -PythonExe '{_powershell_single_quote(PYTHON_EXE)}' -TaskSnapshotPath '{_powershell_single_quote(str(snapshot_path))}' -OutputRoot '{_powershell_single_quote(str(output_root))}' | Out-String | Set-Content -LiteralPath '{_powershell_single_quote(str(tmp_path / "script_stdout.txt"))}' -Encoding utf8
+}}
+catch {{
+    $exitCode = 1
+    $caughtMessage = [string]$_.Exception.Message
+    $caughtType = $_.Exception.GetType().FullName
+}}
+$taskStates = @($global:MockTaskStore.Values | Sort-Object TaskName | ForEach-Object {{ ConvertTo-MockTaskSummary -Task $_ }})
+$summary = [ordered]@{{
+    exit_code = $exitCode
+    caught_message = $caughtMessage
+    caught_type = $caughtType
+    operation_log = [object[]](ConvertTo-MockStableArray -Value $global:MockOperationLog)
+    remaining_task_names = @($taskStates | ForEach-Object {{ $_.task_name }})
+    task_states = $taskStates
+    run_roots = @((Get-ChildItem -LiteralPath '{_powershell_single_quote(str(output_root))}' -Directory -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {{ $_.FullName }}))
+}}
+$summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath '{_powershell_single_quote(str(summary_path))}' -Encoding utf8
+exit $exitCode
+""",
+        encoding="utf-8",
+    )
+    runtime = host_path or _powershell_runtime()
+    assert runtime is not None
+    proc = _run_powershell_host(runtime, "-File", str(wrapper_path))
+    summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+    return proc, summary, output_root
+
+
+def _single_run_root(output_root: Path) -> Path:
+    run_roots = [path for path in output_root.iterdir() if path.is_dir()]
+    assert len(run_roots) == 1
+    return run_roots[0]
 
 
 def test_migration_validate_only_plan_identifies_four_legacy_tasks_precisely(tmp_path: Path) -> None:
@@ -454,6 +922,183 @@ def test_canonical_replacement_is_exact_and_disabled(tmp_path: Path) -> None:
     assert plan["apply_guards"]["verify_canonical_task_before_legacy_removal"] is True
 
 
+def test_windows_powershell_desktop_reproduces_generic_list_array_subexpression_failure_when_available() -> None:
+    host_path = _powershell_hosts().get("desktop")
+    if host_path is None:
+        pytest.skip("Windows PowerShell Desktop is not available on this runner")
+
+    proc = _run_list_subexpression_probe(host_path)
+    payload = json.loads(proc.stdout.strip())
+
+    assert proc.returncode != 0, _process_debug(proc, "desktop array-subexpression repro")
+    assert payload["ok"] is False
+    assert payload["edition"] == "Desktop"
+    assert payload["exception_type"] == "System.ArgumentException"
+    assert payload["message"] == "Argument types do not match"
+
+
+def test_powershell_core_keeps_generic_list_array_subexpression_stable_when_available() -> None:
+    host_path = _powershell_hosts().get("core")
+    if host_path is None:
+        pytest.skip("PowerShell Core is not available on this runner")
+
+    proc = _run_list_subexpression_probe(host_path)
+    payload = json.loads(proc.stdout.strip())
+
+    assert proc.returncode == 0, _process_debug(proc, "core array-subexpression probe")
+    assert payload["ok"] is True
+    assert payload["edition"] == "Core"
+    assert payload["count"] == 1
+
+
+def test_mocked_apply_reproduces_historical_pre_backups_failure_before_mutation_on_desktop(tmp_path: Path) -> None:
+    host_path = _powershell_hosts().get("desktop")
+    if host_path is None:
+        pytest.skip("Windows PowerShell Desktop is not available on this runner")
+
+    reverted_source = _source().replace("        pre_backups = $preBackupArray", "        pre_backups = @($preBackups)", 1)
+    assert reverted_source != _source()
+
+    proc, summary, output_root = _run_mocked_apply(tmp_path, source_text=reverted_source, host_path=host_path)
+    assert proc.returncode != 0, _process_debug(proc, "mocked historical apply failure")
+
+    failure_reports = [
+        payload
+        for payload in _extract_json_lines(proc.stderr)
+        if payload.get("report_type") == "lena_scheduler_legacy_to_canonical_driver_failure"
+    ]
+    assert len(failure_reports) == 1, _process_debug(proc, "mocked historical apply failure")
+    failure = failure_reports[0]
+    assert failure["stage_identifier"] == "receipt writing"
+    assert failure["exception_type"] == "System.ArgumentException"
+    assert failure["message"] == "Argument types do not match"
+    assert failure["script_name"].endswith("mocked_apply_source.ps1")
+    assert failure["script_line_number"] > 0
+    assert failure["mutation_counters"] == {
+        "scheduler_mutations_performed": 0,
+        "task_start_operations_performed": 0,
+        "task_enable_operations_performed": 0,
+        "backup_writes_performed": 4,
+        "receipt_writes_performed": 0,
+    }
+    assert SECRET_SENTINEL not in proc.stderr
+    assert SECRET_SENTINEL not in proc.stdout
+
+    operations = [entry["operation"] for entry in summary["operation_log"]]
+    assert operations.count("Export-ScheduledTask") == 4
+    assert "Register-ScheduledTask" not in operations
+    assert "Disable-ScheduledTask" not in operations
+    assert "Unregister-ScheduledTask" not in operations
+    assert sorted(summary["remaining_task_names"]) == sorted(LEGACY_TASKS)
+
+    run_root = _single_run_root(output_root)
+    backup_names = sorted(path.name for path in run_root.glob("pre_*.xml"))
+    assert backup_names == [
+        "pre_Lena_Daily_Orchestrator.xml",
+        "pre_Lena_Publish_Afternoon_Slot.xml",
+        "pre_Lena_Publish_Evening_Slot.xml",
+        "pre_Lena_Publish_Morning_Slot.xml",
+    ]
+    assert not (run_root / "migration_receipt.json").exists()
+    assert not (run_root / "rollback_receipt.json").exists()
+
+
+def test_mocked_apply_succeeds_with_stable_array_conversion_and_preserves_stage_order(tmp_path: Path) -> None:
+    proc, summary, output_root = _run_mocked_apply(tmp_path)
+    assert proc.returncode == 0, _process_debug(proc, "mocked apply success")
+
+    run_root = _single_run_root(output_root)
+    receipt = json.loads((run_root / "migration_receipt.json").read_text(encoding="utf-8-sig"))
+
+    assert receipt["stage"] == "legacy_retired"
+    assert receipt["legacy_tasks_removed"] == LEGACY_TASKS
+    assert len(receipt["pre_backups"]) == 4
+    assert receipt["canonical_post"]["task_name"] == CANONICAL_TASK_NAME
+    assert "failure" not in receipt
+    assert SECRET_SENTINEL not in json.dumps(receipt)
+    assert not (run_root / "rollback_receipt.json").exists()
+
+    operations = summary["operation_log"]
+    register_index = next(
+        index
+        for index, entry in enumerate(operations)
+        if entry["operation"] == "Register-ScheduledTask"
+        and entry["task_name"] == CANONICAL_TASK_NAME
+        and not entry["details"]["xml_mode"]
+    )
+    canonical_post_export_index = next(
+        index
+        for index, entry in enumerate(operations)
+        if entry["operation"] == "Export-ScheduledTask" and entry["task_name"] == CANONICAL_TASK_NAME
+    )
+    first_unregister_index = next(
+        index for index, entry in enumerate(operations) if entry["operation"] == "Unregister-ScheduledTask"
+    )
+    assert register_index < canonical_post_export_index < first_unregister_index
+
+    export_entries = [entry for entry in operations if entry["operation"] == "Export-ScheduledTask"]
+    assert all(entry["details"]["task_name_type"] == "System.String" for entry in export_entries)
+    register_entry = operations[register_index]
+    assert register_entry["details"]["action_type"] not in {
+        "<null>",
+        "System.Collections.Generic.List`1[System.Object]",
+    }
+    assert register_entry["details"]["trigger_type"] not in {
+        "<null>",
+        "System.Collections.Generic.List`1[System.Object]",
+    }
+
+    assert summary["remaining_task_names"] == [CANONICAL_TASK_NAME]
+    assert len(summary["task_states"]) == 1
+    assert summary["task_states"][0]["task_name"] == CANONICAL_TASK_NAME
+    assert summary["task_states"][0]["enabled"] is False
+    assert summary["task_states"][0]["state"] == "Disabled"
+    assert "Start-ScheduledTask" not in json.dumps(summary)
+    assert "Enable-ScheduledTask" not in json.dumps(summary)
+
+
+def test_mocked_apply_failure_reports_stage_location_and_omits_secret_values(tmp_path: Path) -> None:
+    proc, summary, output_root = _run_mocked_apply(tmp_path, failure_mode="throw_on_register")
+    assert proc.returncode != 0, _process_debug(proc, "mocked apply structured failure")
+
+    failure_reports = [
+        payload
+        for payload in _extract_json_lines(proc.stderr)
+        if payload.get("report_type") == "lena_scheduler_legacy_to_canonical_driver_failure"
+    ]
+    assert len(failure_reports) == 1, _process_debug(proc, "mocked apply structured failure")
+    failure = failure_reports[0]
+    assert failure["stage_identifier"] == "canonical registration"
+    assert failure["exception_type"] == "System.Exception"
+    assert failure["message"] == "mock canonical registration failure"
+    assert failure["script_name"].endswith("run_mocked_apply.ps1")
+    assert failure["script_line_number"] > 0
+    assert "mock canonical registration failure" in failure["line"]
+    assert failure["inner_exceptions"] == [
+        {
+            "exception_type": "System.InvalidOperationException",
+            "message": "mock inner failure",
+        }
+    ]
+    assert failure["mutation_counters"] == {
+        "scheduler_mutations_performed": 0,
+        "task_start_operations_performed": 0,
+        "task_enable_operations_performed": 0,
+        "backup_writes_performed": 4,
+        "receipt_writes_performed": 1,
+    }
+    assert SECRET_SENTINEL not in proc.stderr
+    assert SECRET_SENTINEL not in proc.stdout
+
+    run_root = _single_run_root(output_root)
+    receipt = json.loads((run_root / "migration_receipt.json").read_text(encoding="utf-8-sig"))
+    rollback = json.loads((run_root / "rollback_receipt.json").read_text(encoding="utf-8-sig"))
+    assert receipt["failure"]["stage_identifier"] == "canonical registration"
+    assert rollback["report_type"] == "lena_scheduler_legacy_to_canonical_driver_rollback_receipt"
+    assert [item["task_name"] for item in rollback["restored_tasks"]] == LEGACY_TASKS
+    assert sorted(summary["remaining_task_names"]) == sorted(LEGACY_TASKS)
+
+
 def test_source_resolves_current_host_before_fallback_and_avoids_literal_child_powershell() -> None:
     source = _source()
 
@@ -514,6 +1159,12 @@ def test_source_verifies_canonical_before_legacy_retirement_and_records_stages()
     assert "legacy_retired" in source
     assert "Canonical task verification failed: task is not disabled." in source
     assert "Canonical task verification failed: action mismatch after registration." in source
+    assert "stage_identifier = $StageIdentifier" in source
+    assert "backup-root preparation" in source
+    assert "legacy-state verification" in source
+    assert "backup hashing" in source
+    assert "receipt writing" in source
+    assert "rollback preparation" in source
     assert source.index("$receipt.stage = 'legacy_retirement_started'") < source.index("Unregister-ScheduledTask -TaskName $spec.task_name -Confirm:$false")
 
 
@@ -534,6 +1185,29 @@ def test_source_has_rollback_restore_contract() -> None:
     assert "Disable-ScheduledTask -TaskName $TaskName | Out-Null" in source
     assert "rollback_receipt.json" in source
     assert "restore_legacy_disabled_commands" in source
+
+
+def test_source_uses_stable_array_conversion_for_receipt_and_rollback_collections() -> None:
+    source = _source()
+
+    assert "function ConvertTo-StableArray" in source
+    assert "pre_backups = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'pre_backups')" in source
+    assert "legacy_tasks_removed = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'legacy_tasks_removed')" in source
+    assert "changes = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'changes')" in source
+    assert "post_state = ConvertTo-StableArray -Value (Get-TaskField $Receipt 'post_state')" in source
+    assert "restored_tasks = ConvertTo-StableArray -Value $restoreLog" in source
+    assert "pre_backups = @($preBackups)" not in source
+    assert "restored_tasks = @($restoreLog)" not in source
+
+
+def test_source_structured_failure_report_omits_direct_secret_loading() -> None:
+    source = _source()
+
+    assert "function New-StructuredFailureReport" in source
+    assert "fully_qualified_error_id = [string]$ErrorRecord.FullyQualifiedErrorId" in source
+    assert "script_line_number = $invocation.ScriptLineNumber" in source
+    assert "inner_exceptions = @(Get-InnerExceptionDetails -Exception $ErrorRecord.Exception)" in source
+    assert "META_PAGE_ACCESS_TOKEN" not in source
 
 
 def test_source_has_no_video_task_handling_or_provider_capability() -> None:
@@ -558,7 +1232,7 @@ def test_failed_execution_reports_process_details_instead_of_json_decode_noise(t
         "-RepoRoot",
         str(ROOT),
         "-PythonExe",
-        sys.executable,
+        PYTHON_EXE,
         "-TaskSnapshotPath",
         str(tmp_path / "missing_snapshot.json"),
     )
