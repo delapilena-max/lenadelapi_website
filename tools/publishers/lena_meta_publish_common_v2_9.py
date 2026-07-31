@@ -9,6 +9,18 @@ LOCAL_CONFIG = NODE / "meta_publisher_config_v2_9.local.json"
 EXAMPLE_CONFIG = NODE / "meta_publisher_config_v2_9.example.json"
 ENV_MAP_FILE = NODE / "meta_env_key_map_v2_9_1.json"
 ENV_ROOT_KEYS = ("LENA_AUTOPUBLISH_PRODUCTION_ROOT", "CONTENT_BOT_ROOT")
+ENV_MAP_CONTRACT_ID = "lena_meta_env_key_map_v2_9_1"
+ENV_MAP_SCHEMA_VERSION = "v1"
+ENV_VAR_TO_CONFIG_KEY = {
+    "META_PAGE_ACCESS_TOKEN": "page_access_token",
+    "META_INSTAGRAM_ACCESS_TOKEN": "instagram_access_token",
+    "META_IG_USER_ID": "instagram_business_account_id",
+    "META_FACEBOOK_PAGE_ID": "facebook_page_id",
+    "META_GRAPH_API_VERSION": "graph_api_version",
+    "LENA_MEDIA_PUBLIC_BASE_URL": "media_public_base_url",
+    "LENA_MEDIA_PUBLIC_LOCAL_DIR": "media_public_local_dir",
+}
+LOCAL_MEDIA_PUBLIC_DIR_REL = Path("pipeline") / "publishing" / "lena" / "media_public"
 
 
 def _resolve_root(root: Path | None = None) -> Path:
@@ -39,6 +51,9 @@ def _env_map_path(root: Path | None = None) -> Path:
 class MetaConnectorError(Exception):
     pass
 
+class ConfigContractError(MetaConnectorError):
+    pass
+
 def redact(s: str) -> str:
     if not s:
         return ""
@@ -62,11 +77,125 @@ def parse_dotenv(path: Path) -> dict:
             out[k] = v
     return out
 
+def _is_placeholder(value: object) -> bool:
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    return any(
+        marker in raw
+        for marker in (
+            "PASTE_",
+            "YOUR_PUBLIC_MEDIA_HOST",
+            "YOUR_MEDIA_ROOT",
+            "PLACEHOLDER",
+        )
+    )
+
+def _default_media_public_local_dir(root: Path | None = None) -> str:
+    return str(_resolve_root(root) / LOCAL_MEDIA_PUBLIC_DIR_REL)
+
+def _load_file_config_only(root: Path | None = None) -> dict:
+    base_root = _resolve_root(root)
+    local_config = _local_config_path(base_root)
+    example_config = _example_config_path(base_root)
+    cfg = {}
+    if example_config.exists():
+        try:
+            cfg.update(json.loads(example_config.read_text(encoding="utf-8-sig")))
+        except Exception:
+            pass
+    if local_config.exists():
+        try:
+            local = json.loads(local_config.read_text(encoding="utf-8-sig"))
+            cfg.update({k: v for k, v in local.items() if v not in ("", None)})
+        except Exception:
+            pass
+    return cfg
+
+def load_file_config(root: Path | None = None) -> dict:
+    return dict(_load_file_config_only(root))
+
+def _resolve_env_candidate(root: Path | None, candidate: str) -> Path:
+    path = Path(candidate)
+    if path.is_absolute():
+        return path
+    return _resolve_root(root) / path
+
+def _validated_env_map_spec(root: Path | None = None) -> dict:
+    env_map_file = _env_map_path(root)
+    if not env_map_file.is_file():
+        raise ConfigContractError(f"missing env map contract: {env_map_file}")
+    try:
+        spec = json.loads(env_map_file.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        raise ConfigContractError(f"invalid env map JSON: {env_map_file}: {exc}") from exc
+    if not isinstance(spec, dict):
+        raise ConfigContractError(f"env map contract must be a JSON object: {env_map_file}")
+    if str(spec.get("contract_id") or "").strip() != ENV_MAP_CONTRACT_ID:
+        raise ConfigContractError(
+            f"env map contract_id must be {ENV_MAP_CONTRACT_ID!r}: {env_map_file}"
+        )
+    if str(spec.get("schema_version") or "").strip() != ENV_MAP_SCHEMA_VERSION:
+        raise ConfigContractError(
+            f"env map schema_version must be {ENV_MAP_SCHEMA_VERSION!r}: {env_map_file}"
+        )
+    env_file_candidates = spec.get("env_file_candidates")
+    if not isinstance(env_file_candidates, list) or not env_file_candidates:
+        raise ConfigContractError(
+            f"env map env_file_candidates must be a non-empty list: {env_map_file}"
+        )
+    if not all(isinstance(item, str) and item.strip() for item in env_file_candidates):
+        raise ConfigContractError(f"env map env_file_candidates must contain only strings: {env_map_file}")
+    key_map = spec.get("key_map")
+    if not isinstance(key_map, dict):
+        raise ConfigContractError(f"env map key_map must be a JSON object: {env_map_file}")
+    for config_key, env_keys in key_map.items():
+        if not isinstance(config_key, str) or not config_key.strip():
+            raise ConfigContractError(f"env map key_map keys must be non-empty strings: {env_map_file}")
+        if not isinstance(env_keys, list) or not env_keys:
+            raise ConfigContractError(f"env map key_map values must be non-empty lists: {env_map_file}")
+        if not all(isinstance(item, str) and item.strip() for item in env_keys):
+            raise ConfigContractError(f"env map key_map lists must contain only strings: {env_map_file}")
+    defaults = spec.get("defaults", {})
+    if not isinstance(defaults, dict):
+        raise ConfigContractError(f"env map defaults must be a JSON object: {env_map_file}")
+    return {
+        **spec,
+        "env_file_candidates": [str(item).strip() for item in env_file_candidates],
+        "key_map": {str(key).strip(): [str(item).strip() for item in value] for key, value in key_map.items()},
+        "defaults": defaults,
+    }
+
+def _apply_effective_config(
+    cfg: dict,
+    discovered: dict,
+    process_env: dict[str, str],
+    root: Path | None = None,
+) -> dict:
+    resolved = dict(cfg)
+    for key, value in discovered.get("values", {}).items():
+        if key.startswith("_"):
+            continue
+        if not resolved.get(key) or _is_placeholder(resolved.get(key)):
+            resolved[key] = value
+    for env_key, config_key in ENV_VAR_TO_CONFIG_KEY.items():
+        if process_env.get(env_key):
+            resolved[config_key] = process_env[env_key]
+    if not resolved.get("media_public_local_dir") or _is_placeholder(resolved.get("media_public_local_dir")):
+        resolved["media_public_local_dir"] = _default_media_public_local_dir(root)
+        resolved["_media_public_local_dir_source"] = "runtime_default"
+    if not resolved.get("page_access_token") and resolved.get("instagram_access_token"):
+        resolved["page_access_token"] = resolved["instagram_access_token"]
+        resolved["_page_access_token_alias"] = "instagram_access_token"
+    return resolved
+
 def _load_env_for_r2(root: Path | None = None) -> None:
-    """Best-effort: populate os.environ with .env values so R2_* vars are visible."""
-    for k, v in parse_dotenv(_resolve_root(root) / ".env").items():
-        if not os.environ.get(k):
-            os.environ[k] = v
+    """Best-effort: populate os.environ with contract-approved .env values so R2_* vars are visible."""
+    spec = load_env_map(root)
+    for candidate in spec.get("env_file_candidates", []):
+        for k, v in parse_dotenv(_resolve_env_candidate(root, candidate)).items():
+            if not os.environ.get(k):
+                os.environ[k] = v
 
 
 def _r2_is_configured(root: Path | None = None) -> bool:
@@ -91,14 +220,7 @@ def _try_r2_upload(src: Path, key: str) -> dict | None:
 
 
 def load_env_map(root: Path | None = None) -> dict:
-    env_map_file = _env_map_path(root)
-    if env_map_file.exists():
-        return json.loads(env_map_file.read_text(encoding="utf-8-sig"))
-    return {
-        "env_file_candidates": [str(_resolve_root(root) / ".env")],
-        "key_map": {},
-        "defaults": {},
-    }
+    return _validated_env_map_spec(root)
 
 def discover_dotenv_values(root: Path | None = None) -> dict:
     spec = load_env_map(root)
@@ -106,9 +228,7 @@ def discover_dotenv_values(root: Path | None = None) -> dict:
     sources = []
     env_values = dict(os.environ)
     for candidate in spec.get("env_file_candidates", []):
-        p = Path(candidate)
-        if not p.is_absolute():
-            p = _resolve_root(root) / candidate
+        p = _resolve_env_candidate(root, candidate)
         vals = parse_dotenv(p)
         if vals:
             sources.append(str(p))
@@ -122,55 +242,13 @@ def discover_dotenv_values(root: Path | None = None) -> dict:
                 break
     for k, v in spec.get("defaults", {}).items():
         found.setdefault(k, v)
-    return {"values": found, "sources": sources}
+    return {"values": found, "sources": sources, "env_map_path": str(_env_map_path(root))}
 
 def load_config(root: Path | None = None) -> dict:
     base_root = _resolve_root(root)
-    local_config = _local_config_path(base_root)
-    example_config = _example_config_path(base_root)
-    cfg = {}
-    if example_config.exists():
-        try:
-            cfg.update(json.loads(example_config.read_text(encoding="utf-8-sig")))
-        except Exception:
-            pass
-    if local_config.exists():
-        try:
-            local = json.loads(local_config.read_text(encoding="utf-8-sig"))
-            cfg.update({k: v for k, v in local.items() if v not in ("", None)})
-        except Exception:
-            pass
-
+    cfg = _load_file_config_only(base_root)
     discovered = discover_dotenv_values(base_root)
-    # .env fills blanks/placeholders only; explicit local config wins.
-    for k, v in discovered["values"].items():
-        if k.startswith("_"):
-            continue
-        existing = str(cfg.get(k, "") or "")
-        placeholder = "PASTE_" in existing or "YOUR_PUBLIC_MEDIA_HOST" in existing
-        if not existing or placeholder:
-            cfg[k] = v
-
-    # Environment variables override last.
-    env_map = {
-        "META_PAGE_ACCESS_TOKEN": "page_access_token",
-        "META_INSTAGRAM_ACCESS_TOKEN": "instagram_access_token",
-        "META_IG_USER_ID": "instagram_business_account_id",
-        "META_FACEBOOK_PAGE_ID": "facebook_page_id",
-        "META_GRAPH_API_VERSION": "graph_api_version",
-        "LENA_MEDIA_PUBLIC_BASE_URL": "media_public_base_url",
-        "LENA_MEDIA_PUBLIC_LOCAL_DIR": "media_public_local_dir",
-    }
-    for env, key in env_map.items():
-        if os.environ.get(env):
-            cfg[key] = os.environ[env]
-
-    # Backward compatibility: Instagram-only token can drive IG connector.
-    if not cfg.get("page_access_token") and cfg.get("instagram_access_token"):
-        cfg["page_access_token"] = cfg["instagram_access_token"]
-        cfg["_page_access_token_alias"] = "instagram_access_token"
-
-    return cfg
+    return _apply_effective_config(cfg, discovered, dict(os.environ), base_root)
 
 def token_for_platform(cfg: dict, platform: str) -> str:
     if _auth_mode(cfg) == "instagram_login" and platform.startswith("Instagram") and cfg.get("instagram_access_token"):
@@ -178,14 +256,29 @@ def token_for_platform(cfg: dict, platform: str) -> str:
     return cfg.get("page_access_token", "")
 
 def config_status(test_api: bool = False, root: Path | None = None) -> dict:
-    cfg = load_config(root)
-    discovered = discover_dotenv_values(root)
+    base_root = _resolve_root(root)
+    contract_error = ""
+    env_map_ok = False
+    try:
+        cfg = load_config(base_root)
+        discovered = discover_dotenv_values(base_root)
+        env_map_ok = True
+    except ConfigContractError as exc:
+        contract_error = str(exc)
+        cfg = _load_file_config_only(base_root)
+        if not cfg.get("media_public_local_dir") or _is_placeholder(cfg.get("media_public_local_dir")):
+            cfg["media_public_local_dir"] = _default_media_public_local_dir(base_root)
+            cfg["_media_public_local_dir_source"] = "runtime_default"
+        discovered = {"values": {}, "sources": [], "env_map_path": str(_env_map_path(base_root))}
     def check(key, secret=False):
         val = str(cfg.get(key, "") or "")
-        placeholder = "PASTE_" in val or "YOUR_PUBLIC_MEDIA_HOST" in val
+        placeholder = _is_placeholder(val)
         return {"ok": bool(val) and not placeholder, "value": redact(val) if secret else val}
 
-    r2_ok    = _r2_is_configured(root)
+    try:
+        r2_ok = _r2_is_configured(base_root) if env_map_ok else False
+    except ConfigContractError:
+        r2_ok = False
     mode     = _auth_mode(cfg)
     checks = {
         "instagram_access_token": check("instagram_access_token", True),
@@ -196,8 +289,15 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
         "media_public_base_url": check("media_public_base_url", False),
         "media_public_local_dir": check("media_public_local_dir", False),
         "r2_configured": {"ok": r2_ok, "note": "R2 env vars present — R2 upload active" if r2_ok else "R2 env vars not set"},
-        "local_config_exists": {"ok": _local_config_path(root).exists(), "path": str(_local_config_path(root))},
-        "dotenv_sources": {"ok": bool(discovered.get("sources")), "sources": discovered.get("sources", [])}
+        "local_config_exists": {"ok": _local_config_path(base_root).exists(), "path": str(_local_config_path(base_root))},
+        "dotenv_sources": {"ok": env_map_ok and bool(discovered.get("sources")), "sources": discovered.get("sources", [])},
+        "env_map_contract": {
+            "ok": env_map_ok,
+            "path": str(_env_map_path(base_root)),
+            "contract_id": ENV_MAP_CONTRACT_ID,
+            "schema_version": ENV_MAP_SCHEMA_VERSION,
+            "detail": contract_error,
+        },
     }
 
     media_host_ok = checks["media_public_base_url"]["ok"] or r2_ok
@@ -216,9 +316,9 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
             api_result = {"ok": False, "error": str(e)}
 
     return {
-        "ok": instagram_ready or facebook_ready,
+        "ok": env_map_ok and (instagram_ready or facebook_ready),
         "version": "v2.9.1",
-        "config_path": str(_local_config_path(root)),
+        "config_path": str(_local_config_path(base_root)),
         "checks": checks,
         "readiness": {
             "auth_mode":       mode,
@@ -264,7 +364,10 @@ def preflight_token(cfg: dict, platform: str = "") -> dict:
 
 def validate_config_for(platform: str, media_type: str, root: Path | None = None) -> dict:
     status = config_status(False, root=root)
-    cfg = load_config(root)
+    try:
+        cfg = load_config(root)
+    except ConfigContractError as exc:
+        return {"ok": False, "reason": "invalid_env_map_contract", "detail": str(exc), "status": status}
     if platform.startswith("Instagram"):
         if not cfg.get("instagram_business_account_id"):
             return {"ok": False, "reason": "missing_instagram_business_account_id", "status": status}
@@ -277,7 +380,7 @@ def validate_config_for(platform: str, media_type: str, root: Path | None = None
             return {"ok": False, "reason": "missing_page_access_token", "status": status}
     else:
         return {"ok": False, "reason": "unsupported_meta_platform", "status": status}
-    if not cfg.get("media_public_base_url") or "YOUR_PUBLIC_MEDIA_HOST" in str(cfg.get("media_public_base_url")):
+    if not cfg.get("media_public_base_url") or _is_placeholder(cfg.get("media_public_base_url")):
         if not _r2_is_configured(root):
             return {"ok": False, "reason": "missing_public_media_base_url_and_r2_not_configured", "status": status}
     return {"ok": True, "config": cfg}

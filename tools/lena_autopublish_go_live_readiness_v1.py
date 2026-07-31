@@ -62,6 +62,13 @@ REQUIRED_PUBLISH_ENV_KEYS = (
     "LENA_MEDIA_PUBLIC_BASE_URL",
     "LENA_MEDIA_PUBLIC_LOCAL_DIR",
 )
+R2_ENV_KEYS = (
+    "R2_ACCOUNT_ID",
+    "R2_BUCKET_NAME",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_PUBLIC_BASE_URL",
+)
 
 CANONICAL_TASK_NAME = "Lena Autonomy Scheduler Driver"
 LEGACY_TASK_NAMES = (
@@ -271,15 +278,55 @@ def _probe_python_interpreter(python_exe: Path, production_root: Path) -> dict[s
     }
 
 
-def _env_presence_report(production_root: Path, process_env: dict[str, str]) -> dict[str, Any]:
+def _required_runtime_env_keys(config_status: dict[str, Any], effective_cfg: dict[str, Any]) -> set[str]:
+    checks = config_status.get("checks", {})
+    required: set[str] = set()
+    if not str(effective_cfg.get("page_access_token") or "").strip():
+        required.add("META_PAGE_ACCESS_TOKEN")
+    if not str(effective_cfg.get("instagram_business_account_id") or "").strip():
+        required.add("META_IG_USER_ID")
+    if not str(effective_cfg.get("facebook_page_id") or "").strip():
+        required.add("META_FACEBOOK_PAGE_ID")
+    media_base_ok = bool(checks.get("media_public_base_url", {}).get("ok", False))
+    local_dir_ok = bool(checks.get("media_public_local_dir", {}).get("ok", False))
+    r2_ok = bool(checks.get("r2_configured", {}).get("ok", False))
+    if not media_base_ok and not r2_ok:
+        required.add("LENA_MEDIA_PUBLIC_BASE_URL")
+        required.update(R2_ENV_KEYS)
+    if media_base_ok and not local_dir_ok and not r2_ok:
+        required.add("LENA_MEDIA_PUBLIC_LOCAL_DIR")
+    return required
+
+
+def _env_presence_report(
+    production_root: Path,
+    process_env: dict[str, str],
+    config_status: dict[str, Any],
+) -> dict[str, Any]:
     dotenv_path = production_root / ".env"
     dotenv_vars = publish_common.parse_dotenv(dotenv_path)
-    env_map = publish_common.load_env_map(production_root)
+    contract_error = ""
+    env_map_ok = False
+    try:
+        env_map = publish_common.load_env_map(production_root)
+        effective_cfg = publish_common.load_config(production_root)
+        env_map_ok = True
+    except publish_common.ConfigContractError as exc:
+        contract_error = str(exc)
+        env_map = {}
+        effective_cfg = publish_common.load_file_config(production_root)
     key_map = env_map.get("key_map", {}) if isinstance(env_map, dict) else {}
+    required_env_keys = _required_runtime_env_keys(config_status, effective_cfg) if env_map_ok else set(REQUIRED_PUBLISH_ENV_KEYS)
     entries: list[dict[str, Any]] = []
     for env_key in REQUIRED_PUBLISH_ENV_KEYS:
         present_in_process = bool(process_env.get(env_key))
         present_in_dotenv = bool(dotenv_vars.get(env_key))
+        config_key = publish_common.ENV_VAR_TO_CONFIG_KEY.get(env_key, "")
+        effective_config_present = bool(
+            config_key
+            and str(effective_cfg.get(config_key, "") or "").strip()
+            and not publish_common._is_placeholder(effective_cfg.get(config_key))
+        )
         config_keys = [
             config_key for config_key, env_keys in key_map.items()
             if env_key in [str(item) for item in (env_keys or [])]
@@ -290,18 +337,30 @@ def _env_presence_report(production_root: Path, process_env: dict[str, str]) -> 
                 "present_in_process": present_in_process,
                 "present_in_dotenv": present_in_dotenv,
                 "config_keys": config_keys,
-                "present": present_in_process or present_in_dotenv,
+                "required_by_runtime": env_key in required_env_keys,
+                "effective_config_present": effective_config_present,
+                "present": effective_config_present or present_in_process or present_in_dotenv,
             }
         )
-    missing = [entry["env_var"] for entry in entries if not entry["present"]]
+    missing = [entry["env_var"] for entry in entries if entry["required_by_runtime"] and not entry["present"]]
     return {
         "dotenv_path": str(dotenv_path),
         "dotenv_present": dotenv_path.is_file(),
         "env_map_path": str(production_root / "pipeline" / "influencer_nodes" / "lena" / "meta_env_key_map_v2_9_1.json"),
         "env_map_present": (production_root / "pipeline" / "influencer_nodes" / "lena" / "meta_env_key_map_v2_9_1.json").is_file(),
+        "env_map_contract_ok": env_map_ok,
+        "contract_error": contract_error,
+        "required_env_vars": sorted(required_env_keys),
+        "resolved_config_keys": sorted(
+            key
+            for key, value in effective_cfg.items()
+            if not str(key).startswith("_")
+            and str(value or "").strip()
+            and not publish_common._is_placeholder(value)
+        ),
         "entries": entries,
         "missing": missing,
-        "ok": not missing,
+        "ok": env_map_ok and not missing,
     }
 
 
@@ -309,10 +368,14 @@ def _sanitize_config_status(status: dict[str, Any]) -> dict[str, Any]:
     checks: dict[str, dict[str, Any]] = {}
     for key, value in status.get("checks", {}).items():
         checks[key] = {"ok": bool(value.get("ok", False))}
-        if key in {"local_config_exists", "dotenv_sources", "r2_configured"} and value.get("path"):
+        if key in {"local_config_exists", "dotenv_sources", "r2_configured", "env_map_contract"} and value.get("path"):
             checks[key]["path"] = value.get("path", "")
         if key == "dotenv_sources":
             checks[key]["sources"] = value.get("sources", [])
+        if key == "env_map_contract":
+            checks[key]["contract_id"] = value.get("contract_id", "")
+            checks[key]["schema_version"] = value.get("schema_version", "")
+            checks[key]["detail"] = value.get("detail", "")
     readiness = status.get("readiness", {})
     return {
         "ok": bool(status.get("ok", False)),
@@ -779,7 +842,7 @@ def _build_report(
     config_status = publish_common.config_status(False, root=production_root)
     config_checks = config_status.get("checks", {})
     config_readiness = config_status.get("readiness", {})
-    env_report = _env_presence_report(production_root, process_env)
+    env_report = _env_presence_report(production_root, process_env, config_status)
     policy = _policy_summary(production_root, git_state["head"])
     manifest = _manifest_summary(production_root)
     scheduler_definition = _canonical_scheduler_definition(production_root, python_exe)
@@ -798,6 +861,8 @@ def _build_report(
     if not python_probe["ok"]:
         blockers.append({"code": python_probe["reason"], "detail": "python interpreter import probe failed"})
     publisher_config_ready = (
+        bool(config_checks.get("env_map_contract", {}).get("ok", False))
+        and
         bool(config_checks.get("local_config_exists", {}).get("ok", False))
         and bool(config_checks.get("dotenv_sources", {}).get("ok", False))
         and bool(config_readiness.get("instagram_ready", False))
@@ -806,7 +871,9 @@ def _build_report(
     )
     if not publisher_config_ready:
         blockers.append({"code": "publisher_config_not_ready", "detail": "Instagram, Facebook, media host, local config, and dotenv sources must all be ready"})
-    if not env_report["ok"]:
+    if not env_report.get("env_map_contract_ok", False):
+        blockers.append({"code": "publisher_env_map_invalid", "detail": env_report.get("contract_error", "publisher env map contract is invalid")})
+    elif not env_report["ok"]:
         blockers.append({"code": "environment_visibility_issue", "detail": "required environment variables are missing from the production context"})
     if policy["blockers"]:
         blockers.extend(policy["blockers"])
@@ -827,6 +894,7 @@ def _build_report(
             "repository_head_mismatch",
             "python_import_probe_failed",
             "python_executable_missing",
+            "publisher_env_map_invalid",
             "autonomous_policy_id_invalid",
             "autonomous_policy_version_invalid",
             "autonomous_mode_invalid",
@@ -899,10 +967,12 @@ def _build_report(
         for blocker in blockers
     )
     environment_visibility = {
-        "ok": python_probe["ok"] and env_report["ok"],
+        "ok": python_probe["ok"] and env_report.get("env_map_contract_ok", False) and env_report["ok"],
         "python_probe_ok": python_probe["ok"],
+        "env_map_contract_ok": env_report.get("env_map_contract_ok", False),
         "production_root": str(production_root),
         "python_exe": str(python_exe),
+        "required_environment_keys": env_report.get("required_env_vars", []),
         "missing_environment_keys": env_report["missing"],
     }
     connector_readiness = {
@@ -913,8 +983,9 @@ def _build_report(
         "auth_mode": config_readiness.get("auth_mode", ""),
     }
     credential_readiness = {
-        "ok": env_report["ok"],
+        "ok": env_report.get("env_map_contract_ok", False) and env_report["ok"],
         "missing": env_report["missing"],
+        "required": env_report.get("required_env_vars", []),
         "entries": env_report["entries"],
     }
     scheduler_definition_readiness = {
