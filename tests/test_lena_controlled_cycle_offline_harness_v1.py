@@ -89,7 +89,10 @@ def _remove_day_scoped_artifacts() -> None:
     if _LOCK_PATH.exists():
         _LOCK_PATH.unlink()
     for qcsv in (ROOT / "pipeline/publishing/lena/approved_queue").glob(f"*{TEST_DAY}*"):
-        qcsv.unlink()
+        if qcsv.is_dir():
+            shutil.rmtree(qcsv, ignore_errors=True)
+        else:
+            qcsv.unlink()
 
 
 @pytest.fixture
@@ -177,7 +180,7 @@ def test_controlled_cycle_reaches_provider_boundary_with_real_lineage(
     monkeypatch.setattr(photo_qa, "call_anthropic_structured_visual_tool", _fake_anthropic_tool)
     monkeypatch.setattr(autopublish, "_run_connector", _fake_run_connector)
 
-    report = autonomy.run_controlled_cycle(day=TEST_DAY, schedule_slot="morning")
+    report = autonomy.run_controlled_cycle(day=TEST_DAY, schedule_slot="morning", hold_for_publish=True)
 
     assert report.get("provider_calls_performed", 0) >= 1, (
         f"cycle never reached the stubbed provider boundary: {report.get('failure')}"
@@ -200,9 +203,9 @@ def test_controlled_cycle_reaches_provider_boundary_with_real_lineage(
     assert claim_record["report_type"] == "lena_higgsfield_standing_autonomy_generation_claim"
     assert claim_record["operator_id"] == standing_autonomy.AUTHORIZATION_ISSUER
 
-    assert report.get("publish_performed") in (True, None)
+    assert report.get("publish_performed") in (False, None)
     if report.get("ok") is True:
-        assert report.get("publish_performed") is True
+        assert report.get("publish_performed") is False
         assert report.get("queue_mutated") is True
 
 
