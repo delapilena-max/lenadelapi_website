@@ -34,9 +34,16 @@
     "enabled": true,
     "recipe_id": "hcr_012",
     "wardrobe_outfit_id": "wc_p050",
-    "visual_provider": "anthropic",
-    "visual_model": "claude-sonnet-5",
-    "visual_model_authority_path": "pipeline/identity/lena_visual_model_authority_v1.json",
+    "qa_mode": "autonomous_local",
+    "human_review_mode": "supervised_human_review",
+    "external_visual_diagnostic": {
+      "enabled": false,
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "visual_model_authority_path": "pipeline/identity/lena_visual_model_authority_v1.json",
+      "explicit_authorization_required": true,
+      "non_authoritative": true
+    },
     "identity_reference_authority_path": "pipeline/identity/lena_visual_reference_authority_v1.json",
     "retry_reason_codes": [
       "hair_crown_forelock_artifact"

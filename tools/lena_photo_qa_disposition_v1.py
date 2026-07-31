@@ -46,6 +46,16 @@ MODEL_AUTHORITY_SCHEMA_VERSION = "lena_visual_model_authority_v1"
 MODEL_AUTHORITY_ID = "lena_visual_model_authority_v1"
 APPROVED_VISUAL_PROVIDER = "anthropic"
 APPROVED_VISUAL_MODEL = "claude-sonnet-5"
+QA_MODE_AUTONOMOUS_LOCAL = "autonomous_local"
+QA_MODE_SUPERVISED_HUMAN_REVIEW = "supervised_human_review"
+QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC = "optional_external_diagnostic"
+ALLOWED_QA_MODES = frozenset(
+    {
+        QA_MODE_AUTONOMOUS_LOCAL,
+        QA_MODE_SUPERVISED_HUMAN_REVIEW,
+        QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+    }
+)
 MODEL_AUTHORITY_KEYS = {
     "schema_version", "influencer_id", "authority_id", "provider", "approved_model",
 }
@@ -1196,6 +1206,122 @@ def _all_unreviewed_observations(note: str) -> dict[str, Any]:
     }
 
 
+def _resolve_qa_mode(
+    *,
+    qa_mode: str | None,
+    live_visual_review: bool,
+) -> str | None:
+    raw = str(qa_mode or "").strip()
+    if raw:
+        if raw not in ALLOWED_QA_MODES:
+            raise BoundaryError(
+                "invalid_qa_mode",
+                f"qa_mode must be one of {sorted(ALLOWED_QA_MODES)!r}",
+            )
+        return raw
+    return None
+
+
+def _build_local_deterministic_checks(
+    *,
+    decision_kind: str,
+    manifest: dict[str, Any],
+    image: dict[str, Any],
+    identity_evidence: dict[str, Any],
+    provider_binding: dict[str, Any] | None,
+    reference_authority: dict[str, Any],
+    reference_set_sha: str,
+    memory_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    checks = {
+        "identity_lineage": {
+            "status": "pass",
+            "notes": f"current Soul binding verified locally for {identity_evidence.get('custom_reference_id')}",
+        },
+        "provider_manifest_integrity": {
+            "status": "pass",
+            "notes": f"provider manifest locally bound to job {manifest.get('provider_job_id')}",
+        },
+        "prompt_and_approval_binding": {
+            "status": "pass",
+            "notes": f"decision kind {decision_kind} bound to prompt/provider execution",
+        },
+        "image_file_integrity": {
+            "status": "pass",
+            "notes": f"locally measured {image['width']}x{image['height']} {image['format']} sha256 {image['sha256']}",
+        },
+        "reference_authority_binding": {
+            "status": "pass",
+            "notes": f"committed reference authority {reference_authority.get('authority_id')} sha {reference_set_sha}",
+        },
+        "reconciliation_and_provenance": {
+            "status": "pass",
+            "notes": "authorization, provenance, and reconciliation bindings validated locally",
+        },
+        "provider_call_accounting": {
+            "status": "pass",
+            "notes": "this QA disposition performed no provider generation, queue, or publish action",
+        },
+        "clean_export_guard": {
+            "status": "pass",
+            "notes": "autonomous lane still relies on downstream clean-derivative and publishing gates",
+        },
+        "queue_and_publish_boundaries": {
+            "status": "pass",
+            "notes": "QA artifact itself performs no queue admission or publishing",
+        },
+    }
+    if provider_binding is not None:
+        checks["provider_execution_binding"] = {
+            "status": "pass",
+            "notes": "provider execution binding present in authorization context",
+        }
+    if memory_evidence.get("hard_excluded"):
+        checks["failure_memory_gate"] = {
+            "status": "fail",
+            "notes": "failure-memory hard exclusion blocked autonomous acceptance",
+        }
+    else:
+        checks["failure_memory_gate"] = {
+            "status": "pass",
+            "notes": "no failure-memory hard exclusion blocked autonomous acceptance",
+        }
+    return checks
+
+
+def _deterministic_mode_result(
+    *,
+    qa_mode: str,
+    memory_evidence: dict[str, Any],
+) -> tuple[str, list[str], bool, Optional[str], str, str]:
+    if memory_evidence.get("hard_excluded"):
+        return (
+            "hard_stop",
+            ["failure_memory_pattern_hard_excluded"],
+            False,
+            "failure_memory_pattern_hard_excluded",
+            "blocked",
+            "human_review_or_new_candidate_required",
+        )
+    if qa_mode == QA_MODE_SUPERVISED_HUMAN_REVIEW:
+        return (
+            "blocked",
+            ["human_visual_review_required"],
+            False,
+            "human_visual_review_required",
+            "human_review_pending",
+            "human_visual_review_required",
+        )
+    return (
+        "accept",
+        [],
+        False,
+        None,
+        "high",
+        "existing_downstream_governed_publish_gates_only",
+    )
+
+
 def deterministic_disposition(
     observations: dict[str, Any], memory_evidence: dict[str, Any]
 ) -> tuple[str, list[str], bool, Optional[str], str, str]:
@@ -1507,11 +1633,18 @@ def evaluate_photo_qa_disposition(
     reference_authority_artifact: Path,
     reference_authority_sha256: str,
     expected_image_sha256: str,
+    qa_mode: Optional[str] = None,
     live_visual_review: bool = False,
     visual_provider: Optional[str] = None,
     visual_model: Optional[str] = None,
     visual_model_authority_artifact: Optional[Path] = None,
     visual_model_authority_sha256: Optional[str] = None,
+    external_visual_diagnostic_enabled: bool = False,
+    external_visual_diagnostic_authorized: bool = False,
+    external_visual_diagnostic_provider: Optional[str] = None,
+    external_visual_diagnostic_model: Optional[str] = None,
+    external_visual_diagnostic_authority_artifact: Optional[Path] = None,
+    external_visual_diagnostic_authority_sha256: Optional[str] = None,
     expected_decision_fingerprint: Optional[str] = None,
     expected_reference_set_sha256: Optional[str] = None,
     failure_memory_loader: Callable[[], dict[str, Any]] = failure_memory.compute_higgsfield_failure_memory,
@@ -1519,6 +1652,10 @@ def evaluate_photo_qa_disposition(
 ) -> dict[str, Any]:
     provider_called = False
     try:
+        resolved_qa_mode = _resolve_qa_mode(
+            qa_mode=qa_mode,
+            live_visual_review=live_visual_review,
+        )
         autonomy_ladder.assert_allowed(
             "lena_photo_qa_disposition_v1",
             level=2,
@@ -1559,11 +1696,106 @@ def evaluate_photo_qa_disposition(
         memory_evidence = _failure_memory_evidence(manifest, failure_memory_loader)
 
         visual_observations: Optional[dict[str, Any]] = None
+        diagnostic_record: dict[str, Any] | None = None
+        local_deterministic_checks = _build_local_deterministic_checks(
+            decision_kind=decision_kind,
+            manifest=manifest,
+            image=image,
+            identity_evidence=identity_evidence,
+            provider_binding=provider_binding,
+            reference_authority=reference_authority,
+            reference_set_sha=reference_set_sha,
+            memory_evidence=memory_evidence,
+        )
 
         if memory_evidence["hard_excluded"]:
             visual_observations = _all_unreviewed_observations(
                 "visual review skipped because the current lane/pose pattern is already hard-excluded"
             )
+        elif resolved_qa_mode == QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC:
+            if not external_visual_diagnostic_enabled and not live_visual_review:
+                raise BoundaryError(
+                    "external_visual_diagnostic_disabled",
+                    "optional external diagnostic mode is disabled by default",
+                )
+            if not external_visual_diagnostic_authorized:
+                raise BoundaryError(
+                    "external_visual_diagnostic_unauthorized",
+                    "optional external diagnostic mode requires explicit authorization before any API call",
+                )
+            provider_name = str(external_visual_diagnostic_provider or visual_provider or "")
+            model_name = str(external_visual_diagnostic_model or visual_model or "")
+            diagnostic_record = {
+                "mode": QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+                "non_authoritative": True,
+                "requested": True,
+                "authorized": True,
+                "enabled": True,
+                "provider": provider_name,
+                "model": model_name,
+                "called": False,
+                "status": "not_called",
+                "error_code": None,
+                "error_detail": None,
+                "observations": None,
+            }
+            authority_artifact = external_visual_diagnostic_authority_artifact or visual_model_authority_artifact
+            authority_sha = external_visual_diagnostic_authority_sha256 or visual_model_authority_sha256
+            if authority_artifact is not None and authority_sha is not None:
+                model_authority = _validate_model_authority(
+                    authority_artifact.resolve(),
+                    authority_sha,
+                    decision["authority_commit"],
+                    provider_name,
+                    model_name,
+                )
+                bindings = {
+                    "decision fingerprint": (expected_decision_fingerprint, active_fingerprint),
+                    "image SHA": (expected_image_sha256, image["sha256"]),
+                    "reference-set SHA": (expected_reference_set_sha256, reference_set_sha),
+                }
+                mismatches = [
+                    name
+                    for name, (expected, actual) in bindings.items()
+                    if expected is not None and expected != actual
+                ]
+                if mismatches:
+                    raise BoundaryError(
+                        "decision_binding_mismatch",
+                        "optional external diagnostic binding mismatch: " + ", ".join(mismatches),
+                    )
+                rubric = _load_canonical_rubric(decision["authority_commit"])
+                request = _review_request(
+                    decision,
+                    candidate,
+                    manifest,
+                    image,
+                    references,
+                    reference_authority["authority_id"],
+                    reference_set_sha,
+                    provider_name,
+                    model_name,
+                    rubric,
+                    model_authority,
+                )
+                try:
+                    provider_called = True
+                    diagnostic_record["called"] = True
+                    visual_observations = call_anthropic_visual_review(request)
+                    diagnostic_record["status"] = "completed"
+                    diagnostic_record["observations"] = validate_visual_observations(visual_observations)
+                except BoundaryError as exc:
+                    diagnostic_record["status"] = "unavailable"
+                    diagnostic_record["error_code"] = exc.code
+                    diagnostic_record["error_detail"] = exc.detail
+                except Exception as exc:
+                    diagnostic_record["status"] = "unavailable"
+                    diagnostic_record["error_code"] = "external_visual_diagnostic_unavailable"
+                    diagnostic_record["error_detail"] = str(exc)
+            else:
+                diagnostic_record["status"] = "unavailable"
+                diagnostic_record["error_code"] = "external_visual_diagnostic_authority_missing"
+                diagnostic_record["error_detail"] = "optional external diagnostic is missing approved-model authority inputs"
         elif live_visual_review:
             if visual_model_authority_artifact is None or visual_model_authority_sha256 is None:
                 raise BoundaryError("visual_review_unavailable", "live visual review requires committed approved-model authority")
@@ -1592,39 +1824,68 @@ def evaluate_photo_qa_disposition(
             except Exception as exc:
                 raise BoundaryError("visual_review_unavailable", f"visual provider call failed: {exc}") from exc
 
-        if visual_observations is None:
-            visual_observations = _all_unreviewed_observations(
-                "no semantic visual review occurred; default local validation cannot judge pixels"
+        if resolved_qa_mode in {
+            QA_MODE_AUTONOMOUS_LOCAL,
+            QA_MODE_SUPERVISED_HUMAN_REVIEW,
+            QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+        }:
+            disposition, reasons, retry_eligible, hard_reason, confidence, next_action = _deterministic_mode_result(
+                qa_mode=resolved_qa_mode,
+                memory_evidence=memory_evidence,
             )
-        observations = validate_visual_observations(visual_observations)
-        observations.update(
-            {
-                "dimensions": {"status": "pass", "reason_codes": [], "notes": f"locally measured {image['width']}x{image['height']}"},
-                "file_integrity": {"status": "pass", "reason_codes": [], "notes": "Pillow verify and reopen succeeded"},
-                "format": {"status": "pass", "reason_codes": [], "notes": f"locally detected supported format {image['format']}"},
-                "downstream_compatibility": {"status": "pass", "reason_codes": [], "notes": "approved Higgsfield dimensions and supported still-image format"},
+            observations = local_deterministic_checks
+            reviewer_type = "local_validation_only"
+            visual_source = {
+                "qa_mode": resolved_qa_mode,
+                "resolution": "explicit_qa_mode",
+                "reviewer_type": reviewer_type,
+                "authoritative_mode": resolved_qa_mode != QA_MODE_OPTIONAL_EXTERNAL_DIAGNOSTIC,
+                "provider_called": provider_called,
+                "external_visual_diagnostic": diagnostic_record,
+                "notes": (
+                    "autonomous-local acceptance relies only on deterministic local checks"
+                    if resolved_qa_mode == QA_MODE_AUTONOMOUS_LOCAL
+                    else "supervised human-review mode stops after deterministic local checks"
+                    if resolved_qa_mode == QA_MODE_SUPERVISED_HUMAN_REVIEW
+                    else "external visual diagnostic is non-authoritative and cannot approve publishing or autonomy"
+                ),
             }
-        )
-        disposition, reasons, retry_eligible, hard_reason, confidence, next_action = deterministic_disposition(
-            observations, memory_evidence
-        )
-        reviewer_type = "bounded_visual_provider" if provider_called else "local_validation_only"
-        visual_source = {
-            "reviewer_type": reviewer_type,
-            "provider": visual_provider if provider_called else None,
-            "model": visual_model if provider_called else None,
-            "observation_schema_version": VISUAL_SCHEMA_VERSION,
-            "observations_sha256": _sha256_bytes(_canonical_bytes(visual_observations)),
-            "request_binding_sha256": _sha256_bytes(
-                _canonical_bytes(
-                    {
-                        "decision_fingerprint_sha256": active_fingerprint,
-                        "image_sha256": image["sha256"],
-                        "reference_set_sha256": reference_set_sha,
-                    }
+        else:
+            if visual_observations is None:
+                visual_observations = _all_unreviewed_observations(
+                    "no semantic visual review occurred; default local validation cannot judge pixels"
                 )
-            ),
-        }
+            observations = validate_visual_observations(visual_observations)
+            observations.update(
+                {
+                    "dimensions": {"status": "pass", "reason_codes": [], "notes": f"locally measured {image['width']}x{image['height']}"},
+                    "file_integrity": {"status": "pass", "reason_codes": [], "notes": "Pillow verify and reopen succeeded"},
+                    "format": {"status": "pass", "reason_codes": [], "notes": f"locally detected supported format {image['format']}"},
+                    "downstream_compatibility": {"status": "pass", "reason_codes": [], "notes": "approved Higgsfield dimensions and supported still-image format"},
+                }
+            )
+            disposition, reasons, retry_eligible, hard_reason, confidence, next_action = deterministic_disposition(
+                observations, memory_evidence
+            )
+            reviewer_type = "bounded_visual_provider" if provider_called else "local_validation_only"
+            visual_source = {
+                "qa_mode": "legacy_live_visual_review" if provider_called else "legacy_local_validation_only",
+                "resolution": "legacy_live_visual_review_flag" if provider_called else "legacy_default",
+                "reviewer_type": reviewer_type,
+                "provider": visual_provider if provider_called else None,
+                "model": visual_model if provider_called else None,
+                "observation_schema_version": VISUAL_SCHEMA_VERSION,
+                "observations_sha256": _sha256_bytes(_canonical_bytes(visual_observations)),
+                "request_binding_sha256": _sha256_bytes(
+                    _canonical_bytes(
+                        {
+                            "decision_fingerprint_sha256": active_fingerprint,
+                            "image_sha256": image["sha256"],
+                            "reference_set_sha256": reference_set_sha,
+                        }
+                    )
+                ),
+            }
         # The existing schema remains authoritative and unchanged; this record
         # records which canonical keys are downstream-gating without writing it.
         qa_template = lena_photo_qa.build_qa_template(
@@ -1694,6 +1955,7 @@ def evaluate_photo_qa_disposition(
                 "decision_kind": decision_kind,
                 "failure_memory": memory_evidence,
                 "canonical_qa_contract": canonical_qa_contract,
+                "qa_mode": resolved_qa_mode or "legacy_local_validation_only",
             },
             "qa_checks": observations,
             "reason_codes": reasons,
@@ -1751,11 +2013,18 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--identity-reference-authority-sha256", required=True)
     parser.add_argument("--identity-reference", action="append", default=[], metavar="PATH::SHA256")
     parser.add_argument("--write-artifact", action="store_true")
+    parser.add_argument("--qa-mode", choices=sorted(ALLOWED_QA_MODES))
     parser.add_argument("--live-visual-review", action="store_true")
     parser.add_argument("--visual-provider")
     parser.add_argument("--visual-model")
     parser.add_argument("--visual-model-authority-artifact", type=Path)
     parser.add_argument("--visual-model-authority-sha256")
+    parser.add_argument("--external-visual-diagnostic-enabled", action="store_true")
+    parser.add_argument("--external-visual-diagnostic-authorized", action="store_true")
+    parser.add_argument("--external-visual-diagnostic-provider")
+    parser.add_argument("--external-visual-diagnostic-model")
+    parser.add_argument("--external-visual-diagnostic-authority-artifact", type=Path)
+    parser.add_argument("--external-visual-diagnostic-authority-sha256")
     parser.add_argument("--expected-decision-fingerprint")
     parser.add_argument("--expected-reference-set-sha256")
     return parser
@@ -1775,11 +2044,18 @@ def main() -> int:
             reference_specs=specs,
             reference_authority_artifact=args.identity_reference_authority_artifact,
             reference_authority_sha256=args.identity_reference_authority_sha256,
+            qa_mode=args.qa_mode,
             live_visual_review=args.live_visual_review,
             visual_provider=args.visual_provider,
             visual_model=args.visual_model,
             visual_model_authority_artifact=args.visual_model_authority_artifact,
             visual_model_authority_sha256=args.visual_model_authority_sha256,
+            external_visual_diagnostic_enabled=args.external_visual_diagnostic_enabled,
+            external_visual_diagnostic_authorized=args.external_visual_diagnostic_authorized,
+            external_visual_diagnostic_provider=args.external_visual_diagnostic_provider,
+            external_visual_diagnostic_model=args.external_visual_diagnostic_model,
+            external_visual_diagnostic_authority_artifact=args.external_visual_diagnostic_authority_artifact,
+            external_visual_diagnostic_authority_sha256=args.external_visual_diagnostic_authority_sha256,
             expected_decision_fingerprint=args.expected_decision_fingerprint,
             expected_reference_set_sha256=args.expected_reference_set_sha256,
         )

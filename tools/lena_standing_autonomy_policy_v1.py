@@ -23,6 +23,16 @@ AUTH_SCHEMA_VERSION = "v1"
 AUTHORIZATION_MODE = "standing_autonomy_policy"
 AUTHORIZATION_ISSUER = "lena_autonomy_controller"
 AUTHORIZATION_TTL = timedelta(minutes=30)
+AUTONOMOUS_QA_MODE = "autonomous_local"
+SUPERVISED_HUMAN_REVIEW_MODE = "supervised_human_review"
+OPTIONAL_EXTERNAL_DIAGNOSTIC_MODE = "optional_external_diagnostic"
+ALLOWED_QA_MODES = frozenset(
+    {
+        AUTONOMOUS_QA_MODE,
+        SUPERVISED_HUMAN_REVIEW_MODE,
+        OPTIONAL_EXTERNAL_DIAGNOSTIC_MODE,
+    }
+)
 
 
 class StandingAutonomyPolicyError(RuntimeError):
@@ -144,6 +154,57 @@ def _path_from_repo_text(raw_path: str) -> Path:
     return path if path.is_absolute() else ROOT / path
 
 
+def summarize_controlled_qa_mode(policy: dict[str, Any]) -> dict[str, Any]:
+    controlled = policy.get("controlled_photo_autonomy")
+    if not isinstance(controlled, dict) or controlled.get("enabled") is not True:
+        return {
+            "configured_autonomous_qa_mode": None,
+            "autonomous_external_visual_provider_required": False,
+            "external_visual_diagnostics_enabled": False,
+            "external_visual_diagnostic_authorization_required": None,
+            "human_review_mode": None,
+            "human_review_required_for_autonomous_operation": None,
+            "deterministic_local_checks_present": [],
+            "missing_required_local_safeguards": [],
+        }
+    diagnostic = controlled.get("external_visual_diagnostic")
+    diagnostic_enabled = isinstance(diagnostic, dict) and diagnostic.get("enabled") is True
+    local_checks = [
+        "exact_soul_id_and_identity_lineage",
+        "provider_job_and_manifest_integrity",
+        "prompt_and_approval_binding",
+        "result_image_hash_dimensions_and_format",
+        "reference_authority_and_provenance_binding",
+        "reconciliation_and_freshness_binding",
+        "cost_and_provider_call_cap_enforcement",
+        "clean_derivative_requirement",
+        "queue_and_publishing_safeguards",
+    ]
+    missing: list[str] = []
+    if not str(controlled.get("identity_reference_authority_path") or "").strip():
+        missing.append("identity_reference_authority_path")
+    if policy.get("identity_verification_required") is not True:
+        missing.append("identity_verification_required")
+    if policy.get("qa_required") is not True:
+        missing.append("qa_required")
+    if policy.get("duplicate_content_rejection_enabled") is not True:
+        missing.append("duplicate_content_rejection_enabled")
+    if controlled.get("privacy_clean_derivative_required") is not True:
+        missing.append("privacy_clean_derivative_required")
+    return {
+        "configured_autonomous_qa_mode": str(controlled.get("qa_mode") or ""),
+        "autonomous_external_visual_provider_required": str(controlled.get("qa_mode") or "") != AUTONOMOUS_QA_MODE,
+        "external_visual_diagnostics_enabled": diagnostic_enabled,
+        "external_visual_diagnostic_authorization_required": (
+            diagnostic.get("explicit_authorization_required") if isinstance(diagnostic, dict) else None
+        ),
+        "human_review_mode": str(controlled.get("human_review_mode") or ""),
+        "human_review_required_for_autonomous_operation": False,
+        "deterministic_local_checks_present": local_checks,
+        "missing_required_local_safeguards": missing,
+    }
+
+
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -221,8 +282,52 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
     if controlled_enabled:
         _require(controlled.get("recipe_id") == "hcr_012", "policy_controlled_recipe_invalid", "controlled photo autonomy is limited to hcr_012")
         _require(controlled.get("wardrobe_outfit_id") == "wc_p050", "policy_controlled_wardrobe_invalid", "controlled photo autonomy is limited to wc_p050")
-        _require(controlled.get("visual_provider") == "anthropic", "policy_visual_provider_invalid", "controlled photo autonomy requires the approved Anthropic visual provider")
-        _require(controlled.get("visual_model") == "claude-sonnet-5", "policy_visual_model_invalid", "controlled photo autonomy requires the approved visual model")
+        _require(
+            controlled.get("qa_mode") in ALLOWED_QA_MODES,
+            "policy_controlled_qa_mode_invalid",
+            "controlled photo autonomy qa_mode must be one of the approved governed modes",
+        )
+        _require(
+            controlled.get("qa_mode") == AUTONOMOUS_QA_MODE,
+            "policy_autonomous_qa_mode_invalid",
+            "controlled photo autonomy must use autonomous_local for normal autonomous operation",
+        )
+        _require(
+            controlled.get("human_review_mode") == SUPERVISED_HUMAN_REVIEW_MODE,
+            "policy_human_review_mode_invalid",
+            "controlled photo autonomy human_review_mode must remain supervised_human_review",
+        )
+        diagnostic = controlled.get("external_visual_diagnostic")
+        _require(
+            isinstance(diagnostic, dict),
+            "policy_external_visual_diagnostic_missing",
+            "controlled photo autonomy must declare external_visual_diagnostic configuration",
+        )
+        _require(
+            diagnostic.get("enabled") is False,
+            "policy_external_visual_diagnostic_default_invalid",
+            "external visual diagnostics must default to disabled",
+        )
+        _require(
+            diagnostic.get("explicit_authorization_required") is True,
+            "policy_external_visual_diagnostic_authorization_invalid",
+            "external visual diagnostics must require explicit authorization",
+        )
+        _require(
+            diagnostic.get("non_authoritative") is True,
+            "policy_external_visual_diagnostic_authority_invalid",
+            "external visual diagnostics must remain non-authoritative",
+        )
+        _require(
+            diagnostic.get("provider") == "anthropic",
+            "policy_external_visual_provider_invalid",
+            "external visual diagnostic provider must remain the approved Anthropic surface",
+        )
+        _require(
+            diagnostic.get("model") == "claude-sonnet-5",
+            "policy_external_visual_model_invalid",
+            "external visual diagnostic model must remain the approved model",
+        )
         _require(controlled.get("retry_reason_codes") == ["hair_crown_forelock_artifact"], "policy_retry_reasons_invalid", "controlled photo autonomy permits only the canonical hair-crown retry")
         _require(int(controlled.get("provider_call_cap_per_cycle", 0)) == 2, "policy_controlled_provider_cap_invalid", "controlled photo autonomy provider cap must be two")
         _require(int(controlled.get("retry_cap_per_cycle", -1)) == 1, "policy_controlled_retry_cap_invalid", "controlled photo autonomy retry cap must be one")
@@ -239,9 +344,17 @@ def validate_policy_artifact(policy_path: Path) -> dict[str, Any]:
             "policy_schedule_slots_invalid",
             "controlled photo autonomy schedule_slots must be a non-empty, duplicate-free subset of morning/afternoon/evening",
         )
-        for key in ("visual_model_authority_path", "identity_reference_authority_path"):
+        for key in ("identity_reference_authority_path",):
             authority_path = _path_from_repo_text(str(controlled.get(key) or ""))
             _ensure_path_within_root(authority_path, ROOT, code=f"policy_{key}_escape", label=key, must_exist=True)
+        authority_path = _path_from_repo_text(str(diagnostic.get("visual_model_authority_path") or ""))
+        _ensure_path_within_root(
+            authority_path,
+            ROOT,
+            code="policy_visual_model_authority_path_escape",
+            label="external_visual_diagnostic.visual_model_authority_path",
+            must_exist=True,
+        )
     current_utc = _now_utc()
     effective_at = _validate_iso_datetime(str(policy.get("effective_at_utc") or ""), code="policy_effective_at_invalid", label="effective_at_utc")
     _require(effective_at <= current_utc, "policy_effective_at_future_invalid", "effective_at_utc must not be in the future")

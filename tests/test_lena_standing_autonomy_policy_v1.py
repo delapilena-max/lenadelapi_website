@@ -11,6 +11,7 @@ from tests.test_lena_bounded_live_cycle_v1 import _build_bundle as build_live_cy
 from tests.test_lena_bounded_live_cycle_v1 import _patch_clock as patch_live_cycle_clock
 from tests.test_lena_bounded_live_cycle_v1 import _patch_roots as patch_live_cycle_roots
 from tools import lena_standing_autonomy_policy_v1 as standing_autonomy
+from tools import lena_validate_autonomous_qa_mode_v1 as autonomous_qa_validator
 from tools import lena_photo_qa_disposition_v1 as photo_qa
 
 
@@ -393,3 +394,42 @@ def test_prompt_sha_resolution_missing_everywhere_fails_closed(
         )
 
     assert exc_info.value.code == "authorization_provider_execution_prompt_sha_mismatch"
+
+
+def test_controlled_qa_summary_reports_autonomous_local_without_external_dependency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    bundle = build_live_cycle_bundle(tmp_path, monkeypatch, controlled=True)
+    policy = json.loads(Path(bundle["policy_path"]).read_text(encoding="utf-8"))
+
+    summary = standing_autonomy.summarize_controlled_qa_mode(policy)
+
+    assert summary["configured_autonomous_qa_mode"] == standing_autonomy.AUTONOMOUS_QA_MODE
+    assert summary["autonomous_external_visual_provider_required"] is False
+    assert summary["external_visual_diagnostics_enabled"] is False
+    assert summary["external_visual_diagnostic_authorization_required"] is True
+    assert summary["human_review_mode"] == standing_autonomy.SUPERVISED_HUMAN_REVIEW_MODE
+    assert summary["human_review_required_for_autonomous_operation"] is False
+    assert summary["missing_required_local_safeguards"] == []
+
+
+def test_autonomous_qa_validator_reports_expected_non_routine_external_defaults(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_live_cycle_roots(monkeypatch, tmp_path)
+    patch_live_cycle_clock(monkeypatch)
+    build_live_cycle_bundle(tmp_path, monkeypatch, controlled=True)
+
+    report = autonomous_qa_validator._report()
+
+    assert report["ok"] is True
+    assert report["configured_autonomous_qa_mode"] == standing_autonomy.AUTONOMOUS_QA_MODE
+    assert report["autonomous_external_visual_provider_required"] is False
+    assert report["external_visual_diagnostics_enabled"] is False
+    assert report["external_visual_diagnostic_authorization_required"] is True
+    assert report["human_review_required_for_autonomous_operation"] is False
+    assert report["missing_required_local_safeguards"] == []
