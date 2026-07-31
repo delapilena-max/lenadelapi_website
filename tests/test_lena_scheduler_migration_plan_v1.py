@@ -17,6 +17,7 @@ REGISTER_SCRIPT = ROOT / "tools" / "register_lena_autonomy_scheduler_task_v1.ps1
 CANONICAL_TASK_NAME = "Lena Autonomy Scheduler Driver"
 LEGACY_REPO_ROOT = r"C:\projects\ai\lenadelapi_website_autopublish_fix"
 SECRET_SENTINEL = "TEST_META_PAGE_ACCESS_TOKEN_SHOULD_NOT_APPEAR"
+INVALID_DURATION = "P99999999DT23H59M59S"
 LEGACY_TASKS = [
     "Lena Daily Orchestrator",
     "Lena Publish Morning Slot",
@@ -315,6 +316,12 @@ def _source() -> str:
     return SCRIPT.read_text(encoding="utf-8")
 
 
+def _assert_trigger_contract(xml_text: str) -> None:
+    assert "<Interval>PT1M</Interval>" in xml_text
+    assert "<Duration>" not in xml_text
+    assert INVALID_DURATION not in xml_text
+
+
 def _powershell_hosts() -> dict[str, str]:
     hosts: dict[str, str] = {}
     desktop = shutil.which("powershell.exe")
@@ -565,13 +572,14 @@ function New-ScheduledTaskTrigger {{
         [switch]$Once,
         [datetime]$At,
         [timespan]$RepetitionInterval,
-        [timespan]$RepetitionDuration
+        [object]$RepetitionDuration = $null
     )
     return [pscustomobject]@{{
         Once = [bool]$Once
         At = $At
         RepetitionInterval = $RepetitionInterval
-        RepetitionDuration = $RepetitionDuration
+        RepetitionDuration = if ($PSBoundParameters.ContainsKey('RepetitionDuration')) {{ $RepetitionDuration }} else {{ $null }}
+        HasRepetitionDuration = $PSBoundParameters.ContainsKey('RepetitionDuration')
     }}
 }}
 
@@ -681,6 +689,9 @@ function Register-ScheduledTask {{
         xml_mode = $PSBoundParameters.ContainsKey('Xml')
         action_type = Get-StringTypeName -Value $Action
         trigger_type = Get-StringTypeName -Value $Trigger
+        trigger_interval = if ($null -ne $Trigger -and $null -ne $Trigger.RepetitionInterval) {{ if ($Trigger.RepetitionInterval.TotalMinutes -eq 1) {{ 'PT1M' }} else {{ [string]$Trigger.RepetitionInterval }} }} else {{ $null }}
+        trigger_has_repetition_duration = if ($null -ne $Trigger) {{ [bool]$Trigger.HasRepetitionDuration }} else {{ $false }}
+        trigger_duration = if ($null -ne $Trigger -and $Trigger.HasRepetitionDuration) {{ [System.Xml.XmlConvert]::ToString([timespan]$Trigger.RepetitionDuration) }} else {{ $null }}
         principal_type = Get-StringTypeName -Value $Principal
         settings_type = Get-StringTypeName -Value $Settings
     }})
@@ -747,6 +758,16 @@ catch {{
     $caughtType = $_.Exception.GetType().FullName
 }}
 $taskStates = @($global:MockTaskStore.Values | Sort-Object TaskName | ForEach-Object {{ ConvertTo-MockTaskSummary -Task $_ }})
+$canonicalTask = if ($global:MockTaskStore.ContainsKey('{CANONICAL_TASK_NAME}')) {{ $global:MockTaskStore['{CANONICAL_TASK_NAME}'] }} else {{ $null }}
+$canonicalXml = ''
+if ($null -ne $canonicalTask) {{
+    $action = @($canonicalTask.Actions)[0]
+    $registerEntry = @($global:MockOperationLog | Where-Object {{ $_.operation -eq 'Register-ScheduledTask' -and $_.task_name -eq '{CANONICAL_TASK_NAME}' }} | Select-Object -First 1)[0]
+    $triggerInterval = if ($null -ne $registerEntry) {{ [string]$registerEntry.details.trigger_interval }} else {{ '' }}
+    $durationXml = if ($null -ne $registerEntry -and $registerEntry.details.trigger_has_repetition_duration) {{ '<Duration>' + [string]$registerEntry.details.trigger_duration + '</Duration>' }} else {{ '' }}
+    $enabledText = if ([bool]$canonicalTask.Settings.Enabled) {{ 'true' }} else {{ 'false' }}
+    $canonicalXml = "<Task><Triggers><TimeTrigger><Repetition><Interval>$triggerInterval</Interval>$durationXml</Repetition></TimeTrigger></Triggers><Settings><Enabled>$enabledText</Enabled></Settings><Actions><Exec><Command>$($action.Execute)</Command><Arguments>$($action.Arguments)</Arguments><WorkingDirectory>$($action.WorkingDirectory)</WorkingDirectory></Exec></Actions></Task>"
+}}
 $summary = [ordered]@{{
     exit_code = $exitCode
     caught_message = $caughtMessage
@@ -755,6 +776,7 @@ $summary = [ordered]@{{
     remaining_task_names = @($taskStates | ForEach-Object {{ $_.task_name }})
     task_states = $taskStates
     run_roots = @((Get-ChildItem -LiteralPath '{_powershell_single_quote(str(output_root))}' -Directory -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object {{ $_.FullName }}))
+    canonical_xml = $canonicalXml
 }}
 $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath '{_powershell_single_quote(str(summary_path))}' -Encoding utf8
 exit $exitCode
@@ -785,6 +807,10 @@ def test_migration_validate_only_plan_identifies_four_legacy_tasks_precisely(tmp
     assert plan["canonical_replacement_count"] == 1
     assert plan["canonical_plan"]["task_count"] == 1
     assert plan["canonical_plan"]["disabled_by_default"] is True
+    assert plan["canonical_plan"]["trigger"]["repetition_interval"] == "PT1M"
+    assert plan["canonical_plan"]["trigger"]["repetition_duration_mode"] == "indefinite"
+    assert plan["canonical_plan"]["trigger"]["repetition_duration_element"] == "omitted"
+    assert plan["canonical_plan"]["trigger"]["stop_at_duration_end"] is False
     assert plan["canonical_task_state"]["present"] is False
     assert plan["runtime_capabilities"] == {
         "provider_calls": False,
@@ -794,6 +820,7 @@ def test_migration_validate_only_plan_identifies_four_legacy_tasks_precisely(tmp
         "anthropic": False,
         "video": False,
     }
+    assert INVALID_DURATION not in json.dumps(plan)
 
 
 def test_migration_plan_governs_exact_old_checkout_paths_and_principals(tmp_path: Path) -> None:
@@ -918,6 +945,7 @@ def test_canonical_replacement_is_exact_and_disabled(tmp_path: Path) -> None:
     assert plan["canonical_plan"]["task_name"] == CANONICAL_TASK_NAME
     assert plan["canonical_plan"]["action"]["arguments"] == canonical["action"]["arguments"]
     assert plan["canonical_plan"]["action"]["working_directory"] == str(ROOT)
+    assert plan["canonical_plan"]["trigger"] == canonical["trigger"]
     assert plan["apply_guards"]["canonical_task_must_be_disabled"] is True
     assert plan["apply_guards"]["verify_canonical_task_before_legacy_removal"] is True
 
@@ -1051,12 +1079,16 @@ def test_mocked_apply_succeeds_with_stable_array_conversion_and_preserves_stage_
         "<null>",
         "System.Collections.Generic.List`1[System.Object]",
     }
+    assert register_entry["details"]["trigger_interval"] == "PT1M"
+    assert register_entry["details"]["trigger_has_repetition_duration"] is False
+    assert register_entry["details"]["trigger_duration"] is None
 
     assert summary["remaining_task_names"] == [CANONICAL_TASK_NAME]
     assert len(summary["task_states"]) == 1
     assert summary["task_states"][0]["task_name"] == CANONICAL_TASK_NAME
     assert summary["task_states"][0]["enabled"] is False
     assert summary["task_states"][0]["state"] == "Disabled"
+    _assert_trigger_contract(summary["canonical_xml"])
     assert "Start-ScheduledTask" not in json.dumps(summary)
     assert "Enable-ScheduledTask" not in json.dumps(summary)
 
@@ -1150,6 +1182,8 @@ def test_source_requires_elevation_and_backups_before_mutation() -> None:
 
     assert "Apply mode requires an elevated Administrator session." in source
     assert "backup_legacy_xml_before_change = $true" in source
+    assert "[TimeSpan]::MaxValue" not in source
+    assert INVALID_DURATION not in source
     assert source.index("$preBackups.Add((Export-TaskXmlToPath") < source.index("Register-ScheduledTask -TaskName $CanonicalTaskName")
     assert source.index("Register-ScheduledTask -TaskName $CanonicalTaskName") < source.index("Unregister-ScheduledTask -TaskName $spec.task_name -Confirm:$false")
 
@@ -1169,6 +1203,8 @@ def test_source_verifies_canonical_before_legacy_retirement_and_records_stages()
     assert "backup hashing" in source
     assert "receipt writing" in source
     assert "rollback preparation" in source
+    assert "Canonical trigger interval contract mismatch" in source
+    assert "Canonical trigger duration contract mismatch" in source
     assert source.index("$receipt.stage = 'legacy_retirement_started'") < source.index("Unregister-ScheduledTask -TaskName $spec.task_name -Confirm:$false")
 
 
