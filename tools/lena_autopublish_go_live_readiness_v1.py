@@ -4,6 +4,8 @@ import argparse
 import json
 import hashlib
 import os
+import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -45,6 +47,7 @@ PYTHON_EXE_ENV_KEYS = (
     "CONTENT_BOT_PYTHON_EXE",
     "PYTHON_EXE",
 )
+WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
 REQUIRED_PUBLISH_ENV_KEYS = (
     "META_PAGE_ACCESS_TOKEN",
     "META_INSTAGRAM_ACCESS_TOKEN",
@@ -59,6 +62,17 @@ REQUIRED_PUBLISH_ENV_KEYS = (
     "LENA_MEDIA_PUBLIC_BASE_URL",
     "LENA_MEDIA_PUBLIC_LOCAL_DIR",
 )
+
+CANONICAL_TASK_NAME = "Lena Autonomy Scheduler Driver"
+LEGACY_TASK_NAMES = (
+    "Lena Daily Orchestrator",
+    "Lena Publish Morning Slot",
+    "Lena Publish Afternoon Slot",
+    "Lena Publish Evening Slot",
+)
+REGISTER_SCRIPT_REL = Path("tools") / "register_lena_autonomy_scheduler_task_v1.ps1"
+DRIVER_WRAPPER_REL = Path("tools") / "lena_autonomy_scheduler_driver_run_v1.ps1"
+DRIVER_MODULE_REL = Path("tools") / "lena_autonomy_scheduler_driver_v1.py"
 
 
 class ReadinessError(RuntimeError):
@@ -137,12 +151,31 @@ def _resolve_production_root(raw: str | None = None) -> Path:
 
 
 def _resolve_python_exe(raw: str | None = None) -> tuple[Path, str]:
+    def is_windows_absolute(value: str) -> bool:
+        return bool(WINDOWS_ABSOLUTE_PATH_RE.match(value))
+
+    def resolve_candidate(value: str) -> Path:
+        expanded = os.path.expanduser(value)
+        if is_windows_absolute(expanded):
+            return Path(expanded)
+        candidate = Path(expanded)
+        if candidate.is_absolute():
+            return candidate.resolve()
+        which = shutil.which(value)
+        if which:
+            if is_windows_absolute(which):
+                return Path(which)
+            return Path(which).resolve()
+        if any(sep in expanded for sep in ("\\", "/")):
+            return candidate.resolve()
+        return candidate.resolve()
+
     if raw:
-        return Path(raw).expanduser().resolve(), "cli"
+        return resolve_candidate(raw), "cli"
     for env_key in PYTHON_EXE_ENV_KEYS:
         env_value = os.environ.get(env_key, "").strip()
         if env_value:
-            return Path(env_value).expanduser().resolve(), f"env:{env_key}"
+            return resolve_candidate(env_value), f"env:{env_key}"
     return Path(sys.executable).resolve(), "current_runtime"
 
 
@@ -155,6 +188,8 @@ def _git_state(root: Path) -> dict[str, Any]:
     head = _git_command(root, "rev-parse", "HEAD")
     branch = _git_command(root, "branch", "--show-current")
     origin_main = _git_command(root, "rev-parse", "origin/main")
+    origin_main_ancestor_of_head = _git_is_ancestor(root, origin_main, head)
+    head_ancestor_of_origin_main = _git_is_ancestor(root, head, origin_main)
     return {
         "branch": branch,
         "head": head,
@@ -162,7 +197,20 @@ def _git_state(root: Path) -> dict[str, Any]:
         "clean": not bool(status.strip()),
         "status_lines": [line for line in status.splitlines() if line.strip()],
         "head_matches_origin_main": head == origin_main,
+        "origin_main_ancestor_of_head": origin_main_ancestor_of_head,
+        "head_ancestor_of_origin_main": head_ancestor_of_origin_main,
     }
+
+
+def _git_is_ancestor(root: Path, ancestor_commit: str, descendant_commit: str) -> bool:
+    try:
+        subprocess.check_output(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", ancestor_commit, descendant_commit],
+            text=True,
+        )
+        return True
+    except Exception:
+        return False
 
 
 def _probe_python_interpreter(python_exe: Path, production_root: Path) -> dict[str, Any]:
@@ -290,16 +338,30 @@ def _policy_summary(production_root: Path, git_head: str) -> dict[str, Any]:
         if not ok:
             blockers.append({"code": code, "detail": detail})
 
+    autonomous_enabled = policy.get("autonomous_enabled")
+    autonomous_enabled_by_default = policy.get("autonomous_enabled_by_default")
+    autonomous_policy_state = str(policy.get("autonomous_policy_state") or "").strip()
+    authority_commit = str(policy.get("authority_commit") or "").strip()
+    authority_commit_is_ancestor = bool(authority_commit) and _git_is_ancestor(production_root, authority_commit, git_head)
+
     ensure(policy.get("policy_id") == "lena_approved_queue_auto_publisher_policy_v2_8", "autonomous_policy_id_invalid", "policy_id must match the autonomous queue publisher contract")
     ensure(policy.get("policy_version") == "v2.8.0", "autonomous_policy_version_invalid", "policy_version must be v2.8.0")
     ensure(policy.get("autonomous_mode") == "scheduled_autonomous", "autonomous_mode_invalid", "policy must describe the scheduled autonomous mode")
-    ensure(policy.get("autonomous_enabled") is False, "autonomous_policy_enabled_unexpected", "autonomous publishing must remain disabled by policy until explicit activation")
-    ensure(policy.get("autonomous_enabled_by_default") is False, "autonomous_policy_default_enabled", "autonomous mode must be disabled by default")
+    ensure(isinstance(autonomous_enabled, bool), "autonomous_policy_enabled_flag_invalid", "autonomous_enabled must be a boolean")
+    if isinstance(autonomous_enabled, bool):
+        expected_policy_state = "enabled" if autonomous_enabled else "disabled_by_default"
+        ensure(
+            autonomous_policy_state == expected_policy_state,
+            "autonomous_policy_state_invalid",
+            f"autonomous_policy_state must match autonomous_enabled: expected {expected_policy_state!r}",
+        )
+    ensure(autonomous_enabled_by_default is False, "autonomous_policy_default_enabled", "autonomous mode must be disabled by default")
     ensure(policy.get("manual_live_mode_unchanged") is True, "manual_live_mode_changed", "manual-live behavior must remain unchanged")
     ensure(policy.get("autonomous_mode_requires_distinct_policy_gate") is True, "autonomous_policy_distinct_gate_missing", "scheduled autonomous mode must require a distinct policy gate")
     ensure(policy.get("repository_name") == "delapilena-max/lenadelapi_website", "autonomous_policy_repository_invalid", "repository_name must bind the Lena repo")
     ensure(str(policy.get("authority_version") or "").strip() == "main", "autonomous_policy_authority_version_invalid", "authority_version must be main")
-    ensure(str(policy.get("authority_commit") or "").strip() == git_head, "autonomous_policy_stale", "autonomous policy must match the current repository authority")
+    ensure(bool(authority_commit), "autonomous_policy_authority_commit_missing", "authority_commit is required")
+    ensure(authority_commit_is_ancestor, "autonomous_policy_stale", "autonomous policy authority_commit must be an ancestor of the current HEAD")
     ensure(int(policy.get("hard_item_limit_per_invocation", 0)) == 1, "autonomous_policy_item_limit_invalid", "hard_item_limit_per_invocation must be one")
     ensure(set(str(item).strip().lower() for item in policy.get("approved_slots", [])) == {"morning", "afternoon", "evening"}, "autonomous_policy_slots_invalid", "approved_slots must be morning, afternoon, and evening")
     ensure(int(policy.get("queue_claim_lease_seconds", 0)) > 0, "autonomous_policy_claim_lease_invalid", "queue_claim_lease_seconds must be positive")
@@ -325,7 +387,12 @@ def _policy_summary(production_root: Path, git_head: str) -> dict[str, Any]:
         "path": str(path),
         "sha256": _sha256_file(path),
         "blockers": blockers,
-        "disabled_by_policy": policy.get("autonomous_enabled") is False,
+        "autonomous_enabled": autonomous_enabled if isinstance(autonomous_enabled, bool) else None,
+        "autonomous_enabled_by_default": autonomous_enabled_by_default if isinstance(autonomous_enabled_by_default, bool) else None,
+        "autonomous_policy_state": autonomous_policy_state,
+        "activation_permitted_by_policy": bool(autonomous_enabled) if isinstance(autonomous_enabled, bool) else False,
+        "authority_commit": authority_commit,
+        "authority_commit_is_ancestor": authority_commit_is_ancestor,
         "autonomous_mode": policy.get("autonomous_mode", ""),
         "approved_slots": policy.get("approved_slots", []),
         "autonomous_queue_platforms": policy.get("autonomous_queue_platforms", []),
@@ -374,56 +441,7 @@ def _manifest_summary(production_root: Path) -> dict[str, Any]:
     }
 
 
-def _wrapper_summary() -> dict[str, Any]:
-    slots = []
-    blockers: list[dict[str, str]] = []
-    for name, slot in zip(BATCH_GATES, SLOT_SPECS.keys(), strict=True):
-        path = ROOT / name
-        text = path.read_text(encoding="utf-8", errors="ignore") if path.exists() else ""
-        has_pause = "pause" in text.lower()
-        has_scheduled_autonomous = "--scheduled-autonomous" in text
-        has_slot_keyword = f"--slot-keyword {slot}" in text
-        has_hardcoded_temp_root = "lenadelapi_website_hpe2" in text.lower()
-        has_required_root_env = "LENA_AUTOPUBLISH_PRODUCTION_ROOT" in text or "CONTENT_BOT_ROOT" in text
-        has_required_python_env = "LENA_AUTOPUBLISH_PYTHON_EXE" in text or "CONTENT_BOT_PYTHON_EXE" in text
-        slot_blockers = []
-        if not path.exists():
-            slot_blockers.append("batch_wrapper_missing")
-        if has_pause:
-            slot_blockers.append("pause_present")
-        if not has_scheduled_autonomous:
-            slot_blockers.append("scheduled_autonomous_missing")
-        if not has_slot_keyword:
-            slot_blockers.append("slot_keyword_missing")
-        if has_hardcoded_temp_root:
-            slot_blockers.append("temp_worktree_hardcoded")
-        if not has_required_root_env:
-            slot_blockers.append("production_root_env_contract_missing")
-        if not has_required_python_env:
-            slot_blockers.append("python_exe_env_contract_missing")
-        if slot_blockers:
-            blockers.append({"slot_keyword": slot, "code": "scheduler_wrapper_invalid", "detail": ", ".join(slot_blockers)})
-        slots.append(
-            {
-                "slot_keyword": slot,
-                "path": str(path),
-                "exists": path.exists(),
-                "has_pause": has_pause,
-                "has_scheduled_autonomous": has_scheduled_autonomous,
-                "has_slot_keyword": has_slot_keyword,
-                "has_hardcoded_temp_root": has_hardcoded_temp_root,
-                "has_root_env_contract": has_required_root_env,
-                "has_python_env_contract": has_required_python_env,
-            }
-        )
-    return {"slots": slots, "blockers": blockers}
-
-
-def _core_autonomous_command(
-    production_root: Path,
-    python_exe: Path,
-    slot_keyword: str,
-) -> str:
+def _core_autonomous_command(production_root: Path, python_exe: Path, slot_keyword: str) -> str:
     return (
         f"\"{python_exe.as_posix()}\" -m tools.lena_autopublish_approved_queue_v2_8 "
         f"--scheduled-autonomous --slot-keyword {slot_keyword} --limit 1 "
@@ -431,68 +449,266 @@ def _core_autonomous_command(
     )
 
 
-def _cron_command(root: Path, python_exe: Path, slot_keyword: str) -> str:
-    return f"cd {root.as_posix()} && {_core_autonomous_command(root, python_exe, slot_keyword)}"
+def _canonical_scheduler_definition(production_root: Path, python_exe: Path) -> dict[str, Any]:
+    blockers: list[dict[str, str]] = []
+    register_script = production_root / REGISTER_SCRIPT_REL
+    wrapper_path = production_root / DRIVER_WRAPPER_REL
+    driver_module_path = production_root / DRIVER_MODULE_REL
+
+    if not register_script.is_file():
+        blockers.append({"code": "scheduler_register_script_missing", "detail": f"canonical registration script missing: {register_script}"})
+    if not wrapper_path.is_file():
+        blockers.append({"code": "scheduler_wrapper_missing", "detail": f"canonical driver wrapper missing: {wrapper_path}"})
+    if not driver_module_path.is_file():
+        blockers.append({"code": "scheduler_driver_module_missing", "detail": f"canonical driver module missing: {driver_module_path}"})
+    if blockers:
+        return {
+            "ok": False,
+            "register_script_path": str(register_script),
+            "wrapper_path": str(wrapper_path),
+            "driver_module_path": str(driver_module_path),
+            "blockers": blockers,
+        }
+
+    command = [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(register_script),
+        "-ValidateOnly",
+        "-RepoRoot",
+        str(production_root),
+        "-PythonExe",
+        str(python_exe),
+    ]
+    proc = subprocess.run(
+        command,
+        cwd=str(production_root),
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if proc.returncode != 0:
+        blockers.append(
+            {
+                "code": "scheduler_plan_failed",
+                "detail": f"canonical registration plan failed with exit {proc.returncode}",
+            }
+        )
+        return {
+            "ok": False,
+            "register_script_path": str(register_script),
+            "wrapper_path": str(wrapper_path),
+            "driver_module_path": str(driver_module_path),
+            "plan_command": command,
+            "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+            "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+            "blockers": blockers,
+        }
+    try:
+        plan = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        blockers.append({"code": "scheduler_plan_not_json", "detail": f"canonical registration plan did not emit JSON: {exc}"})
+        return {
+            "ok": False,
+            "register_script_path": str(register_script),
+            "wrapper_path": str(wrapper_path),
+            "driver_module_path": str(driver_module_path),
+            "plan_command": command,
+            "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+            "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+            "blockers": blockers,
+        }
+
+    def ensure(ok: bool, code: str, detail: str) -> None:
+        if not ok:
+            blockers.append({"code": code, "detail": detail})
+
+    action = plan.get("action", {}) if isinstance(plan, dict) else {}
+    safeguards = plan.get("safeguards", {}) if isinstance(plan, dict) else {}
+    trigger = plan.get("trigger", {}) if isinstance(plan, dict) else {}
+    arguments = str(action.get("arguments") or "")
+
+    ensure(isinstance(plan, dict), "scheduler_plan_invalid", "canonical registration plan must be a JSON object")
+    ensure(plan.get("task_count") == 1, "scheduler_task_count_invalid", "canonical registration plan must emit exactly one task")
+    ensure(plan.get("task_name") == CANONICAL_TASK_NAME, "scheduler_task_name_invalid", f"canonical task must be {CANONICAL_TASK_NAME!r}")
+    ensure(plan.get("disabled_by_default") is True, "scheduler_disabled_default_invalid", "canonical task must be disabled by default")
+    ensure(str(plan.get("run_wrapper_path") or "") == str(wrapper_path), "scheduler_wrapper_binding_invalid", "canonical plan must target this checkout's driver wrapper")
+    ensure(str(plan.get("driver_module_path") or "") == str(driver_module_path), "scheduler_driver_binding_invalid", "canonical plan must target this checkout's driver module")
+    ensure(str(action.get("working_directory") or "") == str(production_root), "scheduler_working_directory_invalid", "canonical task must run from the explicit production root")
+    ensure(str(action.get("execute") or "").lower() == "powershell.exe", "scheduler_execute_invalid", "canonical task must execute powershell.exe")
+    ensure("lena_autonomy_scheduler_driver_run_v1.ps1" in arguments, "scheduler_wrapper_argument_missing", "canonical task must invoke the scheduler driver wrapper")
+    ensure(f'-RepoRoot "{production_root}"' in arguments, "scheduler_repo_root_argument_missing", "canonical task must bind the explicit production root")
+    ensure(trigger.get("type") == "poll_every_minute", "scheduler_trigger_invalid", "canonical task must use the per-minute driver trigger")
+    ensure(trigger.get("schedule_slots") == ["morning", "afternoon", "evening"], "scheduler_slot_order_invalid", "canonical task must preserve the three daily photo slots")
+    ensure(safeguards.get("no_daily_orchestrator") is True, "scheduler_daily_orchestrator_not_retired", "canonical task must not route through Daily Orchestrator")
+    ensure(safeguards.get("no_fixed_publish_slot_tasks") is True, "scheduler_fixed_slot_tasks_not_retired", "canonical task must not use fixed publish-slot tasks")
+    ensure(safeguards.get("no_video_task") is True, "scheduler_video_task_present", "canonical task must remain photo-only")
+
+    return {
+        "ok": not blockers,
+        "register_script_path": str(register_script),
+        "wrapper_path": str(wrapper_path),
+        "driver_module_path": str(driver_module_path),
+        "plan_command": command,
+        "plan": plan,
+        "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+        "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+        "blockers": blockers,
+    }
 
 
-def _scheduler_specs(production_root: Path, python_exe: Path) -> dict[str, Any]:
-    cron = []
-    systemd = []
-    windows = []
-    for slot_keyword, local_time in SLOT_SPECS.items():
-        core_command = _core_autonomous_command(production_root, python_exe, slot_keyword)
-        command = _cron_command(production_root, python_exe, slot_keyword)
-        cron.append(
-            {
-                "slot_keyword": slot_keyword,
-                "schedule": f"daily {local_time}",
-                "command": command,
-                "core_command": core_command,
-                "working_directory": str(production_root),
-                "concurrency": "single_run_claim_required",
-                "timeout_seconds": 10800,
-                "timezone_assumption": "system_local_timezone",
-            }
-        )
-        systemd.append(
-            {
-                "slot_keyword": slot_keyword,
-                "on_calendar": f"*-*-* {local_time}:00",
-                "exec_start": core_command,
-                "working_directory": str(production_root),
-                "concurrency": "single_run_claim_required",
-                "timeout_seconds": 10800,
-                "timezone_assumption": "system_local_timezone",
-                "core_command": core_command,
-            }
-        )
-        windows.append(
-            {
-                "slot_keyword": slot_keyword,
-                "execute": str(python_exe),
-                "arguments": (
-                    f"-m tools.lena_autopublish_approved_queue_v2_8 "
-                    f"--scheduled-autonomous --slot-keyword {slot_keyword} --limit 1 "
-                    f"--autonomous-policy {production_root.joinpath('pipeline', 'influencer_nodes', 'lena', 'approved_queue_auto_publisher_policy_v2_8.json').as_posix()}"
-                ),
-                "working_directory": str(production_root),
-                "principal": "dedicated account with stored credentials",
-                "logon_type": "Password_or_S4U_not_InteractiveToken",
-                "enabled_state": "disabled_until_explicit_activation_review",
-                "trigger": f"daily at {local_time}",
-                "timezone_assumption": "system_local_timezone",
-                "concurrency": "single_run_claim_required",
-                "timeout_seconds": 10800,
-                "core_command": core_command,
-            }
-        )
-    return {"cron": cron, "systemd": systemd, "windows_task_scheduler": windows}
+def _registered_task_deployment_status(production_root: Path, scheduler_definition: dict[str, Any]) -> dict[str, Any]:
+    task_names = [CANONICAL_TASK_NAME, *LEGACY_TASK_NAMES]
+    query_script = """
+$names = @(
+  'Lena Autonomy Scheduler Driver',
+  'Lena Daily Orchestrator',
+  'Lena Publish Morning Slot',
+  'Lena Publish Afternoon Slot',
+  'Lena Publish Evening Slot'
+)
+$rows = @()
+foreach ($name in $names) {
+  $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+  if ($null -eq $task) {
+    $rows += [pscustomobject]@{
+      task_name = $name
+      present = $false
+      enabled = $false
+      state = 'NotRegistered'
+      actions = @()
+    }
+    continue
+  }
+  $actions = @()
+  foreach ($action in @($task.Actions)) {
+    $actions += [pscustomobject]@{
+      execute = [string]$action.Execute
+      arguments = [string]$action.Arguments
+      working_directory = [string]$action.WorkingDirectory
+    }
+  }
+  $rows += [pscustomobject]@{
+    task_name = $name
+    present = $true
+    enabled = [bool]$task.Settings.Enabled
+    state = [string]$task.State
+    actions = $actions
+  }
+}
+$rows | ConvertTo-Json -Depth 6 -Compress
+"""
+    proc = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-Command", query_script],
+        cwd=str(production_root),
+        text=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if proc.returncode != 0:
+        return {
+            "query_ok": False,
+            "deployment_state": "query_unavailable",
+            "activation_required": True,
+            "tasks": [],
+            "legacy_tasks_present": [],
+            "stale_deployment_detected": False,
+            "blockers": [
+                {
+                    "code": "scheduler_query_unavailable",
+                    "detail": f"unable to query registered tasks (exit {proc.returncode})",
+                }
+            ],
+            "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+            "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+        }
+    try:
+        parsed = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        return {
+            "query_ok": False,
+            "deployment_state": "query_unavailable",
+            "activation_required": True,
+            "tasks": [],
+            "legacy_tasks_present": [],
+            "stale_deployment_detected": False,
+            "blockers": [{"code": "scheduler_query_not_json", "detail": f"registered task query did not emit JSON: {exc}"}],
+            "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+            "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+        }
+
+    tasks = parsed if isinstance(parsed, list) else []
+    task_map = {
+        str(item.get("task_name") or ""): item
+        for item in tasks
+        if isinstance(item, dict)
+    }
+    canonical = task_map.get(CANONICAL_TASK_NAME, {})
+    canonical_present = bool(canonical.get("present"))
+    canonical_enabled = bool(canonical.get("enabled")) if canonical_present else False
+    legacy_tasks_present = [name for name in LEGACY_TASK_NAMES if task_map.get(name, {}).get("present")]
+    plan = scheduler_definition.get("plan", {}) if isinstance(scheduler_definition, dict) else {}
+    plan_action = plan.get("action", {}) if isinstance(plan, dict) else {}
+    expected_execute = str(plan_action.get("execute") or "").lower()
+    expected_working_directory = str(plan_action.get("working_directory") or "")
+    expected_wrapper_token = "lena_autonomy_scheduler_driver_run_v1.ps1"
+    expected_repo_arg = f'-RepoRoot "{production_root}"'
+    canonical_matches_plan = False
+    if canonical_present:
+        for action in canonical.get("actions", []):
+            if not isinstance(action, dict):
+                continue
+            execute = str(action.get("execute") or "").lower()
+            arguments = str(action.get("arguments") or "")
+            working_directory = str(action.get("working_directory") or "")
+            if (
+                execute == expected_execute
+                and working_directory == expected_working_directory
+                and expected_wrapper_token in arguments
+                and expected_repo_arg in arguments
+            ):
+                canonical_matches_plan = True
+                break
+
+    if legacy_tasks_present:
+        deployment_state = "stale_legacy_tasks_present"
+    elif canonical_present and canonical_matches_plan and canonical_enabled:
+        deployment_state = "canonical_driver_enabled"
+    elif canonical_present and canonical_matches_plan and not canonical_enabled:
+        deployment_state = "canonical_driver_disabled"
+    elif canonical_present:
+        deployment_state = "canonical_driver_mismatch"
+    else:
+        deployment_state = "canonical_driver_missing"
+
+    activation_required = deployment_state != "canonical_driver_enabled"
+    return {
+        "query_ok": True,
+        "deployment_state": deployment_state,
+        "activation_required": activation_required,
+        "tasks": tasks,
+        "canonical_task_present": canonical_present,
+        "canonical_task_enabled": canonical_enabled,
+        "canonical_task_matches_plan": canonical_matches_plan,
+        "legacy_tasks_present": legacy_tasks_present,
+        "stale_deployment_detected": bool(legacy_tasks_present) or deployment_state == "canonical_driver_mismatch",
+        "blockers": [],
+        "stdout_tail": [line for line in proc.stdout.splitlines() if line.strip()][-12:],
+        "stderr_tail": [line for line in proc.stderr.splitlines() if line.strip()][-12:],
+    }
 
 
 def _safe_validation_commands(production_root: Path, python_exe: Path) -> list[str]:
     policy_path = production_root / "pipeline" / "influencer_nodes" / "lena" / "approved_queue_auto_publisher_policy_v2_8.json"
     commands = [
-        f'"{python_exe.as_posix()}" -m tools.lena_autopublish_go_live_readiness_v1 --production-root {production_root.as_posix()} --python-exe {python_exe.as_posix()}',
+        f'"{python_exe.as_posix()}" -m tools.lena_autopublish_go_live_readiness_v1 --production-root {production_root.as_posix()} --python-exe {python_exe.as_posix()} --validate-only',
+        f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{production_root.joinpath(REGISTER_SCRIPT_REL).as_posix()}" -ValidateOnly -RepoRoot "{production_root.as_posix()}" -PythonExe "{python_exe.as_posix()}"',
+        f'cd /d "{production_root.as_posix()}" && "{python_exe.as_posix()}" -m tools.lena_autonomy_scheduler_driver_v1 --inspect-only',
         f'"{python_exe.as_posix()}" -m tools.lena_validate_approved_queue_autopublisher_v2_8',
         f'"{python_exe.as_posix()}" -m tools.lena_autopublish_approved_queue_v2_8 --scheduled-autonomous --dry-run --slot-keyword morning --limit 1 --autonomous-policy {policy_path.as_posix()}',
         f'"{python_exe.as_posix()}" -m tools.lena_autopublish_approved_queue_v2_8 --scheduled-autonomous --dry-run --slot-keyword afternoon --limit 1 --autonomous-policy {policy_path.as_posix()}',
@@ -502,17 +718,10 @@ def _safe_validation_commands(production_root: Path, python_exe: Path) -> list[s
 
 
 def _later_enablement_commands(production_root: Path, python_exe: Path) -> list[str]:
-    commands = [
-        "Enable-ScheduledTask -TaskName 'Lena Daily Orchestrator'",
-        "Enable-ScheduledTask -TaskName 'Lena Publish Morning Slot'",
-        "Enable-ScheduledTask -TaskName 'Lena Publish Afternoon Slot'",
-        "Enable-ScheduledTask -TaskName 'Lena Publish Evening Slot'",
+    return [
+        f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{production_root.joinpath(REGISTER_SCRIPT_REL).as_posix()}" -RepoRoot "{production_root.as_posix()}" -PythonExe "{python_exe.as_posix()}"',
+        f"Enable-ScheduledTask -TaskName '{CANONICAL_TASK_NAME}'",
     ]
-    commands.extend(
-        _core_autonomous_command(production_root, python_exe, slot_keyword)
-        for slot_keyword in SLOT_SPECS
-    )
-    return commands
 
 
 def _operator_checklist(report: dict[str, Any]) -> list[dict[str, Any]]:
@@ -523,49 +732,36 @@ def _operator_checklist(report: dict[str, Any]) -> list[dict[str, Any]]:
             "step": 1,
             "title": "Confirm production root and interpreter",
             "requires_user": True,
-            "notes": "Set or confirm the production-root and interpreter environment contract before any scheduled run.",
-            "validation_commands": report["safe_validation_commands"][:2],
+            "notes": "Set or confirm the production-root and interpreter environment contract before any scheduler replacement.",
+            "validation_commands": report["safe_validation_commands"][:1],
         },
         {
             "step": 2,
-            "title": "Check publisher readiness",
+            "title": "Emit the canonical scheduler plan",
             "requires_user": False,
-            "notes": "Run the readiness tool and confirm Instagram, Facebook, and media-host checks are green.",
-            "validation_commands": [report["safe_validation_commands"][0]],
+            "notes": "Confirm the repository now models exactly one disabled-by-default scheduler-driver task with no fixed publish-slot tasks.",
+            "validation_commands": [report["safe_validation_commands"][1]],
         },
         {
             "step": 3,
-            "title": "Check scheduler adapter safety",
+            "title": "Inspect the driver schedule without side effects",
             "requires_user": False,
-            "notes": "Verify the checked-in batch adapters are root-explicit, non-interactive, and slot-specific.",
-            "validation_commands": [
-                f'"{python_exe}" -m tools.lena_validate_approved_queue_autopublisher_v2_8',
-            ],
+            "notes": "Verify the single driver preserves the morning, afternoon, and evening photo cadence internally.",
+            "validation_commands": [report["safe_validation_commands"][2]],
         },
         {
             "step": 4,
-            "title": "Review deployment adapter specs",
+            "title": "Check publisher and connector readiness",
             "requires_user": True,
-            "notes": "Confirm the generated cron, systemd, and Windows Task Scheduler specs point at the same bounded core command.",
-            "commands": [
-                report["scheduler_specs"]["cron"][0]["command"],
-                report["scheduler_specs"]["systemd"][0]["exec_start"],
-                report["scheduler_specs"]["windows_task_scheduler"][0]["arguments"],
-            ],
+            "notes": "Run the read-only readiness report and confirm structural validity, credential visibility, connector readiness, and registered-task deployment state.",
+            "validation_commands": [report["safe_validation_commands"][0], report["safe_validation_commands"][3]],
         },
         {
             "step": 5,
-            "title": "Keep autonomous policy disabled until explicit activation review",
+            "title": "Replace stale registered tasks only after approval",
             "requires_user": True,
-            "notes": "Do not enable the autonomous policy or the scheduled tasks until the blockers are cleared and review is granted.",
-            "requires_interactive_token": False,
-        },
-        {
-            "step": 6,
-            "title": "Enable tasks one at a time after approval",
-            "requires_user": True,
-            "notes": "Enable only one Lena task at a time; if a later rollback is needed, disable before changing anything else.",
-            "enablement_commands": report["later_enablement_commands"][:4],
+            "notes": "Keep the current disabled legacy tasks unchanged in this task. Only after explicit approval should the disabled legacy tasks be replaced with the canonical single driver.",
+            "enablement_commands": report["later_enablement_commands"],
         },
     ]
 
@@ -586,16 +782,19 @@ def _build_report(
     env_report = _env_presence_report(production_root, process_env)
     policy = _policy_summary(production_root, git_state["head"])
     manifest = _manifest_summary(production_root)
-    wrappers = _wrapper_summary()
-    scheduler_specs = _scheduler_specs(production_root, python_exe)
+    scheduler_definition = _canonical_scheduler_definition(production_root, python_exe)
+    registered_task_deployment_status = _registered_task_deployment_status(production_root, scheduler_definition)
     safe_validation_commands = _safe_validation_commands(production_root, python_exe)
     later_enablement_commands = _later_enablement_commands(production_root, python_exe)
 
     blockers: list[dict[str, Any]] = []
     if not git_state["clean"]:
         blockers.append({"code": "repository_dirty", "detail": "production repository has uncommitted changes"})
-    if not git_state["head_matches_origin_main"]:
-        blockers.append({"code": "repository_head_mismatch", "detail": "HEAD must match origin/main before go-live"})
+    head_contains_origin_main = bool(
+        git_state.get("origin_main_ancestor_of_head", git_state["head_matches_origin_main"])
+    )
+    if not head_contains_origin_main:
+        blockers.append({"code": "repository_head_mismatch", "detail": "HEAD must contain origin/main before go-live"})
     if not python_probe["ok"]:
         blockers.append({"code": python_probe["reason"], "detail": "python interpreter import probe failed"})
     publisher_config_ready = (
@@ -613,10 +812,130 @@ def _build_report(
         blockers.extend(policy["blockers"])
     if manifest["blockers"]:
         blockers.extend(manifest["blockers"])
-    if wrappers["blockers"]:
-        blockers.extend(wrappers["blockers"])
+    if scheduler_definition["blockers"]:
+        blockers.extend(scheduler_definition["blockers"])
+    if registered_task_deployment_status["blockers"]:
+        blockers.extend(registered_task_deployment_status["blockers"])
 
-    overall_result = "ready_for_explicit_activation_review" if not blockers else "blocked"
+    activation_required = (
+        not bool(policy.get("activation_permitted_by_policy"))
+        or bool(registered_task_deployment_status.get("activation_required", True))
+    )
+    structural_valid = not any(
+        blocker["code"] in {
+            "repository_dirty",
+            "repository_head_mismatch",
+            "python_import_probe_failed",
+            "python_executable_missing",
+            "autonomous_policy_id_invalid",
+            "autonomous_policy_version_invalid",
+            "autonomous_mode_invalid",
+            "autonomous_policy_enabled_flag_invalid",
+            "autonomous_policy_state_invalid",
+            "autonomous_policy_default_enabled",
+            "manual_live_mode_changed",
+            "autonomous_policy_distinct_gate_missing",
+            "autonomous_policy_repository_invalid",
+            "autonomous_policy_authority_version_invalid",
+            "autonomous_policy_authority_commit_missing",
+            "autonomous_policy_stale",
+            "autonomous_policy_item_limit_invalid",
+            "autonomous_policy_slots_invalid",
+            "autonomous_policy_claim_lease_invalid",
+            "autonomous_policy_retry_cap_invalid",
+            "autonomous_policy_outreach_invalid",
+            "autonomous_policy_queue_build_invalid",
+            "autonomous_policy_clean_export_invalid",
+            "autonomous_policy_claim_required_invalid",
+            "autonomous_policy_receipts_required_invalid",
+            "autonomous_policy_sync_required_invalid",
+            "autonomous_policy_platforms_missing",
+            "autonomous_policy_expiry_missing",
+            "autonomous_policy_expiry_malformed",
+            "autonomous_policy_expired",
+            "autonomous_manifest_queue_building_invalid",
+            "autonomous_manifest_autopublish_invalid",
+            "autonomous_manifest_mode_invalid",
+            "autonomous_manifest_default_enabled",
+            "autonomous_manifest_manual_live_changed",
+            "autonomous_manifest_distinct_policy_missing",
+            "autonomous_manifest_explicit_flags_missing",
+            "autonomous_manifest_outreach_invalid",
+            "autonomous_manifest_claim_invalid",
+            "autonomous_manifest_slot_limit_invalid",
+            "autonomous_manifest_slots_invalid",
+            "autonomous_manifest_queue_build_invalid",
+            "autonomous_manifest_clean_export_invalid",
+            "autonomous_manifest_receipts_invalid",
+            "autonomous_manifest_sync_invalid",
+            "autonomous_manifest_queue_building_disallowed",
+            "autonomous_manifest_duplicate_prevention_invalid",
+            "autonomous_manifest_already_posted_skip_invalid",
+            "autonomous_manifest_bounded_retries_invalid",
+            "autonomous_manifest_crash_recovery_invalid",
+            "autonomous_manifest_stale_claim_invalid",
+            "autonomous_manifest_partial_failure_invalid",
+            "scheduler_register_script_missing",
+            "scheduler_wrapper_missing",
+            "scheduler_driver_module_missing",
+            "scheduler_plan_failed",
+            "scheduler_plan_not_json",
+            "scheduler_plan_invalid",
+            "scheduler_task_count_invalid",
+            "scheduler_task_name_invalid",
+            "scheduler_disabled_default_invalid",
+            "scheduler_wrapper_binding_invalid",
+            "scheduler_driver_binding_invalid",
+            "scheduler_working_directory_invalid",
+            "scheduler_execute_invalid",
+            "scheduler_wrapper_argument_missing",
+            "scheduler_repo_root_argument_missing",
+            "scheduler_trigger_invalid",
+            "scheduler_slot_order_invalid",
+            "scheduler_daily_orchestrator_not_retired",
+            "scheduler_fixed_slot_tasks_not_retired",
+            "scheduler_video_task_present",
+        }
+        for blocker in blockers
+    )
+    environment_visibility = {
+        "ok": python_probe["ok"] and env_report["ok"],
+        "python_probe_ok": python_probe["ok"],
+        "production_root": str(production_root),
+        "python_exe": str(python_exe),
+        "missing_environment_keys": env_report["missing"],
+    }
+    connector_readiness = {
+        "ok": publisher_config_ready,
+        "instagram_ready": bool(config_readiness.get("instagram_ready", False)),
+        "facebook_ready": bool(config_readiness.get("facebook_ready", False)),
+        "media_host_ready": bool(config_readiness.get("media_host_ready", False)),
+        "auth_mode": config_readiness.get("auth_mode", ""),
+    }
+    credential_readiness = {
+        "ok": env_report["ok"],
+        "missing": env_report["missing"],
+        "entries": env_report["entries"],
+    }
+    scheduler_definition_readiness = {
+        "ok": scheduler_definition["ok"],
+        "blockers": scheduler_definition["blockers"],
+        "plan": scheduler_definition.get("plan", {}),
+        "register_script_path": scheduler_definition["register_script_path"],
+    }
+    activation_state = {
+        "autonomous_enabled": policy.get("autonomous_enabled"),
+        "autonomous_enabled_by_default": policy.get("autonomous_enabled_by_default"),
+        "autonomous_policy_state": policy.get("autonomous_policy_state"),
+        "activation_required": activation_required,
+        "active_deployment_present": not activation_required,
+    }
+    if blockers:
+        overall_result = "blocked"
+    elif not activation_required:
+        overall_result = "active_deployment_present"
+    else:
+        overall_result = "ready_for_disabled_scheduler_replacement"
     report = {
         "report_type": "lena_autopublish_go_live_readiness",
         "schema_version": "v1",
@@ -630,11 +949,16 @@ def _build_report(
         "python_probe": python_probe,
         "publisher_config": _sanitize_config_status(config_status),
         "publisher_config_ready": publisher_config_ready,
+        "structural_validity": {"ok": structural_valid},
+        "environment_visibility": environment_visibility,
+        "connector_readiness": connector_readiness,
+        "credential_readiness": credential_readiness,
         "environment_contract": env_report,
         "policy": policy,
         "manifest": manifest,
-        "scheduler_wrappers": wrappers,
-        "scheduler_specs": scheduler_specs,
+        "scheduler_definition_readiness": scheduler_definition_readiness,
+        "registered_task_deployment_status": registered_task_deployment_status,
+        "activation_state": activation_state,
         "safe_validation_commands": safe_validation_commands,
         "later_enablement_commands": later_enablement_commands,
         "operator_checklist": _operator_checklist(
@@ -642,7 +966,6 @@ def _build_report(
                 "production_root": str(production_root),
                 "python_exe": str(python_exe),
                 "safe_validation_commands": safe_validation_commands,
-                "scheduler_specs": scheduler_specs,
                 "later_enablement_commands": later_enablement_commands,
             }
         ),
@@ -677,6 +1000,8 @@ def _render_markdown(report: dict[str, Any]) -> str:
         f"- Git HEAD: `{report['git']['head']}`",
         f"- Origin main: `{report['git']['origin_main']}`",
         f"- Clean worktree: `{report['git']['clean']}`",
+        f"- Structural validity: `{report['structural_validity']['ok']}`",
+        f"- Activation required: `{report['activation_state']['activation_required']}`",
         "",
         "## Operator Checklist",
     ]
@@ -702,12 +1027,20 @@ def _render_markdown(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Later Enablement Commands",
+            "## Registered Task Deployment Status",
             "",
         ]
     )
-    for command in report["later_enablement_commands"]:
-        lines.append(f"- `{command}`")
+    deployment = report["registered_task_deployment_status"]
+    lines.append(f"- Deployment state: `{deployment['deployment_state']}`")
+    lines.append(f"- Canonical task present: `{deployment.get('canonical_task_present', False)}`")
+    lines.append(f"- Canonical task matches plan: `{deployment.get('canonical_task_matches_plan', False)}`")
+    lines.append(f"- Canonical task enabled: `{deployment.get('canonical_task_enabled', False)}`")
+    if deployment.get("legacy_tasks_present"):
+        for task_name in deployment["legacy_tasks_present"]:
+            lines.append(f"- Stale legacy task present: `{task_name}`")
+    else:
+        lines.append("- Stale legacy task present: none")
     lines.extend(
         [
             "",
@@ -739,6 +1072,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--production-root", default="", help="Explicit production repository root")
     parser.add_argument("--python-exe", default="", help="Interpreter used for read-only import and readiness probes")
     parser.add_argument("--date", default=datetime.now(timezone.utc).date().isoformat(), help="Readiness date label")
+    parser.add_argument("--validate-only", "--read-only", action="store_true", dest="validate_only", help="Emit the full readiness report to stdout without writing any report artifacts")
     args = parser.parse_args(argv)
 
     root_source = "cli" if args.production_root else ("env" if any(os.environ.get(key, "").strip() for key in PRODUCTION_ROOT_ENV_KEYS) else "current_runtime")
@@ -746,9 +1080,13 @@ def main(argv: list[str] | None = None) -> int:
     python_exe, python_source = _resolve_python_exe(args.python_exe or None)
     stamp = _now_utc().strftime("%Y%m%dT%H%M%SZ")
     report = _build_report(production_root, python_exe, python_source, root_source, args.date)
+    if args.validate_only:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0 if report["overall_result"] != "blocked" else 1
+
     json_path, md_path = save_report(report, production_root, args.date, stamp)
     summary = {
-        "ok": report["overall_result"] == "ready_for_explicit_activation_review",
+        "ok": report["overall_result"] != "blocked",
         "overall_result": report["overall_result"],
         "report_path": str(json_path),
         "checklist_path": str(md_path),
