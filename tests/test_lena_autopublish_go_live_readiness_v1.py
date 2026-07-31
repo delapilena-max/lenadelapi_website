@@ -578,6 +578,7 @@ def test_classify_git_status_excludes_expected_governed_runtime_outputs(tmp_path
     summary = readiness._classify_git_status(
         production_root,
         [
+            "?? logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
             "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
             "?? pipeline/analytics/lena_post_metrics_v1_6_1.csv",
             "?? pipeline/approvals/lena/bounded_live_cycles/2026-07-31/lena_bounded_live_cycle_authorization_2026-07-31_lenagate20260731dd3acbe5-pack000-00-photo.json",
@@ -594,8 +595,9 @@ def test_classify_git_status_excludes_expected_governed_runtime_outputs(tmp_path
     assert summary["repository_dirty"] is False
     assert summary["tracked_status_lines"] == []
     assert summary["unexpected_untracked_paths"] == []
-    assert summary["excluded_governed_runtime_path_count"] == 8
+    assert summary["excluded_governed_runtime_path_count"] == 9
     assert summary["excluded_governed_runtime_roots"] == [
+        "logs/scheduler",
         "pipeline/analytics",
         "pipeline/approvals/lena/bounded_live_cycles",
         "pipeline/publish_packets",
@@ -650,6 +652,7 @@ def test_classify_git_status_unexpected_untracked_file_still_blocks(tmp_path: Pa
         "pipeline/publishing/lena/dispatch_reports/2026-07-31/runtime_fix.ps1",
         "pipeline/publish_packets/lena/2026-07-31/meta_publisher_config_v2_9.local.json",
         "pipeline/publishing/lena/approved_queue/2026-07-31/.env",
+        "logs/scheduler/lena_autonomy_scheduler_2026-07-31.py",
     ],
 )
 def test_classify_governed_runtime_path_rejects_source_config_and_secret_like_files(
@@ -971,15 +974,21 @@ def test_build_report_reports_governed_runtime_exclusions_transparently(
             "physically_clean": False,
             "repository_dirty": False,
             "status_lines": [
+                "?? logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
                 "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
                 "?? pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
             ],
             "tracked_status_lines": [],
             "untracked_status_lines": [
+                "?? logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
                 "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
                 "?? pipeline/publishing/lena/dispatch_reports/2026-07-31/approved_queue_autopublish_report_152811_v2_8_4.json",
             ],
             "excluded_governed_runtime_paths": [
+                {
+                    "path": "logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
+                    "approved_root": "logs/scheduler",
+                },
                 {
                     "path": "pipeline/analytics/lena_manual_post_log_v2_7.csv",
                     "approved_root": "pipeline/analytics",
@@ -989,8 +998,9 @@ def test_build_report_reports_governed_runtime_exclusions_transparently(
                     "approved_root": "pipeline/publishing/lena/dispatch_reports",
                 },
             ],
-            "excluded_governed_runtime_path_count": 2,
+            "excluded_governed_runtime_path_count": 3,
             "excluded_governed_runtime_roots": [
+                "logs/scheduler",
                 "pipeline/analytics",
                 "pipeline/publishing/lena/dispatch_reports",
             ],
@@ -1042,12 +1052,17 @@ def test_build_report_reports_governed_runtime_exclusions_transparently(
 
     assert report["overall_result"] == "ready_for_bounded_photo_autonomy_proof"
     assert report["governed_runtime_exclusions"] == {
-        "count": 2,
+        "count": 3,
         "roots": [
+            "logs/scheduler",
             "pipeline/analytics",
             "pipeline/publishing/lena/dispatch_reports",
         ],
         "paths": [
+            {
+                "path": "logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
+                "approved_root": "logs/scheduler",
+            },
             {
                 "path": "pipeline/analytics/lena_manual_post_log_v2_7.csv",
                 "approved_root": "pipeline/analytics",
