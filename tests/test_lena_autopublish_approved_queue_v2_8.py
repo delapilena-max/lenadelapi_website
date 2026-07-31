@@ -699,3 +699,148 @@ def test_manual_dry_run_returns_preview_without_connector_side_effects(tmp_path:
     assert not (tmp_path / "pipeline" / "publishing" / "lena" / "dispatch_reports").exists()
     queue_rows = list(csv.DictReader(queue_path.open("r", encoding="utf-8")))
     assert [row["publish_state"] for row in queue_rows] == ["queued", "queued"]
+
+
+def test_manual_live_success_writes_governed_receipt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True, authority_commit="a" * 40)
+    _manifest(tmp_path)
+    rows = _base_rows(tmp_path, _sha(policy_path))
+    queue_path = _queue_rows(tmp_path, rows=rows)
+    _connector_script(tmp_path, "lena_publish_instagram_feed_v2_8.py", ok=True)
+
+    report = autopublish.run_manual_publish(
+        day="2026-07-19",
+        platforms="Instagram Feed",
+        dry_run=False,
+        live=True,
+        ack_publish_risk=True,
+        limit=1,
+        slot_keyword="morning",
+        max_attempts=3,
+        feedback_queue_limit=6,
+    )
+
+    assert report["ok"] is True
+    assert report["publish_calls_performed"] == 1
+    assert report["posted_count"] == 1
+    receipt = tmp_path / "pipeline" / "publishing" / "lena" / "approved_queue_receipts" / "2026-07-19" / "morning-slot-001" / "q-instagram_Instagram_Feed_publish_receipt.json"
+    assert receipt.is_file()
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["posted"] is True
+    assert payload["post_id"] == "q-instagram-post"
+    assert payload["provider_result"]["payload"].endswith("q-instagram_Instagram_Feed_payload.json")
+    queue_rows = list(csv.DictReader(queue_path.open("r", encoding="utf-8")))
+    assert next(row for row in queue_rows if row["queue_id"] == "q-instagram")["publish_state"] == "posted"
+
+
+def test_manual_live_receipt_write_failure_marks_reconciliation_and_prevents_republish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True, authority_commit="a" * 40)
+    _manifest(tmp_path)
+    rows = _base_rows(tmp_path, _sha(policy_path))
+    queue_path = _queue_rows(tmp_path, rows=rows)
+    _connector_script(tmp_path, "lena_publish_instagram_feed_v2_8.py", ok=True)
+
+    original_record_receipt = autopublish._record_receipt
+
+    def fail_record_receipt(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(autopublish, "_record_receipt", fail_record_receipt)
+    first = autopublish.run_manual_publish(
+        day="2026-07-19",
+        platforms="Instagram Feed",
+        dry_run=False,
+        live=True,
+        ack_publish_risk=True,
+        limit=1,
+        slot_keyword="morning",
+        max_attempts=3,
+        feedback_queue_limit=6,
+    )
+
+    assert first["ok"] is True
+    assert first["publish_calls_performed"] == 1
+    assert first["receipt_reconciliation_required_count"] == 1
+    assert first["results"][0]["result"]["receipt_reconciliation_required"] is True
+    queue_rows = list(csv.DictReader(queue_path.open("r", encoding="utf-8")))
+    first_row = next(row for row in queue_rows if row["queue_id"] == "q-instagram")
+    assert first_row["publish_state"] == "posted"
+    assert first_row["failure_reason"] == "receipt_reconciliation_required"
+    assert "receipt_reconciliation_required:OSError" in first_row["notes"]
+    receipt = tmp_path / "pipeline" / "publishing" / "lena" / "approved_queue_receipts" / "2026-07-19" / "morning-slot-001" / "q-instagram_Instagram_Feed_publish_receipt.json"
+    assert not receipt.exists()
+
+    monkeypatch.setattr(autopublish, "_record_receipt", original_record_receipt)
+
+    def fail_if_republished(*args, **kwargs):
+        raise AssertionError("receipt reconciliation should not invoke connector subprocesses")
+
+    monkeypatch.setattr(autopublish.subprocess, "run", fail_if_republished)
+    second = autopublish.run_manual_publish(
+        day="2026-07-19",
+        platforms="Instagram Feed",
+        dry_run=False,
+        live=True,
+        ack_publish_risk=True,
+        limit=1,
+        slot_keyword="morning",
+        max_attempts=3,
+        feedback_queue_limit=6,
+    )
+
+    assert second["ok"] is True
+    assert second["publish_calls_performed"] == 0
+    assert second["recovered_queue_ids"] == ["q-instagram"]
+    assert second["results"][0]["result"]["reconciled_from_dispatch_report"] is True
+    assert receipt.is_file()
+    queue_rows = list(csv.DictReader(queue_path.open("r", encoding="utf-8")))
+    second_row = next(row for row in queue_rows if row["queue_id"] == "q-instagram")
+    assert second_row["publish_state"] == "posted"
+    assert second_row["failure_reason"] == ""
+    assert "receipt_reconciled_from_dispatch_report" in second_row["notes"]
+
+
+def test_manual_existing_conflicting_receipt_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True, authority_commit="a" * 40)
+    _manifest(tmp_path)
+    rows = _base_rows(tmp_path, _sha(policy_path))
+    _queue_rows(tmp_path, rows=rows)
+    receipt = tmp_path / "pipeline" / "publishing" / "lena" / "approved_queue_receipts" / "2026-07-19" / "morning-slot-001" / "q-instagram_Instagram_Feed_publish_receipt.json"
+    _write_json(
+        receipt,
+        {
+            "date": "2026-07-19",
+            "slot_id": "morning-slot-001",
+            "queue_id": "q-instagram",
+            "platform": "Instagram Feed",
+            "posted": True,
+            "post_id": "existing",
+            "row_snapshot": {
+                "queue_id": "q-instagram",
+                "platform": "Instagram Feed",
+                "slot_id": "morning-slot-001",
+                "caption": "conflicting caption",
+            },
+        },
+    )
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("conflicting receipt recovery must fail before connector invocation")
+
+    monkeypatch.setattr(autopublish.subprocess, "run", fail_if_called)
+    with pytest.raises(autopublish.AutopublishError) as excinfo:
+        autopublish.run_manual_publish(
+            day="2026-07-19",
+            platforms="Instagram Feed",
+            dry_run=False,
+            live=True,
+            ack_publish_risk=True,
+            limit=1,
+            slot_keyword="morning",
+            max_attempts=3,
+            feedback_queue_limit=6,
+        )
+    assert excinfo.value.code == "autonomous_receipt_row_conflict"

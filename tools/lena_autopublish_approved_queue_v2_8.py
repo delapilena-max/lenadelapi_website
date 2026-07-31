@@ -808,6 +808,39 @@ def _record_receipt(day: str, slot_id: str, row: dict[str, str], connector_resul
     return receipt_path
 
 
+def _validate_receipt_row_binding(row: dict[str, str], receipt: dict[str, Any], receipt_path: Path) -> None:
+    expected_top_level = {
+        "date": row.get("date", ""),
+        "slot_id": row.get("slot_id", ""),
+        "queue_id": row.get("queue_id", ""),
+        "platform": row.get("platform", ""),
+    }
+    for key, expected in expected_top_level.items():
+        actual = str(receipt.get(key, "") or "")
+        if actual != str(expected):
+            raise AutopublishError(
+                "autonomous_receipt_row_conflict",
+                f"receipt binding mismatch for {key}: {receipt_path}",
+            )
+    snapshot = receipt.get("row_snapshot")
+    if not isinstance(snapshot, dict):
+        return
+    for key in ("queue_id", "platform", "slot_id"):
+        if str(snapshot.get(key, "") or "") != str(row.get(key, "") or ""):
+            raise AutopublishError(
+                "autonomous_receipt_row_conflict",
+                f"receipt row snapshot mismatch for {key}: {receipt_path}",
+            )
+    for key in ("asset_path", "asset_sha256", "caption", "clean_export_report_path", "clean_export_report_sha256"):
+        expected = str(row.get(key, "") or "")
+        actual = str(snapshot.get(key, "") or "")
+        if expected and actual and actual != expected:
+            raise AutopublishError(
+                "autonomous_receipt_row_conflict",
+                f"receipt row snapshot mismatch for {key}: {receipt_path}",
+            )
+
+
 def _slot_receipt_exists(day: str, slot_id: str, row: dict[str, str]) -> Path | None:
     receipt_path = _receipt_path(day, slot_id, row.get("queue_id", ""), row.get("platform", ""))
     return receipt_path if receipt_path.exists() else None
@@ -846,8 +879,63 @@ def _recover_from_existing_receipt(day: str, slot_id: str, row: dict[str, str], 
     receipt = _read_json_object(receipt_path, code="autonomous_receipt_invalid", label="publish receipt")
     if not receipt.get("posted"):
         raise AutopublishError("autonomous_receipt_not_posted", f"receipt does not record a published row: {receipt_path}")
+    _validate_receipt_row_binding(row, receipt, receipt_path)
     _apply_posted_row_update(row, receipt)
     return {"ok": True, "recovered": True, "receipt_path": str(receipt_path), "receipt": receipt, "posted": True, "post_id": receipt.get("post_id", ""), "post_url": receipt.get("post_url", "")}
+
+
+def _find_dispatch_report_result(day: str, row: dict[str, str]) -> dict[str, Any] | None:
+    report_dir = REPORT_ROOT / day
+    if not report_dir.exists():
+        return None
+    report_paths = sorted(report_dir.glob("approved_queue_autopublish_report_*_v2_8_4.json"), reverse=True)
+    for report_path in report_paths:
+        report = _read_json_object(report_path, code="dispatch_report_invalid", label="dispatch report")
+        results = report.get("results")
+        if not isinstance(results, list):
+            continue
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            if (
+                str(item.get("queue_id", "") or "") != str(row.get("queue_id", "") or "")
+                or str(item.get("platform", "") or "") != str(row.get("platform", "") or "")
+                or str(item.get("slot_id", "") or "") != str(row.get("slot_id", "") or "")
+            ):
+                continue
+            result = item.get("result")
+            if isinstance(result, dict):
+                return {"report_path": report_path, "result": result}
+    return None
+
+
+def _reconcile_missing_receipt_from_dispatch_report(day: str, slot_id: str, row: dict[str, str]) -> dict[str, Any]:
+    located = _find_dispatch_report_result(day, row)
+    if not located:
+        raise AutopublishError(
+            "dispatch_reconciliation_missing",
+            f"no preserved dispatch report found for queue row {row.get('queue_id', '')}",
+        )
+    result = dict(located["result"])
+    if not (result.get("ok") and result.get("posted")):
+        raise AutopublishError(
+            "dispatch_reconciliation_not_posted",
+            f"dispatch report does not record a successful publish for queue row {row.get('queue_id', '')}",
+        )
+    payload_path = _resolve_repo_path(str(result.get("payload", "")))
+    receipt_path = _record_receipt(day, slot_id, row, result, payload_path)
+    _apply_posted_row_update(row, result)
+    row["failure_reason"] = ""
+    row["notes"] = _ensure_note(row.get("notes", ""), "receipt_reconciled_from_dispatch_report")
+    return {
+        "ok": True,
+        "reconciled_from_dispatch_report": True,
+        "receipt_path": str(receipt_path),
+        "dispatch_report_path": str(located["report_path"]),
+        "posted": True,
+        "post_id": result.get("post_id", ""),
+        "post_url": result.get("post_url", ""),
+    }
 
 
 def admit_controlled_photo(
@@ -1182,9 +1270,22 @@ def run_manual_publish(day: str, platforms: str, dry_run: bool, live: bool, ack_
     results, processed = [], 0
     writable_rows = [dict(r) for r in rows]
     posted_queue_ids: list[str] = []
+    recovered_queue_ids: list[str] = []
+    publish_calls = 0
 
     for row in writable_rows:
+        slot_id = row.get("slot_id", "")
+        receipt_path = _slot_receipt_exists(day, slot_id, row)
         if row.get("publish_state") == "posted":
+            if (
+                not dry_run
+                and receipt_path is None
+                and row.get("failure_reason") == "receipt_reconciliation_required"
+            ):
+                recovery = _reconcile_missing_receipt_from_dispatch_report(day, slot_id, row)
+                posted_queue_ids.append(row.get("queue_id", ""))
+                recovered_queue_ids.append(row.get("queue_id", ""))
+                results.append({"queue_id": row.get("queue_id"), "platform": row.get("platform"), "slot_id": slot_id, "result": recovery, "state_after": row.get("publish_state")})
             continue
         if row.get("publish_state") not in ("queued", "failed", "ready_for_connector", "dry_run", ""):
             continue
@@ -1196,19 +1297,39 @@ def run_manual_publish(day: str, platforms: str, dry_run: bool, live: bool, ack_
             continue
 
         processed += 1
+        if receipt_path and not dry_run:
+            recovery = _recover_from_existing_receipt(day, slot_id, row, receipt_path)
+            posted_queue_ids.append(row.get("queue_id", ""))
+            recovered_queue_ids.append(row.get("queue_id", ""))
+            results.append({"queue_id": row.get("queue_id"), "platform": row.get("platform"), "slot_id": slot_id, "result": recovery, "state_after": row.get("publish_state")})
+            continue
+        if not dry_run:
+            publish_calls += 1
         result = _run_connector(row, dry_run=dry_run)
         now = _iso_now().replace("Z", "")
 
         if dry_run:
             pass
         elif result.get("ok") and result.get("posted"):
-            row["publish_state"] = "posted"
-            row["posted_at"] = result.get("posted_at") or now
-            row["post_url"] = result.get("post_url", "")
-            row["failure_reason"] = ""
-            row["attempt_count"] = "0"
-            if result.get("post_id"):
-                row["notes"] = f"post_id:{result['post_id']}"
+            payload_path = _resolve_repo_path(str(result.get("payload", "")))
+            try:
+                receipt_path = _record_receipt(day, slot_id, row, result, payload_path)
+            except Exception as exc:
+                _apply_posted_row_update(row, result)
+                row["failure_reason"] = "receipt_reconciliation_required"
+                row["notes"] = _ensure_note(
+                    row.get("notes", ""),
+                    f"receipt_reconciliation_required:{type(exc).__name__}",
+                )
+                result = {
+                    **result,
+                    "receipt_reconciliation_required": True,
+                    "receipt_error": str(exc),
+                    "receipt_path": "",
+                }
+            else:
+                _apply_posted_row_update(row, result)
+                result = {**result, "receipt_path": str(receipt_path)}
             posted_queue_ids.append(row.get("queue_id", ""))
         else:
             reason = result.get("reason", "connector_failed_or_not_configured")
@@ -1235,8 +1356,10 @@ def run_manual_publish(day: str, platforms: str, dry_run: bool, live: bool, ack_
         "queue_csv": str(queue_path),
         "queue_sync": queue_sync,
         "results": results,
+        "recovered_queue_ids": recovered_queue_ids,
+        "receipt_reconciliation_required_count": sum(1 for r in results if r["result"].get("receipt_reconciliation_required")),
         "provider_calls_performed": 0,
-        "publish_calls_performed": sum(1 for r in results if r["result"].get("posted")),
+        "publish_calls_performed": publish_calls,
     }
     if not dry_run:
         report_path = REPORT_ROOT / day / f"approved_queue_autopublish_report_{datetime.now().strftime('%H%M%S')}_v2_8_4.json"
