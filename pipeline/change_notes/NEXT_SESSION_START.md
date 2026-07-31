@@ -104,3 +104,57 @@ Action 3 above ran: job `64084207-2b32-4ed4-bcfa-c32fa66eeedd` under Soul id `e4
 Nicolas erased the account's Souls and retrained a fresh Lena Soul 2.0: `79119c27-64fc-47f8-9ff3-c174d12932aa` (`type: soul_2`, `status: completed`, confirmed via `higgsfield soul-id list --json`). Claude updated the current-id constant (`pipeline/identity/lena_higgsfield_soul_cinema_contract_v1.py::CUSTOM_REFERENCE_ID`), the historical-evidence set (`pipeline/identity/lena_higgsfield_identity.py::APPROVED_CUSTOM_REFERENCE_IDS`, which now retains `e45ec580` only as historical fact), the executor's doc comment, and the pinned test literals in `tests/test_lena_build_next_live_image_handoff_v1.py`, `tests/test_lena_higgsfield_executor_handoff_contract_v1.py`, and `tests/test_lena_prepare_higgsfield_retry_handoff_v1.py`.
 
 Next safe action: this new Soul id has NOT yet been proven with any live generation. Do not assume it visually matches Lena until a fresh paid, executor-only test is explicitly authorized, run, and reviewed by Nicolas -- same process as before (fresh handoff/approval, stop after download, no queue/publish/second job).
+
+## Addendum (Codex, 2026-07-31) - single canonical publisher secret source
+
+A. What changed
+
+- Removed the per-worktree `.env` requirement for Lena photo publishing in this deployment checkout.
+- The shared config resolver, go-live readiness surface, and scheduler driver launcher now all resolve governed publisher secrets from the single canonical machine-local secret source `C:\projects\ai\content_bot\.env`.
+- The tracked env-key map is now translation-only and no longer declares repo-local dotenv discovery.
+- `.env.example` and tracked publisher config notes now instruct operators to keep secrets only in `C:\projects\ai\content_bot\.env`.
+
+B. Files changed
+
+- `.env.example`
+- `pipeline/influencer_nodes/lena/meta_env_key_map_v2_9_1.json`
+- `pipeline/influencer_nodes/lena/meta_publisher_config_v2_9.local.json`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+- `tests/test_lena_autopublish_go_live_readiness_v1.py`
+- `tests/test_lena_scheduler_registration_source_v1.py`
+- `tools/lena_autonomy_scheduler_driver_run_v1.ps1`
+- `tools/lena_autopublish_go_live_readiness_v1.py`
+- `tools/lena_meta_refresh_page_token_v1.py`
+- `tools/publishers/lena_meta_publish_common_v2_9.py`
+
+C. Validations run
+
+- `C:\Python314\python.exe -m py_compile tools\publishers\lena_meta_publish_common_v2_9.py tools\lena_autopublish_go_live_readiness_v1.py tools\lena_meta_refresh_page_token_v1.py tests\test_lena_autopublish_go_live_readiness_v1.py tests\test_lena_scheduler_registration_source_v1.py tests\test_lena_autonomy_scheduler_driver_v1.py tests\test_lena_autopublish_approved_queue_v2_8.py tests\test_lena_autopublish_approved_queue_v2_8_new.py tests\test_lena_run_autonomous_publish_cycle_v1.py tests\test_lena_build_publish_packet_v1.py`
+- `C:\Python314\python.exe -m pytest -p no:cacheprovider tests/test_lena_autopublish_go_live_readiness_v1.py tests/test_lena_build_publish_packet_v1.py tests/test_lena_autonomy_scheduler_driver_v1.py tests/test_lena_scheduler_registration_source_v1.py tests/test_lena_autopublish_approved_queue_v2_8.py tests/test_lena_autopublish_approved_queue_v2_8_new.py tests/test_lena_run_autonomous_publish_cycle_v1.py`
+- PowerShell parser checks passed for `tools/lena_autonomy_scheduler_driver_run_v1.ps1`, `tools/register_lena_autonomy_scheduler_task_v1.ps1`, and `setup_lena_3photo_scheduler_v1.ps1`.
+- `git diff --check` passed with line-ending warnings only.
+- Read-only readiness from `C:\projects\ai\content_bot_photo_production_main_v1` resolved `META_PAGE_ACCESS_TOKEN` and the other governed secret keys from `C:\projects\ai\content_bot\.env` without requiring a deployment-local `.env`.
+
+D. Decisions made
+
+- Git worktree cleanliness is not allowed to govern secret-source authority.
+- Secret-source authority is now fixed to `C:\projects\ai\content_bot\.env`, while non-secret publisher values continue to come from `pipeline/influencer_nodes/lena/meta_publisher_config_v2_9.local.json`.
+- The scheduler wrapper now imports the same Python resolver used by readiness and publisher runtime rather than re-implementing secret loading in PowerShell.
+
+E. Blockers / parked branches
+
+- Readiness no longer reports `publisher_config_not_ready` or `environment_visibility_issue` for this checkout.
+- The remaining readiness blocker is still `repository_dirty` because `tests/test_lena_scheduler_migration_plan_v1.py` and `tools/migrate_lena_legacy_scheduler_tasks_to_canonical_driver_v1.ps1` remain untracked in this worktree.
+- The canonical driver task is still not registered, and the four disabled legacy tasks still point at `C:\projects\ai\lenadelapi_website_autopublish_fix`; that scheduler replacement remains parked pending explicit approval.
+
+F. Next approved step
+
+1. Decide whether to land or remove the two unrelated local migration files so the deployment checkout can become clean.
+2. After the worktree is clean and with explicit approval, run the disabled-task replacement step for the scheduler.
+
+G. What must not be done
+
+- Do not create or require `C:\projects\ai\content_bot_photo_production_main_v1\.env`.
+- Do not copy, print, or rewrite any secret from `C:\projects\ai\content_bot\.env`.
+- Do not modify Task Scheduler in this step.
+- Do not publish, generate media, create queues, invoke Anthropic, or touch video in this step.

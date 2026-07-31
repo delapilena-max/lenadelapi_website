@@ -11,6 +11,9 @@ ENV_MAP_FILE = NODE / "meta_env_key_map_v2_9_1.json"
 ENV_ROOT_KEYS = ("LENA_AUTOPUBLISH_PRODUCTION_ROOT", "CONTENT_BOT_ROOT")
 ENV_MAP_CONTRACT_ID = "lena_meta_env_key_map_v2_9_1"
 ENV_MAP_SCHEMA_VERSION = "v1"
+CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE = "LENA_CANONICAL_PUBLISHER_SECRET_ENV_FILE"
+CANONICAL_PUBLISHER_SECRET_ENV_PATH = Path(r"C:\projects\ai\content_bot\.env")
+CANONICAL_PUBLISHER_SECRET_SOURCE_AUTHORITY = "content_bot_shared_secret_env"
 ENV_VAR_TO_CONFIG_KEY = {
     "META_PAGE_ACCESS_TOKEN": "page_access_token",
     "META_INSTAGRAM_ACCESS_TOKEN": "instagram_access_token",
@@ -20,6 +23,12 @@ ENV_VAR_TO_CONFIG_KEY = {
     "LENA_MEDIA_PUBLIC_BASE_URL": "media_public_base_url",
     "LENA_MEDIA_PUBLIC_LOCAL_DIR": "media_public_local_dir",
 }
+GOVERNED_PUBLISHER_SECRET_ENV_KEYS = (
+    "META_PAGE_ACCESS_TOKEN",
+    "META_INSTAGRAM_ACCESS_TOKEN",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+)
 LOCAL_MEDIA_PUBLIC_DIR_REL = Path("pipeline") / "publishing" / "lena" / "media_public"
 
 
@@ -115,11 +124,43 @@ def _load_file_config_only(root: Path | None = None) -> dict:
 def load_file_config(root: Path | None = None) -> dict:
     return dict(_load_file_config_only(root))
 
-def _resolve_env_candidate(root: Path | None, candidate: str) -> Path:
-    path = Path(candidate)
-    if path.is_absolute():
-        return path
-    return _resolve_root(root) / path
+def canonical_publisher_secret_source_path() -> Path:
+    raw = os.environ.get(CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE, "").strip()
+    if raw:
+        return Path(raw).expanduser().resolve()
+    return CANONICAL_PUBLISHER_SECRET_ENV_PATH
+
+def load_canonical_publisher_secret_source(root: Path | None = None) -> dict:
+    path = canonical_publisher_secret_source_path()
+    if not path.is_file():
+        raise ConfigContractError(f"missing canonical publisher secret source: {path}")
+    raw_values = parse_dotenv(path)
+    values = {
+        key: raw_values[key]
+        for key in GOVERNED_PUBLISHER_SECRET_ENV_KEYS
+        if raw_values.get(key)
+    }
+    return {
+        "authority": CANONICAL_PUBLISHER_SECRET_SOURCE_AUTHORITY,
+        "path": str(path),
+        "values": values,
+        "loaded_keys": sorted(values),
+        "governed_keys": list(GOVERNED_PUBLISHER_SECRET_ENV_KEYS),
+    }
+
+def populate_process_env_from_canonical_secret_source(root: Path | None = None) -> dict:
+    source = load_canonical_publisher_secret_source(root)
+    imported_keys = []
+    for key, value in source["values"].items():
+        if not os.environ.get(key):
+            os.environ[key] = value
+            imported_keys.append(key)
+    return {
+        "authority": source["authority"],
+        "path": source["path"],
+        "loaded_keys": source["loaded_keys"],
+        "imported_keys": imported_keys,
+    }
 
 def _validated_env_map_spec(root: Path | None = None) -> dict:
     env_map_file = _env_map_path(root)
@@ -139,13 +180,10 @@ def _validated_env_map_spec(root: Path | None = None) -> dict:
         raise ConfigContractError(
             f"env map schema_version must be {ENV_MAP_SCHEMA_VERSION!r}: {env_map_file}"
         )
-    env_file_candidates = spec.get("env_file_candidates")
-    if not isinstance(env_file_candidates, list) or not env_file_candidates:
+    if "env_file_candidates" in spec:
         raise ConfigContractError(
-            f"env map env_file_candidates must be a non-empty list: {env_map_file}"
+            f"env map must not declare env_file_candidates; the secret source is governed separately: {env_map_file}"
         )
-    if not all(isinstance(item, str) and item.strip() for item in env_file_candidates):
-        raise ConfigContractError(f"env map env_file_candidates must contain only strings: {env_map_file}")
     key_map = spec.get("key_map")
     if not isinstance(key_map, dict):
         raise ConfigContractError(f"env map key_map must be a JSON object: {env_map_file}")
@@ -157,13 +195,14 @@ def _validated_env_map_spec(root: Path | None = None) -> dict:
         if not all(isinstance(item, str) and item.strip() for item in env_keys):
             raise ConfigContractError(f"env map key_map lists must contain only strings: {env_map_file}")
     defaults = spec.get("defaults", {})
-    if not isinstance(defaults, dict):
-        raise ConfigContractError(f"env map defaults must be a JSON object: {env_map_file}")
+    if defaults not in ({}, None):
+        raise ConfigContractError(
+            f"env map defaults must be empty or omitted; non-secret defaults belong in tracked config: {env_map_file}"
+        )
     return {
         **spec,
-        "env_file_candidates": [str(item).strip() for item in env_file_candidates],
         "key_map": {str(key).strip(): [str(item).strip() for item in value] for key, value in key_map.items()},
-        "defaults": defaults,
+        "defaults": {},
     }
 
 def _apply_effective_config(
@@ -178,9 +217,6 @@ def _apply_effective_config(
             continue
         if not resolved.get(key) or _is_placeholder(resolved.get(key)):
             resolved[key] = value
-    for env_key, config_key in ENV_VAR_TO_CONFIG_KEY.items():
-        if process_env.get(env_key):
-            resolved[config_key] = process_env[env_key]
     if not resolved.get("media_public_local_dir") or _is_placeholder(resolved.get("media_public_local_dir")):
         resolved["media_public_local_dir"] = _default_media_public_local_dir(root)
         resolved["_media_public_local_dir_source"] = "runtime_default"
@@ -190,12 +226,8 @@ def _apply_effective_config(
     return resolved
 
 def _load_env_for_r2(root: Path | None = None) -> None:
-    """Best-effort: populate os.environ with contract-approved .env values so R2_* vars are visible."""
-    spec = load_env_map(root)
-    for candidate in spec.get("env_file_candidates", []):
-        for k, v in parse_dotenv(_resolve_env_candidate(root, candidate)).items():
-            if not os.environ.get(k):
-                os.environ[k] = v
+    """Best-effort: populate os.environ with governed canonical secret values."""
+    populate_process_env_from_canonical_secret_source(root)
 
 
 def _r2_is_configured(root: Path | None = None) -> bool:
@@ -224,15 +256,9 @@ def load_env_map(root: Path | None = None) -> dict:
 
 def discover_dotenv_values(root: Path | None = None) -> dict:
     spec = load_env_map(root)
+    source = load_canonical_publisher_secret_source(root)
     found = {}
-    sources = []
-    env_values = dict(os.environ)
-    for candidate in spec.get("env_file_candidates", []):
-        p = _resolve_env_candidate(root, candidate)
-        vals = parse_dotenv(p)
-        if vals:
-            sources.append(str(p))
-            env_values.update(vals)
+    env_values = dict(source["values"])
     key_map = spec.get("key_map", {})
     for config_key, env_keys in key_map.items():
         for env_key in env_keys:
@@ -240,9 +266,13 @@ def discover_dotenv_values(root: Path | None = None) -> dict:
                 found[config_key] = env_values[env_key]
                 found[f"_{config_key}_source"] = env_key
                 break
-    for k, v in spec.get("defaults", {}).items():
-        found.setdefault(k, v)
-    return {"values": found, "sources": sources, "env_map_path": str(_env_map_path(root))}
+    return {
+        "values": found,
+        "sources": [source["path"]],
+        "env_map_path": str(_env_map_path(root)),
+        "loaded_keys": source["loaded_keys"],
+        "authority": source["authority"],
+    }
 
 def load_config(root: Path | None = None) -> dict:
     base_root = _resolve_root(root)
@@ -257,26 +287,38 @@ def token_for_platform(cfg: dict, platform: str) -> str:
 
 def config_status(test_api: bool = False, root: Path | None = None) -> dict:
     base_root = _resolve_root(root)
-    contract_error = ""
     env_map_ok = False
+    env_map_error = ""
+    secret_source_ok = False
+    secret_source_error = ""
+    secret_source_path = str(canonical_publisher_secret_source_path())
+    discovered = {"values": {}, "sources": [], "env_map_path": str(_env_map_path(base_root))}
+    try:
+        load_env_map(base_root)
+        env_map_ok = True
+    except ConfigContractError as exc:
+        env_map_error = str(exc)
+    try:
+        secret_source = load_canonical_publisher_secret_source(base_root)
+        secret_source_ok = True
+        secret_source_path = secret_source["path"]
+    except ConfigContractError as exc:
+        secret_source_error = str(exc)
     try:
         cfg = load_config(base_root)
         discovered = discover_dotenv_values(base_root)
-        env_map_ok = True
-    except ConfigContractError as exc:
-        contract_error = str(exc)
+    except ConfigContractError:
         cfg = _load_file_config_only(base_root)
         if not cfg.get("media_public_local_dir") or _is_placeholder(cfg.get("media_public_local_dir")):
             cfg["media_public_local_dir"] = _default_media_public_local_dir(base_root)
             cfg["_media_public_local_dir_source"] = "runtime_default"
-        discovered = {"values": {}, "sources": [], "env_map_path": str(_env_map_path(base_root))}
     def check(key, secret=False):
         val = str(cfg.get(key, "") or "")
         placeholder = _is_placeholder(val)
         return {"ok": bool(val) and not placeholder, "value": redact(val) if secret else val}
 
     try:
-        r2_ok = _r2_is_configured(base_root) if env_map_ok else False
+        r2_ok = _r2_is_configured(base_root) if secret_source_ok else False
     except ConfigContractError:
         r2_ok = False
     mode     = _auth_mode(cfg)
@@ -290,13 +332,26 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
         "media_public_local_dir": check("media_public_local_dir", False),
         "r2_configured": {"ok": r2_ok, "note": "R2 env vars present — R2 upload active" if r2_ok else "R2 env vars not set"},
         "local_config_exists": {"ok": _local_config_path(base_root).exists(), "path": str(_local_config_path(base_root))},
-        "dotenv_sources": {"ok": env_map_ok and bool(discovered.get("sources")), "sources": discovered.get("sources", [])},
+        "dotenv_sources": {
+            "ok": secret_source_ok and bool(discovered.get("sources")),
+            "sources": discovered.get("sources", []),
+            "loaded_keys": discovered.get("loaded_keys", []),
+            "authority": discovered.get("authority", ""),
+        },
         "env_map_contract": {
             "ok": env_map_ok,
             "path": str(_env_map_path(base_root)),
             "contract_id": ENV_MAP_CONTRACT_ID,
             "schema_version": ENV_MAP_SCHEMA_VERSION,
-            "detail": contract_error,
+            "detail": env_map_error,
+        },
+        "canonical_secret_source": {
+            "ok": secret_source_ok,
+            "path": secret_source_path,
+            "authority": CANONICAL_PUBLISHER_SECRET_SOURCE_AUTHORITY,
+            "governed_keys": list(GOVERNED_PUBLISHER_SECRET_ENV_KEYS),
+            "loaded_keys": discovered.get("loaded_keys", []),
+            "detail": secret_source_error,
         },
     }
 
@@ -316,7 +371,7 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
             api_result = {"ok": False, "error": str(e)}
 
     return {
-        "ok": env_map_ok and (instagram_ready or facebook_ready),
+        "ok": env_map_ok and secret_source_ok and (instagram_ready or facebook_ready),
         "version": "v2.9.1",
         "config_path": str(_local_config_path(base_root)),
         "checks": checks,
@@ -367,7 +422,9 @@ def validate_config_for(platform: str, media_type: str, root: Path | None = None
     try:
         cfg = load_config(root)
     except ConfigContractError as exc:
-        return {"ok": False, "reason": "invalid_env_map_contract", "detail": str(exc), "status": status}
+        detail = str(exc)
+        reason = "missing_canonical_publisher_secret_source" if "canonical publisher secret source" in detail else "invalid_env_map_contract"
+        return {"ok": False, "reason": reason, "detail": detail, "status": status}
     if platform.startswith("Instagram"):
         if not cfg.get("instagram_business_account_id"):
             return {"ok": False, "reason": "missing_instagram_business_account_id", "status": status}

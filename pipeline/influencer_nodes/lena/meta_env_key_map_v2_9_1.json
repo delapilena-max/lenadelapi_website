@@ -3,9 +3,6 @@
   "schema_version": "v1",
   "version": "v2.9.1",
   "authority": "hybrid_contract_is_canonical",
-  "env_file_candidates": [
-    ".env"
-  ],
   "key_map": {
     "page_access_token": [
       "META_PAGE_ACCESS_TOKEN"
@@ -28,6 +25,5 @@
     "media_public_local_dir": [
       "LENA_MEDIA_PUBLIC_LOCAL_DIR"
     ]
-  },
-  "defaults": {}
+  }
 }

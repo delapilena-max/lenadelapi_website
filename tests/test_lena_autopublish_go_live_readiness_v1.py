@@ -22,13 +22,20 @@ def _write_text(path: Path, text: str) -> Path:
     return path
 
 
-def _write_env_tree(root: Path) -> None:
+def _shared_secret_path(root: Path) -> Path:
+    return root.parent / "content_bot" / ".env"
+
+
+def _set_canonical_secret_source(monkeypatch: pytest.MonkeyPatch, path: Path) -> None:
+    monkeypatch.setenv(publish_common.CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE, str(path))
+
+
+def _write_env_tree(root: Path) -> Path:
     _write_json(
         root / "pipeline" / "influencer_nodes" / "lena" / "meta_env_key_map_v2_9_1.json",
         {
             "contract_id": "lena_meta_env_key_map_v2_9_1",
             "schema_version": "v1",
-            "env_file_candidates": [".env"],
             "key_map": {
                 "page_access_token": ["META_PAGE_ACCESS_TOKEN"],
                 "instagram_access_token": ["META_INSTAGRAM_ACCESS_TOKEN"],
@@ -46,10 +53,10 @@ def _write_env_tree(root: Path) -> None:
         {
             "page_access_token": "PLACEHOLDER",
             "instagram_access_token": "PLACEHOLDER",
-            "instagram_business_account_id": "PLACEHOLDER",
-            "facebook_page_id": "PLACEHOLDER",
-            "graph_api_version": "PLACEHOLDER",
-            "media_public_base_url": "PLACEHOLDER",
+            "instagram_business_account_id": "17841409711154047",
+            "facebook_page_id": "1267219163131062",
+            "graph_api_version": "v25.0",
+            "media_public_base_url": "https://pub.example.invalid",
             "media_public_local_dir": "PLACEHOLDER",
         },
     )
@@ -65,8 +72,8 @@ def _write_env_tree(root: Path) -> None:
             "media_public_local_dir": "YOUR_MEDIA_ROOT",
         },
     )
-    _write_text(
-        root / ".env",
+    return _write_text(
+        _shared_secret_path(root),
         "\n".join(
             [
                 "META_PAGE_ACCESS_TOKEN=page-token",
@@ -87,14 +94,13 @@ def _write_env_tree(root: Path) -> None:
     )
 
 
-def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> None:
+def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> Path:
     _write_json(
         root / "pipeline" / "influencer_nodes" / "lena" / "meta_env_key_map_v2_9_1.json",
         {
             "contract_id": "lena_meta_env_key_map_v2_9_1",
             "schema_version": "v1",
             "authority": "hybrid_contract_is_canonical",
-            "env_file_candidates": [".env"],
             "key_map": {
                 "page_access_token": ["META_PAGE_ACCESS_TOKEN"],
                 "instagram_access_token": ["META_INSTAGRAM_ACCESS_TOKEN"],
@@ -104,7 +110,6 @@ def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> None:
                 "media_public_base_url": ["LENA_MEDIA_PUBLIC_BASE_URL"],
                 "media_public_local_dir": ["LENA_MEDIA_PUBLIC_LOCAL_DIR"],
             },
-            "defaults": {},
         },
     )
     _write_json(
@@ -120,10 +125,15 @@ def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> None:
             "dry_run": False,
         },
     )
-    _write_text(root / ".env", "\n".join(env_lines) + "\n")
+    return _write_text(_shared_secret_path(root), "\n".join(env_lines) + "\n")
+
+
+def _write_local_worktree_env(root: Path, env_lines: list[str]) -> Path:
+    return _write_text(root / ".env", "\n".join(env_lines) + "\n")
 
 
 def _clear_publish_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(publish_common.CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE, raising=False)
     for key in (
         "META_PAGE_ACCESS_TOKEN",
         "META_INSTAGRAM_ACCESS_TOKEN",
@@ -220,14 +230,18 @@ def _write_policy_manifest(root: Path, *, authority_commit: str, autonomous_enab
 
 def test_publish_common_config_status_reads_explicit_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     production_root = tmp_path / "production"
-    _write_env_tree(production_root)
+    shared_secret_path = _write_env_tree(production_root)
     _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     status = publish_common.config_status(False, root=production_root)
 
     assert status["ok"] is True
     assert status["checks"]["env_map_contract"]["ok"] is True
+    assert status["checks"]["canonical_secret_source"]["ok"] is True
+    assert status["checks"]["canonical_secret_source"]["path"] == str(shared_secret_path)
     assert status["checks"]["dotenv_sources"]["ok"] is True
+    assert status["checks"]["dotenv_sources"]["sources"] == [str(shared_secret_path)]
     assert status["checks"]["local_config_exists"]["ok"] is True
     assert status["readiness"]["instagram_ready"] is True
     assert status["readiness"]["facebook_ready"] is True
@@ -239,13 +253,18 @@ def test_hybrid_local_config_counts_without_duplicate_non_secret_env_vars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     production_root = tmp_path / "production"
-    _write_hybrid_contract_tree(
+    shared_secret_path = _write_hybrid_contract_tree(
         production_root,
         env_lines=[
             "META_PAGE_ACCESS_TOKEN=page-token",
+            "META_IG_USER_ID=bad-from-secret-source",
+            "LENA_MEDIA_PUBLIC_BASE_URL=https://should-not-override.invalid",
+            "UNRELATED_SECRET_SHOULD_BE_IGNORED=ignored",
         ],
     )
+    _write_local_worktree_env(production_root, ["META_PAGE_ACCESS_TOKEN=wrong-local-token"])
     _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     cfg = publish_common.load_config(production_root)
     status = publish_common.config_status(False, root=production_root)
@@ -256,7 +275,12 @@ def test_hybrid_local_config_counts_without_duplicate_non_secret_env_vars(
     assert cfg["graph_api_version"] == "v25.0"
     assert cfg["media_public_base_url"] == "https://pub.example.invalid"
     assert cfg["media_public_local_dir"] == str(production_root / "pipeline" / "publishing" / "lena" / "media_public")
-    assert publish_common.discover_dotenv_values(production_root)["sources"] == [str(production_root / ".env")]
+    assert cfg["page_access_token"] == "page-token"
+    assert publish_common.discover_dotenv_values(production_root)["sources"] == [str(shared_secret_path)]
+    assert status["checks"]["canonical_secret_source"]["loaded_keys"] == ["META_PAGE_ACCESS_TOKEN"]
+    assert env_report["secret_source_path"] == str(shared_secret_path)
+    assert env_report["secret_source_contract_ok"] is True
+    assert env_report["loaded_secret_keys"] == ["META_PAGE_ACCESS_TOKEN"]
     assert status["readiness"]["instagram_ready"] is True
     assert status["readiness"]["facebook_ready"] is True
     assert status["readiness"]["media_host_ready"] is True
@@ -267,7 +291,8 @@ def test_hybrid_local_config_counts_without_duplicate_non_secret_env_vars(
     assert "META_GRAPH_API_VERSION" not in env_report["missing"]
     assert "LENA_MEDIA_PUBLIC_BASE_URL" not in env_report["missing"]
     assert "LENA_MEDIA_PUBLIC_LOCAL_DIR" not in env_report["missing"]
-    assert "R2_ACCOUNT_ID" not in env_report["required_env_vars"]
+    assert "R2_ACCESS_KEY_ID" not in env_report["required_env_vars"]
+    assert (production_root / ".env").read_text(encoding="utf-8") == "META_PAGE_ACCESS_TOKEN=wrong-local-token\n"
 
 
 def test_readiness_only_flags_runtime_required_secret_when_hybrid_config_supplies_non_secrets(
@@ -275,8 +300,9 @@ def test_readiness_only_flags_runtime_required_secret_when_hybrid_config_supplie
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     production_root = tmp_path / "production"
-    _write_hybrid_contract_tree(production_root, env_lines=[])
+    shared_secret_path = _write_hybrid_contract_tree(production_root, env_lines=[])
     _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     status = publish_common.config_status(False, root=production_root)
     env_report = readiness._env_presence_report(production_root, dict(os.environ), status)
@@ -293,6 +319,7 @@ def test_missing_env_map_fails_closed_for_runtime_and_readiness(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     production_root = tmp_path / "production"
+    missing_shared_secret_path = _shared_secret_path(production_root)
     _write_json(
         production_root / "pipeline" / "influencer_nodes" / "lena" / "meta_publisher_config_v2_9.local.json",
         {
@@ -303,6 +330,7 @@ def test_missing_env_map_fails_closed_for_runtime_and_readiness(
         },
     )
     _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, missing_shared_secret_path)
 
     status = publish_common.config_status(False, root=production_root)
     validation = publish_common.validate_config_for("Instagram Feed", "image", root=production_root)
@@ -310,10 +338,39 @@ def test_missing_env_map_fails_closed_for_runtime_and_readiness(
 
     assert status["checks"]["env_map_contract"]["ok"] is False
     assert "missing env map contract" in status["checks"]["env_map_contract"]["detail"]
+    assert status["checks"]["canonical_secret_source"]["ok"] is False
+    assert str(missing_shared_secret_path) == status["checks"]["canonical_secret_source"]["path"]
     assert validation["ok"] is False
     assert validation["reason"] == "invalid_env_map_contract"
     assert env_report["env_map_contract_ok"] is False
-    assert "missing env map contract" in env_report["contract_error"]
+    assert env_report["secret_source_contract_ok"] is False
+    assert "missing canonical publisher secret source" in env_report["secret_source_error"]
+
+
+def test_missing_canonical_secret_source_fails_closed_even_with_valid_translation_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_root = tmp_path / "production"
+    _write_hybrid_contract_tree(production_root, env_lines=[])
+    shared_secret_path = _shared_secret_path(production_root)
+    if shared_secret_path.exists():
+        shared_secret_path.unlink()
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
+
+    status = publish_common.config_status(False, root=production_root)
+    validation = publish_common.validate_config_for("Facebook Page", "image", root=production_root)
+    env_report = readiness._env_presence_report(production_root, dict(os.environ), status)
+
+    assert status["checks"]["env_map_contract"]["ok"] is True
+    assert status["checks"]["canonical_secret_source"]["ok"] is False
+    assert status["checks"]["canonical_secret_source"]["path"] == str(shared_secret_path)
+    assert validation["ok"] is False
+    assert validation["reason"] == "missing_canonical_publisher_secret_source"
+    assert env_report["secret_source_contract_ok"] is False
+    assert env_report["secret_source_path"] == str(shared_secret_path)
+    assert "missing canonical publisher secret source" in env_report["secret_source_error"]
 
 
 def test_readiness_report_never_emits_raw_secret_values(
@@ -325,7 +382,7 @@ def test_readiness_report_never_emits_raw_secret_values(
     secret = "page-token-super-secret"
     repo_root.mkdir(parents=True, exist_ok=True)
     production_root.mkdir(parents=True, exist_ok=True)
-    _write_hybrid_contract_tree(
+    shared_secret_path = _write_hybrid_contract_tree(
         production_root,
         env_lines=[
             f"META_PAGE_ACCESS_TOKEN={secret}",
@@ -333,6 +390,7 @@ def test_readiness_report_never_emits_raw_secret_values(
     )
     _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
     _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     monkeypatch.setattr(readiness, "ROOT", repo_root)
     monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
@@ -410,6 +468,7 @@ def test_readiness_report_never_emits_raw_secret_values(
     assert secret not in rendered
     assert report["publisher_config"]["checks"]["page_access_token"]["ok"] is True
     assert report["environment_contract"]["missing"] == []
+    assert report["environment_contract"]["secret_source_path"] == str(shared_secret_path)
 
 
 def test_resolve_python_exe_uses_path_lookup_for_bare_cli_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -464,8 +523,10 @@ def test_go_live_readiness_reports_ready_from_explicit_production_root(
     production_root = tmp_path / "production"
     repo_root.mkdir(parents=True, exist_ok=True)
     production_root.mkdir(parents=True, exist_ok=True)
-    _write_env_tree(production_root)
+    shared_secret_path = _write_env_tree(production_root)
     _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     monkeypatch.setattr(readiness, "ROOT", repo_root)
     monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
@@ -553,6 +614,7 @@ def test_go_live_readiness_reports_ready_from_explicit_production_root(
     assert report["safe_validation_commands"][1].startswith("powershell.exe -NoProfile -ExecutionPolicy Bypass -File")
     assert report["production_root_source"] == "cli"
     assert report["python_exe_source"] == "cli"
+    assert report["environment_contract"]["secret_source_path"] == str(shared_secret_path)
 
 
 def test_build_report_accepts_clean_branch_ahead_of_origin_main(
@@ -563,8 +625,10 @@ def test_build_report_accepts_clean_branch_ahead_of_origin_main(
     production_root = tmp_path / "production"
     repo_root.mkdir(parents=True, exist_ok=True)
     production_root.mkdir(parents=True, exist_ok=True)
-    _write_env_tree(production_root)
+    shared_secret_path = _write_env_tree(production_root)
     _write_policy_manifest(production_root, authority_commit="a" * 40, autonomous_enabled=True)
+    _clear_publish_env(monkeypatch)
+    _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     monkeypatch.setattr(readiness, "ROOT", repo_root)
     monkeypatch.setattr(readiness, "REPORT_ROOT", repo_root / "pipeline" / "publishing" / "lena" / "go_live_readiness")
@@ -642,6 +706,7 @@ def test_build_report_accepts_clean_branch_ahead_of_origin_main(
     assert report["git"]["origin_main_ancestor_of_head"] is True
     assert not any(blocker["code"] == "repository_head_mismatch" for blocker in report["blockers"])
     assert report["overall_result"] == "ready_for_disabled_scheduler_replacement"
+    assert report["environment_contract"]["secret_source_path"] == str(shared_secret_path)
 
 
 def test_save_report_is_conflict_safe(tmp_path: Path) -> None:

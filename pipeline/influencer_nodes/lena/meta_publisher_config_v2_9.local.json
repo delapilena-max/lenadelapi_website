@@ -9,7 +9,7 @@
   "dry_run": false,
   "notes": [
     "auth_mode: facebook_login uses META_PAGE_ACCESS_TOKEN via graph.facebook.com.",
-    "Tokens and secrets live in .env only.",
+    "Tokens and secrets live only in the canonical machine-local publisher secret file C:/projects/ai/content_bot/.env.",
     "R2 env vars provide the primary media host for Meta publishing."
   ]
 }
