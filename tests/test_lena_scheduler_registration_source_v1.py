@@ -55,6 +55,7 @@ def _assert_register_source_contract() -> None:
     assert "no_daily_orchestrator = $true" in source
     assert "no_fixed_publish_slot_tasks = $true" in source
     assert "no_video_task = $true" in source
+    assert '-RepoRoot `"$RepoRoot`"' in source
     assert "Disable-ScheduledTask -TaskName $TaskName" in source
     assert "RUN_LENA_PUBLISH_MORNING_SLOT.bat" not in source
     assert "RUN_LENA_PUBLISH_AFTERNOON_SLOT.bat" not in source
@@ -74,6 +75,14 @@ def _assert_retired_wrapper_contract() -> None:
     assert "RUN_LENA_PUBLISH_MORNING_SLOT.bat" not in source
     assert "RUN_LENA_PUBLISH_AFTERNOON_SLOT.bat" not in source
     assert "RUN_LENA_PUBLISH_EVENING_SLOT.bat" not in source
+
+
+def _assert_driver_wrapper_contract() -> None:
+    source = DRIVER_WRAPPER.read_text(encoding="utf-8")
+    assert "[string]$RepoRoot = (Split-Path -Parent $PSScriptRoot)" in source
+    assert "Set-Location -Path $RepoRoot" in source
+    assert "publish_common.populate_process_env_from_canonical_secret_source(repo_root)" in source
+    assert 'runpy.run_module("tools.lena_autonomy_scheduler_driver_v1", run_name="__main__")' in source
 
 
 def test_register_script_validate_only_emits_single_disabled_driver_plan() -> None:
@@ -97,6 +106,7 @@ def test_register_script_validate_only_emits_single_disabled_driver_plan() -> No
         assert plan["safeguards"]["no_fixed_publish_slot_tasks"] is True
         assert plan["safeguards"]["no_video_task"] is True
     _assert_register_source_contract()
+    _assert_driver_wrapper_contract()
 
 
 def test_retired_scheduler_setup_validate_only_delegates_to_canonical_plan() -> None:
@@ -117,6 +127,7 @@ def test_retired_scheduler_setup_validate_only_delegates_to_canonical_plan() -> 
         assert plan["run_wrapper_path"] == str(DRIVER_WRAPPER)
     _assert_retired_wrapper_contract()
     _assert_register_source_contract()
+    _assert_driver_wrapper_contract()
 
 
 def test_retired_scheduler_setup_rejects_mutating_invocation() -> None:
@@ -133,3 +144,4 @@ def test_retired_scheduler_setup_rejects_mutating_invocation() -> None:
         assert "retired" in combined.lower()
         assert "register_lena_autonomy_scheduler_task_v1.ps1" in combined
     _assert_retired_wrapper_contract()
+    _assert_driver_wrapper_contract()

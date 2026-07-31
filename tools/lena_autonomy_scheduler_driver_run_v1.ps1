@@ -48,7 +48,23 @@ $stamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')
 "[$stamp] invoking driver" | Add-Content -Path $logPath -Encoding utf8
 
 try {
-    $output = & $PythonExe -m tools.lena_autonomy_scheduler_driver_v1 2>&1
+    $bootstrap = @'
+import os
+import runpy
+import sys
+from pathlib import Path
+
+repo_root = Path(sys.argv[1]).resolve()
+os.chdir(repo_root)
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
+
+from tools.publishers import lena_meta_publish_common_v2_9 as publish_common
+
+publish_common.populate_process_env_from_canonical_secret_source(repo_root)
+runpy.run_module("tools.lena_autonomy_scheduler_driver_v1", run_name="__main__")
+'@
+    $output = $bootstrap | & $PythonExe - $RepoRoot 2>&1
     $exitCode = $LASTEXITCODE
     $output | Add-Content -Path $logPath -Encoding utf8
     "[$stamp] exit code $exitCode" | Add-Content -Path $logPath -Encoding utf8

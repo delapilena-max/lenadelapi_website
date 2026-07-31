@@ -5,7 +5,7 @@ Steps:
   STEP_A_EXCHANGE_USER_TOKEN  — accept short-lived USER token, exchange for long-lived
   STEP_B_FETCH_PAGES          — call /me/accounts to list pages + IG linkage
   STEP_C_SELECT_LENA_PAGE     — verify page name, ID, IG ID, IG username
-  STEP_D_WRITE_ENV            — backup .env, write META_PAGE_ACCESS_TOKEN
+  STEP_D_WRITE_ENV            — backup canonical publisher secret source, write META_PAGE_ACCESS_TOKEN
   STEP_E_VALIDATE_PAGE_TOKEN  — debug_token confirms PAGE type, valid, scopes
 
 No token values are printed or logged at any point.
@@ -15,8 +15,10 @@ import getpass, json, os, re, shutil, subprocess, sys, urllib.error, urllib.pars
 from datetime import datetime
 from pathlib import Path
 
+from tools.publishers import lena_meta_publish_common_v2_9 as publish_common
+
 ROOT      = Path(__file__).resolve().parents[1]
-ENV_PATH  = ROOT / ".env"
+ENV_PATH  = publish_common.canonical_publisher_secret_source_path()
 PAGE_ID   = "1267219163131062"
 PAGE_NAME = "Lena Delapi"
 IG_ID     = "17841409711154047"
@@ -135,7 +137,7 @@ def main() -> int:
     print()
 
     if not app_id or not app_sec:
-        print("[ABORT] META_APP_ID or META_APP_SECRET missing from .env")
+        print("[ABORT] META_APP_ID or META_APP_SECRET missing from the canonical publisher secret source")
         return 1
 
     # Accept token via hidden prompt — value never echoed or printed
@@ -241,7 +243,7 @@ def main() -> int:
     step_pass(SC, "all identity checks OK")
     print()
 
-    # ── STEP D — backup + write .env ─────────────────────────────────────────
+    # ── STEP D — backup + write canonical publisher secret source ───────────
     print(f"  Running {SD} ...")
     del ll_token  # no longer needed
 
@@ -272,7 +274,7 @@ def main() -> int:
     step_pass(SD, "META_PAGE_ACCESS_TOKEN written")
     print()
 
-    # ── STEP E — validate new token from .env ────────────────────────────────
+    # ── STEP E — validate new token from canonical publisher secret source ──
     print(f"  Running {SE} ...")
     raw2    = load_env_raw(ENV_PATH)
     new_tok = get_env_val(raw2, "META_PAGE_ACCESS_TOKEN")
