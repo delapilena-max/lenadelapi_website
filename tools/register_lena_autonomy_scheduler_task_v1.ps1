@@ -1,21 +1,17 @@
 <#
 .SYNOPSIS
-    Registers the ONE Windows Scheduled Task that drives Lena's controlled
-    photo autonomy: fires every minute, invokes the idempotent Python
-    scheduler driver, which itself decides whether anything is due.
+    Registers the one canonical Windows Scheduled Task that drives Lena's
+    controlled photo autonomy scheduler.
 
 .DESCRIPTION
-    Deliberately does NOT create three fixed-time tasks -- the actual
-    posting minute is deterministically varied per day (see
-    tools/lena_autonomy_daily_schedule_v1.py), so there is no single
-    fixed clock time to register three tasks against. Instead this
-    registers one task that polls every minute; the driver is a no-op on
-    every poll except the ~6 minutes a day (3 slots x ~2 state
-    transitions) where something is actually due.
+    The canonical scheduler architecture is a single driver task that
+    fires every minute and lets the Python driver decide whether any
+    morning, afternoon, or evening transition is due. This script can
+    emit a non-mutating registration plan or register the task itself.
 
-    LogonType S4U runs the task under the given user account, whether or
-    not that user is logged on, WITHOUT storing a password (S4U requires
-    no credential). This script never prompts for or stores a password.
+    Validate-only mode never touches Task Scheduler. It emits the exact
+    single-task plan as JSON so source and deployment validation can stay
+    read-only.
 
 .PARAMETER TaskName
     Scheduled task name. Defaults to 'Lena Autonomy Scheduler Driver'.
@@ -34,48 +30,83 @@
 .PARAMETER Force
     Overwrite an existing task with the same name.
 
-.EXAMPLE
-    # Register (creates the task DISABLED -- enable explicitly when ready):
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\register_lena_autonomy_scheduler_task_v1.ps1
-
-    # Enable when ready to go fully autonomous:
-    Enable-ScheduledTask -TaskName 'Lena Autonomy Scheduler Driver'
-
-    # Verify:
-    Get-ScheduledTask -TaskName 'Lena Autonomy Scheduler Driver' | Select-Object TaskName, State
-    Get-ScheduledTaskInfo -TaskName 'Lena Autonomy Scheduler Driver'
-
-    # Remove:
-    Unregister-ScheduledTask -TaskName 'Lena Autonomy Scheduler Driver' -Confirm:$false
+.PARAMETER ValidateOnly
+    Emit the canonical single-task registration plan as JSON and exit
+    without touching Task Scheduler.
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]$TaskName = 'Lena Autonomy Scheduler Driver',
-    [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
+    [string]$RepoRoot = '',
     [string]$PythonExe = 'C:\Python314\python.exe',
     [string]$UserId = "$env:USERDOMAIN\$env:USERNAME",
-    [switch]$Force
+    [switch]$Force,
+    [switch]$ValidateOnly
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$wrapperPath = Join-Path $RepoRoot 'tools\lena_autonomy_scheduler_driver_run_v1.ps1'
-if (-not (Test-Path $wrapperPath)) {
-    Write-Error "Run wrapper not found: $wrapperPath"
+if (-not $RepoRoot) {
+    $RepoRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
+}
+else {
+    $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+}
+$WrapperPath = Join-Path $RepoRoot 'tools\lena_autonomy_scheduler_driver_run_v1.ps1'
+$DriverModulePath = Join-Path $RepoRoot 'tools\lena_autonomy_scheduler_driver_v1.py'
+
+if (-not (Test-Path -LiteralPath $WrapperPath -PathType Leaf)) {
+    Write-Error "Canonical scheduler wrapper not found: $WrapperPath"
     exit 1
 }
 
-$argumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$wrapperPath`" -PythonExe `"$PythonExe`" -RepoRoot `"$RepoRoot`""
+if (-not (Test-Path -LiteralPath $DriverModulePath -PathType Leaf)) {
+    Write-Error "Canonical scheduler driver module not found: $DriverModulePath"
+    exit 1
+}
+
+$ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$WrapperPath`" -PythonExe `"$PythonExe`" -RepoRoot `"$RepoRoot`""
+
+$Plan = [ordered]@{
+    report_type = 'lena_autonomy_scheduler_task_registration_plan'
+    schema_version = 'v1'
+    task_count = 1
+    task_name = $TaskName
+    disabled_by_default = $true
+    repo_root = $RepoRoot
+    python_exe = $PythonExe
+    run_wrapper_path = $WrapperPath
+    driver_module_path = $DriverModulePath
+    action = [ordered]@{
+        execute = 'powershell.exe'
+        arguments = $ArgumentList
+        working_directory = $RepoRoot
+    }
+    trigger = [ordered]@{
+        type = 'poll_every_minute'
+        repetition_interval_minutes = 1
+        scheduling_decision = 'driver_internal'
+        schedule_slots = @('morning', 'afternoon', 'evening')
+    }
+    safeguards = [ordered]@{
+        no_daily_orchestrator = $true
+        no_fixed_publish_slot_tasks = $true
+        no_video_task = $true
+    }
+}
+
+if ($ValidateOnly) {
+    $Plan | ConvertTo-Json -Depth 6
+    exit 0
+}
 
 $action = New-ScheduledTaskAction `
     -Execute 'powershell.exe' `
-    -Argument $argumentList `
+    -Argument $ArgumentList `
     -WorkingDirectory $RepoRoot
 
-# Fires once "now", then repeats every minute forever -- the deterministic
-# per-day publish minute lives inside the driver, not in this trigger.
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
     -RepetitionDuration ([TimeSpan]::MaxValue)
@@ -97,19 +128,17 @@ $settings = New-ScheduledTaskSettingsSet `
 
 if ($PSCmdlet.ShouldProcess($TaskName, 'Register-ScheduledTask')) {
     Register-ScheduledTask `
-        -TaskName    $TaskName `
-        -Description 'Polls every minute; runs Lena controlled-photo-autonomy generation/publish only at each deterministic daily slot time. Idempotent no-op otherwise.' `
-        -Action      $action `
-        -Trigger     $trigger `
-        -Principal   $principal `
-        -Settings    $settings `
+        -TaskName $TaskName `
+        -Description 'Polls every minute and lets the Lena autonomy scheduler driver decide whether a photo generation or publish transition is due.' `
+        -Action $action `
+        -Trigger $trigger `
+        -Principal $principal `
+        -Settings $settings `
         -Force:$Force | Out-Null
 
-    Write-Host "Registered task: $TaskName"
-    Write-Host 'Task is created ENABLED per Register-ScheduledTask defaults; run:'
-    Write-Host "  Get-ScheduledTask -TaskName '$TaskName' | Select-Object TaskName, State"
-    Write-Host 'to confirm state, and Disable-ScheduledTask if you want it inert until you are ready.'
+    Disable-ScheduledTask -TaskName $TaskName | Out-Null
+    Write-Host "Registered canonical task and forced disabled state: $TaskName"
 }
 else {
-    Write-Host "[WhatIf] Would register: $TaskName"
+    Write-Host "[WhatIf] Would register canonical disabled-by-default task: $TaskName"
 }

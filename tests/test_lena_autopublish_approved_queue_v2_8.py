@@ -500,6 +500,10 @@ def test_scheduled_autonomous_dry_run_makes_zero_calls(tmp_path: Path, monkeypat
     assert report["provider_calls_performed"] == 0
     assert not (tmp_path / "pipeline" / "publishing" / "lena" / "approved_queue_claims").exists()
     assert not (tmp_path / "pipeline" / "publishing" / "lena" / "approved_queue_receipts").exists()
+    assert not (tmp_path / "pipeline" / "publishing" / "lena" / "dispatch_outbox").exists()
+    assert not (tmp_path / "pipeline" / "publishing" / "lena" / "dispatch_reports").exists()
+    assert report["processed"][0]["result"]["connector_preview"]["payload"]["platform"] == "Instagram Feed"
+    assert report["processed"][1]["result"]["connector_preview"]["payload"]["platform"] == "Facebook Page"
 
 
 def test_scheduled_autonomous_processes_one_slot_with_partial_platform_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -658,3 +662,40 @@ def test_manual_live_behavior_unchanged(tmp_path: Path, monkeypatch: pytest.Monk
     )
     assert report["ok"] is False
     assert report["error"] == "live_publish_blocked_missing_explicit_approval_flags"
+
+
+def test_manual_dry_run_returns_preview_without_connector_side_effects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_tree(monkeypatch, tmp_path)
+    policy_path = _policy(tmp_path, enabled=True, authority_commit="a" * 40)
+    _manifest(tmp_path)
+    rows = _base_rows(tmp_path, _sha(policy_path))
+    queue_path = _queue_rows(tmp_path, rows=rows)
+
+    def fail_subprocess_run(*args, **kwargs):
+        raise AssertionError("manual dry-run should not invoke connector subprocesses")
+
+    monkeypatch.setattr(autopublish.subprocess, "run", fail_subprocess_run)
+
+    report = autopublish.run_manual_publish(
+        day="2026-07-19",
+        platforms="Instagram Feed,Facebook Page",
+        dry_run=True,
+        live=False,
+        ack_publish_risk=False,
+        limit=2,
+        slot_keyword="morning",
+        max_attempts=3,
+        feedback_queue_limit=6,
+    )
+
+    assert report["ok"] is True
+    assert report["dry_run"] is True
+    assert report["queue_mutated"] is False
+    assert report["publish_calls_performed"] == 0
+    assert report["queue_sync"]["reason"] == "dry_run_preview_only_queue_not_mutated"
+    assert report["results"][0]["result"]["connector_preview"]["payload"]["platform"] == "Instagram Feed"
+    assert report["results"][1]["result"]["connector_preview"]["payload"]["platform"] == "Facebook Page"
+    assert not (tmp_path / "pipeline" / "publishing" / "lena" / "dispatch_outbox").exists()
+    assert not (tmp_path / "pipeline" / "publishing" / "lena" / "dispatch_reports").exists()
+    queue_rows = list(csv.DictReader(queue_path.open("r", encoding="utf-8")))
+    assert [row["publish_state"] for row in queue_rows] == ["queued", "queued"]

@@ -328,21 +328,35 @@ def _connector_payload(row: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _connector_preview(row: dict[str, str]) -> dict[str, Any]:
+    return {
+        "connector": row.get("connector_path", ""),
+        "payload": _connector_payload(row),
+    }
+
+
 def _run_connector(row: dict[str, str], *, dry_run: bool = False) -> dict[str, Any]:
     connector = row.get("connector_path") or ""
     payload = _connector_payload(row)
+    preview = _connector_preview(row)
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "posted": False,
+            "reason": "dry_run_preview_only_queue_not_mutated",
+            "connector_preview": preview,
+        }
     outbox = DISPATCH_OUTBOX / row.get("date", "")
     outbox.mkdir(parents=True, exist_ok=True)
     safe_platform = "".join(c if c.isalnum() or c in "-_" else "_" for c in row.get("platform", "platform"))
     payload_path = outbox / f"{row.get('queue_id')}_{safe_platform}_payload.json"
     payload_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    if dry_run:
-        return {"ok": True, "dry_run": True, "posted": False, "reason": "dry_run_preview_only_queue_not_mutated", "payload": str(payload_path)}
     if not connector:
-        return {"ok": False, "posted": False, "reason": "missing_connector_path", "payload": str(payload_path)}
+        return {"ok": False, "posted": False, "reason": "missing_connector_path", "payload": str(payload_path), "connector_preview": preview}
     connector_path = ROOT / connector
     if not connector_path.exists():
-        return {"ok": False, "posted": False, "reason": f"connector_not_installed: {connector}", "payload": str(payload_path)}
+        return {"ok": False, "posted": False, "reason": f"connector_not_installed: {connector}", "payload": str(payload_path), "connector_preview": preview}
     proc = subprocess.run(
         [PY, str(connector_path), "--payload", str(payload_path)],
         cwd=str(ROOT),
@@ -376,6 +390,7 @@ def _run_connector(row: dict[str, str], *, dry_run: bool = False) -> dict[str, A
     data["returncode"] = proc.returncode
     data["connector"] = connector
     data["payload"] = str(payload_path)
+    data["connector_preview"] = preview
     if proc.returncode != 0:
         data["ok"] = False
     return data
@@ -1037,7 +1052,18 @@ def run_scheduled_autonomous(*, day: str, slot_keyword: str, limit: int, dry_run
 
             clean_export = _validate_clean_export(row, policy)
             if dry_run:
-                processed.append({"queue_id": row.get("queue_id", ""), "platform": row.get("platform", ""), "slot_id": row.get("slot_id", ""), "result": {"ok": True, "dry_run": True, "clean_export": clean_export}, "state_after": row.get("publish_state", "")})
+                processed.append({
+                    "queue_id": row.get("queue_id", ""),
+                    "platform": row.get("platform", ""),
+                    "slot_id": row.get("slot_id", ""),
+                    "result": {
+                        "ok": True,
+                        "dry_run": True,
+                        "clean_export": clean_export,
+                        "connector_preview": _connector_preview(row),
+                    },
+                    "state_after": row.get("publish_state", ""),
+                })
                 continue
 
             result = _run_connector(row, dry_run=False)
@@ -1212,10 +1238,11 @@ def run_manual_publish(day: str, platforms: str, dry_run: bool, live: bool, ack_
         "provider_calls_performed": 0,
         "publish_calls_performed": sum(1 for r in results if r["result"].get("posted")),
     }
-    report_path = REPORT_ROOT / day / f"approved_queue_autopublish_report_{datetime.now().strftime('%H%M%S')}_v2_8_4.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    report["report"] = str(report_path)
+    if not dry_run:
+        report_path = REPORT_ROOT / day / f"approved_queue_autopublish_report_{datetime.now().strftime('%H%M%S')}_v2_8_4.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+        report["report"] = str(report_path)
     return report
 
 
