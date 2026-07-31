@@ -631,7 +631,22 @@ function New-CanonicalAction {
 }
 
 function New-CanonicalTrigger {
-    return New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration ([TimeSpan]::MaxValue)
+    param([object]$CanonicalPlan)
+
+    $triggerPlan = Get-TaskField $CanonicalPlan 'trigger'
+    $intervalMinutes = [int](Get-TaskField $triggerPlan 'repetition_interval_minutes')
+    $intervalIso = [string](Get-TaskField $triggerPlan 'repetition_interval')
+    $durationMode = [string](Get-TaskField $triggerPlan 'repetition_duration_mode')
+    $durationElement = [string](Get-TaskField $triggerPlan 'repetition_duration_element')
+
+    if ($intervalMinutes -ne 1 -or $intervalIso -ne 'PT1M') {
+        throw "Canonical trigger interval contract mismatch: minutes=$intervalMinutes interval=$intervalIso"
+    }
+    if ($durationMode -ne 'indefinite' -or $durationElement -ne 'omitted') {
+        throw "Canonical trigger duration contract mismatch: mode=$durationMode element=$durationElement"
+    }
+
+    return New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $intervalMinutes)
 }
 
 function New-CanonicalPrincipal {
@@ -1023,7 +1038,7 @@ try {
     if (-not $canonicalAlreadyReady) {
         $currentStage = 'canonical registration'
         $action = New-CanonicalAction -CanonicalPlan $canonicalPlan
-        $trigger = New-CanonicalTrigger
+        $trigger = New-CanonicalTrigger -CanonicalPlan $canonicalPlan
         $principal = New-CanonicalPrincipal
         $settings = New-CanonicalSettings
 

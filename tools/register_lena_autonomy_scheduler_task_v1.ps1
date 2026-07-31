@@ -69,6 +69,28 @@ if (-not (Test-Path -LiteralPath $DriverModulePath -PathType Leaf)) {
 
 $ArgumentList = "-NoProfile -ExecutionPolicy Bypass -File `"$WrapperPath`" -PythonExe `"$PythonExe`" -RepoRoot `"$RepoRoot`""
 
+function New-CanonicalTriggerPlan {
+    return [ordered]@{
+        type = 'poll_every_minute'
+        repetition_interval_minutes = 1
+        repetition_interval = 'PT1M'
+        repetition_duration_mode = 'indefinite'
+        repetition_duration_element = 'omitted'
+        stop_at_duration_end = $false
+        scheduling_decision = 'driver_internal'
+        schedule_slots = @('morning', 'afternoon', 'evening')
+    }
+}
+
+function New-CanonicalTrigger {
+    param([object]$TriggerPlan)
+
+    $intervalMinutes = [int]$TriggerPlan.repetition_interval_minutes
+    return New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $intervalMinutes)
+}
+
+$TriggerPlan = New-CanonicalTriggerPlan
+
 $Plan = [ordered]@{
     report_type = 'lena_autonomy_scheduler_task_registration_plan'
     schema_version = 'v1'
@@ -84,12 +106,7 @@ $Plan = [ordered]@{
         arguments = $ArgumentList
         working_directory = $RepoRoot
     }
-    trigger = [ordered]@{
-        type = 'poll_every_minute'
-        repetition_interval_minutes = 1
-        scheduling_decision = 'driver_internal'
-        schedule_slots = @('morning', 'afternoon', 'evening')
-    }
+    trigger = $TriggerPlan
     safeguards = [ordered]@{
         no_daily_orchestrator = $true
         no_fixed_publish_slot_tasks = $true
@@ -107,9 +124,7 @@ $action = New-ScheduledTaskAction `
     -Argument $ArgumentList `
     -WorkingDirectory $RepoRoot
 
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-    -RepetitionInterval (New-TimeSpan -Minutes 1) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+$trigger = New-CanonicalTrigger -TriggerPlan $TriggerPlan
 
 $principal = New-ScheduledTaskPrincipal `
     -UserId $UserId `
