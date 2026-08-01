@@ -16,10 +16,27 @@ from tools import lena_photo_qa_disposition_v1 as photo_qa
 from tools.diagnostics import lena_higgsfield_prompt_library_dryrun as prompt_library
 
 
+FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
+JULY_31_EVENING_FIXTURE = FIXTURE_ROOT / "lenagate2026073186e81161-pack000-00-photo_seed.png"
+
+
 def _write_json(path: Path, value: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def _privacy_clean_lineage() -> dict[str, str]:
+    return {
+        "candidate_artifact_sha256": "1" * 64,
+        "prompt_sha256": "2" * 64,
+        "packet_sha256": "3" * 64,
+        "handoff_sha256": "4" * 64,
+        "approval_sha256": "5" * 64,
+        "execution_receipt_sha256": "6" * 64,
+        "manifest_sha256": "7" * 64,
+        "qa_sha256": "8" * 64,
+    }
 
 
 def _controlled_policy() -> dict:
@@ -263,16 +280,7 @@ def test_privacy_clean_derivative_is_separate_metadata_free_and_lineage_bound(tm
     Image.new("RGB", (64, 96), "red").save(source, pnginfo=metadata)
     output = tmp_path / "clean.png"
     report_path = tmp_path / "clean.json"
-    lineage = {
-        "candidate_artifact_sha256": "1" * 64,
-        "prompt_sha256": "2" * 64,
-        "packet_sha256": "3" * 64,
-        "handoff_sha256": "4" * 64,
-        "approval_sha256": "5" * 64,
-        "execution_receipt_sha256": "6" * 64,
-        "manifest_sha256": "7" * 64,
-        "qa_sha256": "8" * 64,
-    }
+    lineage = _privacy_clean_lineage()
 
     report = clean_photo.prepare_privacy_clean_photo(
         source,
@@ -289,33 +297,62 @@ def test_privacy_clean_derivative_is_separate_metadata_free_and_lineage_bound(tm
     assert clean_photo.validate_privacy_clean_report(report_path)["lineage"] == lineage
 
 
+def test_july_31_fixture_clean_export_succeeds_without_false_png_metadata_hit(tmp_path: Path) -> None:
+    source = JULY_31_EVENING_FIXTURE
+    output = tmp_path / "fixture-clean.png"
+    report_path = tmp_path / "fixture-clean.json"
+    inspection = clean_photo.inspect_embedded_metadata(source)
+
+    assert inspection == {
+        "forbidden_metadata_chunks": [],
+        "suspicious_metadata_terms": [],
+        "clean": True,
+    }
+
+    report = clean_photo.prepare_privacy_clean_photo(
+        source,
+        output,
+        report_path,
+        source_image_sha256=clean_photo._sha256_file(source),
+        lineage=_privacy_clean_lineage(),
+    )
+
+    assert report["source_sha256"] == clean_photo._sha256_file(source)
+    assert report["output_sha256"] == clean_photo._sha256_file(output)
+    assert report["metadata_inspection"]["forbidden_metadata_chunks"] == []
+    assert report["metadata_inspection"]["suspicious_metadata_terms"] == []
+    assert report["verified_clean"] is True
+    assert clean_photo.validate_privacy_clean_report(report_path)["lineage"] == _privacy_clean_lineage()
+
+
 def test_privacy_clean_validation_rejects_altered_derivative(tmp_path: Path) -> None:
     source = tmp_path / "source.png"
     Image.new("RGB", (32, 32), "blue").save(source)
     output = tmp_path / "clean.png"
     report_path = tmp_path / "clean.json"
-    lineage_keys = (
-        "candidate_artifact_sha256",
-        "prompt_sha256",
-        "packet_sha256",
-        "handoff_sha256",
-        "approval_sha256",
-        "execution_receipt_sha256",
-        "manifest_sha256",
-        "qa_sha256",
-    )
-    lineage = {key: str(index) * 64 for index, key in enumerate(lineage_keys, start=1)}
     clean_photo.prepare_privacy_clean_photo(
         source,
         output,
         report_path,
         source_image_sha256=clean_photo._sha256_file(source),
-        lineage=lineage,
+        lineage=_privacy_clean_lineage(),
     )
     output.write_bytes(output.read_bytes() + b"tamper")
     with pytest.raises(clean_photo.PrivacyCleanPhotoError) as exc:
         clean_photo.validate_privacy_clean_report(report_path)
     assert exc.value.code == "clean_export_sha_mismatch"
+
+
+def test_privacy_clean_export_rejects_incomplete_lineage_for_fixture(tmp_path: Path) -> None:
+    with pytest.raises(clean_photo.PrivacyCleanPhotoError) as exc:
+        clean_photo.prepare_privacy_clean_photo(
+            JULY_31_EVENING_FIXTURE,
+            tmp_path / "clean.png",
+            tmp_path / "clean.json",
+            source_image_sha256=clean_photo._sha256_file(JULY_31_EVENING_FIXTURE),
+            lineage={"candidate_artifact_sha256": "1" * 64},
+        )
+    assert exc.value.code == "clean_export_lineage_incomplete"
 
 
 def test_callable_retry_executor_validates_before_claim_and_provider(
