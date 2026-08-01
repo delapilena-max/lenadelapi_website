@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,6 +31,8 @@ PROMPT_SHA = "186c0feb77d819cf1d001507dd56448e22057eeab5f2af33c83e0b464abdf640"
 AUTHORITY_COMMIT = "6924dc10d7916b3bc91a87953ca3e319171e42fc"
 CAPTION = "single-command bounded live cycle"
 PLATFORM = "Instagram Feed"
+FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
+JULY_31_EVENING_FIXTURE = FIXTURE_ROOT / "lenagate2026073186e81161-pack000-00-photo_seed.png"
 
 
 def _sha(path: Path) -> str:
@@ -58,6 +61,12 @@ def _write_auth_json(path: Path, payload: dict) -> Path:
 def _write_image(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (identity.EXPECTED_WIDTH, identity.EXPECTED_HEIGHT), "white").save(path)
+    return path
+
+
+def _write_july_31_fixture_image(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(JULY_31_EVENING_FIXTURE.read_bytes())
     return path
 
 
@@ -1222,6 +1231,72 @@ def test_controlled_live_success_autonomously_cleans_queues_schedules_and_publis
     assert report["queue_mutated"] is True
     assert report["publish_performed"] is True
     assert admissions and state["qa_calls"] == 1
+
+
+def test_controlled_live_july_31_fixture_reaches_clean_export_and_hold_without_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_roots(monkeypatch, tmp_path)
+    _patch_clock(monkeypatch)
+    bundle = _build_bundle(tmp_path, monkeypatch, controlled=True)
+    state = _install_live_fakes(monkeypatch, bundle, tmp_path)
+    admissions: list[dict[str, object]] = []
+    report_root = tmp_path / "pipeline" / "autonomy" / "lena" / "bounded_live_cycles"
+
+    monkeypatch.setattr(sys.modules[__name__], "_write_image", _write_july_31_fixture_image)
+    monkeypatch.setattr(
+        autonomous_publisher,
+        "_validate_policy_artifact",
+        lambda path: {
+            "path": Path(path),
+            "sha256": "p" * 64,
+            "artifact": {
+                "policy_id": "lena_approved_queue_auto_publisher_policy_v2_8",
+                "policy_version": "v2.8.0",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        photo_qa,
+        "call_anthropic_visual_review",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Anthropic must not be called")),
+    )
+
+    def fail_if_publish_runs(**kwargs):
+        raise AssertionError("scheduled publish must not run when the cycle is held for publish")
+
+    def fake_admit(**kwargs):
+        admissions.append(kwargs)
+        return {"queue_path": str(tmp_path / "queue.csv"), "queue_id": "controlled-queue-1", "created": True}
+
+    monkeypatch.setattr(autonomous_publisher, "admit_controlled_photo", fake_admit)
+    monkeypatch.setattr(autonomous_publisher, "run_scheduled_autonomous", fail_if_publish_runs)
+
+    report = cycle._run_live_cycle(bundle["auth_path"], report_root=report_root, hold_for_publish=True)  # type: ignore[arg-type]
+
+    clean_root = report_root / DATE / SLOT_ID
+    clean_path = clean_root / f"{SLOT_ID}_publish_clean.png"
+    clean_report_path = clean_root / f"{SLOT_ID}_publish_clean_provenance.json"
+    clean_report = json.loads(clean_report_path.read_text(encoding="utf-8"))
+
+    assert report["ok"] is True, report.get("failure")
+    assert report["autonomous_disposition"] == "accept_and_hold_for_publish"
+    assert report["provider_calls_performed"] == 1
+    assert report["publish_calls_performed"] == 0
+    assert report["publish_performed"] is False
+    assert report["queue_mutated"] is True
+    assert report["provider_original"]["sha256"] == _sha(JULY_31_EVENING_FIXTURE)
+    assert int(state["provider_calls"]) == 1
+    assert int(state["publish_calls"]) == 0
+    assert int(state["qa_calls"]) == 1
+    assert len(admissions) == 1
+    assert Path(str(admissions[0]["asset_path"])).resolve() == clean_path.resolve()
+    assert str(admissions[0]["asset_sha256"]) == _sha(clean_path)
+    assert clean_report["source_sha256"] == _sha(JULY_31_EVENING_FIXTURE)
+    assert clean_report["output_sha256"] == _sha(clean_path)
+    assert clean_report["metadata_inspection"]["forbidden_metadata_chunks"] == []
+    assert clean_report["metadata_inspection"]["suspicious_metadata_terms"] == []
+    assert clean_report["verified_clean"] is True
 
 
 def test_controlled_live_post_generation_qa_uses_frozen_candidate_snapshot(
