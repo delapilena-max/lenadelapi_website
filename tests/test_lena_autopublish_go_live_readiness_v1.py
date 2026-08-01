@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import tools.lena_autonomy_runtime_evidence_v1 as runtime_evidence
 import tools.lena_autopublish_go_live_readiness_v1 as readiness
 import tools.publishers.lena_meta_publish_common_v2_9 as publish_common
 
@@ -581,6 +582,14 @@ def test_classify_git_status_excludes_expected_governed_runtime_outputs(tmp_path
             "?? logs/scheduler/lena_autonomy_scheduler_2026-07-31.log",
             "?? pipeline/analytics/lena_manual_post_log_v2_7.csv",
             "?? pipeline/analytics/lena_post_metrics_v1_6_1.csv",
+            "?? pipeline/autonomy/lena/daily_schedule/2026-07-31/lena_autonomy_daily_schedule_2026-07-31.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/afternoon_skip_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/afternoon_state.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_generation_failure_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_skip_201430_060159.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_state.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/morning_skip_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/morning_state.json",
             "?? pipeline/approvals/lena/bounded_live_cycles/2026-07-31/lena_bounded_live_cycle_authorization_2026-07-31_lenagate20260731dd3acbe5-pack000-00-photo.json",
             "?? pipeline/publish_packets/lena/2026-07-31/lena_publish_packets_v2_4.json",
             "?? pipeline/publishing/lena/approved_queue/2026-07-31/lena_approved_publish_queue_v2_8.csv",
@@ -595,11 +604,13 @@ def test_classify_git_status_excludes_expected_governed_runtime_outputs(tmp_path
     assert summary["repository_dirty"] is False
     assert summary["tracked_status_lines"] == []
     assert summary["unexpected_untracked_paths"] == []
-    assert summary["excluded_governed_runtime_path_count"] == 9
+    assert summary["excluded_governed_runtime_path_count"] == 17
     assert summary["excluded_governed_runtime_roots"] == [
         "logs/scheduler",
         "pipeline/analytics",
         "pipeline/approvals/lena/bounded_live_cycles",
+        "pipeline/autonomy/lena/daily_schedule",
+        "pipeline/autonomy/lena/scheduler_driver",
         "pipeline/publish_packets",
         "pipeline/publishing/lena/approved_queue",
         "pipeline/publishing/lena/approved_queue_receipts",
@@ -645,6 +656,72 @@ def test_classify_git_status_unexpected_untracked_file_still_blocks(tmp_path: Pa
     assert summary["unexpected_untracked_paths"] == [{"path": "notes/unexpected.txt"}]
 
 
+def test_classify_git_status_excludes_current_real_scheduler_driver_json_evidence(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    summary = readiness._classify_git_status(
+        production_root,
+        [
+            "?? pipeline/autonomy/lena/daily_schedule/2026-07-31/lena_autonomy_daily_schedule_2026-07-31.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/afternoon_skip_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/afternoon_state.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_generation_failure_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_skip_201430_060159.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_state.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/morning_skip_190829_593524.json",
+            "?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/morning_state.json",
+        ],
+    )
+
+    assert summary["repository_dirty"] is False
+    assert summary["unexpected_untracked_paths"] == []
+    assert summary["excluded_governed_runtime_path_count"] == 8
+    assert summary["excluded_governed_runtime_roots"] == [
+        "pipeline/autonomy/lena/daily_schedule",
+        "pipeline/autonomy/lena/scheduler_driver",
+    ]
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_generation_190829_593524.json",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_generation_success_190829_593524.json",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_generation_failure_190829_593524.json",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_skip_190829_593524.json",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/evening_poll_190829_593524.json",
+    ],
+)
+def test_classify_governed_runtime_path_accepts_scheduler_driver_artifact_families(
+    tmp_path: Path,
+    relative_path: str,
+) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    assert readiness._classify_governed_runtime_path(production_root, relative_path) == {
+        "path": relative_path,
+        "approved_root": runtime_evidence.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix(),
+    }
+
+
+def test_classify_git_status_invalid_scheduler_json_still_blocks(tmp_path: Path) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+
+    summary = readiness._classify_git_status(
+        production_root,
+        ["?? pipeline/autonomy/lena/scheduler_driver/2026-07-31/random.json"],
+    )
+
+    assert summary["repository_dirty"] is True
+    assert summary["excluded_governed_runtime_path_count"] == 0
+    assert summary["unexpected_untracked_paths"] == [
+        {"path": "pipeline/autonomy/lena/scheduler_driver/2026-07-31/random.json"}
+    ]
+
+
 @pytest.mark.parametrize(
     "relative_path",
     [
@@ -653,6 +730,11 @@ def test_classify_git_status_unexpected_untracked_file_still_blocks(tmp_path: Pa
         "pipeline/publish_packets/lena/2026-07-31/meta_publisher_config_v2_9.local.json",
         "pipeline/publishing/lena/approved_queue/2026-07-31/.env",
         "logs/scheduler/lena_autonomy_scheduler_2026-07-31.py",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/runtime_fix.py",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/runtime_fix.ps1",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/helper.exe",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/.env",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/secrets.json",
     ],
 )
 def test_classify_governed_runtime_path_rejects_source_config_and_secret_like_files(
@@ -671,6 +753,8 @@ def test_classify_governed_runtime_path_rejects_source_config_and_secret_like_fi
         "pipeline/analytics/../secret.env",
         "/pipeline/analytics/lena_manual_post_log_v2_7.csv",
         "pipeline/autonomy/lena/bounded_live_cycles/2026-07-31/lena_bounded_live_cycle_authorization_2026-07-31_slot.json",
+        "pipeline/autonomy/lena/scheduler_driver/2026-07-31/../morning_state.json",
+        "pipeline/autonomy/lena/daily_schedule/2026-07-31/lena_autonomy_daily_schedule_2026-07-30.json",
     ],
 )
 def test_classify_governed_runtime_path_rejects_path_escape_or_unapproved_roots(
@@ -694,6 +778,22 @@ def test_classify_governed_runtime_path_rejects_symlink_escape(tmp_path: Path, m
         readiness._classify_governed_runtime_path(
             production_root,
             "pipeline/publishing/lena/dispatch_outbox/2026-07-31/q_488721d95be927_Instagram_Feed_payload.json",
+        )
+        is None
+    )
+
+
+def test_classify_governed_runtime_path_rejects_autonomy_symlink_escape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    production_root = tmp_path / "production"
+    production_root.mkdir(parents=True, exist_ok=True)
+    escaped = tmp_path / "outside" / "morning_state.json"
+
+    monkeypatch.setattr(readiness, "_resolve_repo_relative_path", lambda root, relative_path: escaped.resolve())
+
+    assert (
+        readiness._classify_governed_runtime_path(
+            production_root,
+            "pipeline/autonomy/lena/scheduler_driver/2026-07-31/morning_state.json",
         )
         is None
     )

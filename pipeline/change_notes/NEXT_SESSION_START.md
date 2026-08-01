@@ -514,3 +514,40 @@ G. What must not be done
 - Do not delete or rewrite the preserved July 31 runtime evidence.
 - Do not enable or start `Lena Autonomy Scheduler Driver` from Codex.
 - Do not generate, publish, invoke Anthropic, or touch video in this fix step.
+
+## Addendum (Codex, 2026-07-31) - scheduler autonomy evidence no longer self-blocks activation readiness
+
+A. What changed
+
+- Found the remaining exact activation-path blocker after the clean-export and scheduler-log fixes: readiness excluded governed queue, receipt, dispatch, approval, packet, analytics, and scheduler-log outputs, but not the canonical scheduler's own Lena autonomy evidence under `pipeline/autonomy/lena/`.
+- The live deployment was tracked-source clean at merged `main`, scheduler disabled, publisher/environment/credentials/media host ready, and blocked only because untracked July 31 scheduler evidence was classified as unexpected source dirt.
+- Added a shared autonomy runtime evidence contract used by readiness and the scheduler driver.
+- Readiness now excludes only exact governed Lena autonomy artifact shapes beneath:
+  - `pipeline/autonomy/lena/daily_schedule/<YYYY-MM-DD>/lena_autonomy_daily_schedule_<YYYY-MM-DD>.json`
+  - `pipeline/autonomy/lena/scheduler_driver/<YYYY-MM-DD>/<slot>_state.json`
+  - `pipeline/autonomy/lena/scheduler_driver/<YYYY-MM-DD>/<slot>_<kind>_<HHMMSS>_<microseconds>.json`
+- The scheduler-driver date directory must be a real ISO date, slot must be `morning`, `afternoon`, or `evening`, and receipt kind must be one of the governed scheduler lifecycle families: `generation`, `generation_success`, `generation_failure`, `publish`, `publish_failure`, `skip`, `poll`, or `poll_result`.
+
+B. Files changed
+
+- `tools/lena_autonomy_runtime_evidence_v1.py`
+- `tools/lena_autopublish_go_live_readiness_v1.py`
+- `tools/lena_autonomy_scheduler_driver_v1.py`
+- `tests/test_lena_autonomy_runtime_evidence_v1.py`
+- `tests/test_lena_autopublish_go_live_readiness_v1.py`
+- `tests/test_lena_autonomy_scheduler_driver_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+
+C. Validation intent
+
+- Prove current real July 31 scheduler-driver JSON evidence is governed runtime evidence, not source dirt.
+- Prove generation, generation-success, generation-failure, skip, and poll evidence shapes are accepted only when they match the exact scheduler contract.
+- Prove arbitrary JSON, source scripts, executables, env/secret-like files, config-like files, traversal, symlink escape, and files outside exact approved Lena autonomy roots still fail closed.
+- Prove tracked source changes still block readiness.
+
+D. Decisions made
+
+- Keep the exclusion exact to Lena's governed autonomy runtime roots; do not exclude `pipeline/autonomy/` broadly.
+- Treat normal scheduler evidence as allowed runtime dirt for readiness, but continue reporting every excluded path, count, and root transparently.
+- Do not enable, disable, or start the scheduler from Codex.
+- Do not generate, queue, publish, reconcile, invoke Anthropic, or touch video.

@@ -6,12 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from tools import lena_autonomy_runtime_evidence_v1 as autonomy_runtime
 from tools import lena_autonomy_daily_schedule_v1 as schedule_mod
 from tools import lena_full_photo_autonomy_v1 as full_autonomy
 from tools import lena_autopublish_approved_queue_v2_8 as autonomous_publisher
 
 ROOT = Path(__file__).resolve().parents[1]
-STATE_ROOT = ROOT / "pipeline" / "autonomy" / "lena" / "scheduler_driver"
+STATE_ROOT = ROOT / Path(autonomy_runtime.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix())
 
 REPORT_TYPE_RECEIPT = "lena_autonomy_scheduler_receipt"
 SCHEMA_VERSION = "v1"
