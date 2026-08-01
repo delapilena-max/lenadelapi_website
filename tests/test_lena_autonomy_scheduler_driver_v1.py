@@ -7,11 +7,16 @@ from pathlib import Path
 
 import pytest
 
+import tools.lena_autonomy_runtime_evidence_v1 as runtime_evidence
 import tools.lena_autonomy_daily_schedule_v1 as schedule_mod
 import tools.lena_autonomy_scheduler_driver_v1 as driver
 
 
 DATE = "2026-07-24"
+
+
+def test_scheduler_driver_uses_shared_governed_runtime_root() -> None:
+    assert driver.STATE_ROOT == driver.ROOT / Path(runtime_evidence.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix())
 
 
 def _roots(tmp_path: Path) -> dict[str, Path]:

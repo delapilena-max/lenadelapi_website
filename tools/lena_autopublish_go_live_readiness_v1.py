@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from tools import lena_autonomy_runtime_evidence_v1 as autonomy_runtime
 from tools.publishers import lena_meta_publish_common_v2_9 as publish_common
 
 REPORT_ROOT = ROOT / "pipeline" / "publishing" / "lena" / "go_live_readiness"
@@ -226,6 +227,8 @@ def _governed_runtime_specs() -> tuple[dict[str, Any], ...]:
     return (
         {"root": _runtime_root("logs/scheduler"), "matcher": _scheduler_log_match},
         {"root": _runtime_root("pipeline/analytics"), "matcher": _analytics_runtime_match},
+        {"root": autonomy_runtime.DAILY_SCHEDULE_RUNTIME_ROOT, "matcher": autonomy_runtime.daily_schedule_runtime_match},
+        {"root": autonomy_runtime.SCHEDULER_DRIVER_RUNTIME_ROOT, "matcher": autonomy_runtime.scheduler_driver_runtime_match},
         {"root": _runtime_root("pipeline/approvals/lena/bounded_live_cycles"), "matcher": _bounded_live_cycle_match},
         {"root": _runtime_root("pipeline/publish_packets"), "matcher": _publish_packets_match},
         {"root": _runtime_root("pipeline/publishing/lena/approved_queue"), "matcher": _approved_queue_match},
