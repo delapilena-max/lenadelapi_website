@@ -78,6 +78,25 @@ def _png_chunks(data: bytes) -> list[str]:
     return chunks
 
 
+def _png_chunk_records(data: bytes) -> list[tuple[str, bytes]]:
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise PrivacyCleanPhotoError("clean_export_format_invalid", "PNG signature is invalid")
+    chunks: list[tuple[str, bytes]] = []
+    cursor = 8
+    while cursor + 12 <= len(data):
+        length = struct.unpack(">I", data[cursor : cursor + 4])[0]
+        end = cursor + 12 + length
+        if end > len(data):
+            raise PrivacyCleanPhotoError("clean_export_format_invalid", "PNG chunk extends past end of file")
+        chunk_type = data[cursor + 4 : cursor + 8].decode("ascii", errors="replace")
+        payload = data[cursor + 8 : cursor + 8 + length]
+        chunks.append((chunk_type, payload))
+        cursor = end
+        if chunk_type == "IEND":
+            break
+    return chunks
+
+
 def _webp_chunks(data: bytes) -> list[str]:
     if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WEBP":
         raise PrivacyCleanPhotoError("clean_export_format_invalid", "WEBP signature is invalid")
@@ -94,11 +113,17 @@ def _webp_chunks(data: bytes) -> list[str]:
 def inspect_embedded_metadata(path: Path) -> dict[str, Any]:
     data = path.read_bytes()
     lower = data.lower()
-    suspicious_terms = [term.decode("ascii") for term in SUSPICIOUS_TERMS if term in lower]
     extension = path.suffix.lower()
     forbidden_chunks: list[str] = []
+    suspicious_scan = lower
     if extension == ".png":
-        forbidden_chunks = sorted(set(_png_chunks(data)) & PNG_FORBIDDEN_CHUNKS)
+        records = _png_chunk_records(data)
+        forbidden_chunks = sorted({chunk_type for chunk_type, _ in records if chunk_type in PNG_FORBIDDEN_CHUNKS})
+        # PNG image data lives in critical chunks such as IDAT. Scanning the
+        # full compressed byte stream for ASCII metadata terms can false-positive
+        # on ordinary pixel data, so restrict term checks to ancillary payloads.
+        ancillary_payloads = [payload.lower() for chunk_type, payload in records if chunk_type and chunk_type[0].islower()]
+        suspicious_scan = b"\n".join(ancillary_payloads)
     elif extension == ".webp":
         forbidden_chunks = sorted(set(_webp_chunks(data)) & WEBP_FORBIDDEN_CHUNKS)
     elif extension in {".jpg", ".jpeg"}:
@@ -112,6 +137,7 @@ def inspect_embedded_metadata(path: Path) -> dict[str, Any]:
         raise PrivacyCleanPhotoError("clean_export_extension_unsupported", f"unsupported image extension: {extension}")
     with Image.open(path) as image:
         image.verify()
+    suspicious_terms = [term.decode("ascii") for term in SUSPICIOUS_TERMS if term in suspicious_scan]
     return {
         "forbidden_metadata_chunks": forbidden_chunks,
         "suspicious_metadata_terms": suspicious_terms,
