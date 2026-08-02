@@ -1,0 +1,33 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_canon_v1",
+  "artifact_id": "itb_ep_001_canon_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:00:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [],
+  "property_identity": {
+    "name": "The Interstitial Travel Bureau",
+    "tagline": "Travel brightly. Return original.",
+    "premise": "An official traveler-safety network for impossible interstellar and interdimensional destinations."
+  },
+  "narrator_doctrine": {
+    "voice_origin": "original_non_imitation",
+    "delivery": "warm_1960s_educational_film",
+    "traits": ["precise", "reassuring", "paternal", "subtly_condescending"],
+    "forbidden_modes": ["theatrical_horror", "modern_influencer_speech", "real_actor_imitation"]
+  },
+  "institutional_tone": ["calm_bureaucracy", "customer_service_certainty", "routine_existential_safety"],
+  "graphic_language": ["crt_vector_diagrams", "optical_titles", "bureau_classification_cards", "analog_futurist_wayfinding"],
+  "visual_invariants": ["1960s instructional-film composition interpreted through an imagined 1980s future", "moderate readable film and VHS wear that never obscures safety information", "specific physical materials and spatial behavior in every world image"],
+  "sound_invariants": ["warm original Bureau baritone above all other audio", "restrained educational electronics and tape texture", "warnings use polite two-tone institutional chimes"],
+  "comedy_doctrine": {
+    "mechanism": "bureaucratic_understatement_of_existential_risk",
+    "prohibitions": ["punchline_delivery", "winking_at_camera", "panic_performance", "mean_spiritedness"]
+  },
+  "universe_prohibitions": ["No recurring human protagonist.", "No unsupported imitation of a living or dead creator, actor, franchise, or protected character.", "No vague impossible world without observable rules."],
+  "recurring_terminology": ["Bureau traveler", "continuity variance", "original return", "courtesy interval", "classification placard"],
+  "allowed_continuity_hooks": ["bureau_forms", "classification_codes", "narrator_protocols", "institutional_graphics", "unresolved_bureau_history"],
+  "prohibited_imitation": ["Do not name or imitate a real actor.", "Do not request the style of another creator.", "Do not adapt recognizable franchise characters or terminology."]
+}

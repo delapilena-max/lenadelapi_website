@@ -1,0 +1,22 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_audio_plan_v1",
+  "artifact_id": "itb_ep_001_audio_plan_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:05:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [{"artifact_id": "itb_ep_001_canon_v1", "sha256": "4334479d225a19cc4618435c90b35506522a6fbda600005a593a84b9dbd48086"}],
+  "narrator_profile": {"voice_origin": "original", "register": "warm_bureau_baritone", "delivery": ["precise_educational_cadence", "reassuring_customer_service", "subtle_condescension", "no_horror_emphasis"], "real_person_imitation": false},
+  "performance_instructions": ["Treat identity displacement as a routine luggage concern.", "Place gentle emphasis on should, sideways, and original.", "Never whisper, growl, shout, or perform fear."],
+  "pronunciation": [{"term": "R-9", "phonetic": "arr nine"}, {"term": "chronometric", "phonetic": "kron-oh-MET-rik"}],
+  "pacing": {"words_per_minute": 150, "cadence": "Short declarative clauses separated by half-beat educational pauses."},
+  "script_timing": {"target_duration_ms": 60000, "maximum_words": 170},
+  "music_language": ["muted analog library synthesizer in major seconds", "brushed vibraphone pulses every two measures", "no horror drones or trailer impacts"],
+  "soundscape": ["6-hertz rubber walkway thrum", "amber CRT relay clicks one beat early", "reversed coat-rustle inside mirrors"],
+  "diegetic_sounds": ["graphite pencil on salmon paper", "aluminum form drawer", "soft vinyl chair release"],
+  "warning_tones": ["polite two-note descending chime at reflection precedence", "single amber relay click before each instruction"],
+  "silence": ["Remove music for 600 milliseconds when the reflection blinks first.", "Hold 400 milliseconds of room tone before the final badge-date reveal."],
+  "synchronization": ["Narration instruction verbs begin on diagram label appearance.", "Relay clicks precede visual changes by one beat until containment."],
+  "platform_mix_targets": {"integrated_lufs": -14, "true_peak_db": -2, "dialogue_priority": true}
+}

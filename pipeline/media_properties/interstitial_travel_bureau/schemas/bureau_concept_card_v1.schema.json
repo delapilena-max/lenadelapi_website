@@ -1,0 +1,16 @@
+{
+  "$id": "bureau_concept_card_v1.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "artifact_type", "artifact_id", "property_id", "episode_id", "created_at", "generator_version", "upstream_artifacts", "episode_concept", "plain_language_hook", "traveler_reason", "impossible_rule", "primary_hazard", "secondary_complication", "bureau_procedure", "iconic_image", "understated_contradiction", "unresolved_lore_implication", "business_intent", "platform_intent", "user_input", "user_forbidden_elements", "assumptions"],
+  "properties": {
+    "schema_version": {"$ref": "common_defs_v1.schema.json#/$defs/schema_version"}, "artifact_type": {"const": "bureau_concept_card_v1"}, "artifact_id": {"$ref": "common_defs_v1.schema.json#/$defs/artifact_id"}, "property_id": {"$ref": "common_defs_v1.schema.json#/$defs/property_id"}, "episode_id": {"$ref": "common_defs_v1.schema.json#/$defs/episode_id"}, "created_at": {"$ref": "common_defs_v1.schema.json#/$defs/created_at"}, "generator_version": {"$ref": "common_defs_v1.schema.json#/$defs/generator_version"}, "upstream_artifacts": {"$ref": "common_defs_v1.schema.json#/$defs/upstream_artifacts"},
+    "episode_concept": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "plain_language_hook": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "traveler_reason": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "impossible_rule": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "primary_hazard": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "secondary_complication": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "bureau_procedure": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "iconic_image": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "understated_contradiction": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "unresolved_lore_implication": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"},
+    "business_intent": {
+      "type": "object", "additionalProperties": false, "required": ["goal", "commercial", "disclosure"],
+      "properties": {"goal": {"enum": ["audience_building", "brand_identity", "education", "commercial_conversion"]}, "commercial": {"type": "boolean"}, "disclosure": {"$ref": "common_defs_v1.schema.json#/$defs/disclosure"}}
+    },
+    "platform_intent": {"type": "object", "additionalProperties": false, "required": ["format", "target_duration_ms", "aspect_ratio"], "properties": {"format": {"const": "short_form_video"}, "target_duration_ms": {"type": "integer", "minimum": 45000, "maximum": 60000}, "aspect_ratio": {"enum": ["9:16", "1:1", "4:5", "16:9"]}}},
+    "user_input": {"type": "object", "additionalProperties": false, "required": ["mode", "locked_elements"], "properties": {"mode": {"enum": ["full_autonomous", "guided", "co_written"]}, "locked_elements": {"type": "array", "items": {"$ref": "common_defs_v1.schema.json#/$defs/user_lock"}, "uniqueItems": true, "maxItems": 50}}},
+    "user_forbidden_elements": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"}, "assumptions": {"type": "array", "items": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "maxItems": 30}
+  }
+}

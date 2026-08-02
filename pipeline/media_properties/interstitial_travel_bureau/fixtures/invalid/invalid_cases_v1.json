@@ -1,0 +1,20 @@
+{
+  "fixture_catalog_version": "itb_invalid_cases_v1",
+  "base_episode": "../../pilots/pilot_001",
+  "cases": [
+    {"case_id": "generic_world_descriptions", "target": "bureau_world_dossier_v1.json", "mutation": "replace summary with repeated vague adjectives and reduce specificity markers", "expected_error": "generic_world_description"},
+    {"case_id": "repeated_recent_world_genome", "target": "bureau_continuity_ledger_v1.json", "mutation": "prepend two previous entries matching three or more major genome dimensions", "expected_error": "creative_genome_novelty_rejected"},
+    {"case_id": "fewer_than_seven_shots", "target": "bureau_visual_sequence_v1.json", "mutation": "retain six shots", "expected_error": "schema_array_too_short"},
+    {"case_id": "visually_repetitive_shots", "target": "bureau_visual_sequence_v1.json", "mutation": "set every environment, scale and camera grammar equal", "expected_error": "shot_diversity_insufficient"},
+    {"case_id": "missing_bureau_framing", "target": "bureau_episode_script_v1.json", "mutation": "replace Bureau sign-off with generic closing credit", "expected_error": "bureau_framing_missing"},
+    {"case_id": "narration_too_long", "target": "bureau_episode_script_v1.json", "mutation": "expand narration beyond governed audio word budget", "expected_error": "narration_too_long"},
+    {"case_id": "conflicting_entity_rule", "target": "bureau_visual_sequence_v1.json", "mutation": "set one shot entity state outside entity authority", "expected_error": "entity_state_conflict"},
+    {"case_id": "missing_upstream_hash", "target": "bureau_episode_script_v1.json", "mutation": "remove sha256 from an upstream reference", "expected_error": "schema_required_field_missing"},
+    {"case_id": "stale_compiled_request", "target": "bureau_generation_plan_v1.json", "mutation": "change authoritative plan content without recompiling", "expected_error": "upstream_sha256_mismatch"},
+    {"case_id": "excessive_generation_attempts", "target": "bureau_generation_plan_v1.json", "mutation": "set attempt ceiling to six", "expected_error": "schema_number_too_large"},
+    {"case_id": "missing_cost_ceiling", "target": "bureau_generation_plan_v1.json", "mutation": "remove cost_ceiling_cents", "expected_error": "schema_required_field_missing"},
+    {"case_id": "commercial_without_disclosure", "target": "bureau_concept_card_v1.json", "mutation": "set commercial true while disclosure remains absent", "expected_error": "commercial_disclosure_missing"},
+    {"case_id": "compiled_before_validation", "target": "bureau_generation_plan_v1.json", "mutation": "set validation status provisional", "expected_error": "schema_const_mismatch"},
+    {"case_id": "imitation_or_copied_concept", "target": "bureau_concept_card_v1.json", "mutation": "request a copy in a named creator style", "expected_error": "imitation_or_copy_request"}
+  ]
+}

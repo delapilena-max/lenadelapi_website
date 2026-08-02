@@ -1,0 +1,32 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_episode_qa_v1",
+  "artifact_id": "itb_ep_001_episode_qa_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:13:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [
+    {"artifact_id": "itb_ep_001_compiled_request_v1", "sha256": "0f76ecf288a69a6e1d70edbe695568ceafd1087e3ef947c58fce5e1aaa6e8282"},
+    {"artifact_id": "itb_ep_001_visual_sequence_v1", "sha256": "3675d600eeb038db8e512227191f77bf10259da4c85f5b13e0f361a587598d05"}
+  ],
+  "qa_state": "plan_only",
+  "deterministic_machine_checks": {
+    "structural": "pass",
+    "world_consistency": "pass",
+    "shot_diversity": "pass",
+    "novelty": "pass",
+    "platform_safety": "pass",
+    "commercial_disclosure": "pass"
+  },
+  "semantic_evaluator": {
+    "required": true,
+    "visual_continuity": "not_evaluated",
+    "narrator_quality": "not_evaluated",
+    "bureau_identity": "not_evaluated",
+    "overall_quality": "not_evaluated",
+    "notes": ["Deterministic validation cannot prove final visual or performance quality.", "Semantic evaluation remains required after future media generation."]
+  },
+  "optional_human_review": {"required": false, "status": "not_requested", "notes": ["A human review may be requested by future production policy."]},
+  "disposition": "planned"
+}

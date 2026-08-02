@@ -1,0 +1,49 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_continuity_ledger_v1",
+  "artifact_id": "itb_ep_001_continuity_ledger_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:12:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [
+    {"artifact_id": "itb_ep_001_creative_genome_v1", "sha256": "8ae77263fb3b553d84d4d2fbea94832881d372209abcc172fdf0975b08b8bc17"},
+    {"artifact_id": "itb_ep_001_episode_script_v1", "sha256": "ebafe9c68ca770a938bbf3a0406cc6c0d018f4a2be13d3dc849858ae6c5a141d"},
+    {"artifact_id": "itb_ep_001_world_dossier_v1", "sha256": "b20776a8c493108197474fb28dfd9b30ef34ba1151a155b821bb9ba396d85504"}
+  ],
+  "retention_limit": 30,
+  "entries": [
+    {
+      "episode_id": "itb_ep_001",
+      "title": "What to Do When Your Reflection Arrives First",
+      "world_rule": "A reflection that moves first has borrowed the traveler's next decision and may claim identity precedence.",
+      "creative_genome": {
+        "environment_family": "municipal_mirror_transit_annex",
+        "hazard_family": "temporal_identity_displacement",
+        "entity_silhouette": "human_outline_with_offset_gesture",
+        "dominant_scale": "variable",
+        "palette_family": "teal_amber_mercury_silver",
+        "camera_grammar": "instructional_locked_frames_with_impossible_reflections",
+        "humor_mechanism": "customer_service_for_temporal_replacement",
+        "opening_structure": "direct_safety_correction",
+        "ending_reveal": "reflection_retains_bureau_badge",
+        "instruction_verbs": ["do_not_greet", "step_sideways", "count_blinks", "present_form"],
+        "emotional_flavor": "reassured_identity_dread",
+        "thumbnail_grammar": "traveler_back_facing_waiting_reflection"
+      },
+      "hazard": "Temporal identity displacement by a premature reflection.",
+      "entities": ["Premature Reflection", "gloved customs clerks"],
+      "environments": ["Rubber-Belt Arrival Walkway", "Mirror Customs Hall", "Form R-9 Inspection Desk", "Identity Holding Gallery"],
+      "silhouettes": ["standing traveler against seated reflection", "human outline with one-beat-early gesture"],
+      "palette": ["oxidized teal", "amber CRT phosphor", "salmon paper", "mercury silver", "cream acoustic panels"],
+      "camera_grammar": "Locked instructional frames, precise diagrams, archival inserts, impossible wide geometry, and intimate observable details.",
+      "hook": "Your reflection should not be waiting for you.",
+      "instructions": ["Do not greet.", "Step outside the viewing cone.", "Count three independent blinks.", "Present Form R-9 edge-first."],
+      "reveal": "The contained reflection's Bureau badge predates the Annex by twelve years.",
+      "closing_line": "Return brightly, and whenever practical, return original.",
+      "lore_hooks": ["Form R-9 predates the recorded phenomenon.", "Inspection Window 0 is absent from the physical hall."],
+      "performance_metrics": {"status": "unavailable"},
+      "future_lockouts": ["mirror_identity_hazard", "early_arrival_double", "teal_amber_terminal"]
+    }
+  ]
+}

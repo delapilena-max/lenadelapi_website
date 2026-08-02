@@ -1,0 +1,260 @@
+{
+  "artifact_id": "itb_ep_001_compiled_request_v1",
+  "artifact_type": "bureau_compiled_request_v1",
+  "compilation_timestamp": "2026-08-02T00:12:00Z",
+  "compiler_version": "itb_deterministic_compiler_v1",
+  "created_at": "2026-08-02T00:12:00Z",
+  "deterministic_compilation_fingerprint": "304d6ee9ace10bfdb7534dc61c7d9314950c86c78c0e4d5b5752e878d8a7670e",
+  "episode_id": "itb_ep_001",
+  "execution_authorized": false,
+  "generator_version": "itb_deterministic_compiler_v1",
+  "model": "unassigned_model",
+  "property_id": "interstitial_travel_bureau",
+  "provider": "unassigned_provider_interface",
+  "schema_version": "itb_artifact_v1",
+  "shot_requests": [
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5000,
+      "exact_compiled_prompt": "[Environment] mirror_customs_hall\n[Subject] A standing traveler seen from behind and the same reflection already facing camera inside smoked glass.\n[Action] The reflection finishes one blink before the traveler stops at the yellow inspection line.\n[Camera] locked_symmetrical_push; Vertical medium-wide with traveler centered low and waiting reflection centered high inside the panel.; Slow five-percent optical push with straight architectural lines and no digital warp.\n[Lighting] Overhead cream fluorescents; amber CRT catchlights appear only in reflected eyes.\n[Materials] smoked_glass, chronometric_silver, wool_coat, teal_tile\n[Palette] oxidized_teal, amber_phosphor, mercury_silver, cream_fluorescent\n[Motion] Subject: Traveler coat settles naturally; reflected shoulders settle 500 milliseconds early; mercury rim climbs against gravity.; Camera: locked_symmetrical_push; Temporal: Hard optical splice on the reflection's completed blink.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, one_beat_early, correct_mirror_geometry",
+      "exact_negative_prompt": "No horror face distortion.; No incorrect left-right mirror geometry.; No extra people or duplicate bodies outside glass.",
+      "output_location": "outputs/shot_01",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No horror face distortion.; No incorrect left-right mirror geometry.; No extra people or duplicate bodies outside glass.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] mirror_customs_hall\n[Subject] A standing traveler seen from behind and the same reflection already facing camera inside smoked glass.\n[Action] The reflection finishes one blink before the traveler stops at the yellow inspection line.\n[Camera] locked_symmetrical_push; Vertical medium-wide with traveler centered low and waiting reflection centered high inside the panel.; Slow five-percent optical push with straight architectural lines and no digital warp.\n[Lighting] Overhead cream fluorescents; amber CRT catchlights appear only in reflected eyes.\n[Materials] smoked_glass, chronometric_silver, wool_coat, teal_tile\n[Palette] oxidized_teal, amber_phosphor, mercury_silver, cream_fluorescent\n[Motion] Subject: Traveler coat settles naturally; reflected shoulders settle 500 milliseconds early; mercury rim climbs against gravity.; Camera: locked_symmetrical_push; Temporal: Hard optical splice on the reflection's completed blink.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, one_beat_early, correct_mirror_geometry"
+      },
+      "shot_id": "shot_01"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5000,
+      "exact_compiled_prompt": "[Environment] arrival_walkway\n[Subject] The physical twelve-meter Annex and its reflection extending as a kilometer-long terminal.\n[Action] Amber counter 001 advances while one teal floor tile telescopes out of the physical corridor.\n[Camera] high_corner_observation; Extreme vertical wide showing traveler as a small figure beneath nine mirror panels.; Deep-focus 24-millimeter geometry with reflected vanishing point impossibly distant but structurally straight.\n[Lighting] Cream ceiling baffles alternate with amber pools; mirror depth falls into cyan haze.\n[Materials] ribbed_rubber, brushed_aluminum, smoked_glass, acoustic_fiber\n[Palette] teal_tile, amber_counter, cyan_depth, cream_baffle\n[Motion] Subject: Rubber walkway moves toward camera; reflected walkway remains fixed; condensation travels upward.; Camera: high_corner_observation; Temporal: Iris down into a Bureau diagram circle.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, one_beat_early",
+      "exact_negative_prompt": "No curving funhouse mirror.; No neon cyberpunk city.; No spatially incoherent architecture.",
+      "output_location": "outputs/shot_02",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No curving funhouse mirror.; No neon cyberpunk city.; No spatially incoherent architecture.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] arrival_walkway\n[Subject] The physical twelve-meter Annex and its reflection extending as a kilometer-long terminal.\n[Action] Amber counter 001 advances while one teal floor tile telescopes out of the physical corridor.\n[Camera] high_corner_observation; Extreme vertical wide showing traveler as a small figure beneath nine mirror panels.; Deep-focus 24-millimeter geometry with reflected vanishing point impossibly distant but structurally straight.\n[Lighting] Cream ceiling baffles alternate with amber pools; mirror depth falls into cyan haze.\n[Materials] ribbed_rubber, brushed_aluminum, smoked_glass, acoustic_fiber\n[Palette] teal_tile, amber_counter, cyan_depth, cream_baffle\n[Motion] Subject: Rubber walkway moves toward camera; reflected walkway remains fixed; condensation travels upward.; Camera: high_corner_observation; Temporal: Iris down into a Bureau diagram circle.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, one_beat_early"
+      },
+      "shot_id": "shot_02"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5500,
+      "exact_compiled_prompt": "[Environment] bureau_optical_diagram\n[Subject] Cream field diagram of traveler, mirror plane, ninety-degree viewing cone, and a second amber timeline cursor.\n[Action] The amber reflected cursor advances 500 milliseconds ahead, borrows one DECISION token, then stops.\n[Camera] orthographic_instructional; Flat full-frame diagram with captions protected in the middle sixty percent.; No perspective; slight gate weave limited to two pixels.\n[Lighting] Even cel illumination with amber phosphor bloom around the early cursor.\n[Materials] painted_cel, graphite_label, crt_phosphor, optical_film\n[Palette] bureau_cream, oxidized_teal, warning_amber, graphite_black\n[Motion] Subject: Mechanical vector arrows step in four discrete optical-printer increments.; Camera: orthographic_instructional; Temporal: Diagram's teal cone becomes the floor's yellow inspection wedge.\n[Continuity] one_beat_early, correct_mirror_geometry, amber_eye_catchlight",
+      "exact_negative_prompt": "No unreadable pseudo-text.; No three-dimensional perspective.; No arbitrary glitch effects.",
+      "output_location": "outputs/shot_03",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5500,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No unreadable pseudo-text.; No three-dimensional perspective.; No arbitrary glitch effects.",
+        "operation": "render_graphic",
+        "prompt": "[Environment] bureau_optical_diagram\n[Subject] Cream field diagram of traveler, mirror plane, ninety-degree viewing cone, and a second amber timeline cursor.\n[Action] The amber reflected cursor advances 500 milliseconds ahead, borrows one DECISION token, then stops.\n[Camera] orthographic_instructional; Flat full-frame diagram with captions protected in the middle sixty percent.; No perspective; slight gate weave limited to two pixels.\n[Lighting] Even cel illumination with amber phosphor bloom around the early cursor.\n[Materials] painted_cel, graphite_label, crt_phosphor, optical_film\n[Palette] bureau_cream, oxidized_teal, warning_amber, graphite_black\n[Motion] Subject: Mechanical vector arrows step in four discrete optical-printer increments.; Camera: orthographic_instructional; Temporal: Diagram's teal cone becomes the floor's yellow inspection wedge.\n[Continuity] one_beat_early, correct_mirror_geometry, amber_eye_catchlight"
+      },
+      "shot_id": "shot_03"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5000,
+      "exact_compiled_prompt": "[Environment] archive_screening_room\n[Subject] Grainy Bureau training footage of a 1960s traveler waving toward an already-seated reflection.\n[Action] A gloved clerk stamps ACKNOWLEDGED across the frame before the traveler's hand reaches shoulder height.\n[Camera] archival_tripod; Square archival insert within a rounded CRT bezel and teal inspection labels.; Slight edge softness, halation on white gloves, stable human proportions.\n[Lighting] Flat institutional tungsten with silver flare confined to mirror edges.\n[Materials] silver_gelatin_film, ribbed_crt_glass, salmon_stamp_ink, white_cotton_glove\n[Palette] faded_salmon, teal_label, tungsten_cream, silver_flare\n[Motion] Subject: Hand-cranked footage jitters at eighteen frames per second while stamp animation remains perfectly steady.; Camera: archival_tripod; Temporal: Stamped diagonal becomes the traveler's sideways path arrow.\n[Continuity] mercury_edge_rim, one_beat_early, correct_mirror_geometry",
+      "exact_negative_prompt": "No gore or panic.; No modern clothing logos.; No imitation of a known film or television property.",
+      "output_location": "outputs/shot_04",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No gore or panic.; No modern clothing logos.; No imitation of a known film or television property.",
+        "operation": "generate_hybrid",
+        "prompt": "[Environment] archive_screening_room\n[Subject] Grainy Bureau training footage of a 1960s traveler waving toward an already-seated reflection.\n[Action] A gloved clerk stamps ACKNOWLEDGED across the frame before the traveler's hand reaches shoulder height.\n[Camera] archival_tripod; Square archival insert within a rounded CRT bezel and teal inspection labels.; Slight edge softness, halation on white gloves, stable human proportions.\n[Lighting] Flat institutional tungsten with silver flare confined to mirror edges.\n[Materials] silver_gelatin_film, ribbed_crt_glass, salmon_stamp_ink, white_cotton_glove\n[Palette] faded_salmon, teal_label, tungsten_cream, silver_flare\n[Motion] Subject: Hand-cranked footage jitters at eighteen frames per second while stamp animation remains perfectly steady.; Camera: archival_tripod; Temporal: Stamped diagonal becomes the traveler's sideways path arrow.\n[Continuity] mercury_edge_rim, one_beat_early, correct_mirror_geometry"
+      },
+      "shot_id": "shot_04"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5500,
+      "exact_compiled_prompt": "[Environment] mirror_customs_hall\n[Subject] Close detail of the traveler's eye crossing out of the silver viewing cone while the reflected eye stays amber-lit.\n[Action] The physical pupil exits frame; the reflected pupil tracks once, then freezes.\n[Camera] macro_profile_track; Split composition: physical eye at left edge, two-millimeter mercury meniscus and reflected eye at right.; Ninety-millimeter macro with shallow depth isolated on eyelashes, glass edge, and amber catchlight.\n[Lighting] Soft cream cheek light and narrow amber rectangle reflected in the iris.\n[Materials] human_skin, eyelash, chronometric_silver, condensation_bead\n[Palette] warm_skin, amber_catchlight, cold_mercury, teal_blur\n[Motion] Subject: One deliberate lateral head movement; condensation beads climb across glass in the opposite direction.; Camera: macro_profile_track; Temporal: Three circular catchlights become three numbered blink-verifier lenses.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, correct_mirror_geometry",
+      "exact_negative_prompt": "No eye deformation.; No beauty-commercial lighting.; No contact between skin and glass.",
+      "output_location": "outputs/shot_05",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5500,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No eye deformation.; No beauty-commercial lighting.; No contact between skin and glass.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] mirror_customs_hall\n[Subject] Close detail of the traveler's eye crossing out of the silver viewing cone while the reflected eye stays amber-lit.\n[Action] The physical pupil exits frame; the reflected pupil tracks once, then freezes.\n[Camera] macro_profile_track; Split composition: physical eye at left edge, two-millimeter mercury meniscus and reflected eye at right.; Ninety-millimeter macro with shallow depth isolated on eyelashes, glass edge, and amber catchlight.\n[Lighting] Soft cream cheek light and narrow amber rectangle reflected in the iris.\n[Materials] human_skin, eyelash, chronometric_silver, condensation_bead\n[Palette] warm_skin, amber_catchlight, cold_mercury, teal_blur\n[Motion] Subject: One deliberate lateral head movement; condensation beads climb across glass in the opposite direction.; Camera: macro_profile_track; Temporal: Three circular catchlights become three numbered blink-verifier lenses.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, correct_mirror_geometry"
+      },
+      "shot_id": "shot_05"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5000,
+      "exact_compiled_prompt": "[Environment] r9_inspection_desk\n[Subject] A three-lens blink verifier beside the traveler and a frozen reflection in ribbed inspection glass.\n[Action] Three lenses illuminate in sequence as the traveler performs blinks the reflection fails to anticipate.\n[Camera] side_on_procedure; Medium profile with verifier foreground, traveler midground, reflection isolated behind ribbed glass.; Forty-millimeter lens with crisp layered depth and no rack-focus ambiguity.\n[Lighting] Each verified blink changes one lens from amber to teal.\n[Materials] machined_aluminum, ribbed_glass, bakelite_lens, teal_tile\n[Palette] inspection_teal, warning_amber, salmon_indicator, brushed_aluminum\n[Motion] Subject: Mechanical iris leaves close and reopen; reflected face remains one frame behind after each success.; Camera: side_on_procedure; Temporal: Third teal lens match-cuts to graphite fibers in Form R-9.\n[Continuity] amber_eye_catchlight, one_beat_early, correct_mirror_geometry",
+      "exact_negative_prompt": "No flashing strobe.; No extra eyes.; No reflection moving after containment indication.",
+      "output_location": "outputs/shot_06",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No flashing strobe.; No extra eyes.; No reflection moving after containment indication.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] r9_inspection_desk\n[Subject] A three-lens blink verifier beside the traveler and a frozen reflection in ribbed inspection glass.\n[Action] Three lenses illuminate in sequence as the traveler performs blinks the reflection fails to anticipate.\n[Camera] side_on_procedure; Medium profile with verifier foreground, traveler midground, reflection isolated behind ribbed glass.; Forty-millimeter lens with crisp layered depth and no rack-focus ambiguity.\n[Lighting] Each verified blink changes one lens from amber to teal.\n[Materials] machined_aluminum, ribbed_glass, bakelite_lens, teal_tile\n[Palette] inspection_teal, warning_amber, salmon_indicator, brushed_aluminum\n[Motion] Subject: Mechanical iris leaves close and reopen; reflected face remains one frame behind after each success.; Camera: side_on_procedure; Temporal: Third teal lens match-cuts to graphite fibers in Form R-9.\n[Continuity] amber_eye_catchlight, one_beat_early, correct_mirror_geometry"
+      },
+      "shot_id": "shot_06"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5500,
+      "exact_compiled_prompt": "[Environment] r9_inspection_desk\n[Subject] Salmon Form R-9 held edge-first by one hand before the mercury-rimmed mirror and a graphite pencil on aluminum.\n[Action] The form slides into a reflected-only drawer while fingers remain four centimeters from glass.\n[Camera] overhead_document_insert; Top-down instructional close shot with measurement ticks showing the four-centimeter hand clearance.; Fifty-millimeter orthographic-like view with controlled paper texture and legible form headings.\n[Lighting] Cool desk strip reveals graphite fibers; amber mirror light outlines the edge.\n[Materials] graphite_fiber_paper, brushed_aluminum, chronometric_silver, wood_pencil\n[Palette] salmon_paper, graphite_black, aluminum_gray, amber_edge\n[Motion] Subject: Paper advances in one straight plane; graphite fibers flash white in reflection but stay matte outside.; Camera: overhead_document_insert; Temporal: Drawer's black slot expands into the dark Identity Holding Gallery.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, dated_bureau_badge",
+      "exact_negative_prompt": "No fingers touching glass.; No gibberish main labels.; No modern plastic office supplies.",
+      "output_location": "outputs/shot_07",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5500,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No fingers touching glass.; No gibberish main labels.; No modern plastic office supplies.",
+        "operation": "generate_hybrid",
+        "prompt": "[Environment] r9_inspection_desk\n[Subject] Salmon Form R-9 held edge-first by one hand before the mercury-rimmed mirror and a graphite pencil on aluminum.\n[Action] The form slides into a reflected-only drawer while fingers remain four centimeters from glass.\n[Camera] overhead_document_insert; Top-down instructional close shot with measurement ticks showing the four-centimeter hand clearance.; Fifty-millimeter orthographic-like view with controlled paper texture and legible form headings.\n[Lighting] Cool desk strip reveals graphite fibers; amber mirror light outlines the edge.\n[Materials] graphite_fiber_paper, brushed_aluminum, chronometric_silver, wood_pencil\n[Palette] salmon_paper, graphite_black, aluminum_gray, amber_edge\n[Motion] Subject: Paper advances in one straight plane; graphite fibers flash white in reflection but stay matte outside.; Camera: overhead_document_insert; Temporal: Drawer's black slot expands into the dark Identity Holding Gallery.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, dated_bureau_badge"
+      },
+      "shot_id": "shot_07"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 6000,
+      "exact_compiled_prompt": "[Environment] identity_holding_gallery\n[Subject] The physical traveler stands at the threshold while the reflection sits alone in a chrome chair climbing the wall.\n[Action] Amber ORIGINAL RETURN claim lights activate from floor to ceiling behind the seated reflection.\n[Camera] vertical_dolly_reveal; Low traveler silhouette anchors bottom; chair rows rotate through ninety degrees above the reflected figure.; Twenty-eight-millimeter rise with straight chrome rails and gravity shift expressed only by chair orientation.\n[Lighting] Amber claim lights chase upward; teal spill keeps traveler readable without horror silhouette.\n[Materials] chrome_tube, heated_vinyl, smoked_glass, painted_signage\n[Palette] deep_teal, claim_amber, chrome_white, vinyl_salmon\n[Motion] Subject: Reflection crosses one ankle without corresponding body motion; empty chair heat-shadows bloom upward.; Camera: vertical_dolly_reveal; Temporal: Amber sign extinguishes to a cream Bureau classification card.\n[Continuity] amber_eye_catchlight, one_beat_early, correct_mirror_geometry, dated_bureau_badge",
+      "exact_negative_prompt": "No monster transformation.; No impossible limb anatomy.; No uncontrolled camera roll.",
+      "output_location": "outputs/shot_08",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 6000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No monster transformation.; No impossible limb anatomy.; No uncontrolled camera roll.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] identity_holding_gallery\n[Subject] The physical traveler stands at the threshold while the reflection sits alone in a chrome chair climbing the wall.\n[Action] Amber ORIGINAL RETURN claim lights activate from floor to ceiling behind the seated reflection.\n[Camera] vertical_dolly_reveal; Low traveler silhouette anchors bottom; chair rows rotate through ninety degrees above the reflected figure.; Twenty-eight-millimeter rise with straight chrome rails and gravity shift expressed only by chair orientation.\n[Lighting] Amber claim lights chase upward; teal spill keeps traveler readable without horror silhouette.\n[Materials] chrome_tube, heated_vinyl, smoked_glass, painted_signage\n[Palette] deep_teal, claim_amber, chrome_white, vinyl_salmon\n[Motion] Subject: Reflection crosses one ankle without corresponding body motion; empty chair heat-shadows bloom upward.; Camera: vertical_dolly_reveal; Temporal: Amber sign extinguishes to a cream Bureau classification card.\n[Continuity] amber_eye_catchlight, one_beat_early, correct_mirror_geometry, dated_bureau_badge"
+      },
+      "shot_id": "shot_08"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 5500,
+      "exact_compiled_prompt": "[Environment] mirror_customs_hall\n[Subject] Traveler from behind remains standing while the matching reflection is seated beneath amber NOW SERVING 001 and looks over one shoulder.\n[Action] The reflection raises Form R-9 just below its dated Bureau badge; physical traveler keeps both hands visible.\n[Camera] iconic_centered_tableau; Vertical two-figure paradox with clean upper caption band, traveler silhouette low, reflected face and badge unobstructed.; Fifty-millimeter normal perspective with exact mirrored clothing geometry and no exaggerated depth.\n[Lighting] Cream key on physical shoulders; amber reflected key separates face, form, and badge.\n[Materials] wool_coat, smoked_glass, graphite_fiber_paper, enamel_badge\n[Palette] oxidized_teal, amber_phosphor, salmon_form, mercury_silver\n[Motion] Subject: Only amber counter phosphor flickers; figures hold a clean readable pose for thumbnail extraction.; Camera: iconic_centered_tableau; Temporal: Form R-9 lowers, revealing synchronized feet at the inspection line.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, correct_mirror_geometry, dated_bureau_badge",
+      "exact_negative_prompt": "No mismatched clothing.; No caption over face or badge.; No threatening expression or horror lighting.",
+      "output_location": "outputs/shot_09",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 5500,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No mismatched clothing.; No caption over face or badge.; No threatening expression or horror lighting.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] mirror_customs_hall\n[Subject] Traveler from behind remains standing while the matching reflection is seated beneath amber NOW SERVING 001 and looks over one shoulder.\n[Action] The reflection raises Form R-9 just below its dated Bureau badge; physical traveler keeps both hands visible.\n[Camera] iconic_centered_tableau; Vertical two-figure paradox with clean upper caption band, traveler silhouette low, reflected face and badge unobstructed.; Fifty-millimeter normal perspective with exact mirrored clothing geometry and no exaggerated depth.\n[Lighting] Cream key on physical shoulders; amber reflected key separates face, form, and badge.\n[Materials] wool_coat, smoked_glass, graphite_fiber_paper, enamel_badge\n[Palette] oxidized_teal, amber_phosphor, salmon_form, mercury_silver\n[Motion] Subject: Only amber counter phosphor flickers; figures hold a clean readable pose for thumbnail extraction.; Camera: iconic_centered_tableau; Temporal: Form R-9 lowers, revealing synchronized feet at the inspection line.\n[Continuity] amber_eye_catchlight, mercury_edge_rim, correct_mirror_geometry, dated_bureau_badge"
+      },
+      "shot_id": "shot_09"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 6000,
+      "exact_compiled_prompt": "[Environment] mirror_customs_hall\n[Subject] Traveler shoes and reflected shoes align on opposite sides of the yellow inspection line beside a teal containment lamp.\n[Action] Both sets of footsteps land together; the mercury edge settles downward and the lamp changes from amber to teal.\n[Camera] floor_level_continuity_check; Low close-wide shows physical and reflected feet, line markings, panel edge, and containment lamp.; Thirty-five-millimeter lens with deep focus from shoe tread to reflected grout lines.\n[Lighting] Teal containment lamp replaces amber spill without changing material colors.\n[Materials] rubber_sole, glazed_tile, chronometric_silver, enamel_lamp\n[Palette] containment_teal, yellow_line, shoe_black, silver_edge\n[Motion] Subject: One synchronized step, natural sole compression, then complete stillness except film gate weave.; Camera: floor_level_continuity_check; Temporal: Teal lamp circle becomes a Bureau seal on cream stock.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, one_beat_early",
+      "exact_negative_prompt": "No extra feet.; No sliding shoes.; No incorrect grout reflection.",
+      "output_location": "outputs/shot_10",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 6000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No extra feet.; No sliding shoes.; No incorrect grout reflection.",
+        "operation": "generate_motion",
+        "prompt": "[Environment] mirror_customs_hall\n[Subject] Traveler shoes and reflected shoes align on opposite sides of the yellow inspection line beside a teal containment lamp.\n[Action] Both sets of footsteps land together; the mercury edge settles downward and the lamp changes from amber to teal.\n[Camera] floor_level_continuity_check; Low close-wide shows physical and reflected feet, line markings, panel edge, and containment lamp.; Thirty-five-millimeter lens with deep focus from shoe tread to reflected grout lines.\n[Lighting] Teal containment lamp replaces amber spill without changing material colors.\n[Materials] rubber_sole, glazed_tile, chronometric_silver, enamel_lamp\n[Palette] containment_teal, yellow_line, shoe_black, silver_edge\n[Motion] Subject: One synchronized step, natural sole compression, then complete stillness except film gate weave.; Camera: floor_level_continuity_check; Temporal: Teal lamp circle becomes a Bureau seal on cream stock.\n[Continuity] mercury_edge_rim, correct_mirror_geometry, one_beat_early"
+      },
+      "shot_id": "shot_10"
+    },
+    {
+      "attempt_ceiling": 1,
+      "cost_ceiling_cents": 0,
+      "dimensions": {
+        "aspect_ratio": "9:16",
+        "orientation": "portrait"
+      },
+      "duration_ms": 6000,
+      "exact_compiled_prompt": "[Environment] bureau_optical_end_card\n[Subject] Cream Bureau seal card beside an inspection photograph where the contained reflection's enamel badge reads BY 32.\n[Action] A graphite underline appears beneath the badge date, followed by the Bureau tagline in optical type.\n[Camera] optical_end_card; Seal at lower left, badge evidence upper right, centered caption-safe tagline.; Flat optical composite with crisp evidence inset and moderate readable analog wear.\n[Lighting] Even cream card illumination; restrained amber phosphor bloom on the anomalous date.\n[Materials] uncoated_cardstock, silver_gelatin_photo, graphite_line, enamel_badge\n[Palette] bureau_cream, graphite_black, oxidized_teal, warning_amber\n[Motion] Subject: End-card layers settle with moderate gate weave; the photograph reflection remains still except one final amber eye catchlight.; Camera: optical_end_card; Temporal: Fade to cream, not black.\n[Continuity] amber_eye_catchlight, dated_bureau_badge, correct_mirror_geometry",
+      "exact_negative_prompt": "No real agency logo.; No imitation franchise insignia.; No unreadable tagline.",
+      "output_location": "outputs/shot_11",
+      "request_payload": {
+        "aspect_ratio": "9:16",
+        "duration_ms": 6000,
+        "interface_version": "itb_compiled_request_interface_v1",
+        "negative_prompt": "No real agency logo.; No imitation franchise insignia.; No unreadable tagline.",
+        "operation": "generate_hybrid",
+        "prompt": "[Environment] bureau_optical_end_card\n[Subject] Cream Bureau seal card beside an inspection photograph where the contained reflection's enamel badge reads BY 32.\n[Action] A graphite underline appears beneath the badge date, followed by the Bureau tagline in optical type.\n[Camera] optical_end_card; Seal at lower left, badge evidence upper right, centered caption-safe tagline.; Flat optical composite with crisp evidence inset and moderate readable analog wear.\n[Lighting] Even cream card illumination; restrained amber phosphor bloom on the anomalous date.\n[Materials] uncoated_cardstock, silver_gelatin_photo, graphite_line, enamel_badge\n[Palette] bureau_cream, graphite_black, oxidized_teal, warning_amber\n[Motion] Subject: End-card layers settle with moderate gate weave; the photograph reflection remains still except one final amber eye catchlight.; Camera: optical_end_card; Temporal: Fade to cream, not black.\n[Continuity] amber_eye_catchlight, dated_bureau_badge, correct_mirror_geometry"
+      },
+      "shot_id": "shot_11"
+    }
+  ],
+  "source_json_references": [
+    {
+      "artifact_id": "itb_ep_001_generation_plan_v1",
+      "sha256": "67e49dd783e1fd09e84630fb5f3a6eda661d7f31fdae305efa6a6678d5b9f8bd"
+    }
+  ],
+  "upstream_artifacts": [
+    {
+      "artifact_id": "itb_ep_001_generation_plan_v1",
+      "sha256": "67e49dd783e1fd09e84630fb5f3a6eda661d7f31fdae305efa6a6678d5b9f8bd"
+    }
+  ]
+}
