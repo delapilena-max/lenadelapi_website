@@ -1,0 +1,51 @@
+{
+  "schema_version": "lena_video_prompt_v1",
+  "slot_id": "lena-20260802-fitcheck-001-reel",
+  "character_id": "lena",
+  "platform": {
+    "name": "instagram_reels",
+    "aspect_ratio": "9:16",
+    "target_duration_seconds": 12
+  },
+  "voice": {
+    "provider": "elevenlabs",
+    "profile": "lena_elevenlabs_voice_contract_v1",
+    "audio_first_required": true,
+    "timestamps_required": true
+  },
+  "story": {
+    "hook": "I almost returned this until I styled it like this.",
+    "payoff": "The finished combination creates a stronger silhouette.",
+    "cta": "Which version wins, one or two?"
+  },
+  "shots": [
+    {
+      "shot_id": "shot_01",
+      "duration_seconds": 4,
+      "framing": "waist-up",
+      "action": "Lena steps naturally into frame and adjusts the jacket collar.",
+      "dialogue_segment": "I almost returned this until I styled it like this."
+    },
+    {
+      "shot_id": "shot_02",
+      "duration_seconds": 4,
+      "framing": "three-quarter fashion framing",
+      "action": "Lena opens the jacket and turns slightly to reveal the coordinated outfit.",
+      "dialogue_segment": "The jacket needed a cleaner shape underneath."
+    },
+    {
+      "shot_id": "shot_03",
+      "duration_seconds": 4,
+      "framing": "waist-up closing shot",
+      "action": "Lena smiles and gestures toward two styling options.",
+      "dialogue_segment": "Which version wins, one or two?"
+    }
+  ],
+  "generation": {
+    "video_provider": "higgsfield",
+    "generate_shots_separately": true,
+    "generate_audio_before_video": true,
+    "video_live_enabled": false,
+    "voice_live_enabled": false
+  }
+}
