@@ -93,7 +93,9 @@ def test_symlink_escape_is_rejected(tmp_path: Path):
             EpisodeStore(root).safe_path("escape/target.json")
         assert error.value.issues[0].code in {"artifact_path_escape", "artifact_symlink_forbidden"}
     finally:
-        if link.exists():
+        if link.is_symlink():
+            link.unlink()
+        elif link.exists():
             os.rmdir(link)
 
 
