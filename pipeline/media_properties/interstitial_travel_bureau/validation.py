@@ -89,7 +89,10 @@ def _validate_script_and_audio(script: LoadedArtifact, audio: LoadedArtifact) ->
 
 
 def _validate_visual_sequence(
-    visual: LoadedArtifact, script: LoadedArtifact, entity: LoadedArtifact
+    visual: LoadedArtifact,
+    script: LoadedArtifact,
+    entity: LoadedArtifact,
+    concept: LoadedArtifact,
 ) -> list[Issue]:
     data = visual.data
     shots = data["shots"]
@@ -100,6 +103,21 @@ def _validate_visual_sequence(
         issues.append(_issue("shot_count_invalid", "Standard shorts require 7-10 shots.", visual, field_path="$/shots", expected="7-10", actual=count))
     if profile == "approved_extended_short" and count != 11:
         issues.append(_issue("extended_shot_count_invalid", "The governed extended-short profile requires exactly 11 shots.", visual, field_path="$/shots", expected=11, actual=count))
+    if profile == "approved_extended_short" and not any(
+        lock["field_path"] == "/bureau_visual_sequence_v1/sequence_profile"
+        and lock["value"] == "approved_extended_short"
+        for lock in concept.data["user_input"]["locked_elements"]
+    ):
+        issues.append(
+            _issue(
+                "extended_profile_user_lock_missing",
+                "The extended-short profile requires an explicit matching user lock.",
+                visual,
+                field_path="$/sequence_profile",
+                expected="user-locked approved_extended_short",
+                actual=profile,
+            )
+        )
     total = sum(item["duration_ms"] for item in shots)
     if total != data["target_duration_ms"] or not 45000 <= total <= 60000:
         issues.append(_issue("shot_duration_fit_failed", "Shot durations must sum exactly to a 45-60 second target.", visual, field_path="$/shots", expected=data["target_duration_ms"], actual=total))
@@ -216,7 +234,7 @@ def validate_loaded_episode(artifacts: Mapping[str, LoadedArtifact]) -> list[Iss
         issues.append(_issue("bureau_framing_missing", "Script sign-off must preserve explicit Bureau framing.", script, field_path="$/bureau_sign_off"))
     issues.extend(_validate_world(world))
     issues.extend(_validate_script_and_audio(script, audio))
-    issues.extend(_validate_visual_sequence(visual, script, entity))
+    issues.extend(_validate_visual_sequence(visual, script, entity, concept))
     issues.extend(_validate_generation_plan(plan, visual))
     issues.extend(_validate_compiled_request(compiled, plan))
     issues.extend(_validate_user_locks(concept, artifacts))
@@ -244,7 +262,7 @@ def validate_source_for_compilation(
         issues.append(_issue("bureau_framing_missing", "Script sign-off must preserve explicit Bureau framing.", script, field_path="$/bureau_sign_off"))
     issues.extend(_validate_world(world))
     issues.extend(_validate_script_and_audio(script, audio))
-    issues.extend(_validate_visual_sequence(visual, script, entity))
+    issues.extend(_validate_visual_sequence(visual, script, entity, concept))
     issues.extend(_validate_user_locks(concept, artifacts))
     issues.extend(_validate_disclosure(concept))
     issues.extend(_validate_non_imitation(concept))
