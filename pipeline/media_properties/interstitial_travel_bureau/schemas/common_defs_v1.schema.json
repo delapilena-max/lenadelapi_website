@@ -1,0 +1,70 @@
+{
+  "$id": "common_defs_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "artifact_id": {"type": "string", "pattern": "^itb_[a-z0-9_]+_v1$", "minLength": 8, "maxLength": 120},
+    "artifact_type": {"type": "string", "pattern": "^bureau_[a-z0-9_]+_v1$"},
+    "created_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+    "episode_id": {"type": "string", "pattern": "^itb_ep_[0-9]{3}$"},
+    "generator_version": {"type": "string", "pattern": "^itb_[a-z0-9_]+_v[0-9]+$", "maxLength": 100},
+    "nonempty_string": {"type": "string", "minLength": 1, "maxLength": 4000},
+    "property_id": {"type": "string", "const": "interstitial_travel_bureau"},
+    "schema_version": {"type": "string", "const": "itb_artifact_v1"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "slug": {"type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$", "maxLength": 80},
+    "string_list": {"type": "array", "items": {"$ref": "#/$defs/nonempty_string"}, "uniqueItems": true, "minItems": 1, "maxItems": 100},
+    "tag_list": {"type": "array", "items": {"$ref": "#/$defs/slug"}, "uniqueItems": true, "minItems": 1, "maxItems": 40},
+    "upstream_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "sha256"],
+      "properties": {
+        "artifact_id": {"$ref": "#/$defs/artifact_id"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "upstream_artifacts": {"type": "array", "items": {"$ref": "#/$defs/upstream_artifact"}, "uniqueItems": true, "maxItems": 30},
+    "user_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field_path", "value"],
+      "properties": {
+        "field_path": {"type": "string", "pattern": "^/", "maxLength": 300},
+        "value": {}
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commercial_intent", "required", "text"],
+      "properties": {
+        "commercial_intent": {"type": "boolean"},
+        "required": {"type": "boolean"},
+        "text": {"type": ["string", "null"], "maxLength": 300}
+      }
+    },
+    "genome_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_family", "hazard_family", "entity_silhouette", "dominant_scale", "palette_family", "camera_grammar", "humor_mechanism", "opening_structure", "ending_reveal", "instruction_verbs", "emotional_flavor", "thumbnail_grammar"],
+      "properties": {
+        "environment_family": {"$ref": "#/$defs/slug"},
+        "hazard_family": {"$ref": "#/$defs/slug"},
+        "entity_silhouette": {"$ref": "#/$defs/slug"},
+        "dominant_scale": {"$ref": "#/$defs/slug"},
+        "palette_family": {"$ref": "#/$defs/slug"},
+        "camera_grammar": {"$ref": "#/$defs/slug"},
+        "humor_mechanism": {"$ref": "#/$defs/slug"},
+        "opening_structure": {"$ref": "#/$defs/slug"},
+        "ending_reveal": {"$ref": "#/$defs/slug"},
+        "instruction_verbs": {"$ref": "#/$defs/tag_list"},
+        "emotional_flavor": {"$ref": "#/$defs/slug"},
+        "thumbnail_grammar": {"$ref": "#/$defs/slug"}
+      }
+    },
+    "base_properties": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
+}

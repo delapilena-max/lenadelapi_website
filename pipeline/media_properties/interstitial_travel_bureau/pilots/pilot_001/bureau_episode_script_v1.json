@@ -1,0 +1,43 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_episode_script_v1",
+  "artifact_id": "itb_ep_001_episode_script_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:06:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [
+    {"artifact_id": "itb_ep_001_concept_card_v1", "sha256": "13e6a12ccf7981197022bdf5cbadb11ffbd14105f33ec581fdc6ca2038001ebf"},
+    {"artifact_id": "itb_ep_001_world_dossier_v1", "sha256": "b20776a8c493108197474fb28dfd9b30ef34ba1151a155b821bb9ba396d85504"},
+    {"artifact_id": "itb_ep_001_audio_plan_v1", "sha256": "87fe52df742923152dc35e3e51892a8dc2e12a18a6ce09cff3dba1c6850668b1"}
+  ],
+  "title": "What to Do When Your Reflection Arrives First",
+  "hook_options": ["Your reflection should not be waiting for you.", "If the mirror is early, you are already late.", "Please allow your reflection to clear customs after you."],
+  "selected_hook": "Your reflection should not be waiting for you.",
+  "traveler_promise": "The Bureau's four-step courtesy interval can preserve your status as the original traveler.",
+  "setup": "At the Liminal Arrivals Annex, reflected time may cross inspection several minutes ahead of the body.",
+  "impossible_rule": "A reflection that moves first has borrowed your next decision and may file it as proof of identity precedence.",
+  "instructions": ["Do not greet the waiting reflection.", "Step sideways until neither eye remains inside the silvered viewing cone.", "Count three blinks the reflection cannot anticipate.", "Present Form R-9 edge-first without touching the glass."],
+  "escalation": "If the reflection sits down while you remain standing, it has begun the original-return claim.",
+  "institutional_contradiction": "The Bureau calls this a courtesy interval; travelers who skip it are retained as decorative optics.",
+  "reveal": "The contained reflection still wears a Bureau badge dated twelve years before the Annex opened.",
+  "closing_line": "Return brightly, and whenever practical, return original.",
+  "bureau_sign_off": "A traveler-safety notice from The Interstitial Travel Bureau.",
+  "narration_segments": [
+    {"segment_id": "narration_01", "text": "Your reflection should not be waiting for you.", "duration_ms": 5000, "caption_safe": true},
+    {"segment_id": "narration_02", "text": "At the Liminal Arrivals Annex, reflected time occasionally clears customs first.", "duration_ms": 5000, "caption_safe": true},
+    {"segment_id": "narration_03", "text": "An early gesture means it has borrowed your next decision.", "duration_ms": 5500, "caption_safe": true},
+    {"segment_id": "narration_04", "text": "First, do not greet it. Courtesy may be interpreted as surrender.", "duration_ms": 5000, "caption_safe": true},
+    {"segment_id": "narration_05", "text": "Step sideways until both eyes leave the silvered viewing cone.", "duration_ms": 5500, "caption_safe": true},
+    {"segment_id": "narration_06", "text": "Next, count three blinks it did not anticipate.", "duration_ms": 5000, "caption_safe": true},
+    {"segment_id": "narration_07", "text": "Present Form R-9 edge-first. Neither paper nor fingers should touch the glass.", "duration_ms": 5500, "caption_safe": true},
+    {"segment_id": "narration_08", "text": "If it sits while you stand, the original-return claim has begun.", "duration_ms": 6000, "caption_safe": true},
+    {"segment_id": "narration_09", "text": "Remain calm. Decorative-optics classification is usually avoidable.", "duration_ms": 5500, "caption_safe": true},
+    {"segment_id": "narration_10", "text": "Containment is complete when your footsteps and reflection agree.", "duration_ms": 6000, "caption_safe": true},
+    {"segment_id": "narration_11", "text": "Do note the badge date. Return brightly, and whenever practical, return original.", "duration_ms": 6000, "caption_safe": true}
+  ],
+  "pronunciation_notes": ["R-9 is spoken arr nine.", "Liminal receives even stress without mystical emphasis."],
+  "user_revisions": ["Opening line locked exactly by user.", "Target runtime locked at sixty seconds.", "Eleven distinct shots locked for Pilot 001."],
+  "timing_estimate_ms": 60000,
+  "semantic_continuity_references": ["premature_reflection", "form_r9", "three_blink_protocol", "original_return_claim", "dated_bureau_badge"]
+}

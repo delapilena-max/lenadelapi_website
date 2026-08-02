@@ -1,0 +1,41 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_concept_card_v1",
+  "artifact_id": "itb_ep_001_concept_card_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:02:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [
+    {"artifact_id": "itb_ep_001_canon_v1", "sha256": "4334479d225a19cc4618435c90b35506522a6fbda600005a593a84b9dbd48086"},
+    {"artifact_id": "itb_ep_001_creative_genome_v1", "sha256": "8ae77263fb3b553d84d4d2fbea94832881d372209abcc172fdf0975b08b8bc17"}
+  ],
+  "episode_concept": "A Bureau safety film teaches travelers how to survive a customs terminal where mirror images can clear inspection several minutes before their owners arrive.",
+  "plain_language_hook": "Your reflection should not be waiting for you.",
+  "traveler_reason": "A routine interstitial transfer requires crossing the Liminal Arrivals Annex, whose only exit is verified through a full-height customs mirror.",
+  "impossible_rule": "A reflection that moves before its traveler has borrowed the traveler's next decision and may use it to claim the original timeline.",
+  "primary_hazard": "The premature reflection can complete the traveler's identity sequence first, leaving the traveler classified as an unauthorized duplicate.",
+  "secondary_complication": "Bureau clerks cannot distinguish the original until both parties perform an asymmetrical blink-and-step protocol.",
+  "bureau_procedure": "Do not greet the reflection; step sideways beyond the silvered panel, count three independent blinks, then present Form R-9 without touching the glass.",
+  "iconic_image": "A traveler seen from behind faces a full-height smoked mirror in which the reflection is already seated beneath an amber NOW SERVING sign.",
+  "understated_contradiction": "The Bureau calls the procedure a courtesy interval even though unsuccessful travelers are reclassified as decorative optics.",
+  "unresolved_lore_implication": "The reflection's lapel carries a Bureau badge dated twelve years before the Annex was commissioned.",
+  "business_intent": {
+    "goal": "audience_building",
+    "commercial": false,
+    "disclosure": {"commercial_intent": false, "required": false, "text": null}
+  },
+  "platform_intent": {"format": "short_form_video", "target_duration_ms": 60000, "aspect_ratio": "9:16"},
+  "user_input": {
+    "mode": "guided",
+    "locked_elements": [
+      {"field_path": "/bureau_episode_script_v1/title", "value": "What to Do When Your Reflection Arrives First"},
+      {"field_path": "/bureau_episode_script_v1/selected_hook", "value": "Your reflection should not be waiting for you."},
+      {"field_path": "/bureau_visual_sequence_v1/sequence_profile", "value": "approved_extended_short"},
+      {"field_path": "/bureau_visual_sequence_v1/target_duration_ms", "value": 60000},
+      {"field_path": "/bureau_audio_plan_v1/narrator_profile/register", "value": "warm_bureau_baritone"}
+    ]
+  },
+  "user_forbidden_elements": ["paid generation", "real actor imitation", "theatrical horror delivery", "recurring human protagonist"],
+  "assumptions": ["Pilot 001 uses the explicitly approved 11-shot extended-short profile.", "All compiled requests remain execution-disabled and provider-unassigned."]
+}

@@ -1,0 +1,40 @@
+{
+  "$id": "bureau_canon_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifact_type", "artifact_id", "property_id", "episode_id", "created_at", "generator_version", "upstream_artifacts", "property_identity", "narrator_doctrine", "institutional_tone", "graphic_language", "visual_invariants", "sound_invariants", "comedy_doctrine", "universe_prohibitions", "recurring_terminology", "allowed_continuity_hooks", "prohibited_imitation"],
+  "properties": {
+    "schema_version": {"$ref": "common_defs_v1.schema.json#/$defs/schema_version"},
+    "artifact_type": {"const": "bureau_canon_v1"},
+    "artifact_id": {"$ref": "common_defs_v1.schema.json#/$defs/artifact_id"},
+    "property_id": {"$ref": "common_defs_v1.schema.json#/$defs/property_id"},
+    "episode_id": {"$ref": "common_defs_v1.schema.json#/$defs/episode_id"},
+    "created_at": {"$ref": "common_defs_v1.schema.json#/$defs/created_at"},
+    "generator_version": {"$ref": "common_defs_v1.schema.json#/$defs/generator_version"},
+    "upstream_artifacts": {"$ref": "common_defs_v1.schema.json#/$defs/upstream_artifacts"},
+    "property_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "tagline", "premise"],
+      "properties": {"name": {"const": "The Interstitial Travel Bureau"}, "tagline": {"const": "Travel brightly. Return original."}, "premise": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}}
+    },
+    "narrator_doctrine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["voice_origin", "delivery", "traits", "forbidden_modes"],
+      "properties": {"voice_origin": {"const": "original_non_imitation"}, "delivery": {"const": "warm_1960s_educational_film"}, "traits": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"}, "forbidden_modes": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"}}
+    },
+    "institutional_tone": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"},
+    "graphic_language": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"},
+    "visual_invariants": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"},
+    "sound_invariants": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"},
+    "comedy_doctrine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mechanism", "prohibitions"],
+      "properties": {"mechanism": {"const": "bureaucratic_understatement_of_existential_risk"}, "prohibitions": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"}}
+    },
+    "universe_prohibitions": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"},
+    "recurring_terminology": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"},
+    "allowed_continuity_hooks": {"$ref": "common_defs_v1.schema.json#/$defs/tag_list"},
+    "prohibited_imitation": {"$ref": "common_defs_v1.schema.json#/$defs/string_list"}
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_episode_manifest_v1",
+  "artifact_id": "itb_ep_001_episode_manifest_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:14:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [
+    {"artifact_id": "itb_ep_001_compiled_request_v1", "sha256": "0f76ecf288a69a6e1d70edbe695568ceafd1087e3ef947c58fce5e1aaa6e8282"},
+    {"artifact_id": "itb_ep_001_episode_qa_v1", "sha256": "11a034b2753b37870878e018dc2653a01b867085299f54887bfb4afff9489ad7"}
+  ],
+  "lifecycle_state": "pre_generation",
+  "generated_assets": [],
+  "provider_jobs": [],
+  "total_cost_cents": 0,
+  "total_attempts": 0,
+  "source_hashes": [{"artifact_id": "itb_ep_001_compiled_request_v1", "sha256": "0f76ecf288a69a6e1d70edbe695568ceafd1087e3ef947c58fce5e1aaa6e8282"}],
+  "edit_timeline": [],
+  "narration_assets": [],
+  "music_assets": [],
+  "caption_assets": [],
+  "clean_export_lineage": [],
+  "platform_derivatives": [],
+  "final_artifact_hashes": []
+}

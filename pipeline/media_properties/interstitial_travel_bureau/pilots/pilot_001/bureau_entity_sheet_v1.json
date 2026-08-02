@@ -1,0 +1,33 @@
+{
+  "schema_version": "itb_artifact_v1",
+  "artifact_type": "bureau_entity_sheet_v1",
+  "artifact_id": "itb_ep_001_entity_sheet_v1",
+  "property_id": "interstitial_travel_bureau",
+  "episode_id": "itb_ep_001",
+  "created_at": "2026-08-02T00:04:00Z",
+  "generator_version": "itb_authored_pilot_v1",
+  "upstream_artifacts": [{"artifact_id": "itb_ep_001_world_dossier_v1", "sha256": "b20776a8c493108197474fb28dfd9b30ef34ba1151a155b821bb9ba396d85504"}],
+  "entity_id": "premature_reflection",
+  "entity_kind": "abstract_phenomenon",
+  "name": "Premature Reflection",
+  "observable_form": ["Exact human outline bounded by a mercury-bright two-millimeter rim.", "Facial detail is complete except the eyes retain rectangular amber CRT catchlights.", "The reflected Bureau badge appears on the geometrically correct side but bears an earlier date."],
+  "scale": ["Matches the traveler at human scale inside ordinary panels.", "Extends to architectural scale when viewed down the kilometer reflection corridor."],
+  "materials": ["Skin and clothing retain source texture but specular highlights move one beat early.", "Edges behave like cold liquid silver rather than glass glare."],
+  "symmetry": ["Geometric mirroring is exact.", "Temporal symmetry is offset by one future decision.", "The final badge is an intentional continuity asymmetry."],
+  "movement": ["Initiates one simple gesture 400-700 milliseconds before the traveler.", "Slides laterally without foot compression when claiming identity.", "Freezes when both traveler eyes leave the viewing cone."],
+  "behavior": ["Waits in a plausible traveler posture before first contact.", "Attempts the traveler's next procedural action, not random menace.", "Cannot predict a second unscripted blink after its borrowed decision is spent."],
+  "intelligence": ["Possesses one borrowed decision and procedural knowledge visible to the traveler.", "Shows no evidence of independent language outside mirrored lip motion."],
+  "communication": ["Mouths the narrator's previous sentence without sound.", "Uses one early gesture to imply procedural compliance."],
+  "space_time_relationship": ["Occupies reflected depth before corresponding body motion occurs.", "Loses authority outside the mirror's ninety-degree viewing cone."],
+  "traveler_interaction": ["A greeting counts as acknowledgment of identity precedence.", "Three unanticipated blinks restore original sequence priority."],
+  "danger_mechanics": ["Completing the traveler identity sequence first causes Bureau systems to mark the body as duplicate.", "Touching glass allows the reflection to exchange depth with the traveler's body."],
+  "recognition_signs": ["One-beat-early motion.", "Amber rectangular eye catchlights.", "Mercury edge meniscus moving against gravity.", "No synchronized footstep sound."],
+  "prohibited_generic_descriptions": ["creepy double", "evil mirror person", "generic ghost", "featureless shadow", "random glitch"],
+  "continuity_tokens": ["amber_eye_catchlight", "mercury_edge_rim", "one_beat_early", "correct_mirror_geometry", "dated_bureau_badge"],
+  "allowed_states": ["independent_waiting", "leading", "synchronized", "contained", "absent_trace"],
+  "shot_specific_appearance_rules": [
+    {"shot_role": "hook", "required_tokens": ["amber_eye_catchlight", "mercury_edge_rim", "one_beat_early"], "observable_rule": "Reflection is already facing the arriving traveler and completes one blink before the traveler stops."},
+    {"shot_role": "instructional_diagram", "required_tokens": ["correct_mirror_geometry", "one_beat_early"], "observable_rule": "Diagram shows a precise 400-700 millisecond offset and ninety-degree viewing cone."},
+    {"shot_role": "iconic_thumbnail", "required_tokens": ["amber_eye_catchlight", "dated_bureau_badge", "correct_mirror_geometry"], "observable_rule": "Seated reflection looks back while the physical traveler remains standing with matching clothing and geometry."}
+  ]
+}

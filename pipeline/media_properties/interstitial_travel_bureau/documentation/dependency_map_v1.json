@@ -1,0 +1,32 @@
+{
+  "map_version": "itb_dependency_map_v1",
+  "authority_order": ["canon", "creative_genome", "concept", "world", "entity", "audio", "script", "visual_sequence", "validation", "novelty_continuity", "provider_neutral_plan", "compiled_request", "manifest_qa_learning"],
+  "schemas": [
+    {"artifact_type": "bureau_canon_v1", "schema": "bureau_canon_v1.schema.json", "upstream_types": []},
+    {"artifact_type": "bureau_creative_genome_v1", "schema": "bureau_creative_genome_v1.schema.json", "upstream_types": ["bureau_canon_v1"]},
+    {"artifact_type": "bureau_concept_card_v1", "schema": "bureau_concept_card_v1.schema.json", "upstream_types": ["bureau_canon_v1", "bureau_creative_genome_v1"]},
+    {"artifact_type": "bureau_world_dossier_v1", "schema": "bureau_world_dossier_v1.schema.json", "upstream_types": ["bureau_concept_card_v1"]},
+    {"artifact_type": "bureau_entity_sheet_v1", "schema": "bureau_entity_sheet_v1.schema.json", "upstream_types": ["bureau_world_dossier_v1"]},
+    {"artifact_type": "bureau_audio_plan_v1", "schema": "bureau_audio_plan_v1.schema.json", "upstream_types": ["bureau_canon_v1"]},
+    {"artifact_type": "bureau_episode_script_v1", "schema": "bureau_episode_script_v1.schema.json", "upstream_types": ["bureau_concept_card_v1", "bureau_world_dossier_v1", "bureau_audio_plan_v1"]},
+    {"artifact_type": "bureau_visual_sequence_v1", "schema": "bureau_visual_sequence_v1.schema.json", "upstream_types": ["bureau_episode_script_v1", "bureau_world_dossier_v1", "bureau_entity_sheet_v1"]},
+    {"artifact_type": "bureau_generation_plan_v1", "schema": "bureau_generation_plan_v1.schema.json", "upstream_types": ["bureau_visual_sequence_v1", "bureau_entity_sheet_v1", "bureau_continuity_ledger_v1"]},
+    {"artifact_type": "bureau_compiled_request_v1", "schema": "bureau_compiled_request_v1.schema.json", "upstream_types": ["bureau_generation_plan_v1"]},
+    {"artifact_type": "bureau_episode_qa_v1", "schema": "bureau_episode_qa_v1.schema.json", "upstream_types": ["bureau_compiled_request_v1", "bureau_visual_sequence_v1"]},
+    {"artifact_type": "bureau_episode_manifest_v1", "schema": "bureau_episode_manifest_v1.schema.json", "upstream_types": ["bureau_compiled_request_v1", "bureau_episode_qa_v1"]},
+    {"artifact_type": "bureau_continuity_ledger_v1", "schema": "bureau_continuity_ledger_v1.schema.json", "upstream_types": ["bureau_creative_genome_v1", "bureau_episode_script_v1", "bureau_world_dossier_v1"]},
+    {"artifact_type": "bureau_episode_learning_v1", "schema": "bureau_episode_learning_v1.schema.json", "upstream_types": ["bureau_episode_manifest_v1"]}
+  ],
+  "libraries": [
+    {"module": "contracts", "imports": [], "deterministic": true, "llm_allowed": false, "file_mutation": "explicit_atomic_write_only", "network_allowed": false},
+    {"module": "artifacts", "imports": ["contracts"], "deterministic": true, "llm_allowed": false, "file_mutation": "none", "network_allowed": false},
+    {"module": "novelty", "imports": ["contracts"], "deterministic": true, "llm_allowed": false, "file_mutation": "none", "network_allowed": false},
+    {"module": "validation", "imports": ["artifacts", "contracts", "novelty"], "deterministic": true, "llm_allowed": false, "file_mutation": "none", "network_allowed": false},
+    {"module": "compilers", "imports": ["artifacts", "contracts", "validation"], "deterministic": true, "llm_allowed": false, "file_mutation": "none", "network_allowed": false}
+  ],
+  "validators": ["json_syntax", "json_schema", "cross_artifact_authority", "continuity", "shot_duration", "narration_duration", "shot_diversity", "creative_genome_novelty", "platform_aspect_ratio", "cost_and_attempt_ceilings", "user_lock_preservation", "commercial_disclosure", "provider_compilation_readiness"],
+  "compilers": ["compile_world_to_script_context", "compile_script_to_visual_context", "compile_visual_to_generation_plan", "compile_plan_to_request"],
+  "clis": ["tools.itb_validate_episode_v1", "tools.itb_compile_episode_v1", "tools.itb_novelty_check_v1", "tools.itb_inspect_episode_v1"],
+  "generators": ["Canon Engine", "Concept Brain", "World Generator", "Entity Creature Place Danger Item Brain", "Story and Script Generator", "Visual Sequence Generator", "Continuity and Novelty Governor", "Quality Evaluator", "Learning Engine"],
+  "guarantees": {"authority_graph_acyclic": true, "provider_network_access": false, "lena_imports": false, "validate_only_mutation": false, "compiled_requests_upstream_authority": false}
+}
