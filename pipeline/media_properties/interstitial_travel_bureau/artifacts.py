@@ -239,7 +239,17 @@ class EpisodeStore:
         is_junction = getattr(source_root, "is_junction", lambda: False)
         if source_root.is_symlink() or is_junction():
             raise ITBContractError(_issue("episode_root_unsafe", "Episode root must be a real directory, not a symlink or junction.", stage="load", source_file=str(episode_root)))
-        self.root = source_root.resolve(strict=True)
+        try:
+            self.root = source_root.resolve(strict=True)
+        except OSError as exc:
+            raise ITBContractError(
+                _issue(
+                    "episode_root_unavailable",
+                    "Episode root does not exist or cannot be resolved safely.",
+                    stage="load",
+                    source_file=str(episode_root),
+                )
+            ) from exc
         if not self.root.is_dir():
             raise ITBContractError(_issue("episode_root_unsafe", "Episode root must be a real directory, not a symlink.", stage="load", source_file=str(episode_root)))
         self.schemas = LocalSchemaStore()

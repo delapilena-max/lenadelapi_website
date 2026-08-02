@@ -53,3 +53,20 @@ def test_invalid_cli_arguments_return_json_and_meaningful_exit():
     report = json.loads(result.stdout)
     assert result.returncode == 1
     assert report["errors"][0]["code"] == "cli_arguments_invalid"
+
+
+def test_missing_episode_root_returns_structured_json_for_every_cli(tmp_path: Path):
+    missing_root = tmp_path / "missing_episode"
+    for module in (
+        "tools.itb_validate_episode_v1",
+        "tools.itb_compile_episode_v1",
+        "tools.itb_novelty_check_v1",
+        "tools.itb_inspect_episode_v1",
+    ):
+        result = _run(module, "--episode-root", str(missing_root), "--validate-only")
+        report = json.loads(result.stdout)
+        assert result.returncode == 1
+        assert result.stderr == ""
+        assert report["ok"] is False
+        assert report["errors"][0]["code"] == "episode_root_unavailable"
+        assert all(value == 0 for value in report["counters"].values())
