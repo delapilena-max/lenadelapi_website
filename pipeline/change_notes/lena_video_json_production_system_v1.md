@@ -24,11 +24,12 @@ The source policy now records three photo products plus exactly one final Lena
 video product per governed date. Video authority is exactly 8 seconds, 720p,
 720 by 1280, 9:16, and a 36-credit aggregate ceiling. Direct binding to Character
 Element `6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3` is mandatory. Seedance 2.0 is the
-preferred initial route only when direct binding is supported. Voice remains
-optional, temporal HPE is mandatory, and video execution still requires separate
-request-bound authorization. The exact prompt is authored to the existing
-4,096-character Higgsfield repository execution policy; truncation and automatic
-shortening remain forbidden.
+preferred initial route only inside the execution-disabled video artifact
+authority and only when direct binding is supported; the active central
+`video_engine` remains `null`. Voice remains optional, temporal HPE is mandatory,
+and video execution still requires separate request-bound authorization. The
+exact prompt is authored to the existing 4,096-character Higgsfield repository
+execution policy; truncation and automatic shortening remain forbidden.
 
 V1 authorizes zero attempts and zero retries. The provider-neutral plan and
 compiled request both keep execution disabled. The photo-only standing-autonomy
@@ -61,10 +62,10 @@ All commands used `C:\Python314\python.exe` with bytecode/cache writes disabled.
 - New Lena video JSON ring: `68 passed, 2 skipped`. Both skips are real-symlink
   creation cases unavailable to this non-elevated Windows process; traversal,
   local-reference confinement, root safety, and fail-closed escape tests passed.
-- Directly affected shared ring: `81 passed`, covering all ITB tests after the
-  neutral extraction, the Lena strategy-policy contract, and the full existing
-  Higgsfield prompt-budget authority audit.
-- Consolidated affected verification ring: `149 passed, 2 skipped`.
+- Directly affected shared ring: `85 passed`, covering all ITB tests after the
+  neutral extraction, the Lena strategy-policy and active-provider contracts,
+  and the full existing Higgsfield prompt-budget authority audit.
+- Consolidated affected verification ring: `153 passed, 2 skipped`.
 - File-aware source compilation: 19 changed Python files passed.
 - Import smoke: 11 neutral, ITB, Lena, and CLI modules passed.
 - Complete pilot validation: 14 artifacts, zero errors.

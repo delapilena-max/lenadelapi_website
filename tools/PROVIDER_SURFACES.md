@@ -28,12 +28,13 @@ approval, claim, or lineage mismatch.
 
 Lena video creative authority lives under
 `pipeline/media_properties/lena/video/`. The deterministic compiler targets
-Higgsfield Seedance 2.0 only when direct binding to Character Element
-`6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3` is supported. It produces a validated
-provider-neutral plan and an execution-disabled compiled request for exactly
-8 seconds at 720p portrait 9:16, with a 36-credit aggregate ceiling. The exact
-compiled prompt must also remain within the active 4,096-character Higgsfield
-repository execution policy; automatic truncation or shortening is forbidden.
+the model constrained by that source-only authority only when direct binding to
+Character Element `6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3` is supported. It
+produces a validated provider-neutral plan and an execution-disabled compiled
+request for exactly 8 seconds at 720p portrait 9:16, with a 36-credit aggregate
+ceiling. The exact compiled prompt must also remain within the active
+4,096-character Higgsfield repository execution policy; automatic truncation or
+shortening is forbidden.
 
 | Entry point | Purpose |
 |---|---|

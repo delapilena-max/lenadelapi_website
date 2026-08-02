@@ -26,7 +26,7 @@
   },
   "generation": {
     "image_engine": "higgsfield_text2image_soul_v2_reference_guided",
-    "video_engine": "seedance_2_0_preferred_when_direct_character_element_supported",
+    "video_engine": null,
     "video_generation_enabled": false,
     "video_execution_requires_separate_authorization": true,
     "video_motion_control_required": true,

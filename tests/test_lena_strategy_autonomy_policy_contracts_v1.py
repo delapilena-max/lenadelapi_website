@@ -201,7 +201,7 @@ def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_po
         generation["generation"]["image_engine"]
         == "higgsfield_text2image_soul_v2_reference_guided"
     )
-    assert generation["generation"]["video_engine"] == "seedance_2_0_preferred_when_direct_character_element_supported"
+    assert generation["generation"]["video_engine"] is None
     assert generation["generation"]["video_generation_enabled"] is False
     assert generation["generation"]["video_execution_requires_separate_authorization"] is True
     assert generation["generation"]["video_motion_control_required"] is True
