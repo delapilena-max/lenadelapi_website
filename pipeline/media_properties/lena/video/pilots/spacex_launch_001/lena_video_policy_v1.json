@@ -1,0 +1,56 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_policy_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_policy_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:30:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [],
+  "final_videos_per_governed_date": 1,
+  "cadence_calculation": {
+    "calendar_key": "governed_date",
+    "timezone_status": "execution_timezone_requires_separate_authority",
+    "final_states": [
+      "final",
+      "published"
+    ]
+  },
+  "duration_ms": 8000,
+  "resolution": "720p",
+  "width_pixels": 720,
+  "height_pixels": 1280,
+  "aspect_ratio": "9:16",
+  "standard_credit_ceiling": 36,
+  "higgsfield_prompt_execution_policy_max_chars": 4096,
+  "provider_capability_requirements": [
+    "direct binding to the exact governed Lena Character Element",
+    "deterministic acceptance of an exact eight-second portrait request",
+    "720p portrait output with auditable provider job and spend evidence",
+    "temporal performance and controlled camera motion support"
+  ],
+  "direct_character_element_required": true,
+  "preferred_initial_route": "higgsfield_seedance_2_0_when_direct_element_binding_supported",
+  "voice_mode": "optional_by_concept",
+  "temporal_hpe_required": true,
+  "attempt_authority": {
+    "authorized_attempts": 0,
+    "retry_authorized": false,
+    "separate_authorization_required": true,
+    "credit_ceiling_applies_to_all_attempts": true
+  },
+  "duplicate_prevention": "reject_more_than_one_final_video_per_governed_date",
+  "authorization_requirements": [
+    "a separately granted execution authorization bound to the validated compiled request hash",
+    "an explicitly governed attempt count and retry decision",
+    "a provider route proven to support direct Lena Character Element binding",
+    "a preflight proving aggregate authorized spend cannot exceed thirty-six credits"
+  ],
+  "photo_lane_isolation": {
+    "live_photo_lane_unchanged": true,
+    "photo_scheduler_not_consumed": true,
+    "queues_publishers_credentials_not_consumed": true
+  },
+  "execution_authorized": false
+}

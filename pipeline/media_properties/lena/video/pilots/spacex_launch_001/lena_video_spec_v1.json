@@ -1,0 +1,155 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_spec_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:31:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_character_authority_v1",
+      "sha256": "192abae4ab3e48d430af93233700a2b2f7ce7866cc12e549b1ef6fc2faf1e694"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_policy_v1",
+      "sha256": "0bf5bbfaf12b16a665a0abb6e52b65520a8deffbe614ed036cb256c3a078b3d6"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_business_intent_v1",
+      "sha256": "7a69a356bd7fd7bc4a91ac8d23636ce350bf318788229377660b3eed985a5875"
+    }
+  ],
+  "daily_slot": "daily_video_01",
+  "concept": "Lena Excitedly Watches a SpaceX Rocket Launch as an adult spectator from a lawful public viewing area.",
+  "hook": "Open on Lena holding a contained breath as the distant rocket clears the horizon, so her anticipation and the launch become legible in the first second.",
+  "setup": "A companion's rear smartphone camera frames Lena three-quarter length with generous headroom and the distant launch corridor visible over her shoulder.",
+  "payoff": "Lena's real half-step, completed pointing gesture, delighted turn, and settled awe deliver a readable emotional progression while the rocket climbs safely in believable scale.",
+  "platform": "instagram_reel",
+  "character_authority_id": "lena_video_2026_08_03_spacex_launch_001_character_authority_v1",
+  "environment_id": "lena_video_2026_08_03_spacex_launch_001_environment_v1",
+  "wardrobe_id": "lena_video_2026_08_03_spacex_launch_001_wardrobe_v1",
+  "hpe_id": "lena_video_2026_08_03_spacex_launch_001_hpe_v1",
+  "camera_id": "lena_video_2026_08_03_spacex_launch_001_camera_v1",
+  "audio_plan_id": "lena_video_2026_08_03_spacex_launch_001_audio_plan_v1",
+  "temporal_performance": "Four contiguous two-second beats progress from held anticipation through delighted recognition and completed gesture into a naturally recovered state of awe; no beat is a static pose.",
+  "sound_intent": "Prioritize the delayed, distant launch rumble and authentic public-viewing ambience under a restrained rising music bed without fabricated documentary dialogue.",
+  "dialogue_intent": "No dialogue for this concept; Lena's face, breath, gaze, and movement carry the performance, so voice generation and lip sync remain unused.",
+  "caption_intent": "A later autonomous caption-selection stage may frame the universal feeling of witnessing something enormous, but this source artifact authorizes neither caption publication nor provider execution.",
+  "business_intent_id": "lena_video_2026_08_03_spacex_launch_001_business_intent_v1",
+  "cost_ceiling_credits": 36,
+  "attempt_authority": {
+    "authorized_attempts": 0,
+    "retry_authorized": false,
+    "separate_authorization_required": true,
+    "credit_ceiling_applies_to_all_attempts": true
+  },
+  "provider_neutral_requirements": [
+    "bind the exact governed Lena identity element directly",
+    "render one continuous eight-second portrait shot without cuts or temporal resets",
+    "preserve the complete governed performance, wardrobe, environment, camera, and sound contracts",
+    "return auditable request, spend, output, and identity evidence before any final disposition"
+  ],
+  "qa_requirements": [
+    "unmistakable stable Lena identity in every assessable frame",
+    "believable adult anatomy, natural hands, skin texture, and hair motion",
+    "all four temporal performance beats visibly initiate, progress, complete, and recover",
+    "distant rocket scale, launch trajectory, delayed sound, and public viewing geometry remain physically believable",
+    "wardrobe remains exact, fully fastened, continuous, and free of reference-image leakage",
+    "smartphone filming remains companion-held, natural, non-selfie, and free of impossible camera motion",
+    "composition preserves Lena's face, launch context, caption-safe areas, and at least ten-percent headroom",
+    "no restricted access, employment, sponsorship, endorsement, accident, explosion, or unsafe launch implication",
+    "the result must look like premium finished Lena content rather than a provider demonstration"
+  ],
+  "provider_prompt_cue": "Lena watches a distant SpaceX rocket launch from a lawful public coastal viewing area. Hook on held anticipation as the rocket clears the horizon; progress through a real half-step, shared delight, one completed point, and settled awe. Companion-held smartphone, non-selfie, safe successful launch, no affiliation.",
+  "hard_constraints": [
+    "exact direct Lena Character Element",
+    "one continuous coherent eight-second performance",
+    "adult spectator in a lawful public area",
+    "distant believable rocket scale, plume, haze, and delayed sound",
+    "safe successful launch; no explosion, debris, accident, or emergency",
+    "exact continuous fastened wardrobe; no leakage, logos, or changes",
+    "companion rear smartphone only; natural handheld, never selfie",
+    "face, completed gesture, context, safe areas, and twelve-percent headroom visible",
+    "no restricted access, job, sponsor, endorsement, or SpaceX relationship",
+    "premium finished Lena content; no static pose or provider demo"
+  ],
+  "negative_constraints": [
+    "identity drift",
+    "face drift",
+    "body proportion drift",
+    "plastic or waxy skin",
+    "hair morphing",
+    "malformed hands",
+    "extra or fused fingers",
+    "reference-image clothing",
+    "wardrobe leakage",
+    "unfastened shorts",
+    "wardrobe change",
+    "selfie or tripod selfie",
+    "static posing",
+    "single frozen gesture",
+    "frozen expression",
+    "camera teleportation",
+    "impossible camera orbit",
+    "generic luxury background",
+    "empty environment",
+    "rocket too close or giant rocket",
+    "explosion, debris, accident, or failed launch",
+    "restricted launch pad access",
+    "SpaceX employee badge",
+    "SpaceX sponsorship or endorsement claim",
+    "accidental sexualized framing",
+    "cropped head",
+    "insufficient feed-preview headroom",
+    "provider demo aesthetic",
+    "embedded text or watermark"
+  ],
+  "user_locks": [
+    {
+      "field_path": "/lena_video_character_authority_v1/character_element_uuid",
+      "value": "6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3"
+    },
+    {
+      "field_path": "/lena_video_policy_v1/final_videos_per_governed_date",
+      "value": 1
+    },
+    {
+      "field_path": "/lena_video_policy_v1/duration_ms",
+      "value": 8000
+    },
+    {
+      "field_path": "/lena_video_policy_v1/resolution",
+      "value": "720p"
+    },
+    {
+      "field_path": "/lena_video_policy_v1/aspect_ratio",
+      "value": "9:16"
+    },
+    {
+      "field_path": "/lena_video_policy_v1/standard_credit_ceiling",
+      "value": 36
+    },
+    {
+      "field_path": "/lena_video_environment_v1/access_context/restricted_access",
+      "value": false
+    },
+    {
+      "field_path": "/lena_video_camera_v1/camera_holder",
+      "value": "another_person"
+    },
+    {
+      "field_path": "/lena_video_camera_v1/selfie",
+      "value": false
+    },
+    {
+      "field_path": "/lena_video_wardrobe_v1/wardrobe_changes",
+      "value": false
+    },
+    {
+      "field_path": "/lena_video_spec_v1/concept",
+      "value": "Lena Excitedly Watches a SpaceX Rocket Launch as an adult spectator from a lawful public viewing area."
+    }
+  ]
+}

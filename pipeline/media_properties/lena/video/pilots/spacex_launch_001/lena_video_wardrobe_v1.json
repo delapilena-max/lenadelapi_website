@@ -1,0 +1,66 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_wardrobe_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_wardrobe_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:32:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+      "sha256": "8ae14e0d64c929db8cdd1f3c4c7e833d3617f9d26521e81df9c3bd538900d3a1"
+    }
+  ],
+  "garments": [
+    {
+      "garment": "jean_shorts",
+      "fit": "small and tasteful high-hip fit with full seated coverage and no riding up during the half-step",
+      "material": "midweight washed cotton denim with natural seam structure",
+      "color": "medium ocean-blue wash with no logo or distress holes",
+      "fastened_state": "fully_fastened",
+      "continuity": "entire_video",
+      "movement_behavior": "waistband and hems remain stable while the denim folds naturally at the hips during the step"
+    },
+    {
+      "garment": "surfing_rash_guard",
+      "fit": "fitted long-sleeve athletic cut that follows movement without becoming translucent or changing neckline",
+      "material": "matte technical surf knit with subtle realistic stretch",
+      "color": "deep sea-green body with slightly darker sleeves and no brand mark",
+      "fastened_state": "secured",
+      "continuity": "entire_video",
+      "movement_behavior": "fabric stretches naturally at shoulders and elbows without texture crawling or torso adhesion artifacts"
+    },
+    {
+      "garment": "low_profile_shoes",
+      "fit": "casual close-fitting lace-up shoes suitable for firm public lawn and boardwalk footing",
+      "material": "matte canvas uppers with thin rubber soles",
+      "color": "warm off-white with neutral laces and no visible logo",
+      "fastened_state": "fully_fastened",
+      "continuity": "entire_video",
+      "movement_behavior": "both shoes remain grounded and retain shape through the half-step and weight transfer"
+    }
+  ],
+  "accessories": [],
+  "public_safety_rules": [
+    "all garments remain opaque, secure, and platform safe throughout motion",
+    "shorts retain full coverage and never become unfastened or ride up",
+    "footwear remains appropriate for the public lawn and boardwalk surface",
+    "camera framing avoids accidental sexualized emphasis"
+  ],
+  "reference_outfit_exclusion_required": true,
+  "reference_outfit_exclusions": [
+    "ignore every garment, accessory, logo, color, and styling choice visible in Character Element reference imagery",
+    "do not copy reference-image swimwear, lingerie, dresses, footwear, jewelry, or provider-added styling"
+  ],
+  "commercial_brand_declarations": [],
+  "wardrobe_changes": false,
+  "provider_neutral_requirements": [
+    "render exactly the three governed garments and no additional visible accessory",
+    "keep every garment continuous, opaque, fully fastened or secured, and free of brand marks",
+    "preserve physically plausible cloth response without texture crawling, leakage, or sudden restyling",
+    "exclude all Character Element reference-image clothing"
+  ],
+  "provider_prompt_cue": "Exact full-shot wardrobe: small tasteful medium-blue fully fastened jean shorts with full coverage; fitted opaque deep sea-green long-sleeve surfing rash guard; secured off-white low-profile lace-up shoes. No logo, accessory, wardrobe change, translucency, riding up, or reference clothing; natural cloth motion only."
+}

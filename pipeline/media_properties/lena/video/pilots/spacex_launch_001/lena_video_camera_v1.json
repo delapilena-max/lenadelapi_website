@@ -1,0 +1,41 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_camera_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_camera_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:32:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+      "sha256": "8ae14e0d64c929db8cdd1f3c4c7e833d3617f9d26521e81df9c3bd538900d3a1"
+    }
+  ],
+  "camera_holder": "another_person",
+  "device_type": "smartphone_rear_camera",
+  "camera_position": "Companion stands about 2.5 meters away at Lena's front-right, holding the phone vertically at upper-chest height with two hands.",
+  "framing": "Stable three-quarter view from shoes through generous sky above Lena, with her face unobstructed and the distant launch corridor over camera-left shoulder.",
+  "safe_headroom_basis_points": 1200,
+  "lens_behavior": "Natural main-camera perspective near a 24 to 28 millimeter full-frame equivalent; no digital zoom, rack zoom, ultrawide distortion, or lens change.",
+  "camera_movement": "steady_handheld_micro_reframe",
+  "autofocus": "Continuous face-priority focus remains on Lena while depth keeps the distant rocket context legible; no focus pumping.",
+  "exposure": "Lock exposure smoothly to Lena's face, preserving natural skin and bright-plume detail without abrupt gain shifts or HDR halos.",
+  "subject_scale": "Lena occupies about fifty-eight percent of frame height so hands, shoes, face, and body movement remain readable.",
+  "background_scale": "The rocket stays a small bright moving form with a thin lengthening plume, never larger than physically plausible at eight kilometers.",
+  "caption_safe_areas": [
+    "keep the top twelve percent free of Lena's head and essential rocket detail",
+    "keep the lower fifteen percent free of hands, shoes, and the completed pointing gesture",
+    "keep the right-side interface strip free of Lena's eyes and launch path"
+  ],
+  "lena_camera_relationship": "Lena knows her companion is filming but performs through genuine launch attention, one brief shared glance, and a final inclusive glance rather than sustained lens-facing posing.",
+  "selfie": false,
+  "provider_neutral_requirements": [
+    "simulate a real companion-held vertical smartphone shot rather than a selfie, tripod, drone, crane, or impossible orbit",
+    "use only subtle two-handed handheld drift and one small reframe that follows Lena's completed pointing gesture",
+    "preserve face visibility, full gesture readability, launch context, caption-safe areas, and twelve-percent headroom",
+    "maintain coherent focus, exposure, lens perspective, subject scale, and distant background scale for all eight seconds"
+  ],
+  "provider_prompt_cue": "Another person holds a rear smartphone vertically with two hands, 2.5 meters front-right at chest height. Natural 24-28mm view, three-quarter head-to-shoes framing, Lena at 58% frame height, 12% headroom, distant rocket over left shoulder; face-priority focus, stable exposure, subtle handheld micro-reframe, never selfie."
+}

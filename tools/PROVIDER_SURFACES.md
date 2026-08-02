@@ -24,8 +24,30 @@ present in the handoff, approval, and exact subprocess command binding.
 Provider submission remains fail-closed on prompt, Soul, source image,
 approval, claim, or lineage mismatch.
 
+## Source-only video compilation surface
+
+Lena video creative authority lives under
+`pipeline/media_properties/lena/video/`. The deterministic compiler targets
+Higgsfield Seedance 2.0 only when direct binding to Character Element
+`6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3` is supported. It produces a validated
+provider-neutral plan and an execution-disabled compiled request for exactly
+8 seconds at 720p portrait 9:16, with a 36-credit aggregate ceiling. The exact
+compiled prompt must also remain within the active 4,096-character Higgsfield
+repository execution policy; automatic truncation or shortening is forbidden.
+
+| Entry point | Purpose |
+|---|---|
+| `tools/lena_video_validate_v1.py` | Validates the complete local Lena video authority chain without network access or writes |
+| `tools/lena_video_compile_higgsfield_v1.py` | Deterministically compiles local validated JSON; writes only when an explicit output directory is supplied |
+
+There is no video provider executor in this V1. A compiled request never
+authorizes execution, attempts, retries, spend, generation, or publication.
+Any future provider action requires separate authority bound to the exact
+validated request hash.
+
 ## Unsupported generation surfaces
 
-No alternate image or video provider is supported. Video generation is disabled
-in `pipeline/config/lena_generation_policy.json` until a separate provider path
-is explicitly selected and approved.
+No alternate image provider or executable video provider surface is supported.
+Video generation remains disabled in
+`pipeline/config/lena_generation_policy.json` until a separate execution path,
+attempt count, and request-bound authorization are explicitly approved.

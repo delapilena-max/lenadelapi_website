@@ -1,0 +1,41 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_character_authority_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_character_authority_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:30:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [],
+  "identity_name": "Lena",
+  "adult_status": "verified_adult",
+  "character_element_uuid": "6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3",
+  "character_element_token": "@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)",
+  "direct_character_element_binding_required": true,
+  "face_authority": "Preserve Lena's unmistakable verified adult facial identity in every frame, with stable facial geometry, natural asymmetry, visible eyes, and no beautification-driven drift.",
+  "body_authority": "Preserve Lena's established adult proportions and believable anatomy through the full movement, including natural shoulders, torso, hips, legs, arms, and hands without scale changes.",
+  "hair_authority": "Keep Lena's established hair identity stable in color, hairline, length, volume, and texture, with only physically plausible wind response and no morphing.",
+  "skin_authority": "Render natural skin texture, pores, tonal variation, and coherent light response without plastic smoothing, waxiness, or frame-to-frame color shifts.",
+  "posture_camera_relationship": "Lena is aware that a companion is filming her but primarily watches the distant launch; she turns toward the camera briefly through real body movement rather than posing at it continuously.",
+  "wardrobe_doctrine": [
+    "Wardrobe comes only from the governed wardrobe artifact, never from Character Element reference imagery.",
+    "Garments remain continuous, physically plausible, fully fastened, and platform safe for the entire shot.",
+    "Framing must not create accidental sexualized emphasis or crop Lena into isolated body parts."
+  ],
+  "reference_image_clothing_exclusion": true,
+  "prohibited_identity_drift": [
+    "face replacement or facial geometry drift",
+    "body proportion drift or limb-length changes",
+    "hairline, hair color, or texture morphing",
+    "skin texture loss or plastic smoothing",
+    "malformed hands, fused fingers, or extra digits"
+  ],
+  "prohibited_provider_styling": [
+    "provider-added glamour makeup not present in authority",
+    "provider-added jewelry, logos, or branded styling",
+    "reference-image wardrobe leakage",
+    "generic influencer beauty-filter treatment"
+  ],
+  "provider_prompt_cue": "Verified adult Lena through exact direct Character Element binding: stable face geometry and body proportions, natural visible eyes, skin texture, hairline, hair motion, hands and fingers; camera-aware but action-led, with no beautification, reference clothing, or added styling drift."
+}

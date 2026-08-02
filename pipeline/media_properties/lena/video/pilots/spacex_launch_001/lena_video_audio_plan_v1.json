@@ -1,0 +1,53 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_audio_plan_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_audio_plan_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:32:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+      "sha256": "8ae14e0d64c929db8cdd1f3c4c7e833d3617f9d26521e81df9c3bd538900d3a1"
+    }
+  ],
+  "dialogue_mode": "none",
+  "dialogue_text": "",
+  "voice_authority_required": false,
+  "timing": "No spoken line. Preserve one readable breath release near 0.8 seconds and a soft delighted nonverbal exhale near 4.8 seconds without turning either into dialogue.",
+  "pronunciation": [],
+  "lip_sync_required": false,
+  "music": "A restrained warm two-note synth rise enters after one second, grows gently through the point, and resolves before eight seconds without overpowering real ambience.",
+  "diegetic_sound": [
+    "light onshore breeze through coastal grass",
+    "soft non-identifiable public crowd reaction behind Lena",
+    "distant low-frequency launch rumble arriving after a plausible visual delay",
+    "subtle clothing and shoe movement synchronized to Lena's half-step"
+  ],
+  "ambience": [
+    "open coastal air with broad natural stereo width",
+    "quiet water-edge texture without artificial surf crashes",
+    "no close machinery, launch-pad alarms, press audio, or restricted-site communications"
+  ],
+  "sound_hierarchy": [
+    "Lena's breath and immediate physical movement",
+    "distant launch rumble",
+    "public coastal ambience",
+    "restrained music bed"
+  ],
+  "mix_targets": [
+    "integrated loudness suitable for premium vertical social playback without clipping",
+    "preserve transients while keeping the launch rumble below distortion",
+    "keep ambience natural and music subordinate to Lena's human performance",
+    "use no synthetic spoken voice, lip-sync processing, or branded launch commentary"
+  ],
+  "provider_neutral_requirements": [
+    "produce no spoken dialogue and require no voice service",
+    "align breath, foot movement, clothing movement, crowd response, and distant rumble to the governed timeline",
+    "make the launch rumble physically delayed and distant rather than immediate or explosive",
+    "return separate auditable audio evidence before any final quality disposition"
+  ],
+  "provider_prompt_cue": "No dialogue, voice, or lip sync. Sync one breath release near 0.8s, soft delighted exhale near 4.8s, foot and cloth motion; coastal breeze and sparse crowd remain natural. Distant low launch rumble arrives after plausible visual delay under a restrained warm two-note rise, mixed below Lena without clipping."
+}

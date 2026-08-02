@@ -178,11 +178,20 @@ def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_po
     assert continuity["context_mix_targets"]["max_home_share_in_balance_window"] < 1
     assert continuity["context_mix_targets"]["min_public_or_fitness_share_in_balance_window"] > 0
 
-    assert cadence["version"] == "v1.3.1"
-    assert cadence["daily_posts"] == 5
-    assert set(cadence["slot_strategy"]) == {"01", "02", "03", "04", "05"}
+    assert cadence["version"] == "v1.4.0"
+    assert cadence["daily_posts"] == 4
+    assert set(cadence["slot_strategy"]) == {"01", "02", "03", "04"}
     assert cadence["slot_strategy"]["03"]["media_type"] == "video"
-    assert cadence["slot_strategy"]["03"]["music_required"] is True
+    assert cadence["slot_strategy"]["03"]["duration_seconds"] == 8
+    assert cadence["slot_strategy"]["03"]["resolution"] == "720p"
+    assert cadence["slot_strategy"]["03"]["aspect_ratio"] == "9:16"
+    assert cadence["slot_strategy"]["03"]["credit_ceiling"] == 36
+    assert cadence["slot_strategy"]["03"]["prompt_execution_policy_max_chars"] == 4096
+    assert cadence["slot_strategy"]["03"]["direct_character_element_binding_required"] is True
+    assert cadence["slot_strategy"]["03"]["temporal_hpe_required"] is True
+    assert cadence["slot_strategy"]["03"]["voice_optional"] is True
+    assert cadence["slot_strategy"]["03"]["separate_execution_authorization_required"] is True
+    assert cadence["slot_strategy"]["04"]["media_type"] == "photo"
 
     assert buckets["version"] == "v1.3.1"
     assert set(buckets["buckets"]) == {"reach", "trust", "engagement", "identity"}
@@ -192,9 +201,22 @@ def test_world_continuity_policy_daily_cadence_content_buckets_and_generation_po
         generation["generation"]["image_engine"]
         == "higgsfield_text2image_soul_v2_reference_guided"
     )
-    assert generation["generation"]["video_engine"] is None
+    assert generation["generation"]["video_engine"] == "seedance_2_0_preferred_when_direct_character_element_supported"
     assert generation["generation"]["video_generation_enabled"] is False
-    assert generation["content_mix"]["daily_target"]["videos"] == 0
+    assert generation["generation"]["video_execution_requires_separate_authorization"] is True
+    assert generation["generation"]["video_motion_control_required"] is True
+    assert generation["generation"]["video_resolution"] == "720p"
+    assert generation["generation"]["video_dimensions"] == {"width_pixels": 720, "height_pixels": 1280}
+    assert generation["generation"]["video_aspect_ratio"] == "9:16"
+    assert generation["generation"]["video_duration_seconds"] == 8
+    assert generation["generation"]["video_standard_credit_ceiling"] == 36
+    assert generation["generation"]["video_prompt_execution_policy_max_chars"] == 4096
+    assert generation["generation"]["video_character_element_uuid"] == "6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3"
+    assert generation["generation"]["video_direct_character_element_binding_required"] is True
+    assert generation["generation"]["video_temporal_hpe_required"] is True
+    assert generation["generation"]["video_voice_mode"] == "optional_by_concept"
+    assert generation["generation"]["video_compiled_requests_authorize_execution"] is False
+    assert generation["content_mix"]["daily_target"] == {"photos": 3, "videos": 1}
     assert generation["caption_rules"]["hashtag_count_min"] == 0
     assert generation["caption_rules"]["hashtag_count_max"] == 3
     assert generation["caption_rules"]["hashtag_count_min"] <= generation["caption_rules"]["hashtag_count_max"] <= 3

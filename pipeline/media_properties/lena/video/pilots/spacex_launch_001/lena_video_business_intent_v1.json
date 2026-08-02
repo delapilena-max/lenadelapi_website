@@ -1,0 +1,38 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_business_intent_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_business_intent_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:30:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [],
+  "audience_growth_objective": "Earn attention and replay through Lena's credible, emotionally progressive reaction to a distant launch rather than through spectacle-only provider imagery.",
+  "content_pillar": "real_world_wonder",
+  "desired_emotion": "Shared anticipation, delight, and awe with the immediacy of a companion-captured moment.",
+  "revenue_intent": "future_optional",
+  "affiliate_relationship": false,
+  "commercial_relationship": "none",
+  "product_identity": "Independent Lena editorial entertainment content about witnessing a public rocket launch.",
+  "usage_rights": [
+    "Use only newly generated Lena video output and separately cleared audio elements.",
+    "Do not reproduce protected SpaceX marks as a focal graphic or imply rights granted by SpaceX.",
+    "Do not use bystander likenesses as identifiable featured subjects."
+  ],
+  "paid_partnership": false,
+  "space_x_affiliation": "none",
+  "disclosure": {
+    "required": false,
+    "text": "",
+    "reason": "No sponsorship, paid partnership, affiliate relationship, employment, endorsement, or provider-funded placement is claimed."
+  },
+  "prohibited_claims": [
+    "Lena works for, represents, or was invited by SpaceX",
+    "SpaceX sponsored, approved, or endorsed this Lena content",
+    "Lena has restricted launch-site access",
+    "the launch date, mission, or outcome is documentary fact unless separately verified before publication",
+    "future audience, revenue, or performance results are guaranteed"
+  ],
+  "cta_intent": "Invite viewers to share the last real-world moment that made them feel this level of awe, without a sales claim."
+}

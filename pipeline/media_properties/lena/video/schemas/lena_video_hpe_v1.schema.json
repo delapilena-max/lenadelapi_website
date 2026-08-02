@@ -1,0 +1,8 @@
+{
+  "$id": "lena_video_hpe_v1.schema.json", "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "artifact_type", "artifact_id", "property_id", "video_id", "governed_date", "created_at", "generator_version", "upstream_artifacts", "anticipation", "timeline", "final_settled_state"],
+  "properties": {
+    "schema_version": {"const": "lena_video_artifact_v1"}, "artifact_type": {"const": "lena_video_hpe_v1"}, "artifact_id": {"$ref": "common_defs_v1.schema.json#/$defs/artifact_id"}, "property_id": {"const": "lena"}, "video_id": {"$ref": "common_defs_v1.schema.json#/$defs/video_id"}, "governed_date": {"$ref": "common_defs_v1.schema.json#/$defs/governed_date"}, "created_at": {"$ref": "common_defs_v1.schema.json#/$defs/created_at"}, "generator_version": {"$ref": "common_defs_v1.schema.json#/$defs/slug"}, "upstream_artifacts": {"$ref": "common_defs_v1.schema.json#/$defs/upstream_artifacts"},
+    "anticipation": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}, "timeline": {"type": "array", "items": {"$ref": "common_defs_v1.schema.json#/$defs/timeline_segment"}, "minItems": 4, "maxItems": 4}, "final_settled_state": {"$ref": "common_defs_v1.schema.json#/$defs/nonempty_string"}
+  }
+}
