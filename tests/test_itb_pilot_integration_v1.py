@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
+
 from pipeline.media_properties.interstitial_travel_bureau.artifacts import EpisodeStore
-from pipeline.media_properties.interstitial_travel_bureau.validation import validate_episode_root
+from pipeline.media_properties.interstitial_travel_bureau.validation import (
+    validate_episode_root,
+    validate_loaded_episode,
+)
 from tests.itb_helpers import PILOT_ROOT
 
 
@@ -24,6 +30,22 @@ def test_pilot_locked_direction_and_diversity_are_preserved():
     assert len(visual["shots"]) == 11
     assert len({shot["environment"] for shot in visual["shots"]}) >= 3
     assert len({shot["camera"] for shot in visual["shots"]}) >= 3
+
+
+def test_extended_short_profile_requires_explicit_user_lock():
+    artifacts = EpisodeStore(PILOT_ROOT).load_all()
+    concept = artifacts["bureau_concept_card_v1"]
+    concept_data = deepcopy(concept.data)
+    concept_data["user_input"]["locked_elements"] = [
+        lock
+        for lock in concept_data["user_input"]["locked_elements"]
+        if lock["field_path"] != "/bureau_visual_sequence_v1/sequence_profile"
+    ]
+    artifacts["bureau_concept_card_v1"] = replace(concept, data=concept_data)
+
+    issues = validate_loaded_episode(artifacts)
+
+    assert "extended_profile_user_lock_missing" in {issue.code for issue in issues}
 
 
 def test_pilot_has_no_generation_or_provider_claims():
