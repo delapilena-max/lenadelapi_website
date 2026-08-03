@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lena_video_prompt_v1.schema.json",
+  "title": "Lena Video Prompt v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "slot_id", "character_id", "voice", "shots", "generation"],
+  "properties": {
+    "schema_version": {"const": "lena_video_prompt_v1"},
+    "slot_id": {"type": "string", "minLength": 1},
+    "character_id": {"const": "lena"},
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "profile", "audio_first_required", "timestamps_required"],
+      "properties": {
+        "provider": {"const": "elevenlabs"},
+        "profile": {"const": "lena_elevenlabs_voice_contract_v1"},
+        "audio_first_required": {"const": true},
+        "timestamps_required": {"const": true}
+      }
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["shot_id", "duration_seconds", "dialogue_segment"],
+        "properties": {
+          "shot_id": {"type": "string", "minLength": 1},
+          "duration_seconds": {"type": "number", "minimum": 1, "maximum": 20},
+          "dialogue_segment": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "required": ["generate_audio_before_video"],
+      "properties": {"generate_audio_before_video": {"const": true}}
+    }
+  }
+}
