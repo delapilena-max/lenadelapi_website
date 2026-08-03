@@ -1,0 +1,50 @@
+{
+  "schema_version": "lena_video_creative_generator_instruction_v1",
+  "purpose": "Produce provisional structured JSON for exactly one new Lena video creative authority. This authority is not execution permission.",
+  "output_mode": "structured_json_only",
+  "required_inputs": [
+    "static_lena_character_authority",
+    "current_video_policy",
+    "current_business_revenue_intent",
+    "continuity_and_learning_ledger",
+    "recent_content_history",
+    "current_user_seed_if_any",
+    "prohibited_repetition_lockouts",
+    "current_platform_needs"
+  ],
+  "required_outputs": [
+    "video_id",
+    "governed_date",
+    "daily_slot",
+    "concept",
+    "hook",
+    "business_intent",
+    "environment",
+    "wardrobe",
+    "hpe_timeline",
+    "camera_contract",
+    "audio_plan",
+    "caption_intent",
+    "provider_neutral_plan",
+    "assumptions"
+  ],
+  "may_reference_static_authorities": [
+    "Lena identity",
+    "Lena platform safety",
+    "Lena visual policy",
+    "current provider-neutral video policy"
+  ],
+  "may_not": [
+    "validate its own output as authoritative",
+    "calculate trusted hashes",
+    "authorize execution",
+    "reuse a prior compiled prompt",
+    "silently change locked user input",
+    "mutate the continuity or learning ledger",
+    "call a provider",
+    "create a queue entry",
+    "publish media"
+  ],
+  "freshness_rule": "Every new provider create call requires a fresh per-video creative JSON authority and a fresh deterministic compiled prompt bound to video_id, governed_date, and daily_slot.",
+  "reuse_rule": "Exact prompt reuse is allowed only for same-job recovery, reconciliation of the same ambiguous submission, downloading or validating the same result, or deterministic recompilation of the same immutable attempt."
+}
