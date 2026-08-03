@@ -1,6 +1,6 @@
 {
-  "version": "v1.3.1",
-  "daily_posts": 5,
+  "version": "v1.4.0",
+  "daily_posts": 4,
   "slot_strategy": {
     "01": {
       "time_block": "morning",
@@ -53,11 +53,20 @@
         "completion_rate",
         "follows"
       ],
-      "music_required": true
+      "duration_seconds": 8,
+      "resolution": "720p",
+      "aspect_ratio": "9:16",
+      "credit_ceiling": 36,
+      "prompt_execution_policy_max_chars": 4096,
+      "character_element_uuid": "6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3",
+      "direct_character_element_binding_required": true,
+      "temporal_hpe_required": true,
+      "voice_optional": true,
+      "separate_execution_authorization_required": true
     },
     "04": {
       "time_block": "evening",
-      "media_type": "photo_or_video",
+      "media_type": "photo",
       "growth_bucket": "engagement",
       "role": "humor/POV relatable post",
       "preferred_lanes": [
@@ -70,22 +79,6 @@
         "comments",
         "shares",
         "saves"
-      ]
-    },
-    "05": {
-      "time_block": "night",
-      "media_type": "photo",
-      "growth_bucket": "trust",
-      "role": "wind-down/stretch/skincare/home photo",
-      "preferred_lanes": [
-        "evening skincare",
-        "simple dinner",
-        "sauna/recovery",
-        "wind-down stretch"
-      ],
-      "metric_focus": [
-        "saves",
-        "profile_visits"
       ]
     }
   },

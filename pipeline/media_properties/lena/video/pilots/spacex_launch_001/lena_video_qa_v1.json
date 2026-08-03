@@ -1,0 +1,181 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_qa_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_qa_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:34:00Z",
+  "generator_version": "lena_video_qa_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_generation_plan_v1",
+      "sha256": "a219ca9f40b2210542a2ba67828b50dd830c46b59e3813e6018eec420f794970"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_higgsfield_request_v1",
+      "sha256": "6f80fc07960ddf4a15e62157ae9b3f75e4baf9166c25ef2fdd8985a0f45fcc36"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_manifest_v1",
+      "sha256": "f06167f585b34b5263a1506ab7decfb193931e1a7ea40b4639a5533c01eae946"
+    }
+  ],
+  "deterministic_checks": [
+    {
+      "check_id": "strict_schema_validation",
+      "status": "passed",
+      "evidence": "All fourteen artifacts validate against local strict schemas with unknown fields rejected."
+    },
+    {
+      "check_id": "canonical_hash_binding",
+      "status": "passed",
+      "evidence": "Every declared upstream ID resolves within the pilot and every canonical SHA-256 matches current authority bytes."
+    },
+    {
+      "check_id": "character_element_binding",
+      "status": "passed",
+      "evidence": "Character authority, plan, compiled request, and provider arguments use the exact direct Lena Character Element token and UUID."
+    },
+    {
+      "check_id": "daily_cadence_contract",
+      "status": "passed",
+      "evidence": "Policy permits exactly one final governed Lena video on the governed date and the manifest is only pre-generation."
+    },
+    {
+      "check_id": "duration_format_contract",
+      "status": "passed",
+      "evidence": "Policy, plan, request, provider arguments, and manifest agree on exactly 8000 ms, 720p, 720 by 1280, and 9:16."
+    },
+    {
+      "check_id": "hpe_timeline_coverage",
+      "status": "passed",
+      "evidence": "Four contiguous non-overlapping beats cover 0 through 8000 ms with displacement, gaze, expression, breath, weight, completed gesture, and recovery."
+    },
+    {
+      "check_id": "cost_attempt_authority",
+      "status": "passed",
+      "evidence": "The aggregate ceiling is 36 credits, while authorized attempts are zero and retry authority is false."
+    },
+    {
+      "check_id": "execution_boundary",
+      "status": "passed",
+      "evidence": "Policy, provider-neutral plan, compiled request, and provider arguments all remain execution-disabled."
+    },
+    {
+      "check_id": "commercial_declarations",
+      "status": "passed",
+      "evidence": "No paid, affiliate, employment, sponsorship, endorsement, restricted-access, or SpaceX affiliation claim is present."
+    },
+    {
+      "check_id": "source_specificity",
+      "status": "passed",
+      "evidence": "The public coastal environment, companion-held camera, exact wardrobe, launch geometry, delayed sound, and four-beat performance are observable rather than generic."
+    }
+  ],
+  "semantic_visual_checks": [
+    {
+      "check_id": "identity_continuity",
+      "status": "not_assessable",
+      "evidence": "No media exists; Character Element binding is specified but visual Lena identity cannot yet be assessed."
+    },
+    {
+      "check_id": "face_continuity",
+      "status": "not_assessable",
+      "evidence": "No generated frames exist for face geometry, visibility, or drift review."
+    },
+    {
+      "check_id": "body_proportions",
+      "status": "not_assessable",
+      "evidence": "No generated frames exist for anatomical proportion or temporal body-stability review."
+    },
+    {
+      "check_id": "hair_realism",
+      "status": "not_assessable",
+      "evidence": "No generated frames exist for hair identity, wind response, or morphing review."
+    },
+    {
+      "check_id": "skin_realism",
+      "status": "not_assessable",
+      "evidence": "No generated frames exist for natural texture, light response, or plastic-skin rejection."
+    },
+    {
+      "check_id": "hand_anatomy",
+      "status": "not_assessable",
+      "evidence": "No generated frames exist for the pointing hand, finger count, or gesture continuity review."
+    },
+    {
+      "check_id": "wardrobe_continuity",
+      "status": "not_assessable",
+      "evidence": "The exact wardrobe is governed, but no output exists to inspect fastenings, leakage, or cloth motion."
+    },
+    {
+      "check_id": "environment_realism",
+      "status": "not_assessable",
+      "evidence": "No output exists to inspect location specificity, public access geometry, rocket scale, haze, plume, or background behavior."
+    },
+    {
+      "check_id": "hpe_execution",
+      "status": "not_assessable",
+      "evidence": "The timeline is executable on paper, but no output exists to verify all beats actually occur."
+    },
+    {
+      "check_id": "movement_completion",
+      "status": "not_assessable",
+      "evidence": "No output exists to verify the half-step, point, return, and recovery complete naturally."
+    },
+    {
+      "check_id": "camera_realism",
+      "status": "not_assessable",
+      "evidence": "No output exists to verify companion-held smartphone motion, focus, exposure, scale, and safe framing."
+    },
+    {
+      "check_id": "lighting_coherence",
+      "status": "not_assessable",
+      "evidence": "No output exists to verify coherent sun, sky fill, plume highlights, shadows, or temporal exposure."
+    },
+    {
+      "check_id": "audio_quality",
+      "status": "not_assessable",
+      "evidence": "No audio exists to inspect physical delay, synchronization, hierarchy, mix, clipping, or polish."
+    },
+    {
+      "check_id": "lip_sync",
+      "status": "not_applicable",
+      "evidence": "The approved concept has no dialogue and does not authorize voice or lip sync."
+    },
+    {
+      "check_id": "platform_safety",
+      "status": "not_assessable",
+      "evidence": "No output exists to inspect opacity, fastenings, accidental sexualized emphasis, headroom, or interface-safe composition."
+    },
+    {
+      "check_id": "commercial_accuracy",
+      "status": "not_assessable",
+      "evidence": "Source declarations are accurate, but any visible brand, badge, credential, or affiliation implication requires output review."
+    },
+    {
+      "check_id": "premium_overall_quality",
+      "status": "not_assessable",
+      "evidence": "No media exists, so hook strength, replay value, edit polish, and finished-content quality cannot yet pass."
+    }
+  ],
+  "optional_human_review": {
+    "status": "not_requested",
+    "notes": "No output exists and this source-only task does not authorize a human media disposition."
+  },
+  "overall_quality": "not_assessable_pre_generation",
+  "publish_disposition": "not_authorized",
+  "reject_conditions": [
+    "reject any output without unmistakable stable Lena identity and direct Character Element evidence",
+    "reject face, body, hair, skin, hand, finger, or garment drift in any assessable frame",
+    "reject static posing, a single stretched gesture, frozen expression, missing beat, incomplete point, or missing recovery",
+    "reject generic, empty, luxury-coded, restricted, privately credentialed, or spatially incoherent environments",
+    "reject a rocket that is too close, changes scale implausibly, explodes, fails, or produces physically incoherent plume and sound",
+    "reject any selfie grammar, impossible camera orbit, focus pumping, exposure jump, cropped head, or insufficient feed-preview headroom",
+    "reject wardrobe leakage, copied reference clothing, unexplained change, translucency, unfastening, riding up, or accidental sexualized emphasis",
+    "reject false employment, sponsorship, endorsement, affiliate, restricted-access, documentary, or safety claims",
+    "reject malformed, clipped, mistimed, generic, or overpowering audio and any unauthorized synthetic dialogue",
+    "reject technically valid output that remains mediocre, looks like a provider demo, lacks a strong hook, or is not premium finished Lena content"
+  ]
+}

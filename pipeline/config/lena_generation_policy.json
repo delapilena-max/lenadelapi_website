@@ -28,9 +28,23 @@
     "image_engine": "higgsfield_text2image_soul_v2_reference_guided",
     "video_engine": null,
     "video_generation_enabled": false,
-    "video_motion_control_required": false,
-    "video_resolution": null,
-    "video_fps": null,
+    "video_execution_requires_separate_authorization": true,
+    "video_motion_control_required": true,
+    "video_resolution": "720p",
+    "video_dimensions": {
+      "width_pixels": 720,
+      "height_pixels": 1280
+    },
+    "video_aspect_ratio": "9:16",
+    "video_duration_seconds": 8,
+    "video_standard_credit_ceiling": 36,
+    "video_prompt_execution_policy_max_chars": 4096,
+    "video_character_element_uuid": "6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3",
+    "video_direct_character_element_binding_required": true,
+    "video_temporal_hpe_required": true,
+    "video_voice_mode": "optional_by_concept",
+    "video_authority_path": "pipeline/media_properties/lena/video/",
+    "video_compiled_requests_authorize_execution": false,
     "voice_enabled": "sparse_random",
     "voice_consistency_required": true,
     "speech_prompt_usage": "sparse_random"
@@ -38,7 +52,7 @@
   "content_mix": {
     "daily_target": {
       "photos": 3,
-      "videos": 0
+      "videos": 1
     },
     "allowed_formats": [
       "selfie_style_photo",
@@ -49,9 +63,15 @@
       "coffee_or_kitchen",
       "plant_or_home",
       "beauty_or_get_ready",
-      "evening_reset"
+      "evening_reset",
+      "character_element_bound_vertical_video"
     ],
-    "video_bias": []
+    "video_bias": [
+      "one complete eight-second temporal performance",
+      "meaningful action with visible initiation, completion, and recovery",
+      "specific environment, intentional wardrobe, and feasible camera movement",
+      "premium finished Lena content rather than a provider demonstration"
+    ]
   },
   "anti_repetition": {
     "max_same_activity_in_last_10_posts": 2,

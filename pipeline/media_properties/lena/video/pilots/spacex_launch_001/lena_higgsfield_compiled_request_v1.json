@@ -1,0 +1,86 @@
+{
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_higgsfield_request_v1",
+  "artifact_type": "lena_higgsfield_compiled_request_v1",
+  "aspect_ratio": "9:16",
+  "attempt_authority": {
+    "authorized_attempts": 0,
+    "credit_ceiling_applies_to_all_attempts": true,
+    "retry_authorized": false,
+    "separate_authorization_required": true
+  },
+  "character_element_token": "@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)",
+  "compilation_timestamp": "2026-08-02T22:32:00Z",
+  "compiler_version": "lena_video_higgsfield_compiler_v1",
+  "cost_ceiling_credits": 36,
+  "created_at": "2026-08-02T22:32:00Z",
+  "deterministic_compilation_fingerprint": "92e8887fb3c65ec7886a99f5ba7b33927d79f7086f0cd59103ad4fec8a988c0d",
+  "duration_ms": 8000,
+  "exact_compiled_prompt": "@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)\n[Format] Exactly 8 seconds, 720p portrait 9:16, one continuous premium social-video shot.\n[Identity] Verified adult Lena through exact direct Character Element binding: stable face geometry and body proportions, natural visible eyes, skin texture, hairline, hair motion, hands and fingers; camera-aware but action-led, with no beautification, reference clothing, or added styling drift.\n[Concept] Lena watches a distant SpaceX rocket launch from a lawful public coastal viewing area. Hook on held anticipation as the rocket clears the horizon; progress through a real half-step, shared delight, one completed point, and settled awe. Companion-held smartphone, non-selfie, safe successful launch, no affiliation.\n[Environment] Florida Space Coast public viewing lawn outside restricted property, with water and launch corridor eight kilometers behind Lena; timber boardwalk, galvanized rail, coastal grass, chairs, sparse spectators. Warm morning sun camera-right, soft sky fill, humid haze and light breeze; small rocket rises continuously with lengthening plume and delayed rumble.\n[Wardrobe] Exact full-shot wardrobe: small tasteful medium-blue fully fastened jean shorts with full coverage; fitted opaque deep sea-green long-sleeve surfing rash guard; secured off-white low-profile lace-up shoes. No logo, accessory, wardrobe change, translucency, riding up, or reference clothing; natural cloth motion only.\n[Camera] Another person holds a rear smartphone vertically with two hands, 2.5 meters front-right at chest height. Natural 24-28mm view, three-quarter head-to-shoes framing, Lena at 58% frame height, 12% headroom, distant rocket over left shoulder; face-priority focus, stable exposure, subtle handheld micro-reframe, never selfie.\n[0-2s] Rocket clears the far horizon. Lena releases a held breath; brows lift before her smile, chin rises five degrees and torso shifts three centimeters forward. Gaze tracks rocket camera-left; one blink, weight moves to forefeet, right fingers uncurl and hand clears thigh, then shoulders recover loose.\n[2-4s] Delight opens. Lena takes one twelve-centimeter half-step, transfers weight right-to-left, and turns shoulders fifteen degrees toward the phone. After one blink she gives the companion a quick glance, returns gaze to rocket, inhales easily, and lifts her relaxed right forearm to chest height before settling.\n[4-6s] Delight becomes bright awe. Grounded on left foot with no blink, Lena raises chin and sternum, extends right forearm fifteen centimeters and completes one readable point; index finger extends only at target, holds briefly, then relaxes as elbow softens. Her face stays clear; left hand remains loose.\n[6-8s] Lena lowers the completed point five centimeters to her side, redistributes weight evenly, drops shoulders, and returns upright with one blink and calm recovery inhale. She watches the safe climb with settled wonder, then gives her companion a final half-second glance; motion resolves without a frozen grin or repeat.\n[Audio] No dialogue, voice, or lip sync. Sync one breath release near 0.8s, soft delighted exhale near 4.8s, foot and cloth motion; coastal breeze and sparse crowd remain natural. Distant low launch rumble arrives after plausible visual delay under a restrained warm two-note rise, mixed below Lena without clipping.\n[Hard constraints] exact direct Lena Character Element; one continuous coherent eight-second performance; adult spectator in a lawful public area; distant believable rocket scale, plume, haze, and delayed sound; safe successful launch; no explosion, debris, accident, or emergency; exact continuous fastened wardrobe; no leakage, logos, or changes; companion rear smartphone only; natural handheld, never selfie; face, completed gesture, context, safe areas, and twelve-percent headroom visible; no restricted access, job, sponsor, endorsement, or SpaceX relationship; premium finished Lena content; no static pose or provider demo.",
+  "exact_negative_prompt": "identity drift; face drift; body proportion drift; plastic or waxy skin; hair morphing; malformed hands; extra or fused fingers; reference-image clothing; wardrobe leakage; unfastened shorts; wardrobe change; selfie or tripod selfie; static posing; single frozen gesture; frozen expression; camera teleportation; impossible camera orbit; generic luxury background; empty environment; rocket too close or giant rocket; explosion, debris, accident, or failed launch; restricted launch pad access; SpaceX employee badge; SpaceX sponsorship or endorsement claim; accidental sexualized framing; cropped head; insufficient feed-preview headroom; provider demo aesthetic; embedded text or watermark",
+  "execution_authorized": false,
+  "generator_version": "lena_video_higgsfield_compiler_v1",
+  "governed_date": "2026-08-03",
+  "model": "seedance_2_0",
+  "prompt_char_budget": 4096,
+  "prompt_char_count": 3997,
+  "property_id": "lena",
+  "provider": "higgsfield",
+  "provider_arguments": {
+    "aspect_ratio": "9:16",
+    "character_element": "@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)",
+    "duration_seconds": 8,
+    "enhance_prompt": false,
+    "execution_mode": "disabled",
+    "negative_prompt": "identity drift; face drift; body proportion drift; plastic or waxy skin; hair morphing; malformed hands; extra or fused fingers; reference-image clothing; wardrobe leakage; unfastened shorts; wardrobe change; selfie or tripod selfie; static posing; single frozen gesture; frozen expression; camera teleportation; impossible camera orbit; generic luxury background; empty environment; rocket too close or giant rocket; explosion, debris, accident, or failed launch; restricted launch pad access; SpaceX employee badge; SpaceX sponsorship or endorsement claim; accidental sexualized framing; cropped head; insufficient feed-preview headroom; provider demo aesthetic; embedded text or watermark",
+    "prompt": "@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)\n[Format] Exactly 8 seconds, 720p portrait 9:16, one continuous premium social-video shot.\n[Identity] Verified adult Lena through exact direct Character Element binding: stable face geometry and body proportions, natural visible eyes, skin texture, hairline, hair motion, hands and fingers; camera-aware but action-led, with no beautification, reference clothing, or added styling drift.\n[Concept] Lena watches a distant SpaceX rocket launch from a lawful public coastal viewing area. Hook on held anticipation as the rocket clears the horizon; progress through a real half-step, shared delight, one completed point, and settled awe. Companion-held smartphone, non-selfie, safe successful launch, no affiliation.\n[Environment] Florida Space Coast public viewing lawn outside restricted property, with water and launch corridor eight kilometers behind Lena; timber boardwalk, galvanized rail, coastal grass, chairs, sparse spectators. Warm morning sun camera-right, soft sky fill, humid haze and light breeze; small rocket rises continuously with lengthening plume and delayed rumble.\n[Wardrobe] Exact full-shot wardrobe: small tasteful medium-blue fully fastened jean shorts with full coverage; fitted opaque deep sea-green long-sleeve surfing rash guard; secured off-white low-profile lace-up shoes. No logo, accessory, wardrobe change, translucency, riding up, or reference clothing; natural cloth motion only.\n[Camera] Another person holds a rear smartphone vertically with two hands, 2.5 meters front-right at chest height. Natural 24-28mm view, three-quarter head-to-shoes framing, Lena at 58% frame height, 12% headroom, distant rocket over left shoulder; face-priority focus, stable exposure, subtle handheld micro-reframe, never selfie.\n[0-2s] Rocket clears the far horizon. Lena releases a held breath; brows lift before her smile, chin rises five degrees and torso shifts three centimeters forward. Gaze tracks rocket camera-left; one blink, weight moves to forefeet, right fingers uncurl and hand clears thigh, then shoulders recover loose.\n[2-4s] Delight opens. Lena takes one twelve-centimeter half-step, transfers weight right-to-left, and turns shoulders fifteen degrees toward the phone. After one blink she gives the companion a quick glance, returns gaze to rocket, inhales easily, and lifts her relaxed right forearm to chest height before settling.\n[4-6s] Delight becomes bright awe. Grounded on left foot with no blink, Lena raises chin and sternum, extends right forearm fifteen centimeters and completes one readable point; index finger extends only at target, holds briefly, then relaxes as elbow softens. Her face stays clear; left hand remains loose.\n[6-8s] Lena lowers the completed point five centimeters to her side, redistributes weight evenly, drops shoulders, and returns upright with one blink and calm recovery inhale. She watches the safe climb with settled wonder, then gives her companion a final half-second glance; motion resolves without a frozen grin or repeat.\n[Audio] No dialogue, voice, or lip sync. Sync one breath release near 0.8s, soft delighted exhale near 4.8s, foot and cloth motion; coastal breeze and sparse crowd remain natural. Distant low launch rumble arrives after plausible visual delay under a restrained warm two-note rise, mixed below Lena without clipping.\n[Hard constraints] exact direct Lena Character Element; one continuous coherent eight-second performance; adult spectator in a lawful public area; distant believable rocket scale, plume, haze, and delayed sound; safe successful launch; no explosion, debris, accident, or emergency; exact continuous fastened wardrobe; no leakage, logos, or changes; companion rear smartphone only; natural handheld, never selfie; face, completed gesture, context, safe areas, and twelve-percent headroom visible; no restricted access, job, sponsor, endorsement, or SpaceX relationship; premium finished Lena content; no static pose or provider demo.",
+    "resolution": "720p"
+  },
+  "resolution": "720p",
+  "schema_version": "lena_video_artifact_v1",
+  "source_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_character_authority_v1",
+      "sha256": "192abae4ab3e48d430af93233700a2b2f7ce7866cc12e549b1ef6fc2faf1e694"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_policy_v1",
+      "sha256": "0bf5bbfaf12b16a665a0abb6e52b65520a8deffbe614ed036cb256c3a078b3d6"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_business_intent_v1",
+      "sha256": "7a69a356bd7fd7bc4a91ac8d23636ce350bf318788229377660b3eed985a5875"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+      "sha256": "8ae14e0d64c929db8cdd1f3c4c7e833d3617f9d26521e81df9c3bd538900d3a1"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_hpe_v1",
+      "sha256": "24e9ed2de1bb3f6e3a45f6b3d91311ed34e4d645870f72a3b1988b643d63054e"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_environment_v1",
+      "sha256": "f60971b7a89b066955c26c5fbbf81b4297b37319c2d071505bb361b1994054a0"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_wardrobe_v1",
+      "sha256": "d1f288cc21379083c4c01c9db3c944c9fa92795241ac6517568f0874964351e7"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_camera_v1",
+      "sha256": "42a3a78d36b987b1b9db9ed63a28e5d5faa5387f1e84531c9d16f24c3b193a63"
+    },
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_audio_plan_v1",
+      "sha256": "ba61560950e82d8dfa61b86b681a427e328dc9ca0fb53b1edca470e8f6d48678"
+    }
+  ],
+  "source_plan_sha256": "a219ca9f40b2210542a2ba67828b50dd830c46b59e3813e6018eec420f794970",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_generation_plan_v1",
+      "sha256": "a219ca9f40b2210542a2ba67828b50dd830c46b59e3813e6018eec420f794970"
+    }
+  ],
+  "video_id": "lena_video_2026-08-03_spacex_launch_001"
+}

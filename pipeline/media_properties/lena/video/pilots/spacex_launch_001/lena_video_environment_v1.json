@@ -1,0 +1,93 @@
+{
+  "schema_version": "lena_video_artifact_v1",
+  "artifact_type": "lena_video_environment_v1",
+  "artifact_id": "lena_video_2026_08_03_spacex_launch_001_environment_v1",
+  "property_id": "lena",
+  "video_id": "lena_video_2026-08-03_spacex_launch_001",
+  "governed_date": "2026-08-03",
+  "created_at": "2026-08-02T22:32:00Z",
+  "generator_version": "lena_video_dataset_author_v1",
+  "upstream_artifacts": [
+    {
+      "artifact_id": "lena_video_2026_08_03_spacex_launch_001_spec_v1",
+      "sha256": "8ae14e0d64c929db8cdd1f3c4c7e833d3617f9d26521e81df9c3bd538900d3a1"
+    }
+  ],
+  "exact_location": "A lawful public coastal rocket-viewing lawn on Florida's Space Coast, outside all restricted launch property, with an unobstructed horizon across water and the launch corridor several kilometers away.",
+  "architecture": [
+    "low public timber boardwalk behind Lena",
+    "waist-high municipal safety rail along the water edge",
+    "small open-sided public shade pavilion well behind the camera position"
+  ],
+  "materials": [
+    "sun-faded timber boardwalk planks",
+    "galvanized safety-rail posts",
+    "coarse coastal grass over pale sandy soil",
+    "calm blue-gray water with narrow reflected highlights"
+  ],
+  "practical_objects": [
+    "folded spectator camp chair near the boardwalk",
+    "plain reusable water bottle without a visible logo",
+    "small public safety-boundary sign with no legible brand text",
+    "two distant parked family vehicles softened by depth"
+  ],
+  "lighting_sources": [
+    "low warm morning sun from camera-right shaping Lena's face",
+    "soft open-sky fill preserving natural skin detail",
+    "bright but distant launch plume behind Lena without clipping her face"
+  ],
+  "weather": [
+    "clear humid Florida morning",
+    "thin high cloud streaks away from the launch corridor",
+    "light onshore breeze around six knots"
+  ],
+  "environmental_motion": [
+    "coastal grass tips bend intermittently in the light breeze",
+    "small water ripples travel laterally across the middle distance",
+    "Lena's hair ends respond subtly without obscuring her face",
+    "the distant rocket rises continuously and its plume lengthens behind it"
+  ],
+  "background_behavior": [
+    "a few non-identifiable public spectators remain behind the rail and look toward the launch",
+    "no one crosses Lena's silhouette or looks directly into the camera",
+    "the rocket stays distant, small, and vertically progressive rather than growing toward camera"
+  ],
+  "social_context": "Lena is one adult member of a small lawful public audience; no uniforms, badges, access passes, staff behavior, press credentials, or private-site privileges are visible or implied.",
+  "spatial_relationships": [
+    "Lena stands at least two meters inside the public safety rail",
+    "the companion camera is about two and a half meters from Lena at chest height",
+    "the water and launch horizon remain over Lena's camera-left shoulder",
+    "other spectators stay at least five meters behind Lena and outside her silhouette"
+  ],
+  "realism_details": [
+    "the distant plume appears after ignition while low-frequency sound arrives with plausible delay",
+    "atmospheric haze slightly lowers contrast around the far launch corridor",
+    "Lena casts a soft short shadow consistent with the morning sun direction",
+    "phone exposure protects facial highlights while allowing the plume to remain bright",
+    "no explosion, debris, emergency response, or unsafe launch behavior occurs"
+  ],
+  "access_context": {
+    "public_area": true,
+    "restricted_access": false,
+    "special_access_implied": false,
+    "safety_boundary_visible": true
+  },
+  "brand_affiliation_implied": false,
+  "rocket_distance_meters": 8000,
+  "specificity_markers": [
+    "coastal_viewing_lawn",
+    "timber_boardwalk",
+    "galvanized_safety_rail",
+    "blue_gray_water",
+    "morning_open_sky_fill",
+    "distant_launch_haze",
+    "public_spectator_boundary"
+  ],
+  "provider_neutral_requirements": [
+    "show a specific lawful public coastal viewing geometry rather than a generic luxury or empty background",
+    "keep the rocket at a physically believable distance and scale for an eight-kilometer viewing position",
+    "preserve coherent morning light, haze, wind, water, plume, and delayed-sound cues",
+    "show no restricted site access, private credential, employment, sponsorship, accident, or explosion implication"
+  ],
+  "provider_prompt_cue": "Florida Space Coast public viewing lawn outside restricted property, with water and launch corridor eight kilometers behind Lena; timber boardwalk, galvanized rail, coastal grass, chairs, sparse spectators. Warm morning sun camera-right, soft sky fill, humid haze and light breeze; small rocket rises continuously with lengthening plume and delayed rumble."
+}

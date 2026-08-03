@@ -85,7 +85,7 @@ def test_active_provider_code_contains_no_retired_live_surface() -> None:
     assert violations == []
 
 
-def test_generation_policy_is_higgsfield_only_and_video_is_disabled() -> None:
+def test_generation_policy_is_higgsfield_only_and_video_execution_is_disabled() -> None:
     policy = json.loads(
         (ROOT / "pipeline" / "config" / "lena_generation_policy.json").read_text(
             encoding="utf-8-sig"
@@ -98,7 +98,9 @@ def test_generation_policy_is_higgsfield_only_and_video_is_disabled() -> None:
     )
     assert generation["video_engine"] is None
     assert generation["video_generation_enabled"] is False
-    assert policy["content_mix"]["daily_target"]["videos"] == 0
+    assert generation["video_execution_requires_separate_authorization"] is True
+    assert generation["video_compiled_requests_authorize_execution"] is False
+    assert policy["content_mix"]["daily_target"]["videos"] == 1
 
 
 def test_current_higgsfield_identity_contract_uses_reference_guided_soul_cinema() -> None:
