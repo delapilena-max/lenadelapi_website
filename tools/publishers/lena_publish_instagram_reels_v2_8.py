@@ -4,7 +4,7 @@ from pathlib import Path
 from lena_meta_publish_common_v2_9 import (
     validate_config_for, preflight_token, ensure_public_media,
     graph_post, wait_for_container, permalink, success, fail,
-    check_final_publish_approval,
+    check_final_publish_approval, instagram_professional_account_id, sanitize_exception,
 )
 
 def main():
@@ -34,7 +34,7 @@ def main():
     if not media.get("ok"):
         print(json.dumps(fail(platform, payload, media.get("reason","media_public_url_failed"), media), indent=2)); return 1
     try:
-        ig_id = cfg["instagram_business_account_id"]
+        ig_id = instagram_professional_account_id(cfg)
         container = graph_post(f"/{ig_id}/media", {
             "media_type": "REELS",
             "video_url": media["media_url"],
@@ -52,6 +52,6 @@ def main():
         print(json.dumps(success(platform, payload, media_id, permalink(media_id, cfg, platform=platform), {"container": container, "published": published, "media": media}), indent=2))
         return 0
     except Exception as e:
-        print(json.dumps(fail(platform, payload, "instagram_reels_publish_error", {"error": str(e)}), indent=2)); return 1
+        print(json.dumps(fail(platform, payload, "instagram_reels_publish_error", {"error": sanitize_exception(e)}), indent=2)); return 1
 if __name__ == "__main__":
     raise SystemExit(main())

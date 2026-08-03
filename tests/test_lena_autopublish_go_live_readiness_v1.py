@@ -38,10 +38,8 @@ def _write_env_tree(root: Path) -> Path:
             "contract_id": "lena_meta_env_key_map_v2_9_1",
             "schema_version": "v1",
             "key_map": {
-                "page_access_token": ["META_PAGE_ACCESS_TOKEN"],
-                "instagram_access_token": ["META_INSTAGRAM_ACCESS_TOKEN"],
-                "instagram_business_account_id": ["META_IG_USER_ID"],
-                "facebook_page_id": ["META_FACEBOOK_PAGE_ID"],
+                "instagram_login_access_token": ["INSTAGRAM_LOGIN_ACCESS_TOKEN"],
+                "instagram_professional_account_id": ["INSTAGRAM_PROFESSIONAL_ACCOUNT_ID"],
                 "graph_api_version": ["META_GRAPH_API_VERSION"],
                 "media_public_base_url": ["LENA_MEDIA_PUBLIC_BASE_URL"],
                 "media_public_local_dir": ["LENA_MEDIA_PUBLIC_LOCAL_DIR"],
@@ -52,10 +50,9 @@ def _write_env_tree(root: Path) -> Path:
     _write_json(
         root / "pipeline" / "influencer_nodes" / "lena" / "meta_publisher_config_v2_9.local.json",
         {
-            "page_access_token": "PLACEHOLDER",
-            "instagram_access_token": "PLACEHOLDER",
-            "instagram_business_account_id": "17841409711154047",
-            "facebook_page_id": "1267219163131062",
+            "auth_mode": "instagram_login",
+            "instagram_login_access_token": "PLACEHOLDER",
+            "instagram_professional_account_id": "17841409711154047",
             "graph_api_version": "v25.0",
             "media_public_base_url": "https://media.nicnodes.us",
             "r2_account_id": "acct",
@@ -67,10 +64,9 @@ def _write_env_tree(root: Path) -> Path:
     _write_json(
         root / "pipeline" / "influencer_nodes" / "lena" / "meta_publisher_config_v2_9.example.json",
         {
-            "page_access_token": "PASTE_PAGE_ACCESS_TOKEN",
-            "instagram_access_token": "PASTE_INSTAGRAM_ACCESS_TOKEN",
-            "instagram_business_account_id": "PASTE_INSTAGRAM_USER_ID",
-            "facebook_page_id": "PASTE_FACEBOOK_PAGE_ID",
+            "auth_mode": "instagram_login",
+            "instagram_login_access_token": "PASTE_INSTAGRAM_LOGIN_ACCESS_TOKEN",
+            "instagram_professional_account_id": "PASTE_INSTAGRAM_PROFESSIONAL_ACCOUNT_ID",
             "graph_api_version": "v25.0",
             "media_public_base_url": "YOUR_PUBLIC_MEDIA_HOST",
             "media_public_local_dir": "YOUR_MEDIA_ROOT",
@@ -80,10 +76,8 @@ def _write_env_tree(root: Path) -> Path:
         _shared_secret_path(root),
         "\n".join(
             [
-                "META_PAGE_ACCESS_TOKEN=page-token",
-                "META_INSTAGRAM_ACCESS_TOKEN=instagram-token",
-                "META_IG_USER_ID=17841409711154047",
-                "META_FACEBOOK_PAGE_ID=1267219163131062",
+                "INSTAGRAM_LOGIN_ACCESS_TOKEN=instagram-login-token",
+                "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID=17841409711154047",
                 "META_GRAPH_API_VERSION=v25.0",
                 "R2_ACCESS_KEY_ID=access",
                 "R2_SECRET_ACCESS_KEY=secret",
@@ -99,12 +93,10 @@ def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> Path:
         {
             "contract_id": "lena_meta_env_key_map_v2_9_1",
             "schema_version": "v1",
-            "authority": "hybrid_contract_is_canonical",
+            "authority": "instagram_login_contract_is_canonical",
             "key_map": {
-                "page_access_token": ["META_PAGE_ACCESS_TOKEN"],
-                "instagram_access_token": ["META_INSTAGRAM_ACCESS_TOKEN"],
-                "instagram_business_account_id": ["META_IG_USER_ID"],
-                "facebook_page_id": ["META_FACEBOOK_PAGE_ID"],
+                "instagram_login_access_token": ["INSTAGRAM_LOGIN_ACCESS_TOKEN"],
+                "instagram_professional_account_id": ["INSTAGRAM_PROFESSIONAL_ACCOUNT_ID"],
                 "graph_api_version": ["META_GRAPH_API_VERSION"],
                 "media_public_base_url": ["LENA_MEDIA_PUBLIC_BASE_URL"],
                 "media_public_local_dir": ["LENA_MEDIA_PUBLIC_LOCAL_DIR"],
@@ -115,10 +107,9 @@ def _write_hybrid_contract_tree(root: Path, env_lines: list[str]) -> Path:
         root / "pipeline" / "influencer_nodes" / "lena" / "meta_publisher_config_v2_9.local.json",
         {
             "version": "v2.9.0",
-            "auth_mode": "facebook_login",
+            "auth_mode": "instagram_login",
             "graph_api_version": "v25.0",
-            "instagram_business_account_id": "17841409711154047",
-            "facebook_page_id": "1267219163131062",
+            "instagram_professional_account_id": "17841409711154047",
             "ig_share_reels_to_feed": True,
             "media_public_base_url": "https://media.nicnodes.us",
             "r2_account_id": "acct",
@@ -137,10 +128,8 @@ def _write_local_worktree_env(root: Path, env_lines: list[str]) -> Path:
 def _clear_publish_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(publish_common.CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE, raising=False)
     for key in (
-        "META_PAGE_ACCESS_TOKEN",
-        "META_INSTAGRAM_ACCESS_TOKEN",
-        "META_IG_USER_ID",
-        "META_FACEBOOK_PAGE_ID",
+        "INSTAGRAM_LOGIN_ACCESS_TOKEN",
+        "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID",
         "META_GRAPH_API_VERSION",
         "R2_ACCOUNT_ID",
         "R2_BUCKET_NAME",
@@ -175,7 +164,7 @@ def _write_policy_manifest(root: Path, *, authority_commit: str, autonomous_enab
             "hard_item_limit_per_invocation": 1,
             "queue_claim_lease_seconds": 1800,
             "max_attempts_per_row": 2,
-            "autonomous_queue_platforms": ["Instagram Feed", "Facebook Page"],
+            "autonomous_queue_platforms": ["Instagram Feed"],
             "manual_live_mode_unchanged": True,
             "manual_live_flags": ["--live", "--i-understand-this-can-publish"],
             "autonomous_mode_requires_distinct_policy_gate": True,
@@ -314,7 +303,7 @@ def test_publish_common_config_status_reads_explicit_root(tmp_path: Path, monkey
     assert status["checks"]["dotenv_sources"]["sources"] == [str(shared_secret_path)]
     assert status["checks"]["local_config_exists"]["ok"] is True
     assert status["readiness"]["instagram_ready"] is True
-    assert status["readiness"]["facebook_ready"] is True
+    assert status["readiness"]["facebook_ready"] is False
     assert status["readiness"]["media_host_ready"] is True
 
 
@@ -326,15 +315,15 @@ def test_hybrid_local_config_counts_without_duplicate_non_secret_env_vars(
     shared_secret_path = _write_hybrid_contract_tree(
         production_root,
         env_lines=[
-            "META_PAGE_ACCESS_TOKEN=page-token",
+            "INSTAGRAM_LOGIN_ACCESS_TOKEN=instagram-login-token",
             "R2_ACCESS_KEY_ID=access",
             "R2_SECRET_ACCESS_KEY=secret",
-            "META_IG_USER_ID=bad-from-secret-source",
+            "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID=bad-from-secret-source",
             "LENA_MEDIA_PUBLIC_BASE_URL=https://should-not-override.invalid",
             "UNRELATED_SECRET_SHOULD_BE_IGNORED=ignored",
         ],
     )
-    _write_local_worktree_env(production_root, ["META_PAGE_ACCESS_TOKEN=wrong-local-token"])
+    _write_local_worktree_env(production_root, ["INSTAGRAM_LOGIN_ACCESS_TOKEN=wrong-local-token"])
     _clear_publish_env(monkeypatch)
     _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
@@ -342,29 +331,27 @@ def test_hybrid_local_config_counts_without_duplicate_non_secret_env_vars(
     status = publish_common.config_status(False, root=production_root)
     env_report = readiness._env_presence_report(production_root, dict(os.environ), status)
 
-    assert cfg["instagram_business_account_id"] == "17841409711154047"
-    assert cfg["facebook_page_id"] == "1267219163131062"
+    assert cfg["instagram_professional_account_id"] == "17841409711154047"
     assert cfg["graph_api_version"] == "v25.0"
     assert cfg["media_public_base_url"] == "https://media.nicnodes.us"
     assert cfg["media_public_local_dir"] == str(production_root / "pipeline" / "publishing" / "lena" / "media_public")
-    assert cfg["page_access_token"] == "page-token"
+    assert cfg["instagram_login_access_token"] == "instagram-login-token"
     assert publish_common.discover_dotenv_values(production_root)["sources"] == [str(shared_secret_path)]
-    assert status["checks"]["canonical_secret_source"]["loaded_keys"] == ["META_PAGE_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+    assert status["checks"]["canonical_secret_source"]["loaded_keys"] == ["INSTAGRAM_LOGIN_ACCESS_TOKEN", "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
     assert env_report["secret_source_path"] == str(shared_secret_path)
     assert env_report["secret_source_contract_ok"] is True
-    assert env_report["loaded_secret_keys"] == ["META_PAGE_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+    assert env_report["loaded_secret_keys"] == ["INSTAGRAM_LOGIN_ACCESS_TOKEN", "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
     assert status["readiness"]["instagram_ready"] is True
-    assert status["readiness"]["facebook_ready"] is True
+    assert status["readiness"]["facebook_ready"] is False
     assert status["readiness"]["media_host_ready"] is True
     assert env_report["missing"] == []
     assert env_report["required_env_vars"] == ["R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
-    assert "META_IG_USER_ID" not in env_report["missing"]
-    assert "META_FACEBOOK_PAGE_ID" not in env_report["missing"]
+    assert "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID" not in env_report["missing"]
     assert "META_GRAPH_API_VERSION" not in env_report["missing"]
     assert "LENA_MEDIA_PUBLIC_BASE_URL" not in env_report["missing"]
     assert "LENA_MEDIA_PUBLIC_LOCAL_DIR" not in env_report["missing"]
     assert "R2_ACCESS_KEY_ID" in env_report["required_env_vars"]
-    assert (production_root / ".env").read_text(encoding="utf-8") == "META_PAGE_ACCESS_TOKEN=wrong-local-token\n"
+    assert (production_root / ".env").read_text(encoding="utf-8") == "INSTAGRAM_LOGIN_ACCESS_TOKEN=wrong-local-token\n"
 
 
 def test_readiness_only_flags_runtime_required_secret_when_hybrid_config_supplies_non_secrets(
@@ -382,8 +369,8 @@ def test_readiness_only_flags_runtime_required_secret_when_hybrid_config_supplie
     assert status["readiness"]["instagram_ready"] is False
     assert status["readiness"]["facebook_ready"] is False
     assert status["readiness"]["media_host_ready"] is False
-    assert env_report["missing"] == ["META_PAGE_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
-    assert env_report["required_env_vars"] == ["META_PAGE_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+    assert env_report["missing"] == ["INSTAGRAM_LOGIN_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+    assert env_report["required_env_vars"] == ["INSTAGRAM_LOGIN_ACCESS_TOKEN", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
 
 
 def test_missing_env_map_fails_closed_for_runtime_and_readiness(
@@ -395,9 +382,8 @@ def test_missing_env_map_fails_closed_for_runtime_and_readiness(
     _write_json(
         production_root / "pipeline" / "influencer_nodes" / "lena" / "meta_publisher_config_v2_9.local.json",
         {
-            "auth_mode": "facebook_login",
-            "instagram_business_account_id": "17841409711154047",
-            "facebook_page_id": "1267219163131062",
+            "auth_mode": "instagram_login",
+            "instagram_professional_account_id": "17841409711154047",
             "media_public_base_url": "https://pub.example.invalid",
         },
     )
@@ -432,7 +418,7 @@ def test_missing_canonical_secret_source_fails_closed_even_with_valid_translatio
     _set_canonical_secret_source(monkeypatch, shared_secret_path)
 
     status = publish_common.config_status(False, root=production_root)
-    validation = publish_common.validate_config_for("Facebook Page", "image", root=production_root)
+    validation = publish_common.validate_config_for("Instagram Feed", "image", root=production_root)
     env_report = readiness._env_presence_report(production_root, dict(os.environ), status)
 
     assert status["checks"]["env_map_contract"]["ok"] is True
@@ -451,13 +437,13 @@ def test_readiness_report_never_emits_raw_secret_values(
 ) -> None:
     repo_root = tmp_path / "repo"
     production_root = tmp_path / "production"
-    secret = "page-token-super-secret"
+    secret = "instagram-login-token-super-secret"
     repo_root.mkdir(parents=True, exist_ok=True)
     production_root.mkdir(parents=True, exist_ok=True)
     shared_secret_path = _write_hybrid_contract_tree(
         production_root,
         env_lines=[
-            f"META_PAGE_ACCESS_TOKEN={secret}",
+            f"INSTAGRAM_LOGIN_ACCESS_TOKEN={secret}",
             "R2_ACCESS_KEY_ID=access",
             "R2_SECRET_ACCESS_KEY=secret",
         ],
@@ -523,7 +509,7 @@ def test_readiness_report_never_emits_raw_secret_values(
     rendered = json.dumps(report, ensure_ascii=False)
 
     assert secret not in rendered
-    assert report["publisher_config"]["checks"]["page_access_token"]["ok"] is True
+    assert report["publisher_config"]["checks"]["instagram_login_access_token"]["ok"] is True
     assert report["environment_contract"]["missing"] == []
     assert report["environment_contract"]["secret_source_path"] == str(shared_secret_path)
 

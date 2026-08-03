@@ -104,7 +104,7 @@ def test_queue_builder_invoked_with_the_approved_platform_list(monkeypatch: pyte
     assert "--date" in argv and DATE in argv
     assert "--platforms" in argv
     platforms_value = argv[argv.index("--platforms") + 1]
-    assert platforms_value == "Instagram Feed,Facebook Page"
+    assert platforms_value == "Instagram Feed"
 
 
 def test_successful_dry_run_reaches_publish_stage_with_dry_run_true(monkeypatch: pytest.MonkeyPatch) -> None:

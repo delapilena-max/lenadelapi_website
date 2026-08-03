@@ -15,19 +15,23 @@ CANONICAL_PUBLISHER_SECRET_ENV_OVERRIDE = "LENA_CANONICAL_PUBLISHER_SECRET_ENV_F
 CANONICAL_PUBLISHER_SECRET_ENV_PATH = Path(r"C:\projects\ai\content_bot\.env")
 CANONICAL_PUBLISHER_SECRET_SOURCE_AUTHORITY = "content_bot_shared_secret_env"
 ENV_VAR_TO_CONFIG_KEY = {
-    "META_PAGE_ACCESS_TOKEN": "page_access_token",
-    "META_INSTAGRAM_ACCESS_TOKEN": "instagram_access_token",
-    "META_IG_USER_ID": "instagram_business_account_id",
-    "META_FACEBOOK_PAGE_ID": "facebook_page_id",
+    "INSTAGRAM_LOGIN_ACCESS_TOKEN": "instagram_login_access_token",
+    "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID": "instagram_professional_account_id",
     "META_GRAPH_API_VERSION": "graph_api_version",
     "LENA_MEDIA_PUBLIC_BASE_URL": "media_public_base_url",
     "LENA_MEDIA_PUBLIC_LOCAL_DIR": "media_public_local_dir",
 }
 GOVERNED_PUBLISHER_SECRET_ENV_KEYS = (
-    "META_PAGE_ACCESS_TOKEN",
-    "META_INSTAGRAM_ACCESS_TOKEN",
+    "INSTAGRAM_LOGIN_ACCESS_TOKEN",
+    "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID",
     "R2_ACCESS_KEY_ID",
     "R2_SECRET_ACCESS_KEY",
+)
+REQUIRED_INSTAGRAM_LOGIN_SCOPES = frozenset(
+    {
+        "instagram_business_basic",
+        "instagram_business_content_publish",
+    }
 )
 R2_SECRET_ENV_KEYS = (
     "R2_ACCESS_KEY_ID",
@@ -91,6 +95,36 @@ def redact(s: str) -> str:
     if len(s) <= 8:
         return "***"
     return s[:4] + "..." + s[-4:]
+
+def sanitize_provider_value(value):
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            raw_key = str(key)
+            if any(marker in raw_key.lower() for marker in ("token", "secret", "authorization", "access_token")):
+                out[raw_key] = "***"
+            elif raw_key.lower() == "message":
+                out[raw_key] = "[redacted]"
+            else:
+                out[raw_key] = sanitize_provider_value(item)
+        return out
+    if isinstance(value, list):
+        return [sanitize_provider_value(item) for item in value]
+    if isinstance(value, str):
+        parsed = urllib.parse.urlsplit(value)
+        if parsed.query and any(key in urllib.parse.parse_qs(parsed.query) for key in ("access_token", "client_secret", "appsecret_proof")):
+            query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+            safe_query = urllib.parse.urlencode([(key, "***" if key in {"access_token", "client_secret", "appsecret_proof"} else item) for key, item in query])
+            return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, safe_query, parsed.fragment))
+    return value
+
+def sanitize_exception(exc: Exception) -> dict:
+    raw = str(exc)
+    try:
+        parsed = json.loads(raw)
+        return sanitize_provider_value(parsed)
+    except Exception:
+        return {"error_type": type(exc).__name__}
 
 def parse_dotenv(path: Path) -> dict:
     out = {}
@@ -301,9 +335,6 @@ def _apply_effective_config(
         resolved["_media_public_local_dir_source"] = "runtime_default"
     if not resolved.get("r2_public_base_url") or _is_placeholder(resolved.get("r2_public_base_url")):
         resolved["r2_public_base_url"] = str(resolved.get("media_public_base_url") or "").strip()
-    if not resolved.get("page_access_token") and resolved.get("instagram_access_token"):
-        resolved["page_access_token"] = resolved["instagram_access_token"]
-        resolved["_page_access_token_alias"] = "instagram_access_token"
     return resolved
 
 def _load_env_for_r2(root: Path | None = None) -> None:
@@ -426,9 +457,12 @@ def load_config(root: Path | None = None) -> dict:
     discovered = discover_dotenv_values(base_root)
     return _apply_effective_config(cfg, discovered, dict(os.environ), base_root)
 
+def instagram_professional_account_id(cfg: dict) -> str:
+    return str(cfg.get("instagram_professional_account_id") or "").strip()
+
 def token_for_platform(cfg: dict, platform: str) -> str:
-    if _auth_mode(cfg) == "instagram_login" and platform.startswith("Instagram") and cfg.get("instagram_access_token"):
-        return cfg["instagram_access_token"]
+    if platform.startswith("Instagram"):
+        return str(cfg.get("instagram_login_access_token") or "").strip()
     return cfg.get("page_access_token", "")
 
 def config_status(test_api: bool = False, root: Path | None = None) -> dict:
@@ -481,6 +515,8 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
     r2_ok = media_host_route["ok"]
     mode     = _auth_mode(cfg)
     checks = {
+        "instagram_login_access_token": check("instagram_login_access_token", True),
+        "instagram_professional_account_id": check("instagram_professional_account_id", False),
         "instagram_access_token": check("instagram_access_token", True),
         "page_access_token": check("page_access_token", True),
         "instagram_business_account_id": check("instagram_business_account_id", False),
@@ -529,19 +565,19 @@ def config_status(test_api: bool = False, root: Path | None = None) -> dict:
     }
 
     media_host_ok = r2_ok
-    instagram_ready = checks["instagram_business_account_id"]["ok"] and (checks["instagram_access_token"]["ok"] or checks["page_access_token"]["ok"]) and media_host_ok
-    facebook_ready = checks["facebook_page_id"]["ok"] and checks["page_access_token"]["ok"] and media_host_ok
+    instagram_ready = checks["instagram_professional_account_id"]["ok"] and checks["instagram_login_access_token"]["ok"] and media_host_ok
+    facebook_ready = False
 
     api_result = None
     if test_api:
         try:
-            token = cfg.get("page_access_token") or cfg.get("instagram_access_token")
+            token = cfg.get("instagram_login_access_token")
             if token:
-                api_result = graph_get("/me", {"fields": "id,name"}, cfg, token_override=token)
+                api_result = graph_get("/me", {"fields": "id,user_id,username,account_type"}, cfg, token_override=token, platform="Instagram Feed")
             else:
                 api_result = {"ok": False, "error": "no token available"}
         except Exception as e:
-            api_result = {"ok": False, "error": str(e)}
+            api_result = {"ok": False, "error": sanitize_exception(e)}
 
     return {
         "ok": env_map_ok and secret_source_ok and (instagram_ready or facebook_ready),
@@ -636,32 +672,175 @@ def verify_hosted_media_before_container(
 
 
 def preflight_token(cfg: dict, platform: str = "") -> dict:
-    """Validate token resolves cleanly before touching R2 or the Graph API."""
+    """Validate token resolves cleanly before touching R2 or container APIs."""
     token = token_for_platform(cfg, platform)
     if not token:
         return {"ok": False, "reason": "no_token_in_config"}
     try:
-        data = graph_get("/me", {"fields": "id"}, cfg,
+        data = graph_get("/me", {"fields": "id,user_id,username,account_type"}, cfg,
                          token_override=token, platform=platform)
         if "error" in data:
             code = data["error"].get("code", 0)
             sub  = data["error"].get("error_subcode", 0)
-            msg  = data["error"].get("message", "unknown")
             if code == 190:
                 return {
                     "ok": False, "reason": "token_expired",
-                    "code": code, "subcode": sub, "message": msg,
+                    "code": code, "subcode": sub,
                 }
             return {
                 "ok": False, "reason": "token_invalid",
-                "code": code, "message": msg,
+                "code": code, "subcode": sub,
             }
-        return {"ok": True, "me_id": data.get("id", "")}
+        return {"ok": True, "me_id": str(data.get("id") or data.get("user_id") or "")}
     except Exception as exc:
-        raw = str(exc)
-        if "190" in raw:
-            return {"ok": False, "reason": "token_expired", "detail": raw}
-        return {"ok": False, "reason": "preflight_error", "detail": raw}
+        detail = sanitize_exception(exc)
+        if "190" in str(detail):
+            return {"ok": False, "reason": "token_expired", "detail": detail}
+        return {"ok": False, "reason": "preflight_error", "detail": detail}
+
+def _graph_error_reason(data: dict, *, default: str = "instagram_api_error") -> str:
+    error = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(error, dict):
+        return default
+    code = int(error.get("code", 0) or 0)
+    subcode = int(error.get("error_subcode", 0) or 0)
+    if code == 190:
+        return "instagram_token_expired" if subcode in {463, 467, 492} else "instagram_token_invalid"
+    if code in {10, 200}:
+        return "instagram_business_content_publish_scope_missing"
+    return default
+
+def _checked_graph_get(path: str, params: dict, cfg: dict, *, token: str, default_reason: str) -> tuple[dict | None, dict | None]:
+    try:
+        data = graph_get(path, params, cfg, token_override=token, platform="Instagram Feed")
+    except Exception as exc:
+        detail = sanitize_exception(exc)
+        parsed = detail.get("response") if isinstance(detail, dict) else None
+        if isinstance(parsed, dict):
+            reason = _graph_error_reason(parsed, default=default_reason)
+        else:
+            reason = default_reason
+        return None, {"ok": False, "reason": reason, "provider_error": detail}
+    if isinstance(data, dict) and "error" in data:
+        return None, {"ok": False, "reason": _graph_error_reason(data, default=default_reason), "provider_error": sanitize_provider_value(data)}
+    return data, None
+
+def validate_instagram_login_readiness(
+    *,
+    root: Path | None = None,
+    platform: str = "Instagram Feed",
+    media_type: str = "photo",
+) -> dict:
+    """Read-only pre-generation readiness for Instagram API with Instagram Login."""
+    base_root = _resolve_root(root)
+    status = config_status(False, root=base_root)
+    checks = status.get("checks", {})
+    if not checks.get("env_map_contract", {}).get("ok"):
+        return {"ok": False, "reason": "credential_map_unavailable", "status": {"env_map_contract": checks.get("env_map_contract", {})}, "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+    if not checks.get("canonical_secret_source", {}).get("ok"):
+        return {"ok": False, "reason": "canonical_secret_source_unavailable", "status": {"canonical_secret_source": checks.get("canonical_secret_source", {})}, "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+    try:
+        cfg = load_config(base_root)
+    except ConfigContractError as exc:
+        return {"ok": False, "reason": "publisher_config_unavailable", "detail": str(exc), "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+
+    route = resolve_media_host_route(cfg, base_root)
+    if not route.get("ok"):
+        return {
+            "ok": False,
+            "reason": "media_host_not_ready",
+            "media_host_route": {
+                "ok": False,
+                "reason": route.get("reason", ""),
+                "host_kind": route.get("host", {}).get("host_kind", ""),
+                "missing_nonsecret_keys": route.get("missing_nonsecret_keys", []),
+                "missing_secret_keys": route.get("missing_secret_keys", []),
+            },
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "instagram_container_created": False,
+        }
+
+    token = token_for_platform(cfg, platform)
+    if not token:
+        return {"ok": False, "reason": "instagram_login_access_token_missing", "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+    expected_id = instagram_professional_account_id(cfg)
+    if not expected_id:
+        return {"ok": False, "reason": "instagram_professional_account_id_missing", "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+
+    me, failure = _checked_graph_get(
+        "/me",
+        {"fields": "id,user_id,username,account_type"},
+        cfg,
+        token=token,
+        default_reason="instagram_token_invalid",
+    )
+    if failure:
+        return {**failure, "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+    resolved_id = str(me.get("id") or me.get("user_id") or "") if isinstance(me, dict) else ""
+    if resolved_id != expected_id:
+        return {
+            "ok": False,
+            "reason": "instagram_professional_account_mismatch",
+            "expected_instagram_professional_account_id": expected_id,
+            "resolved_instagram_professional_account_id": resolved_id,
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "instagram_container_created": False,
+        }
+
+    debug, failure = _checked_graph_get(
+        "/debug_token",
+        {"input_token": token},
+        cfg,
+        token=token,
+        default_reason="instagram_scope_validation_failed",
+    )
+    if failure:
+        return {**failure, "provider_calls_performed": 0, "publish_calls_performed": 0, "instagram_container_created": False}
+    data = debug.get("data", debug) if isinstance(debug, dict) else {}
+    raw_scopes = data.get("scopes", []) if isinstance(data, dict) else []
+    if not raw_scopes and isinstance(data, dict):
+        granular_scopes = data.get("granular_scopes", [])
+        if isinstance(granular_scopes, list):
+            raw_scopes = [
+                item.get("scope") if isinstance(item, dict) else item
+                for item in granular_scopes
+            ]
+    scopes = {str(scope) for scope in raw_scopes if scope}
+    missing_scopes = sorted(REQUIRED_INSTAGRAM_LOGIN_SCOPES - scopes)
+    if missing_scopes:
+        return {
+            "ok": False,
+            "reason": "instagram_business_content_publish_scope_missing" if "instagram_business_content_publish" in missing_scopes else "instagram_business_basic_scope_missing",
+            "missing_scopes": missing_scopes,
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "instagram_container_created": False,
+        }
+    expires_at = data.get("expires_at") or data.get("expires_in") or "unknown"
+    return {
+        "ok": True,
+        "reason": "ready",
+        "platform": platform,
+        "media_type": media_type,
+        "auth_mode": "instagram_login",
+        "graph_base_url": graph_base(cfg, platform),
+        "instagram_professional_account_id": expected_id,
+        "instagram_username": str(me.get("username") or "") if isinstance(me, dict) else "",
+        "account_type": str(me.get("account_type") or "") if isinstance(me, dict) else "",
+        "required_scopes_present": sorted(REQUIRED_INSTAGRAM_LOGIN_SCOPES),
+        "token_expiry": expires_at,
+        "media_host_ready": True,
+        "media_host_method": route.get("route", ""),
+        "media_public_base_url": route.get("media_public_base_url", ""),
+        "credential_map_resolved": True,
+        "provider_calls_performed": 0,
+        "publish_calls_performed": 0,
+        "instagram_container_created": False,
+    }
+
+validate_pregeneration_publish_readiness = validate_instagram_login_readiness
 
 
 def validate_config_for(platform: str, media_type: str, root: Path | None = None) -> dict:
@@ -673,10 +852,10 @@ def validate_config_for(platform: str, media_type: str, root: Path | None = None
         reason = "missing_canonical_publisher_secret_source" if "canonical publisher secret source" in detail else "invalid_env_map_contract"
         return {"ok": False, "reason": reason, "detail": detail, "status": status}
     if platform.startswith("Instagram"):
-        if not cfg.get("instagram_business_account_id"):
-            return {"ok": False, "reason": "missing_instagram_business_account_id", "status": status}
-        if not (cfg.get("instagram_access_token") or cfg.get("page_access_token")):
-            return {"ok": False, "reason": "missing_instagram_or_page_access_token", "status": status}
+        if not instagram_professional_account_id(cfg):
+            return {"ok": False, "reason": "missing_instagram_professional_account_id", "status": status}
+        if not cfg.get("instagram_login_access_token"):
+            return {"ok": False, "reason": "missing_instagram_login_access_token", "status": status}
     elif platform.startswith("Facebook"):
         if not cfg.get("facebook_page_id"):
             return {"ok": False, "reason": "missing_facebook_page_id", "status": status}
@@ -699,12 +878,13 @@ def _auth_mode(cfg: dict) -> str:
     explicit = str(cfg.get("auth_mode") or "").strip().lower()
     if explicit in ("instagram_login", "facebook_login"):
         return explicit
-    token = str(cfg.get("instagram_access_token") or cfg.get("page_access_token") or "")
-    return "instagram_login" if token.startswith("IGAA") else "facebook_login"
+    return "instagram_login" if cfg.get("instagram_login_access_token") else "facebook_login"
 
 
 def graph_base(cfg: dict, platform: str = "") -> str:
     version = cfg.get("graph_api_version") or "v23.0"
+    if platform.startswith("Instagram"):
+        return f"https://graph.instagram.com/{version}"
     if platform.startswith("Facebook"):
         return f"https://graph.facebook.com/{version}"
     if _auth_mode(cfg) == "instagram_login":
@@ -918,7 +1098,7 @@ def fail(platform, payload, reason, extra=None):
     return {
         "ok": False, "posted": False, "version": "v2.9.1",
         "platform": platform, "queue_id": payload.get("queue_id"), "slot_id": payload.get("slot_id"),
-        "reason": reason, "extra": extra or {}
+        "reason": reason, "extra": sanitize_provider_value(extra or {})
     }
 
 

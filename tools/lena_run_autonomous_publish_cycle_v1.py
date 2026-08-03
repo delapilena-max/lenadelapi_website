@@ -40,7 +40,7 @@ from tools import lena_autopublish_approved_queue_v2_8 as autopublish  # noqa: E
 
 PY = sys.executable
 QUEUE_BUILDER_SCRIPT = ROOT / "tools" / "lena_build_approved_publish_queue_v2_8.py"
-APPROVED_PLATFORMS = ["Instagram Feed", "Facebook Page"]
+APPROVED_PLATFORMS = ["Instagram Feed"]
 
 
 class PublishCycleError(RuntimeError):

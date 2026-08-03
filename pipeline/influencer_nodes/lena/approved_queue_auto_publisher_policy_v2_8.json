@@ -20,8 +20,7 @@
   "queue_claim_lease_seconds": 1800,
   "max_attempts_per_row": 3,
   "autonomous_queue_platforms": [
-    "Instagram Feed",
-    "Facebook Page"
+    "Instagram Feed"
   ],
   "manual_live_mode_unchanged": true,
   "manual_live_flags": [

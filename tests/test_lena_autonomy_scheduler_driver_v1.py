@@ -19,12 +19,28 @@ def test_scheduler_driver_uses_shared_governed_runtime_root() -> None:
     assert driver.STATE_ROOT == driver.ROOT / Path(runtime_evidence.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix())
 
 
-def _roots(tmp_path: Path) -> dict[str, Path]:
+def _roots(tmp_path: Path) -> dict[str, object]:
     return {
         "schedule_root": tmp_path / "schedule",
         "state_root": tmp_path / "state",
         "receipt_root": tmp_path / "state",
+        "validate_publish_readiness": _ready_stub(),
     }
+
+
+def _ready_stub(*, ok: bool = True, reason: str = "ready"):
+    def validate_publish_readiness(*, root, platform, media_type):
+        return {
+            "ok": ok,
+            "reason": reason,
+            "platform": platform,
+            "media_type": media_type,
+            "provider_calls_performed": 0,
+            "publish_calls_performed": 0,
+            "instagram_container_created": False,
+        }
+
+    return validate_publish_readiness
 
 
 def _held_cycle_stub(calls: list[str]):
@@ -158,6 +174,70 @@ def test_failed_generation_records_a_skip_instead_of_a_late_publish(tmp_path: Pa
     morning_result = next(r for r in result["results"] if r["slot"] == "morning")
     assert morning_result["action"] == "skipped"
     assert json.loads(state_path.read_text(encoding="utf-8"))["status"] == "skipped"
+
+
+def test_missing_instagram_login_token_blocks_before_generation(tmp_path: Path) -> None:
+    schedule = schedule_mod.compute_daily_schedule(DATE)
+    generation_calls: list[str] = []
+    inside_window = schedule_mod.generation_at(schedule, "morning") + timedelta(minutes=1)
+
+    result = driver.run_once(
+        now=inside_window,
+        date_str=DATE,
+        policy_path=tmp_path / "policy.json",
+        run_cycle=_held_cycle_stub(generation_calls),
+        run_publish=_publish_stub([]),
+        validate_publish_readiness=_ready_stub(ok=False, reason="instagram_login_access_token_missing"),
+        schedule_root=tmp_path / "schedule",
+        state_root=tmp_path / "state",
+        receipt_root=tmp_path / "state",
+    )
+
+    assert generation_calls == []
+    morning = next(r for r in result["results"] if r["slot"] == "morning")
+    assert morning == {"slot": "morning", "action": "generation_blocked", "reason": "instagram_login_access_token_missing"}
+    state = json.loads(driver._state_path(DATE, "morning", tmp_path / "state").read_text(encoding="utf-8"))
+    assert state["status"] == "generation_blocked"
+    assert state["provider_calls_performed"] == 0
+    assert state["container_creation_performed"] == 0
+    receipt = next((tmp_path / "state" / DATE).glob("morning_generation_blocked_*.json"))
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["provider_calls_performed"] == 0
+    assert payload["queue_creation_performed"] == 0
+    assert payload["container_creation_performed"] == 0
+    assert payload["publish_calls_performed"] == 0
+
+
+def test_invalid_instagram_login_token_blocks_queued_publish_without_retry_loop(tmp_path: Path) -> None:
+    schedule = schedule_mod.compute_daily_schedule(DATE)
+    publish_calls: list[str] = []
+    state_path = driver._state_path(DATE, "morning", tmp_path / "state")
+    driver._write_state_atomic(state_path, {"status": "queued_awaiting_publish"})
+    at_publish = schedule_mod.publish_at(schedule, "morning") + timedelta(minutes=1)
+
+    def fail_if_generation_runs(**kwargs):
+        raise AssertionError("generation must not run during publish recovery")
+
+    for _ in range(2):
+        result = driver.run_once(
+            now=at_publish,
+            date_str=DATE,
+            policy_path=tmp_path / "policy.json",
+            run_cycle=fail_if_generation_runs,
+            run_publish=_publish_stub(publish_calls, posted=False),
+            validate_publish_readiness=_ready_stub(ok=False, reason="instagram_token_invalid"),
+            schedule_root=tmp_path / "schedule",
+            state_root=tmp_path / "state",
+            receipt_root=tmp_path / "state",
+        )
+
+    assert publish_calls == []
+    morning = next(r for r in result["results"] if r["slot"] == "morning")
+    assert morning == {"slot": "morning", "action": "noop", "status": "publish_blocked"}
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["status"] == "publish_blocked"
+    receipts = list((tmp_path / "state" / DATE).glob("morning_publish_blocked_*.json"))
+    assert len(receipts) == 1
 
 
 def test_missed_generation_window_records_a_skip_without_publishing_late(tmp_path: Path) -> None:

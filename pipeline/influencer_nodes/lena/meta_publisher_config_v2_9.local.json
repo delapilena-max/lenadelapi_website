@@ -1,9 +1,8 @@
 {
   "version": "v2.9.0",
-  "auth_mode": "facebook_login",
+  "auth_mode": "instagram_login",
   "graph_api_version": "v25.0",
-  "instagram_business_account_id": "17841409711154047",
-  "facebook_page_id": "1267219163131062",
+  "instagram_professional_account_id": "17841409711154047",
   "ig_share_reels_to_feed": true,
   "media_public_base_url": "https://media.nicnodes.us",
   "r2_account_id": "c0e8fe2666397392158302767db14a7b",
@@ -11,7 +10,8 @@
   "r2_public_base_url": "https://media.nicnodes.us",
   "dry_run": false,
   "notes": [
-    "auth_mode: facebook_login uses META_PAGE_ACCESS_TOKEN via graph.facebook.com.",
+    "auth_mode: instagram_login uses INSTAGRAM_LOGIN_ACCESS_TOKEN via graph.instagram.com.",
+    "Facebook Login, Facebook Page tokens, /me/accounts discovery, and Page-linked Instagram discovery are retired for Lena publishing.",
     "Tokens and secrets live only in the canonical machine-local publisher secret file C:/projects/ai/content_bot/.env.",
     "R2 access credentials live only in the canonical machine-local publisher secret file; non-secret R2 route values are tracked here.",
     "Meta publishing uses the governed nicnodes-media bucket and the production custom domain https://media.nicnodes.us."
