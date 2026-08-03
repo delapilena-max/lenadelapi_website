@@ -556,21 +556,18 @@ D. Decisions made
 
 A. What changed
 
-- Added an offline Lena video creative-generation layer so every new video content unit can receive a fresh provisional creative JSON authority before deterministic prompt compilation.
-- Added the LLM instruction authority for structured JSON only; it cannot validate itself, calculate trusted hashes, authorize execution, reuse a prior prompt, silently change locked input, mutate learning, call providers, queue, or publish.
-- Added deterministic compilation, prompt SHA, request SHA, plan SHA, fingerprint, prompt-transport proof, novelty checks, prompt-reuse blocking, and immutable attempt artifact construction.
+- Added an offline Lena video creative-generation layer inside the canonical namespace `pipeline/media_properties/lena/video/`, so every new video content unit can receive fresh canonical A-N source artifacts before deterministic prompt compilation.
+- Removed the provisional parallel `pipeline/video/` namespace during merge-gate review because it duplicated schema, provider-compiler, prompt-hash, request-hash, and example-package authority.
+- Added the LLM instruction authority for structured JSON only; it cannot define schemas, compile provider requests, calculate final request hashes or fingerprints, authorize execution, reuse a prior prompt, silently change locked input, mutate learning, call providers, queue, or publish.
+- The fresh helper now delegates source validation to `validate_source_for_compilation()` and plan/request compilation to the existing canonical `compile_video()` path.
 - Added prompt-reuse rules that allow exact reuse only for same-job recovery, same ambiguous-submission reconciliation, same-result download/validation, or deterministic recompilation of the same immutable attempt.
 - Added attempt-versioning rules so a QA-rejected attempt cannot be rerun under the old compiled prompt as a new provider create call.
-- Added three offline example packages: SpaceX pilot Example 01 plus two unrelated examples proving distinct concept, environment, wardrobe, HPE action, camera grammar, and prompt hashes.
+- Fresh examples are generated as temporary fixtures in tests/CLI output roots only; they do not consume a governed daily production slot.
 
 B. Files changed
 
-- `pipeline/video/__init__.py`
-- `pipeline/video/lena_video_creative_generation_v1.py`
-- `pipeline/video/lena/creative_authority/lena_video_creative_generator_instruction_v1.json`
-- `pipeline/video/lena/examples/2026-08-04/example-01-spacex-launch/attempt_001/*`
-- `pipeline/video/lena/examples/2026-08-04/example-02-night-market-dessert/attempt_001/*`
-- `pipeline/video/lena/examples/2026-08-04/example-03-rainy-balcony-reset/attempt_001/*`
+- `pipeline/media_properties/lena/video/fresh_creative_generation.py`
+- deleted `pipeline/video/**`
 - `tools/lena_build_fresh_video_package_v1.py`
 - `tests/test_lena_video_fresh_creative_generation_v1.py`
 - `pipeline/change_notes/NEXT_SESSION_START.md`
@@ -579,23 +576,24 @@ B. Files changed
 C. Validations run
 
 - `python -B -m pytest -p no:cacheprovider tests/test_lena_video_fresh_creative_generation_v1.py -q`
-  - Result: `11 passed`
-- `python -B -m compileall pipeline\video tools\lena_build_fresh_video_package_v1.py tests\test_lena_video_fresh_creative_generation_v1.py`
+  - Result: `15 passed`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_json_schemas_v1.py tests/test_lena_video_json_validation_v1.py -q`
+  - Result: `50 passed, 2 skipped`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_json_compiler_v1.py tests/test_lena_video_json_cli_architecture_v1.py -q`
+  - Result: `23 passed`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_higgsfield_retry_generation_approval_v1.py tests/test_lena_record_human_rejection_v1.py tests/test_lena_higgsfield_generation_approval_v1.py -q`
+  - Result: `141 passed`
+- `python -B -m compileall pipeline\media_properties\lena\video\fresh_creative_generation.py tools\lena_build_fresh_video_package_v1.py tests\test_lena_video_fresh_creative_generation_v1.py`
   - Result: passed
-- `git diff --check` on owned files
+- `git diff --check`
   - Result: passed
-- Adjacent clean-branch checks:
-  - `tests/test_lena_higgsfield_retry_generation_approval_v1.py`: `12 passed`
-  - `tests/test_lena_record_human_rejection_v1.py`: `14 passed`
-  - `tests/test_lena_higgsfield_generation_approval_v1.py`: `115 passed`
-- Pull request `#139` against `main` is mergeable and GitHub checks passed:
-  - `build`: pass
-  - `main_ci_check`: pass
 
 D. Decisions made
 
 - Root cause: the SpaceX Pilot dataset was a single immutable example episode with validators and deterministic compilers, but no upstream governed creative-generation layer that minted fresh per-video JSON authority before each new provider create call.
 - The SpaceX Pilot prompt remains valid only as an immutable example or for same-attempt recovery/reconciliation/validation/recompile; it must not become a reusable production prompt.
+- The canonical namespace is `pipeline/media_properties/lena/video/`; `pipeline/video/` must not become a competing Lena video authority surface.
+- Canonical source schemas, source validation, plan compilation, compiled request shape, prompt transport, request hashes, and fingerprints remain owned by the existing Lena video stack.
 - Keep this as an offline source/authority slice; no live executor, queue, publication, learning mutation, or photo-lane routing changed.
 - Use PR `#139` as the clean review target; conflicting PR `#138` was closed.
 

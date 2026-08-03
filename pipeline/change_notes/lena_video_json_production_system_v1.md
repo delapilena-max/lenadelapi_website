@@ -100,9 +100,9 @@ separate future tasks.
 
 The SpaceX Pilot chain remains one immutable example episode, not a reusable
 production prompt. A follow-up offline source slice adds the missing governed
-creative-generation layer so future Lena video production can mint a fresh
-provisional creative JSON authority, deterministic compiled prompt, hashes,
-fingerprint, and attempt artifact for each new content unit before any
+creative-generation layer under the canonical namespace
+`pipeline/media_properties/lena/video/` so future Lena video production can mint
+fresh canonical A-N source artifacts for each new content unit before any
 provider-bound authorization is considered.
 
 Root cause corrected at architecture level:
@@ -114,46 +114,52 @@ Root cause corrected at architecture level:
 - Without that layer, an immutable compiled Pilot prompt could be mistaken for a
   production template.
 
-The new offline layer records:
+The merge-gate review removed the provisional parallel `pipeline/video/` tree.
+That tree duplicated schema constants, canonical JSON/hash helpers, provider
+request compilation, final request hashes, prompt hashes, fingerprints, and
+example packages. Those responsibilities now remain solely with the existing
+canonical Lena video stack:
+
+- schemas: `pipeline/media_properties/lena/video/schemas/`;
+- source validation: `validate_source_for_compilation()`;
+- canonical compilation: `compile_video()`;
+- generation-plan and compiled-request shapes: canonical A-N schemas;
+- prompt transport, request hash, plan hash, and fingerprint: canonical compiler
+  outputs only.
+
+The repaired offline layer records:
 
 - structured-JSON-only LLM instruction authority;
-- provisional creative JSON generation;
-- deterministic provider-request compilation;
-- prompt SHA, request SHA, plan SHA, and fingerprint;
-- prompt transport proof that the Lena Character Element token remains first;
+- canonical A-N source artifact authoring;
+- canonical source validation before compilation;
+- deterministic prompt/request compilation only through `compile_video()`;
 - daily novelty checks across recent concept, environment, wardrobe, gesture,
   emotional arc, camera grammar, hook, CTA, audio, and ending-pose fields;
 - prompt-reuse blocking for new provider create calls;
-- immutable attempt artifact construction with superseded-attempt, prior-job,
-  previous-QA, creative-change, prompt, request, authorization, and retry fields.
+- offline attempt-record construction with superseded-attempt, prior-job,
+  previous-QA, creative-change, compiled request, source plan, authorization,
+  and retry fields. The attempt record cannot authorize provider creation.
 
 Prompt reuse is allowed only for same-provider-job recovery, reconciliation of
 the same ambiguous submission, downloading or validating the same result, or
 deterministic recompilation of the same immutable attempt. A QA-rejected attempt
 may not be rerun under the old prompt as a new provider create call.
 
-Three offline example packages were added under
-`pipeline/video/lena/examples/2026-08-04/`:
-
-- Example 01 SpaceX prompt SHA:
-  `1b399f011751e9336f1b7ef05657097c1ed5eb0ddeec4f6fa2cb3157a37cb323`
-- Example 02 night-market dessert prompt SHA:
-  `e9faa2594b5b11c085cb3484e4726fcf636a712430209cb6f983fbf860759753`
-- Example 03 rainy balcony reset prompt SHA:
-  `b53d795087e569a8a1fa0eaff76a69ae9316b578afe58d12355a970365afb8dc`
-
-All three prompts differ. All three keep the static Lena Character Element token
-first. No provider call, media generation, queue action, publication, scheduler,
-credential, `.env`, Anthropic, live photo-lane, or historical evidence mutation
-occurred.
+Offline examples are now generated as test/CLI fixtures under explicit output
+roots. They do not live under a governed production date tree and do not consume
+a real daily slot. The tests prove three example concepts compile through the
+canonical compiler to three distinct prompts, and each compiled prompt begins
+with the static Lena Character Element token.
 
 Validation:
 
-- fresh-video suite: `11 passed`;
-- compileall for new video module, CLI, and tests: passed;
-- owned-file `git diff --check`: passed;
-- adjacent clean-branch checks:
-  - retry generation approval: `12 passed`;
-  - human rejection recorder: `14 passed`;
-  - Higgsfield generation approval: `115 passed`;
-- PR `#139`: mergeable, GitHub `build` pass, GitHub `main_ci_check` pass.
+- fresh-video suite: `15 passed`;
+- canonical video schema/validation ring: `50 passed, 2 skipped`;
+- canonical video compiler/CLI architecture ring: `23 passed`;
+- adjacent generation-approval/human-rejection ring: `141 passed`;
+- compileall for canonical fresh video module, CLI, and tests: passed;
+- `git diff --check`: passed.
+
+No provider call, media generation, queue action, publication, scheduler,
+credential, `.env`, Anthropic, live photo-lane, or historical evidence mutation
+occurred.
