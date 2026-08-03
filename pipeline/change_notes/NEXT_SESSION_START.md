@@ -551,3 +551,65 @@ D. Decisions made
 - Treat normal scheduler evidence as allowed runtime dirt for readiness, but continue reporting every excluded path, count, and root transparently.
 - Do not enable, disable, or start the scheduler from Codex.
 - Do not generate, queue, publish, reconcile, invoke Anthropic, or touch video.
+
+## Addendum (Codex, 2026-08-03) - fresh Lena video creative authority prevents Pilot prompt reuse
+
+A. What changed
+
+- Added an offline Lena video creative-generation layer inside the canonical namespace `pipeline/media_properties/lena/video/`, so every new video content unit can receive fresh canonical A-N source artifacts before deterministic prompt compilation.
+- Removed the provisional parallel `pipeline/video/` namespace during merge-gate review because it duplicated schema, provider-compiler, prompt-hash, request-hash, and example-package authority.
+- Added the LLM instruction authority for structured JSON only; it cannot define schemas, compile provider requests, calculate final request hashes or fingerprints, authorize execution, reuse a prior prompt, silently change locked input, mutate learning, call providers, queue, or publish.
+- The fresh helper now delegates source validation to `validate_source_for_compilation()` and plan/request compilation to the existing canonical `compile_video()` path.
+- Added prompt-reuse rules that allow exact reuse only for same-job recovery, same ambiguous-submission reconciliation, same-result download/validation, or deterministic recompilation of the same immutable attempt.
+- Added attempt-versioning rules so a QA-rejected attempt cannot be rerun under the old compiled prompt as a new provider create call.
+- Fresh examples are generated as temporary fixtures in tests/CLI output roots only; they do not consume a governed daily production slot.
+
+B. Files changed
+
+- `pipeline/media_properties/lena/video/fresh_creative_generation.py`
+- deleted `pipeline/video/**`
+- `tools/lena_build_fresh_video_package_v1.py`
+- `tests/test_lena_video_fresh_creative_generation_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+- `pipeline/change_notes/lena_video_json_production_system_v1.md`
+
+C. Validations run
+
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_fresh_creative_generation_v1.py -q`
+  - Result: `15 passed`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_json_schemas_v1.py tests/test_lena_video_json_validation_v1.py -q`
+  - Result: `50 passed, 2 skipped`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_json_compiler_v1.py tests/test_lena_video_json_cli_architecture_v1.py -q`
+  - Result: `23 passed`
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_higgsfield_retry_generation_approval_v1.py tests/test_lena_record_human_rejection_v1.py tests/test_lena_higgsfield_generation_approval_v1.py -q`
+  - Result: `141 passed`
+- `python -B -m compileall pipeline\media_properties\lena\video\fresh_creative_generation.py tools\lena_build_fresh_video_package_v1.py tests\test_lena_video_fresh_creative_generation_v1.py`
+  - Result: passed
+- `git diff --check`
+  - Result: passed
+
+D. Decisions made
+
+- Root cause: the SpaceX Pilot dataset was a single immutable example episode with validators and deterministic compilers, but no upstream governed creative-generation layer that minted fresh per-video JSON authority before each new provider create call.
+- The SpaceX Pilot prompt remains valid only as an immutable example or for same-attempt recovery/reconciliation/validation/recompile; it must not become a reusable production prompt.
+- The canonical namespace is `pipeline/media_properties/lena/video/`; `pipeline/video/` must not become a competing Lena video authority surface.
+- Canonical source schemas, source validation, plan compilation, compiled request shape, prompt transport, request hashes, and fingerprints remain owned by the existing Lena video stack.
+- Keep this as an offline source/authority slice; no live executor, queue, publication, learning mutation, or photo-lane routing changed.
+- Use PR `#139` as the clean review target; conflicting PR `#138` was closed.
+
+E. Blockers / parked branches
+
+- No provider execution is authorized by this checkpoint.
+- No automatic live-video engine integration is completed here; this is the creative authority and guard layer only.
+- Legacy checkpoint-skill files `lena_filesystem_native_agent_pivot_master.md` and `lena_agentic_pivot_changelog.md` are absent from current `origin/main`; this checkpoint updates the current `NEXT_SESSION_START.md` plus the current video JSON production change note instead.
+
+F. Next approved step
+
+- Review and merge PR `#139` if the implementation and CI remain acceptable.
+- After merge, wire future daily video planning through this fresh creative authority before any provider-bound request is considered.
+
+G. What must not be done
+
+- Do not reuse the SpaceX Pilot compiled prompt for a new provider create call.
+- Do not rerun a QA-rejected attempt under the old prompt as a new create call.
+- Do not generate media, spend credits, create queue entries, publish, invoke Anthropic, edit `.env`, or mutate the live photo lane from this slice.
