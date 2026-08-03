@@ -1,0 +1,13 @@
+@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)
+[Format] Exactly 8 seconds, 720p portrait 9:16, one continuous premium social-video shot.
+[Identity] Verified adult Lena through the saved Character Element; preserve stable face geometry, body proportions, natural eyes, skin texture, hairline, hair motion, hands, and fingers.
+[Concept] rainy apartment balcony reset :: rainy balcony reset
+[Hook] Lena pauses her chaotic morning when rain turns the balcony into a private reset.
+[Business Intent] Save-driving intimacy Reel emphasizing calm, beauty, and repeatable ritual.
+[Environment] small apartment balcony after rain with plants, wet railing, city lights, and warm indoor spill.
+[Wardrobe] soft oat cropped cardigan over fitted taupe tank, high-waist charcoal lounge shorts, cream socks
+[Camera] locked vertical doorway frame looking out to balcony; nearly static with a tiny human handheld sway; vertical social video; Lena remains the dominant subject; action relationship must be visually legible.
+[Human Presence Timeline] 0-2s: establish hook: Lena pauses her chaotic morning when rain turns the balcony into a private reset. (clear attention shift). 2-4s: body beat: slow mug lift and shoulder-softening exhale begins (readable motive). 4-6s: complete gesture: slow mug lift and shoulder-softening exhale (single completed action). 6-8s: resolve: leaning on railing with mug near chest (grounded reset).
+[Audio] rain, ceramic mug touch, quiet room tone, soft no-lyric music
+[Caption Intent] Save this for your next reset. Hook structure: chaos-to-calm transformation.
+[Hard constraints] Use the bound Lena Character Element; no unrelated reference asset; no publication authority; no queue authority; one provider create call only after separate paid authorization.

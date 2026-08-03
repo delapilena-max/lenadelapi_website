@@ -1,0 +1,13 @@
+@[Lena](6a842337-ef20-4cb9-a0ff-04fa5eb8f8d3)
+[Format] Exactly 8 seconds, 720p portrait 9:16, one continuous premium social-video shot.
+[Identity] Verified adult Lena through the saved Character Element; preserve stable face geometry, body proportions, natural eyes, skin texture, hairline, hair motion, hands, and fingers.
+[Concept] night-market dessert choice flirt challenge :: night market dessert choice
+[Hook] Lena spots two desserts and silently makes the comments choose.
+[Business Intent] Comment-driving lifestyle Reel built for playful parasocial engagement.
+[Environment] busy outdoor night market dessert stall with warm practical lights and shallow crowd movement.
+[Wardrobe] black ribbed square-neck top, cream cropped jacket, dark fitted skirt, low white sneakers
+[Camera] close companion walk-and-talk framing with dessert insert cut-ins represented in one continuous shot; slow side-step orbit; vertical social video; Lena remains the dominant subject; action relationship must be visually legible.
+[Human Presence Timeline] 0-2s: establish hook: Lena spots two desserts and silently makes the comments choose. (clear attention shift). 2-4s: body beat: two-option palm reveal between dessert trays begins (readable motive). 4-6s: complete gesture: two-option palm reveal between dessert trays (single completed action). 6-8s: resolve: half-smile holding both choices in frame (playful comment bait).
+[Audio] market ambience, paper tray rustle, soft laugh breath, no dialogue
+[Caption Intent] Pick left or right. Hook structure: choice prompt before payoff.
+[Hard constraints] Use the bound Lena Character Element; no unrelated reference asset; no publication authority; no queue authority; one provider create call only after separate paid authorization.

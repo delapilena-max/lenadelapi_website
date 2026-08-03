@@ -1,0 +1,79 @@
+{
+  "schema_version": "lena_video_creative_generation_v1",
+  "authority_state": "provisional_requires_validation",
+  "influencer_id": "lena",
+  "video_id": "example-03-rainy-balcony-reset",
+  "governed_date": "2026-08-04",
+  "daily_slot": "video-example-03",
+  "concept": "rainy apartment balcony reset :: rainy balcony reset",
+  "hook": "Lena pauses her chaotic morning when rain turns the balcony into a private reset.",
+  "business_intent": "Save-driving intimacy Reel emphasizing calm, beauty, and repeatable ritual.",
+  "environment": "small apartment balcony after rain with plants, wet railing, city lights, and warm indoor spill.",
+  "wardrobe": "soft oat cropped cardigan over fitted taupe tank, high-waist charcoal lounge shorts, cream socks",
+  "outfit_family": "cozy elevated lounge",
+  "principal_gesture": "slow mug lift and shoulder-softening exhale",
+  "emotional_arc": "frazzled start to private calm to grounded confidence",
+  "camera_contract": {
+    "grammar": "locked vertical doorway frame looking out to balcony",
+    "movement": "nearly static with a tiny human handheld sway",
+    "framing": "vertical social video; Lena remains the dominant subject; action relationship must be visually legible"
+  },
+  "camera_grammar": "locked vertical doorway frame looking out to balcony",
+  "camera_movement": "nearly static with a tiny human handheld sway",
+  "audio_plan": "rain, ceramic mug touch, quiet room tone, soft no-lyric music",
+  "caption_intent": {
+    "cta": "Save this for your next reset.",
+    "hook_structure": "chaos-to-calm transformation",
+    "platform_needs": [
+      "reels_primary",
+      "comment_or_save_intent"
+    ]
+  },
+  "provider_neutral_plan": {
+    "duration_seconds": 8,
+    "resolution": "720p",
+    "aspect_ratio": "9:16",
+    "audio_enabled": true,
+    "model_family": "provider_neutral_video",
+    "no_provider_create_authority": true
+  },
+  "hpe_timeline": [
+    {
+      "time_window": "0-2s",
+      "action": "establish hook: Lena pauses her chaotic morning when rain turns the balcony into a private reset.",
+      "human_presence_goal": "clear attention shift"
+    },
+    {
+      "time_window": "2-4s",
+      "action": "body beat: slow mug lift and shoulder-softening exhale begins",
+      "human_presence_goal": "readable motive"
+    },
+    {
+      "time_window": "4-6s",
+      "action": "complete gesture: slow mug lift and shoulder-softening exhale",
+      "human_presence_goal": "single completed action"
+    },
+    {
+      "time_window": "6-8s",
+      "action": "resolve: leaning on railing with mug near chest",
+      "human_presence_goal": "grounded reset"
+    }
+  ],
+  "ending_pose": "leaning on railing with mug near chest",
+  "hook_structure": "chaos-to-calm transformation",
+  "cta": "Save this for your next reset.",
+  "audio_use": "rain, ceramic mug touch, quiet room tone, soft no-lyric music",
+  "emotional_payoff": "grounded reset",
+  "assumptions": [
+    "Static Lena identity authority is referenced, not regenerated.",
+    "This provisional JSON is not execution authority.",
+    "Separate novelty, schema, cross-artifact, compilation, inspection, cost, and paid authorization gates are required."
+  ],
+  "source_inputs_summary": {
+    "has_static_lena_character_authority": false,
+    "has_learning_ledger": false,
+    "recent_history_count": 0,
+    "prohibited_repetition_lockouts": [],
+    "current_user_seed": "rainy balcony reset"
+  }
+}
