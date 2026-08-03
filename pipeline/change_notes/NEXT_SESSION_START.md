@@ -1,4 +1,45 @@
-# Next Session Start - Lena Reference-Guided Higgsfield Integration
+# Next Session Start - content_bot Canonical State
+
+Updated: 2026-08-03
+Authoritative main: `824f58615eee41e15b93f72d71bb8b8241fcf169`
+
+## Current Operating State - 2026-08-03
+
+- PR `#139` is merged.
+- Resulting main SHA: `824f58615eee41e15b93f72d71bb8b8241fcf169`.
+- Verdict: `lena_fresh_prompt_generation_merged`.
+- Canonical Lena video authority: `pipeline/media_properties/lena/video/`.
+- Fresh creative generator: `pipeline/media_properties/lena/video/fresh_creative_generation.py`.
+- The competing `pipeline/video/` authority tree was removed.
+- The current video slot is complete because Nic already posted a video.
+- SpaceX job: `46af7a32-8b36-46e6-adbf-b3172a635e83`.
+- SpaceX result: `qa_rejected`.
+- Charged cost: `20 credits`.
+- Submitted generation calls: `1`.
+- Submitted retries: `0`.
+- Queue/publication from that job: none.
+- SpaceX Attempt 02: cancelled and unauthorized.
+- The rejected SpaceX asset and QA evidence remain historical learning evidence only.
+- Do not resume SpaceX unless Nic explicitly requests it.
+- The next open video slot requires a completely fresh concept, fresh JSON authority, and fresh compiled prompt.
+- No production action is currently required until that next slot is open or Nic gives a new instruction.
+
+## Current Next Action
+
+No production action is currently required. If Nic opens the next video slot or gives a new production instruction, start from the canonical Lena video authority and create a fresh concept, fresh source JSON, and fresh compiled prompt/request.
+
+## Current Hard Prohibitions
+
+- Do not generate media, call providers, spend credits, create queue entries, publish, invoke Anthropic, edit `.env`, modify schedulers, modify the live photo lane, or modify ITB from this handoff.
+- Do not resume SpaceX, prepare SpaceX Attempt 02, or recommend another generation for the completed slot unless Nic explicitly requests a revision or replacement.
+- Do not reuse the SpaceX Pilot or rejected SpaceX prompt/request for a new provider create call.
+- Preserve rejected SpaceX output and QA findings as immutable historical learning evidence.
+
+## Historical Entries Below
+
+Entries below this line are retained as historical context. They do not override the current operating state above.
+
+# Historical - Lena Reference-Guided Higgsfield Integration
 
 Updated: 2026-07-23
 Repo: `C:\projects\ai\content_bot\lenadelapi_website_full_photo_autonomy`
