@@ -90,7 +90,7 @@ def _released_policy_payload(
         "hard_item_limit_per_invocation": 1,
         "queue_claim_lease_seconds": 1800,
         "max_attempts_per_row": 3,
-        "autonomous_queue_platforms": ["Instagram Feed", "Facebook Page"],
+        "autonomous_queue_platforms": ["Instagram Feed"],
         "manual_live_mode_unchanged": True,
         "manual_live_flags": ["--live", "--i-understand-this-can-publish"],
         "autonomous_mode_requires_distinct_policy_gate": True,
