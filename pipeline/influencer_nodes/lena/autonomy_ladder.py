@@ -15,7 +15,7 @@ LEVEL_3_POLICY_ID = "lena_approved_queue_auto_publisher_policy_v2_8"
 LEVEL_3_POLICY_VERSION = "v2.8.0"
 LEVEL_3_POLICY_PATH = Path("pipeline/influencer_nodes/lena/approved_queue_auto_publisher_policy_v2_8.json")
 LEVEL_3_APPROVED_SLOTS = ("morning", "afternoon", "evening")
-LEVEL_3_APPROVED_PLATFORMS = ("Facebook Page", "Instagram Feed")
+LEVEL_3_APPROVED_PLATFORMS = ("Instagram Feed",)
 LEVEL_3_REQUIRED_LIVE_FLAGS = ("--i-understand-this-can-publish", "--live")
 
 
@@ -161,7 +161,7 @@ def _validate_level_three_authority(binding: dict[str, Any]) -> dict[str, Any]:
     _require(int(policy.get("hard_item_limit_per_invocation", 0)) == 1, "level_3_policy_unauthorized", "hard_item_limit_per_invocation must be one")
     _require(int(policy.get("queue_claim_lease_seconds", 0)) > 0, "level_3_policy_unauthorized", "queue_claim_lease_seconds must be positive")
     _require(int(policy.get("max_attempts_per_row", 0)) > 0, "level_3_policy_unauthorized", "max_attempts_per_row must be positive")
-    _require(_policy_required_set(policy.get("autonomous_queue_platforms", [])) == set(LEVEL_3_APPROVED_PLATFORMS), "level_3_policy_unauthorized", "autonomous_queue_platforms must remain Instagram Feed and Facebook Page only")
+    _require(_policy_required_set(policy.get("autonomous_queue_platforms", [])) == set(LEVEL_3_APPROVED_PLATFORMS), "level_3_policy_unauthorized", "autonomous_queue_platforms must remain Instagram Feed only")
     _require(policy.get("live_posting_requires_explicit_flags") is True, "level_3_policy_unauthorized", "live posting must require explicit flags")
     _require(_policy_required_set(policy.get("required_live_flags", [])) == set(LEVEL_3_REQUIRED_LIVE_FLAGS), "level_3_policy_unauthorized", "required live flags must remain --live and --i-understand-this-can-publish")
 

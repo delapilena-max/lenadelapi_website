@@ -4,7 +4,7 @@ from pathlib import Path
 from lena_meta_publish_common_v2_9 import (
     validate_config_for, preflight_token, ensure_public_media,
     graph_post, wait_for_container, permalink, success, fail,
-    check_final_publish_approval,
+    check_final_publish_approval, instagram_professional_account_id, sanitize_exception,
 )
 
 
@@ -51,7 +51,7 @@ def main():
             media.get("reason", "media_public_url_failed"), media), indent=2))
         return 1
     try:
-        ig_id = cfg["instagram_business_account_id"]
+        ig_id = instagram_professional_account_id(cfg)
         _EXPECTED_IG_ID = "17841409711154047"
         if ig_id != _EXPECTED_IG_ID:
             print(json.dumps(fail(platform, payload, "ig_id_guard_failed",
@@ -87,7 +87,7 @@ def main():
         return 0
     except Exception as e:
         print(json.dumps(fail(platform, payload,
-            "instagram_feed_publish_error", {"error": str(e)}), indent=2))
+            "instagram_feed_publish_error", {"error": sanitize_exception(e)}), indent=2))
         return 1
 
 

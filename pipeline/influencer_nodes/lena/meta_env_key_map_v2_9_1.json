@@ -2,19 +2,13 @@
   "contract_id": "lena_meta_env_key_map_v2_9_1",
   "schema_version": "v1",
   "version": "v2.9.1",
-  "authority": "hybrid_contract_is_canonical",
+  "authority": "instagram_login_contract_is_canonical",
   "key_map": {
-    "page_access_token": [
-      "META_PAGE_ACCESS_TOKEN"
+    "instagram_login_access_token": [
+      "INSTAGRAM_LOGIN_ACCESS_TOKEN"
     ],
-    "instagram_access_token": [
-      "META_INSTAGRAM_ACCESS_TOKEN"
-    ],
-    "instagram_business_account_id": [
-      "META_IG_USER_ID"
-    ],
-    "facebook_page_id": [
-      "META_FACEBOOK_PAGE_ID"
+    "instagram_professional_account_id": [
+      "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID"
     ],
     "graph_api_version": [
       "META_GRAPH_API_VERSION"

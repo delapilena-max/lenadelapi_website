@@ -10,6 +10,7 @@ from tools import lena_autonomy_runtime_evidence_v1 as autonomy_runtime
 from tools import lena_autonomy_daily_schedule_v1 as schedule_mod
 from tools import lena_full_photo_autonomy_v1 as full_autonomy
 from tools import lena_autopublish_approved_queue_v2_8 as autonomous_publisher
+from tools.publishers import lena_meta_publish_common_v2_9 as meta_publish
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE_ROOT = ROOT / Path(autonomy_runtime.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix())
@@ -17,7 +18,7 @@ STATE_ROOT = ROOT / Path(autonomy_runtime.SCHEDULER_DRIVER_RUNTIME_ROOT.as_posix
 REPORT_TYPE_RECEIPT = "lena_autonomy_scheduler_receipt"
 SCHEMA_VERSION = "v1"
 
-TERMINAL_STATUSES = {"published", "skipped"}
+TERMINAL_STATUSES = {"published", "skipped", "generation_blocked", "publish_blocked"}
 
 
 def _now_chicago() -> datetime:
@@ -87,6 +88,7 @@ def run_slot_once(
     policy_path: Path,
     run_cycle: Callable[..., dict[str, Any]],
     run_publish: Callable[..., dict[str, Any]],
+    validate_publish_readiness: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     state_path = _state_path(date_str, slot, state_root)
     state = _read_state(state_path)
@@ -100,6 +102,40 @@ def run_slot_once(
     if status == "queued_awaiting_publish":
         if now < publish_due_at:
             return {"slot": slot, "action": "noop", "status": "queued_awaiting_publish"}
+        readiness = validate_publish_readiness(root=ROOT, platform="Instagram Feed", media_type="photo")
+        if not readiness.get("ok"):
+            reason = str(readiness.get("reason") or "publishing_readiness_failed")
+            receipt = _write_receipt(
+                receipt_root,
+                date_str,
+                slot,
+                "publish_blocked",
+                {
+                    "blocked_stage": "pre_publish_publish_readiness",
+                    "reason": reason,
+                    "readiness": readiness,
+                    "provider_calls_performed": 0,
+                    "credits_spent": 0,
+                    "queue_creation_performed": 0,
+                    "container_creation_performed": 0,
+                    "publish_calls_performed": 0,
+                },
+                now=now,
+            )
+            _write_state_atomic(
+                state_path,
+                {
+                    "status": "publish_blocked",
+                    "blocked_reason": reason,
+                    "blocked_receipt": str(receipt),
+                    "provider_calls_performed": 0,
+                    "credits_spent": 0,
+                    "queue_creation_performed": 0,
+                    "container_creation_performed": 0,
+                    "publish_calls_performed": 0,
+                },
+            )
+            return {"slot": slot, "action": "publish_blocked", "reason": reason}
         try:
             publish_result = run_publish(day=date_str, slot_keyword=slot, limit=1, dry_run=False)
         except Exception as exc:  # noqa: BLE001 - recorded, never crashes the poll loop
@@ -132,6 +168,35 @@ def run_slot_once(
     if now < generation_due_at:
         return {"slot": slot, "action": "noop", "status": "waiting_for_generation_window"}
 
+    readiness = validate_publish_readiness(root=ROOT, platform="Instagram Feed", media_type="photo")
+    if not readiness.get("ok"):
+        reason = str(readiness.get("reason") or "publishing_readiness_failed")
+        payload = {
+            "blocked_stage": "pre_generation_publish_readiness",
+            "reason": reason,
+            "readiness": readiness,
+            "provider_calls_performed": 0,
+            "credits_spent": 0,
+            "queue_creation_performed": 0,
+            "container_creation_performed": 0,
+            "publish_calls_performed": 0,
+        }
+        receipt = _write_receipt(receipt_root, date_str, slot, "generation_blocked", payload, now=now)
+        _write_state_atomic(
+            state_path,
+            {
+                "status": "generation_blocked",
+                "blocked_reason": reason,
+                "blocked_receipt": str(receipt),
+                "provider_calls_performed": 0,
+                "credits_spent": 0,
+                "queue_creation_performed": 0,
+                "container_creation_performed": 0,
+                "publish_calls_performed": 0,
+            },
+        )
+        return {"slot": slot, "action": "generation_blocked", "reason": reason}
+
     try:
         result = run_cycle(day=date_str, schedule_slot=slot, policy_path=policy_path, hold_for_publish=True)
     except full_autonomy.FullPhotoAutonomyError as exc:
@@ -163,6 +228,7 @@ def run_slot_once(
             date_str=date_str, slot=slot, now=now, schedule=schedule,
             state_root=state_root, receipt_root=receipt_root, policy_path=policy_path,
             run_cycle=run_cycle, run_publish=run_publish,
+            validate_publish_readiness=validate_publish_readiness,
         )
 
     receipt = _write_receipt(receipt_root, date_str, slot, "generation_failure", {"result": result}, now=now)
@@ -180,6 +246,7 @@ def run_once(
     policy_path: Path = full_autonomy.POLICY_PATH,
     run_cycle: Callable[..., dict[str, Any]] = full_autonomy.run_controlled_cycle,
     run_publish: Callable[..., dict[str, Any]] = autonomous_publisher.run_scheduled_autonomous,
+    validate_publish_readiness: Callable[..., dict[str, Any]] = meta_publish.validate_pregeneration_publish_readiness,
     inspect_only: bool = False,
 ) -> dict[str, Any]:
     resolved_now = _normalize_now(now)
@@ -209,6 +276,7 @@ def run_once(
             policy_path=policy_path,
             run_cycle=run_cycle,
             run_publish=run_publish,
+            validate_publish_readiness=validate_publish_readiness,
         )
         for slot in schedule_mod.SLOT_ORDER
     ]

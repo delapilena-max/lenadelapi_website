@@ -13,8 +13,10 @@ SCHEDULER_DRIVER_RECEIPT_KINDS = frozenset(
     {
         "generation",
         "generation_failure",
+        "generation_blocked",
         "generation_success",
         "publish",
+        "publish_blocked",
         "publish_failure",
         "poll",
         "poll_result",

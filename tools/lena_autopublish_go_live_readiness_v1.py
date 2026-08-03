@@ -50,8 +50,8 @@ PYTHON_EXE_ENV_KEYS = (
 )
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
 REQUIRED_PUBLISH_ENV_KEYS = (
-    "META_PAGE_ACCESS_TOKEN",
-    "META_INSTAGRAM_ACCESS_TOKEN",
+    "INSTAGRAM_LOGIN_ACCESS_TOKEN",
+    "INSTAGRAM_PROFESSIONAL_ACCOUNT_ID",
     "R2_ACCESS_KEY_ID",
     "R2_SECRET_ACCESS_KEY",
 )
@@ -422,12 +422,13 @@ def _probe_python_interpreter(python_exe: Path, production_root: Path) -> dict[s
 def _required_runtime_env_keys(config_status: dict[str, Any], effective_cfg: dict[str, Any]) -> set[str]:
     required: set[str] = set()
     auth_mode = str(effective_cfg.get("auth_mode") or "").strip().lower()
-    page_token = str(effective_cfg.get("page_access_token") or "").strip()
-    instagram_token = str(effective_cfg.get("instagram_access_token") or "").strip()
-    if not page_token and bool(effective_cfg.get("facebook_page_id")):
-        required.add("META_PAGE_ACCESS_TOKEN")
-    if not page_token and not instagram_token and auth_mode == "instagram_login":
-        required.add("META_INSTAGRAM_ACCESS_TOKEN")
+    instagram_token = str(effective_cfg.get("instagram_login_access_token") or "").strip()
+    instagram_account_id = str(effective_cfg.get("instagram_professional_account_id") or "").strip()
+    if auth_mode == "instagram_login":
+        if not instagram_token:
+            required.add("INSTAGRAM_LOGIN_ACCESS_TOKEN")
+        if not instagram_account_id:
+            required.add("INSTAGRAM_PROFESSIONAL_ACCOUNT_ID")
     try:
         media_host_route = publish_common.resolve_media_host_route(effective_cfg, ROOT)
     except publish_common.ConfigContractError:
@@ -466,7 +467,7 @@ def _env_presence_report(
     except publish_common.ConfigContractError:
         effective_cfg = publish_common.load_file_config(production_root)
     key_map = env_map.get("key_map", {}) if isinstance(env_map, dict) else {}
-    required_env_keys = _required_runtime_env_keys(config_status, effective_cfg) if env_map_ok else {"META_PAGE_ACCESS_TOKEN"}
+    required_env_keys = _required_runtime_env_keys(config_status, effective_cfg) if env_map_ok else {"INSTAGRAM_LOGIN_ACCESS_TOKEN"}
     entries: list[dict[str, Any]] = []
     for env_key in REQUIRED_PUBLISH_ENV_KEYS:
         present_in_process = bool(process_env.get(env_key))
@@ -1133,11 +1134,10 @@ def _build_report(
         bool(config_checks.get("local_config_exists", {}).get("ok", False))
         and bool(config_checks.get("dotenv_sources", {}).get("ok", False))
         and bool(config_readiness.get("instagram_ready", False))
-        and bool(config_readiness.get("facebook_ready", False))
         and bool(config_readiness.get("media_host_ready", False))
     )
     if not publisher_config_ready:
-        blockers.append({"code": "publisher_config_not_ready", "detail": "Instagram, Facebook, media host, local config, and dotenv sources must all be ready"})
+        blockers.append({"code": "publisher_config_not_ready", "detail": "Instagram Login, media host, local config, and canonical dotenv sources must all be ready"})
     if not env_report.get("env_map_contract_ok", False):
         blockers.append({"code": "publisher_env_map_invalid", "detail": env_report.get("env_map_error", "publisher env map contract is invalid")})
     elif not env_report.get("secret_source_contract_ok", False):

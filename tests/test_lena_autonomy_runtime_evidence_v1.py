@@ -12,8 +12,10 @@ import tools.lena_autonomy_runtime_evidence_v1 as runtime_evidence
         ("2026-07-31", "morning_state.json"),
         ("2026-07-31", "afternoon_skip_190829_593524.json"),
         ("2026-07-31", "evening_generation_failure_190829_593524.json"),
+        ("2026-07-31", "morning_generation_blocked_190829_593524.json"),
         ("2026-07-31", "morning_generation_190829_593524.json"),
         ("2026-07-31", "morning_generation_success_190829_593524.json"),
+        ("2026-07-31", "morning_publish_blocked_190829_593524.json"),
         ("2026-07-31", "evening_poll_201430_060159.json"),
     ],
 )
