@@ -93,6 +93,23 @@ def test_hpe_must_cover_exactly_eight_seconds(tmp_path: Path) -> None:
     assert "hpe_timeline_duration_mismatch" in issue_codes(validate_video_root(root))
 
 
+def test_hpe_segments_must_use_exact_two_second_windows() -> None:
+    def mutate(value):
+        for segment, (start_ms, end_ms) in zip(
+            value["timeline"],
+            ((0, 1000), (1000, 3000), (3000, 6000), (6000, 8000)),
+            strict=True,
+        ):
+            segment["start_ms"] = start_ms
+            segment["end_ms"] = end_ms
+
+    artifacts = mutated_loaded(PILOT_ROOT, "lena_video_hpe_v1", mutate)
+
+    assert "hpe_segment_window_mismatch" in _codes(
+        validate_source_for_compilation(artifacts)
+    )
+
+
 def test_static_performance_and_incomplete_gesture_are_rejected() -> None:
     def mutate(value):
         for segment in value["timeline"]:
@@ -196,6 +213,20 @@ def test_user_locked_concept_cannot_change_silently() -> None:
     assert "user_lock_changed" in _codes(validate_source_for_compilation(artifacts))
 
 
+def test_provider_neutral_requirements_reject_embedded_provider_names() -> None:
+    artifacts = mutated_loaded(
+        PILOT_ROOT,
+        "lena_video_camera_v1",
+        lambda value: value["provider_neutral_requirements"].__setitem__(
+            0, "Use Higgsfield-specific camera execution behavior."
+        ),
+    )
+
+    assert "provider_neutrality_violation" in _codes(
+        validate_source_for_compilation(artifacts)
+    )
+
+
 def test_spec_cost_ceiling_must_match_policy() -> None:
     artifacts = mutated_loaded(
         PILOT_ROOT,
@@ -218,6 +249,27 @@ def test_property_and_video_ids_must_match_across_artifacts() -> None:
     )
 
     assert "video_id_mismatch" in _codes(validate_cross_artifact_authority(artifacts))
+
+
+def test_documented_authority_edges_are_enforced_exactly() -> None:
+    artifacts = VideoArtifactStore(PILOT_ROOT).load_sources()
+    spec = artifacts["lena_video_spec_v1"]
+    data = deepcopy(spec.data)
+    data["upstream_artifacts"] = [
+        reference
+        for reference in data["upstream_artifacts"]
+        if reference["artifact_id"]
+        != artifacts["lena_video_policy_v1"].artifact_id
+    ]
+    artifacts["lena_video_spec_v1"] = replace(
+        spec,
+        data=data,
+        sha256=canonical_sha256(data),
+    )
+
+    assert "authority_upstream_mismatch" in _codes(
+        validate_cross_artifact_authority(artifacts)
+    )
 
 
 def test_circular_authority_is_rejected() -> None:

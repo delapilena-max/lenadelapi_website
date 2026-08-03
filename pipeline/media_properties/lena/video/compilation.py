@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .artifacts import LoadedArtifact
+from .artifacts import SOURCE_TYPES, LoadedArtifact
 from .contracts import (
     CHARACTER_ELEMENT_TOKEN,
     CHARACTER_ELEMENT_UUID,
@@ -74,8 +74,11 @@ def compile_generation_plan(
         "created_at": created_at,
         "generator_version": PLAN_COMPILER_VERSION,
         "upstream_artifacts": [
-            {"artifact_id": item.artifact_id, "sha256": item.sha256}
-            for item in sources.values()
+            {
+                "artifact_id": sources[artifact_type].artifact_id,
+                "sha256": sources[artifact_type].sha256,
+            }
+            for artifact_type in SOURCE_TYPES
         ],
         "validation_status": "validated",
         "character_element_requirement": {

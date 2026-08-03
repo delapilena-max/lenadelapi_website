@@ -39,6 +39,33 @@ ARTIFACT_FILES: dict[str, str] = {
 }
 SCHEMA_FILES = {key: f"{key}.schema.json" for key in ARTIFACT_FILES}
 SOURCE_TYPES = tuple(list(ARTIFACT_FILES)[:9])
+EXPECTED_UPSTREAM_TYPES: dict[str, tuple[str, ...]] = {
+    "lena_video_character_authority_v1": (),
+    "lena_video_policy_v1": (),
+    "lena_video_business_intent_v1": (),
+    "lena_video_spec_v1": (
+        "lena_video_character_authority_v1",
+        "lena_video_policy_v1",
+        "lena_video_business_intent_v1",
+    ),
+    "lena_video_hpe_v1": ("lena_video_spec_v1",),
+    "lena_video_environment_v1": ("lena_video_spec_v1",),
+    "lena_video_wardrobe_v1": ("lena_video_spec_v1",),
+    "lena_video_camera_v1": ("lena_video_spec_v1",),
+    "lena_video_audio_plan_v1": ("lena_video_spec_v1",),
+    "lena_video_generation_plan_v1": SOURCE_TYPES,
+    "lena_higgsfield_compiled_request_v1": ("lena_video_generation_plan_v1",),
+    "lena_video_manifest_v1": ("lena_higgsfield_compiled_request_v1",),
+    "lena_video_qa_v1": (
+        "lena_video_generation_plan_v1",
+        "lena_higgsfield_compiled_request_v1",
+        "lena_video_manifest_v1",
+    ),
+    "lena_video_learning_v1": (
+        "lena_video_manifest_v1",
+        "lena_video_qa_v1",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -271,7 +298,34 @@ def validate_cross_artifact_authority(
     if len(governed_dates) != 1:
         issues.append(_issue("governed_date_mismatch", "All artifacts must share one governed date.", actual=sorted(governed_dates)))
     graph: dict[str, list[str]] = {artifact_id: [] for artifact_id in by_id}
-    for loaded in artifacts.values():
+    for artifact_type, loaded in artifacts.items():
+        expected_types = EXPECTED_UPSTREAM_TYPES[artifact_type]
+        unavailable_types = [
+            expected_type
+            for expected_type in expected_types
+            if expected_type not in artifacts
+        ]
+        expected_ids = [
+            artifacts[expected_type].artifact_id
+            for expected_type in expected_types
+            if expected_type in artifacts
+        ]
+        actual_ids = [
+            reference["artifact_id"]
+            for reference in loaded.data["upstream_artifacts"]
+        ]
+        if unavailable_types or actual_ids != expected_ids:
+            issues.append(
+                _issue(
+                    "authority_upstream_mismatch",
+                    "Artifact upstream edges do not match the governed A-N authority graph.",
+                    artifact_id=loaded.artifact_id,
+                    field_path="$/upstream_artifacts",
+                    expected=expected_ids,
+                    actual=actual_ids,
+                    source_file=loaded.relative_path,
+                )
+            )
         for index, reference in enumerate(loaded.data["upstream_artifacts"]):
             upstream = by_id.get(reference["artifact_id"])
             if upstream is None:

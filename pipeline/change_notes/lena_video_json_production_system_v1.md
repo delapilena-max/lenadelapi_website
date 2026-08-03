@@ -59,13 +59,13 @@ access, no SpaceX affiliation, and no execution authority.
 
 All commands used `C:\Python314\python.exe` with bytecode/cache writes disabled.
 
-- New Lena video JSON ring: `68 passed, 2 skipped`. Both skips are real-symlink
+- New Lena video JSON ring: `73 passed, 2 skipped`. Both skips are real-symlink
   creation cases unavailable to this non-elevated Windows process; traversal,
   local-reference confinement, root safety, and fail-closed escape tests passed.
 - Directly affected shared ring: `85 passed`, covering all ITB tests after the
   neutral extraction, the Lena strategy-policy and active-provider contracts,
   and the full existing Higgsfield prompt-budget authority audit.
-- Consolidated affected verification ring: `153 passed, 2 skipped`.
+- Consolidated affected verification ring: `158 passed, 2 skipped`.
 - File-aware source compilation: 19 changed Python files passed.
 - Import smoke: 11 neutral, ITB, Lena, and CLI modules passed.
 - Complete pilot validation: 14 artifacts, zero errors.
@@ -77,6 +77,17 @@ All commands used `C:\Python314\python.exe` with bytecode/cache writes disabled.
 
 No provider, network, generation, publishing, scheduler, video execution,
 Anthropic, credential, or live photo-lane action occurred.
+
+## Final Adversarial Review Correction
+
+The merge review added exact A-N upstream-edge enforcement, exact four-by-two-
+second HPE windows, provider-name rejection inside provider-neutral requirement
+text, source-mapping-order-independent compilation, and an exact outgoing UTF-8
+prompt-byte proof. The governed Pilot plan SHA, request SHA, fingerprint, prompt,
+and all A-N JSON artifacts remain unchanged. The outgoing prompt is exactly
+3,997 ASCII characters and UTF-8 bytes with LF separators, no repository
+wrapper, and 99 characters/bytes of headroom against the 4,096-character
+repository execution policy.
 
 ## Next Authorized Step
 

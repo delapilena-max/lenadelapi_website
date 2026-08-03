@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.media_properties.lena.video.artifacts import VideoArtifactStore
+from pipeline.media_properties.lena.video.compilation import compile_generation_plan
 from pipeline.media_properties.lena.video.compiler import compile_video
 from pipeline.media_properties.lena.video.contracts import (
     CHARACTER_ELEMENT_TOKEN,
@@ -54,6 +55,13 @@ def test_repeated_compilation_is_byte_equivalent_and_matches_checked_in_outputs(
     assert request_a == checked_request
     assert canonical_sha256(plan_a) == "a219ca9f40b2210542a2ba67828b50dd830c46b59e3813e6018eec420f794970"
     assert canonical_sha256(request_a) == "6f80fc07960ddf4a15e62157ae9b3f75e4baf9166c25ef2fdd8985a0f45fcc36"
+
+
+def test_compilation_ignores_source_mapping_insertion_order() -> None:
+    sources = VideoArtifactStore(PILOT_ROOT).load_sources()
+    reversed_sources = dict(reversed(tuple(sources.items())))
+
+    assert compile_generation_plan(reversed_sources) == compile_generation_plan(sources)
 
 
 def test_generation_plan_is_provider_neutral_and_execution_disabled() -> None:
@@ -114,6 +122,22 @@ def test_prompt_contains_full_executable_timeline_and_production_authority() -> 
         assert required in prompt
     assert len(prompt) == 3997
     assert len(prompt) <= 4096
+
+
+def test_exact_provider_prompt_bytes_have_no_wrapper_or_encoding_growth() -> None:
+    _, request = compile_video(PILOT_ROOT)
+    exact_prompt = request["exact_compiled_prompt"]
+    outgoing_prompt = request["provider_arguments"]["prompt"]
+    exact_bytes = exact_prompt.encode("utf-8")
+    outgoing_bytes = outgoing_prompt.encode("utf-8")
+
+    assert exact_prompt.isascii()
+    assert outgoing_prompt == exact_prompt
+    assert outgoing_bytes == exact_bytes
+    assert len(outgoing_bytes) == len(exact_prompt) == 3997
+    assert outgoing_bytes.startswith(CHARACTER_ELEMENT_TOKEN.encode("utf-8") + b"\n")
+    assert b"\r" not in outgoing_bytes
+    assert len(outgoing_bytes) <= request["prompt_char_budget"]
 
 
 def test_negative_prompt_contains_quality_and_safety_rejections() -> None:

@@ -25,6 +25,7 @@ from .contracts import (
 
 FINAL_STATES = {"final", "published"}
 PROVIDER_TERMS = ("higgsfield", "seedance", "kling", "runway", "veo", "meta", "anthropic")
+HPE_WINDOWS = ((0, 2000), (2000, 4000), (4000, 6000), (6000, 8000))
 
 
 def _issue(
@@ -55,6 +56,18 @@ def _at_pointer(value: Any, pointer: str) -> Any:
         token = raw.replace("~1", "/").replace("~0", "~")
         current = current[int(token)] if isinstance(current, list) else current[token]
     return current
+
+
+def _provider_terms_in_text(text: str) -> list[str]:
+    return sorted(
+        term
+        for term in PROVIDER_TERMS
+        if re.search(
+            rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])",
+            text,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _validate_character(character: LoadedArtifact) -> list[Issue]:
@@ -101,6 +114,19 @@ def _validate_hpe(hpe: LoadedArtifact, policy: LoadedArtifact) -> list[Issue]:
     issues: list[Issue] = []
     expected_start = 0
     for index, segment in enumerate(segments):
+        if index < len(HPE_WINDOWS):
+            actual_window = (segment["start_ms"], segment["end_ms"])
+            if actual_window != HPE_WINDOWS[index]:
+                issues.append(
+                    _issue(
+                        "hpe_segment_window_mismatch",
+                        "Each HPE beat must occupy its exact governed two-second window.",
+                        hpe,
+                        field_path=f"$/timeline/{index}",
+                        expected=list(HPE_WINDOWS[index]),
+                        actual=list(actual_window),
+                    )
+                )
         if segment["start_ms"] != expected_start:
             code = "hpe_timeline_overlap" if segment["start_ms"] < expected_start else "hpe_timeline_gap"
             issues.append(_issue(code, "HPE timeline must be contiguous and non-overlapping.", hpe, field_path=f"$/timeline/{index}/start_ms", expected=expected_start, actual=segment["start_ms"]))
@@ -270,11 +296,7 @@ def _validate_provider_prompt_cues(
     )
     issues: list[Issue] = []
     for artifact, field_path, cue in cues:
-        leaked = sorted(
-            term
-            for term in PROVIDER_TERMS
-            if re.search(rf"\b{re.escape(term)}\b", cue, re.IGNORECASE)
-        )
+        leaked = _provider_terms_in_text(cue)
         if leaked:
             issues.append(
                 _issue(
@@ -288,6 +310,35 @@ def _validate_provider_prompt_cues(
     return issues
 
 
+def _validate_provider_neutral_requirements(
+    artifacts: Mapping[str, LoadedArtifact],
+) -> list[Issue]:
+    issues: list[Issue] = []
+    for artifact_type in (
+        "lena_video_spec_v1",
+        "lena_video_environment_v1",
+        "lena_video_wardrobe_v1",
+        "lena_video_camera_v1",
+        "lena_video_audio_plan_v1",
+    ):
+        artifact = artifacts[artifact_type]
+        for index, requirement in enumerate(
+            artifact.data["provider_neutral_requirements"]
+        ):
+            leaked = _provider_terms_in_text(requirement)
+            if leaked:
+                issues.append(
+                    _issue(
+                        "provider_neutrality_violation",
+                        "Provider-neutral requirements cannot name a provider or model route.",
+                        artifact,
+                        field_path=f"$/provider_neutral_requirements/{index}",
+                        actual=leaked,
+                    )
+                )
+    return issues
+
+
 def _validate_plan(
     plan: LoadedArtifact,
     artifacts: Mapping[str, LoadedArtifact],
@@ -295,7 +346,7 @@ def _validate_plan(
     data = plan.data
     issues: list[Issue] = []
     serialized = json.dumps(data, sort_keys=True).lower()
-    leaked = sorted(term for term in PROVIDER_TERMS if f'"{term}"' in serialized)
+    leaked = _provider_terms_in_text(serialized)
     if leaked:
         issues.append(_issue("provider_neutrality_violation", "Provider-neutral plan contains a provider identity.", plan, actual=leaked))
     if data["execution_authorized"]:
@@ -449,6 +500,7 @@ def validate_source_for_compilation(
     issues.extend(_validate_camera(camera))
     issues.extend(_validate_spec_and_locks(spec, artifacts))
     issues.extend(_validate_provider_prompt_cues(artifacts))
+    issues.extend(_validate_provider_neutral_requirements(artifacts))
     return issues
 
 
