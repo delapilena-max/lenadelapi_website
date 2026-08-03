@@ -95,3 +95,65 @@ Review this source-only pull request and merge only after green CI and explicit
 authorization. Provider integration, paid generation, voice, music, editing,
 caption selection, scheduling, publishing, and learning ingestion remain
 separate future tasks.
+
+## 2026-08-03 Fresh Creative Authority Addendum
+
+The SpaceX Pilot chain remains one immutable example episode, not a reusable
+production prompt. A follow-up offline source slice adds the missing governed
+creative-generation layer so future Lena video production can mint a fresh
+provisional creative JSON authority, deterministic compiled prompt, hashes,
+fingerprint, and attempt artifact for each new content unit before any
+provider-bound authorization is considered.
+
+Root cause corrected at architecture level:
+
+- The V1 Pilot proved schema validation, cross-artifact validation, deterministic
+  compilation, and prompt/request hashing.
+- It did not yet provide a governed layer that creates a new per-video creative
+  authority for each daily unit.
+- Without that layer, an immutable compiled Pilot prompt could be mistaken for a
+  production template.
+
+The new offline layer records:
+
+- structured-JSON-only LLM instruction authority;
+- provisional creative JSON generation;
+- deterministic provider-request compilation;
+- prompt SHA, request SHA, plan SHA, and fingerprint;
+- prompt transport proof that the Lena Character Element token remains first;
+- daily novelty checks across recent concept, environment, wardrobe, gesture,
+  emotional arc, camera grammar, hook, CTA, audio, and ending-pose fields;
+- prompt-reuse blocking for new provider create calls;
+- immutable attempt artifact construction with superseded-attempt, prior-job,
+  previous-QA, creative-change, prompt, request, authorization, and retry fields.
+
+Prompt reuse is allowed only for same-provider-job recovery, reconciliation of
+the same ambiguous submission, downloading or validating the same result, or
+deterministic recompilation of the same immutable attempt. A QA-rejected attempt
+may not be rerun under the old prompt as a new provider create call.
+
+Three offline example packages were added under
+`pipeline/video/lena/examples/2026-08-04/`:
+
+- Example 01 SpaceX prompt SHA:
+  `1b399f011751e9336f1b7ef05657097c1ed5eb0ddeec4f6fa2cb3157a37cb323`
+- Example 02 night-market dessert prompt SHA:
+  `e9faa2594b5b11c085cb3484e4726fcf636a712430209cb6f983fbf860759753`
+- Example 03 rainy balcony reset prompt SHA:
+  `b53d795087e569a8a1fa0eaff76a69ae9316b578afe58d12355a970365afb8dc`
+
+All three prompts differ. All three keep the static Lena Character Element token
+first. No provider call, media generation, queue action, publication, scheduler,
+credential, `.env`, Anthropic, live photo-lane, or historical evidence mutation
+occurred.
+
+Validation:
+
+- fresh-video suite: `11 passed`;
+- compileall for new video module, CLI, and tests: passed;
+- owned-file `git diff --check`: passed;
+- adjacent clean-branch checks:
+  - retry generation approval: `12 passed`;
+  - human rejection recorder: `14 passed`;
+  - Higgsfield generation approval: `115 passed`;
+- PR `#139`: mergeable, GitHub `build` pass, GitHub `main_ci_check` pass.

@@ -551,3 +551,67 @@ D. Decisions made
 - Treat normal scheduler evidence as allowed runtime dirt for readiness, but continue reporting every excluded path, count, and root transparently.
 - Do not enable, disable, or start the scheduler from Codex.
 - Do not generate, queue, publish, reconcile, invoke Anthropic, or touch video.
+
+## Addendum (Codex, 2026-08-03) - fresh Lena video creative authority prevents Pilot prompt reuse
+
+A. What changed
+
+- Added an offline Lena video creative-generation layer so every new video content unit can receive a fresh provisional creative JSON authority before deterministic prompt compilation.
+- Added the LLM instruction authority for structured JSON only; it cannot validate itself, calculate trusted hashes, authorize execution, reuse a prior prompt, silently change locked input, mutate learning, call providers, queue, or publish.
+- Added deterministic compilation, prompt SHA, request SHA, plan SHA, fingerprint, prompt-transport proof, novelty checks, prompt-reuse blocking, and immutable attempt artifact construction.
+- Added prompt-reuse rules that allow exact reuse only for same-job recovery, same ambiguous-submission reconciliation, same-result download/validation, or deterministic recompilation of the same immutable attempt.
+- Added attempt-versioning rules so a QA-rejected attempt cannot be rerun under the old compiled prompt as a new provider create call.
+- Added three offline example packages: SpaceX pilot Example 01 plus two unrelated examples proving distinct concept, environment, wardrobe, HPE action, camera grammar, and prompt hashes.
+
+B. Files changed
+
+- `pipeline/video/__init__.py`
+- `pipeline/video/lena_video_creative_generation_v1.py`
+- `pipeline/video/lena/creative_authority/lena_video_creative_generator_instruction_v1.json`
+- `pipeline/video/lena/examples/2026-08-04/example-01-spacex-launch/attempt_001/*`
+- `pipeline/video/lena/examples/2026-08-04/example-02-night-market-dessert/attempt_001/*`
+- `pipeline/video/lena/examples/2026-08-04/example-03-rainy-balcony-reset/attempt_001/*`
+- `tools/lena_build_fresh_video_package_v1.py`
+- `tests/test_lena_video_fresh_creative_generation_v1.py`
+- `pipeline/change_notes/NEXT_SESSION_START.md`
+- `pipeline/change_notes/lena_video_json_production_system_v1.md`
+
+C. Validations run
+
+- `python -B -m pytest -p no:cacheprovider tests/test_lena_video_fresh_creative_generation_v1.py -q`
+  - Result: `11 passed`
+- `python -B -m compileall pipeline\video tools\lena_build_fresh_video_package_v1.py tests\test_lena_video_fresh_creative_generation_v1.py`
+  - Result: passed
+- `git diff --check` on owned files
+  - Result: passed
+- Adjacent clean-branch checks:
+  - `tests/test_lena_higgsfield_retry_generation_approval_v1.py`: `12 passed`
+  - `tests/test_lena_record_human_rejection_v1.py`: `14 passed`
+  - `tests/test_lena_higgsfield_generation_approval_v1.py`: `115 passed`
+- Pull request `#139` against `main` is mergeable and GitHub checks passed:
+  - `build`: pass
+  - `main_ci_check`: pass
+
+D. Decisions made
+
+- Root cause: the SpaceX Pilot dataset was a single immutable example episode with validators and deterministic compilers, but no upstream governed creative-generation layer that minted fresh per-video JSON authority before each new provider create call.
+- The SpaceX Pilot prompt remains valid only as an immutable example or for same-attempt recovery/reconciliation/validation/recompile; it must not become a reusable production prompt.
+- Keep this as an offline source/authority slice; no live executor, queue, publication, learning mutation, or photo-lane routing changed.
+- Use PR `#139` as the clean review target; conflicting PR `#138` was closed.
+
+E. Blockers / parked branches
+
+- No provider execution is authorized by this checkpoint.
+- No automatic live-video engine integration is completed here; this is the creative authority and guard layer only.
+- Legacy checkpoint-skill files `lena_filesystem_native_agent_pivot_master.md` and `lena_agentic_pivot_changelog.md` are absent from current `origin/main`; this checkpoint updates the current `NEXT_SESSION_START.md` plus the current video JSON production change note instead.
+
+F. Next approved step
+
+- Review and merge PR `#139` if the implementation and CI remain acceptable.
+- After merge, wire future daily video planning through this fresh creative authority before any provider-bound request is considered.
+
+G. What must not be done
+
+- Do not reuse the SpaceX Pilot compiled prompt for a new provider create call.
+- Do not rerun a QA-rejected attempt under the old prompt as a new create call.
+- Do not generate media, spend credits, create queue entries, publish, invoke Anthropic, edit `.env`, or mutate the live photo lane from this slice.
